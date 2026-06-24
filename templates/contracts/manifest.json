@@ -1,0 +1,51 @@
+{
+  "templates": [
+    {
+      "filename": "kontrate-me-afat-te-caktuar.docx",
+      "name": "Kontrate me Afat te Caktuar",
+      "templateSubtype": "AFAT_I_CAKTUAR",
+      "fields": [
+        "company_name",
+        "authorized_person_name",
+        "employee_name",
+        "employee_position",
+        "company_address",
+        "contract_start_date",
+        "contract_end_date",
+        "employment_start_date",
+        "probation_end_date",
+        "daily_hours",
+        "weekly_hours",
+        "salary_gross",
+        "travel_compensation",
+        "document_date",
+        "document_place",
+        "authorized_person_name",
+        "employee_name"
+      ]
+    },
+    {
+      "filename": "kontrate-me-afat-te-pacaktuar.docx",
+      "name": "Kontrate me Afat te Pacaktuar",
+      "templateSubtype": "AFAT_I_PACAKTUAR",
+      "fields": [
+        "company_name",
+        "authorized_person_name",
+        "employee_name",
+        "employee_position",
+        "company_address",
+        "contract_start_date",
+        "employment_start_date",
+        "probation_end_date",
+        "daily_hours",
+        "weekly_hours",
+        "salary_gross",
+        "travel_compensation",
+        "document_date",
+        "document_place",
+        "authorized_person_name",
+        "employee_name"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+---
+description: After Prisma/schema/migration changes or DB column drift errors, deploy migrations, regenerate client, clear Next cache — run commands in the workspace; do not delegate to the user.
+alwaysApply: true
+---
+
+# Prisma & Next cache sync (PagaPRO)
+
+When **any** of the following happen:
+
+- `schema.prisma` or files under `prisma/migrations/` were added or edited
+- Fixing `PrismaClientKnownRequestError` about missing/unknown columns, enums, or drift vs the database
+- User reports stale types, wrong SQL shape, or “column does not exist” after a merge
+
+**Execute in the project root** (unless DATABASE_URL is unavailable — then say so):
+
+1. `npx prisma migrate deploy` (or `npm run db:deploy`)
+2. `npx prisma generate` (redundant with `npm run dev` only after `predev` exists — still run explicitly after migrations if unsure)
+3. Remove the Next.js build cache: delete the `.next` directory, or run `npm run dev:clean` when starting dev is acceptable
+
+Do **not** only list these steps for the user — **run them** when you have shell access and a valid `DATABASE_URL`.
+
+CI note: ensure deploy pipelines run `prisma migrate deploy` before build; local agents cannot push to remote CI — mention only if the fix requires pipeline changes.

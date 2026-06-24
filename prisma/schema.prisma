@@ -1,0 +1,2119 @@
+// PagaPRO — PostgreSQL schema (Kosovo payroll–oriented, multi-company ready)
+// Run: npx prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum CurrencyCode {
+  EUR // Kosovo operational reality + accounting norm
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum CompanyMembershipRole {
+  OWNER
+  ADMIN
+  HR_MANAGER
+  ACCOUNTANT
+  READ_ONLY
+}
+
+enum EmploymentType {
+  EMPLOYEE // subject to Kosovo withholding + pension per parameter set
+  CONTRACTOR // gross-out; PIT & pension amounts expected to be 0 at entry level
+}
+
+enum EmployerPrimacy {
+  PRIMARY // progressive ATK brackets (punëdhënës kryesor)
+  SECONDARY // flat withholding at source for chosen secondary employer (ATK 10% default)
+}
+
+enum SecondaryEmployerPitBase {
+  TAXABLE_AFTER_PENSION
+  GROSS
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE /// Jo aktiv — nuk është larguar zyrtarisht
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNSPECIFIED
+}
+
+/// Append-only employment events for HR history & audits (complements EmploymentPeriod segments).
+enum EmployeeHistoryEventKind {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  ARCHIVED
+  TERMINATED
+}
+
+enum PayrollPeriodStatus {
+  DRAFT
+  REVIEWED // në shqyrtim — pa ndryshime
+  APPROVED // i miratuar për kyçje
+  LOCKED // immutable — entries të ngrira
+  ARCHIVED // arkiv historik pas kyçjes
+}
+
+enum CompensationBasis {
+  GROSS_MONTHLY
+  TARGET_NET_MONTHLY
+}
+
+enum PayrollCorrectionKind {
+  NET_ADJUSTMENT
+  GROSS_ADJUSTMENT
+  TAX_ADJUSTMENT
+  PENSION_ADJUSTMENT
+  OTHER
+}
+
+enum PayrollAdjustmentKind {
+  BONUS
+  DEDUCTION
+  EMPLOYER_CONTRIBUTION
+}
+
+enum PayrollDocumentKind {
+  REGISTER_WITH_TOTALS
+  REGISTER_SIGNATURE_LIST
+  EMPLOYEE_PAYSLIP
+}
+
+enum PayrollEntryStatus {
+  DRAFT
+  FINAL
+}
+
+enum PayslipDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum LeaveType {
+  PUSHIM_VJETOR
+  PUSHIM_MJEKESOR
+  PUSHIM_PERSONAL
+  PUSHIM_PA_PAGESE
+  PUSHIM_LEHONIE
+  TJETER
+}
+
+/// Kosovo Law 03/L-212 operational sub-types (Art 39 paid events, Art 50 paternity phases, maternity phase labels for payroll hooks).
+enum LeaveSubtype {
+  NONE
+  MARTESE
+  VDEKJE_FAMILJARE
+  LINDJE_FEMIJE
+  DHURIM_GJAKU
+  ATERSI_PAGUAR_2_DITE
+  ATERSI_PA_PAGESE_JAVE_2
+  LEHONI_FAZA_PUNEDHENESI_70
+  LEHONI_FAZA_QEVERIA_50
+  LEHONI_FAZA_FUNDIT_PA_PAGESE
+}
+
+enum LeaveRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ContractKind {
+  EMPLOYMENT
+  CONTRACTOR_AGREEMENT
+  AMENDMENT
+}
+
+/// Universal document family for templates + generation artifacts
+enum DocumentCategory {
+  CONTRACT
+  LEAVE
+  TERMINATION
+  WARNING
+  PAYROLL
+  OTHER
+}
+
+/// Polymorphic subject pointer (mirrors DocumentCategory)
+enum DocumentSubjectKind {
+  CONTRACT
+  LEAVE
+  TERMINATION
+  WARNING
+  PAYROLL
+  OTHER
+}
+
+/// Only meaningful when DocumentTemplate.documentCategory = CONTRACT
+enum DocumentTemplateSubtype {
+  AFAT_I_CAKTUAR // fixed-term
+  AFAT_I_PACAKTUAR // open-ended / indefinite
+  KONTRATE_SPECIFIKE // specific / special-purpose agreement
+}
+
+enum DocumentSourceFormat {
+  DOCX
+  HTML_LEGACY // historic bodyHtml column
+  PDF // reserved — generation pipeline not implemented yet
+}
+
+enum TemplateDetectionMode {
+  PLACEHOLDER
+  BLANK_FIELDS
+  MIXED
+}
+
+enum DocumentGenerationStatus {
+  PENDING
+  RENDERING
+  SUCCEEDED
+  FAILED
+}
+
+enum DocumentGenerationArtifactKind {
+  PREVIEW
+  ARCHIVED_FINAL
+}
+
+enum DisciplinaryWarningStatus {
+  DRAFT
+  ISSUED
+  VOID
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  SUPERSEDED
+  TERMINATED
+}
+
+enum TerminationType {
+  LARGIM_VULLNETAR
+  PA_PARALAJMERIM
+  MARREVESHJE_E_DYANSHME
+  NGA_PUNEDHENESI
+  MANUAL
+}
+
+enum TerminationStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ReportOutputFormat {
+  PDF
+  XLSX
+  CSV
+}
+
+/// Raportet module — catalogued operational exports (stable keys for filters_json validation).
+enum ReportType {
+  LISTA_PUNONJESVE
+  PUNONJES_AKTIVE
+  PUNONJES_TE_LARGUAR
+  KONTRAKTORE
+  PUNONJES_SIPAS_DEPARTAMENTIT
+  PUNONJES_ME_DOKUMENTE_QE_MUNGOJNE
+  RAPORT_PAGAVE_MUJORE
+  LISTA_PAGAVE_ME_SUMA
+  LISTA_PER_NENSHKRIM_PA_SUMA
+  FINANCE_PAYROLL_WORKBOOK
+  ATK_EXPORT_WORKBOOK
+  TRUSTI_DHE_TATIMI
+  EMPLOYER_TOTAL_COST
+  SALARY_ADVANCE_DEDUCTIONS
+  PUSHIMET_SIPAS_PUNONJESIT
+  PUSHIMET_VJETORE_TE_SHFRYTEZUARA
+  PUSHIMET_NE_PRITJE
+  PUSHIMET_MJEKESORE
+  PUSHIMET_PA_PAGESE
+  BALANCA_E_PUSHIMEVE
+  CARRY_OVER_LEAVE
+  DOKUMENTET_E_GJENERUARA
+  KONTRATA_AKTIVE
+  KONTRATA_AFER_SKADIMIT
+  DOKUMENTET_SIPAS_PUNONJESIT
+  TEMPLATES_TE_PERDORURA
+  LARGIMET_SIPAS_MUAJIT
+  LARGIMET_SIPAS_ARSYEVE
+  FINAL_PAYROLL_REPORTS
+  DOKUMENTET_E_LARGIMIT
+}
+
+enum ReportExportAction {
+  GENERATED
+  DOWNLOADED
+  REGENERATED
+  ARCHIVED
+  PREVIEWED
+}
+
+enum WorkArrangement {
+  ON_SITE
+  REMOTE
+  HYBRID
+}
+
+enum EmploymentPeriodReason {
+  HIRE
+  REHIRE
+  TERMINATION
+  CORRECTION
+}
+
+enum TimelineEventSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+/// Payroll calendar — how the holiday was introduced (HR-visible).
+enum CompanyHolidayCategory {
+  KOSOVO_OFFICIAL_FIXED
+  KOSOVO_OFFICIAL_MOVABLE
+  COMPANY_CUSTOM
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+  SMS
+}
+
+enum NotificationTopic {
+  CONTRACT_EXPIRING
+  PAYROLL_REMINDER
+  LEAVE_PENDING
+  SYSTEM_ALERT
+}
+
+/// Domain-level verbs for HR-readable activity rows (complements AuditLog technical actions).
+enum DomainActivityVerb {
+  CREATED
+  UPDATED
+  APPROVED
+  REJECTED
+  LOCKED
+  UNLOCKED
+  ARCHIVED
+  VOIDED
+}
+
+// -----------------------------------------------------------------------------
+// Companies & settings
+// -----------------------------------------------------------------------------
+
+model Company {
+  id        String @id @default(cuid())
+  legalName String
+  tradeName String?
+
+  /// Kosovo Business Registration Number (or successor identifier)
+  businessRegistrationNumber String? @unique
+
+  fiscalNumber String? @unique // taxpayer / fiscal reference where applicable (NUI)
+  status       CompanyStatus   @default(ACTIVE)
+
+  defaultCurrency CurrencyCode @default(EUR)
+  timezone        String       @default("Europe/Belgrade")
+
+  /// Registered / legal profile contact (distinct from letterhead line in CompanySetting)
+  email     String?
+  phone     String?
+  website   String?
+  addressLine String?
+  city        String?
+  postalCode  String?
+  country     String? @default("XK")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings             CompanySetting?
+  memberships          UserCompanyMembership[]
+  departments          Department[]
+  employees            Employee[]
+  payrolls             Payroll[]
+  payrollParameterSets PayrollParameterSet[]
+  documentTemplates    DocumentTemplate[]
+  contracts            Contract[]
+  leaveRequests        LeaveRequest[]
+  leaveBalances        LeaveBalance[]
+  terminations         Termination[]
+  disciplinaryWarnings DisciplinaryWarning[]
+  reportDefinitions    ReportDefinition[]
+  reportJobs           ReportJob[]
+  employeeTimelineEvents EmployeeTimelineEvent[]
+  domainActivities       DomainActivity[]
+  notificationOutboxes NotificationOutbox[]
+  notificationPreferences NotificationPreference[]
+  employmentPeriods      EmploymentPeriod[]
+  employeeEmploymentHistories EmployeeEmploymentHistory[]
+
+  configuration           CompanyConfiguration?
+  authorizedRepresentatives AuthorizedRepresentative[]
+  payrollSettings         PayrollSettings?
+  companyHolidays         CompanyHoliday[]
+  payrollSnapshots        PayrollSnapshot[]
+  payrollGeneratedDocs    PayrollGeneratedDocument[]
+  payrollCorrections      PayrollCorrection[]
+  documentGenerationArtifacts DocumentGenerationArtifact[]
+  documentTimelineEvents      DocumentTimelineEvent[]
+  leavePolicyParameterSets    LeavePolicyParameterSet[]
+  leaveAccrualLedgerEntries   LeaveAccrualLedger[]
+  payrollAtkExports           PayrollATKExport[]
+  terminationChecklists       TerminationChecklist[]
+  generatedReports            GeneratedReport[]
+  reportExportLogs            ReportExportLog[]
+
+  @@index([status])
+  @@map("companies")
+}
+
+/// Company-wide operational defaults consumed by payroll, documents, and leave flows (tenant-isolated).
+model CompanyConfiguration {
+  id String @id @default(cuid())
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Reference minimum wage — payroll validation should prefer active PayrollParameterSet; this is the configured company default.
+  minimumSalaryCurrent Decimal? @db.Decimal(14, 2)
+
+  /// Planned / announced minimum from 1 July (or next legal effective date) — used for projections and reminders.
+  minimumSalaryFromJuly1 Decimal? @db.Decimal(14, 2)
+
+  /// Total pension / “trust” contribution rate as percent (e.g. 10.0000 = 10%). Engine may split employee/employer from legislation.
+  trustContributionPercent Decimal? @db.Decimal(8, 4)
+
+  standardWeeklyHours Decimal? @db.Decimal(6, 2)
+
+  contractReferencePrefix String? @db.VarChar(48)
+  payrollPdfPrefix        String? @db.VarChar(48)
+  generalDocumentPrefix String? @db.VarChar(48)
+
+  annualLeaveDaysDefault   Decimal? @db.Decimal(6, 2)
+  personalLeaveDaysDefault Decimal? @db.Decimal(6, 2)
+  medicalLeavePolicyNote   String?  @db.Text
+
+  /// Company-level switches — notification worker filters on these before enqueueing.
+  notifyContractExpiring Boolean @default(true)
+  notifyPayrollReminders Boolean @default(true)
+  notifyLeaveApprovals   Boolean @default(true)
+  notifyEmployeeWarnings Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("company_configurations")
+}
+
+/// Legal representatives for signatures / stamps — extensible for multiple signatories per company.
+model AuthorizedRepresentative {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  sortOrder Int @default(0)
+
+  fullName String
+  position String?
+
+  signatureStorageKey String?
+  stampStorageKey     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, sortOrder])
+  @@map("authorized_representatives")
+}
+
+model CompanySetting {
+  id String @id @default(cuid())
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Minimum gross monthly salary enforced in app against active LegalParameterSet (stored here as cache optional)
+  enforceMinimumSalary Boolean @default(true)
+
+  /// Snapshot preference: payroll uses parameter set effective on period end date
+  payrollUseParameterEffectiveOn String @default("PERIOD_END") // PERIOD_END | PERIOD_START
+
+  /// Authorized signatory for contracts ({{authorized_person}})
+  authorizedRepresentativeName     String?
+  /// Job title / role ({{authorized_position}})
+  authorizedRepresentativePosition String?
+  /// Future: PNG scan of signature in object storage
+  authorizedSignatureStorageKey    String?
+
+  /// Future: stamp image in object storage (company seal)
+  authorizedStampStorageKey String?
+
+  /// Registered address line(s) for contracts / letters (letterhead; Company.addressLine is legal registry block)
+  companyAddressLine String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+// -----------------------------------------------------------------------------
+// Users & multi-company membership (RBAC anchor)
+// -----------------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  emailVerifiedAt DateTime?
+  status       UserStatus @default(INVITED)
+
+  displayName String?
+  locale      String      @default("sq")
+
+  /// bcrypt hash; null until the account is provisioned with credentials
+  passwordHash       String?
+  /// Platform-level super admin (backstage console) — not a per-company role
+  isPlatformAdmin    Boolean   @default(false)
+  /// Force password rotation on next login (temp passwords issued by admins)
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions          Session[]
+  memberships       UserCompanyMembership[]
+  linkedEmployees   Employee[]
+  lockedPayrolls    Payroll[]               @relation("PayrollLockedBy")
+  reviewedPayrolls  Payroll[]               @relation("PayrollReviewedBy")
+  approvedPayrolls  Payroll[]               @relation("PayrollApprovedBy")
+  archivedPayrolls  Payroll[]               @relation("PayrollArchivedBy")
+  payrollCorrectionsCreated PayrollCorrection[] @relation("PayrollCorrectionCreatedBy")
+  payrollSnapshotsCaptured PayrollSnapshot[] @relation("PayrollSnapshotCapturedBy")
+  payrollDocumentsGenerated PayrollGeneratedDocument[] @relation("PayrollDocumentGeneratedBy")
+  payrollAtkExportsGenerated PayrollATKExport[]       @relation("PayrollAtkExportGeneratedBy")
+  auditActors       AuditLog[]              @relation("AuditActor")
+  documentTemplateVersionsUploaded DocumentTemplateVersion[] @relation("DocumentTemplateVersionUploadedBy")
+  documentArtifactsCreated DocumentGenerationArtifact[] @relation("DocumentArtifactCreatedBy")
+  documentTimelineEventsCreated DocumentTimelineEvent[] @relation("DocumentTimelineCreatedBy")
+  timelineActorEvents     EmployeeTimelineEvent[]       @relation("TimelineActor")
+  domainActivitiesAuthored DomainActivity[]              @relation("DomainActivityActor")
+  notificationPreferences NotificationPreference[]
+  targetedNotifications   NotificationOutbox[]          @relation("NotificationTarget")
+  leaveRequestsCreated       LeaveRequest[]             @relation("LeaveCreatedBy")
+  terminationsApproved       Termination[]              @relation("TerminationApprovedBy")
+  terminationsCreated        Termination[]              @relation("TerminationCreatedBy")
+  terminationChecklistsDone  TerminationChecklist[]     @relation("TerminationChecklistCompletedBy")
+  generatedReports           GeneratedReport[]          @relation("GeneratedReportAuthor")
+  reportExportLogsPerformed  ReportExportLog[]         @relation("ReportExportLogActor")
+
+  @@index([status])
+  @@map("users")
+}
+
+/// Server-side login sessions — cookie stores the raw token, DB stores its sha256 hash.
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model UserCompanyMembership {
+  id String @id @default(cuid())
+
+  userId    String
+  companyId String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  role CompanyMembershipRole
+
+  isActive  Boolean   @default(true)
+  invitedAt DateTime?
+  acceptedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leaveRequestsDecided LeaveRequest[] @relation("LeaveDecidedBy")
+  timelineActorMembershipEvents EmployeeTimelineEvent[] @relation("TimelineActorMembership")
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@index([userId])
+  @@map("user_company_memberships")
+}
+
+// -----------------------------------------------------------------------------
+// Org structure & employees
+// -----------------------------------------------------------------------------
+
+model Department {
+  id   String @id @default(cuid())
+  name String
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+  employmentHistoryRecords EmployeeEmploymentHistory[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("departments")
+}
+
+model Employee {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  /// Optional link if employee signs in to a future portal
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  employmentType EmploymentType
+  status         EmploymentStatus @default(ACTIVE)
+
+  workArrangement WorkArrangement @default(ON_SITE)
+
+  employerPrimacy EmployerPrimacy @default(PRIMARY)
+
+  /// Optional hourly contract fields—when set, engine can validate hourly vs monthly minimum
+  hourlyRate           Decimal? @db.Decimal(14, 4)
+  standardMonthlyHours Decimal? @db.Decimal(8, 2)
+
+  firstName  String
+  lastName   String
+  /// Numri personal — unique brenda kompanisë
+  personalId String
+
+  dateOfBirth DateTime?
+  gender      Gender?
+
+  phone String?
+  email String?
+
+  hireDate           DateTime
+  terminationDate    DateTime?
+  terminationReason  String? @db.Text
+  jobTitle           String?
+
+  /// Orët kontraktuale javore (UI default 40)
+  weeklyHours Decimal @default(40) @db.Decimal(6, 2)
+
+  /// Stored monthly gross for employees; for contractors, interpret as agreed monthly fee baseline (still validated unless exempt)
+  baseSalaryMonthly Decimal @db.Decimal(14, 2)
+
+  compensationBasis CompensationBasis @default(GROSS_MONTHLY)
+
+  /// Target monthly net when compensationBasis = TARGET_NET_MONTHLY (engine solves gross / hourly basis from this).
+  targetNetMonthly Decimal? @db.Decimal(14, 2)
+
+  /// Contractors may bypass minimum salary checks when true
+  exemptFromMinimumSalary Boolean @default(false)
+
+  /// Parapaguesë: apliko pension/trust dhe tatimin në motorin e pagës (kontraktorët = false)
+  applyTrust Boolean @default(true)
+  applyTax   Boolean @default(true)
+
+  /// Emri i bankës (kopjim i shpejtë për UI; llogaria kryesore në EmployeeBankAccount)
+  bankName String?
+
+  /// Legacy convenience IBAN; prefer EmployeeBankAccount for normalized history.
+  bankAccountIban String?
+
+  /// Residential / mailing address for contracts ({{employee_address}})
+  addressLine    String?
+  addressCity    String?
+  addressCountry String? @default("XK")
+
+  internalNotes    String? @db.Text
+  documentsMissing Boolean @default(false)
+
+  /// Kosovo leave law — hazardous roles minimum 30 working days annual (Art 32.3)
+  isHazardousPosition Boolean @default(false)
+  /// Art 32.4 extra leave eligibility flags (HR-maintained)
+  isSingleParent       Boolean @default(false)
+  hasDisability        Boolean @default(false)
+  hasChildUnderThree   Boolean @default(false)
+  /// Optional anchor when legal tenure ≠ hireDate (collective agreements / transfers)
+  leaveTenureAnchorDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payrollEntries PayrollEntry[]
+  contracts      Contract[]
+  leaveRequests  LeaveRequest[]
+  leaveBalances  LeaveBalance[]
+  terminations   Termination[]
+  disciplinaryWarnings DisciplinaryWarning[]
+  employmentPeriods    EmploymentPeriod[]
+  bankAccounts         EmployeeBankAccount[]
+  emergencyContacts    EmployeeEmergencyContact[]
+  timelineEvents       EmployeeTimelineEvent[]
+  employmentHistoryRecords EmployeeEmploymentHistory[]
+  payrollGeneratedDocs PayrollGeneratedDocument[]
+  payrollInclusions    PayrollIncludedEmployee[]
+  payrollCorrections   PayrollCorrection[]
+  documentGenerationArtifacts DocumentGenerationArtifact[]
+  documentTimelineEvents      DocumentTimelineEvent[]
+  leaveAccrualLedgerEntries   LeaveAccrualLedger[]
+
+  @@unique([companyId, personalId])
+  @@index([companyId, lastName, firstName])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, employmentType])
+  @@index([companyId, email])
+  @@index([email])
+  @@index([userId])
+  @@map("employees")
+}
+
+/// HR employment history stream (position/status snapshots). Works alongside EmploymentPeriod legal segments.
+model EmployeeEmploymentHistory {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  occurredAt DateTime @default(now())
+
+  kind EmployeeHistoryEventKind
+
+  title       String
+  description String? @db.Text
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  jobTitle       String?
+  employmentType EmploymentType?
+  status         EmploymentStatus?
+
+  metadata Json?
+
+  @@index([companyId, employeeId, occurredAt(sort: Desc)])
+  @@index([companyId])
+  @@map("employee_employment_history")
+}
+
+/// Hire / re-hire / termination segments — authoritative employment history (use services to maintain consistency with Employee.status).
+model EmploymentPeriod {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  startedAt DateTime
+  endedAt   DateTime?
+
+  reason EmploymentPeriodReason
+
+  terminationId String?
+  termination   Termination? @relation(fields: [terminationId], references: [id], onDelete: SetNull)
+
+  note String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, employeeId, startedAt])
+  @@map("employment_periods")
+}
+
+model EmployeeBankAccount {
+  id String @id @default(cuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  iban              String
+  bankName          String?
+  accountHolderName String?
+  bicSwift          String?
+
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  isPrimary Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("employee_bank_accounts")
+}
+
+model EmployeeEmergencyContact {
+  id String @id @default(cuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  fullName     String
+  relationship String
+  phone        String
+  email        String?
+  notes        String? @db.Text
+
+  isPrimary Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("employee_emergency_contacts")
+}
+
+// -----------------------------------------------------------------------------
+// Kosovo-oriented payroll parameters (versioned, effective-dated)
+// -----------------------------------------------------------------------------
+
+/// Company-specific overrides layered on national defaults (national rows companyId = null optional — here scoped per company for simplicity & tenancy)
+model PayrollParameterSet {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  effectiveFrom DateTime // inclusive; find active set where effectiveFrom <= anchor date
+  effectiveTo   DateTime? // exclusive upper bound; null = open-ended
+
+  label String?
+
+  /// Kosovo legal minimum monthly wage at time of validity (validate Employee.baseSalaryMonthly against this when EmploymentType = EMPLOYEE)
+  minimumMonthlyWage Decimal @db.Decimal(14, 2)
+
+  /// Rates as decimal fractions: e.g. 0.05 = 5%
+  pensionEmployeeRate Decimal @db.Decimal(8, 6)
+  pensionEmployerRate Decimal @db.Decimal(8, 6)
+
+  /// Overtime/holiday/weekend multipliers (structure consumed by payroll calculation engine)
+  premiumRules Json?
+
+  /// Defaults: null → engine uses legislation snapshot default (10% for SECONDARY employer)
+  secondaryEmployerFlatRate Decimal? @db.Decimal(8, 6)
+
+  secondaryEmployerPitBase SecondaryEmployerPitBase?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pitBrackets PitBracket[]
+  payrolls    Payroll[]
+
+  @@index([companyId, effectiveFrom])
+  @@index([companyId, effectiveTo])
+  @@map("payroll_parameter_sets")
+}
+
+/// Progressive / bracket PIT model — Kosovo-aligned shape (bands maintained administratively)
+model PitBracket {
+  id String @id @default(cuid())
+
+  parameterSetId String
+  parameterSet   PayrollParameterSet @relation(fields: [parameterSetId], references: [id], onDelete: Cascade)
+
+  /// Lower bound inclusive (same currency as payroll — EUR)
+  fromAmount Decimal @db.Decimal(14, 2)
+  /// Upper bound inclusive; use very large upper for top bracket
+  toAmount   Decimal @db.Decimal(14, 2)
+  /// Marginal rate for this band as decimal fraction
+  rate       Decimal @db.Decimal(8, 6)
+  /// Flat deductible / allowance per band optional (extend later)
+  sequence   Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parameterSetId])
+  @@map("pit_brackets")
+}
+
+// -----------------------------------------------------------------------------
+// Monthly payroll shell & entries (locking)
+// -----------------------------------------------------------------------------
+
+model Payroll {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Calendar month payroll identifier (Kosovo monthly cycles)
+  year  Int
+  month Int // 1-12
+
+  currency CurrencyCode @default(EUR)
+
+  status PayrollPeriodStatus @default(DRAFT)
+
+  /// Weekdays Mon–Fri in month × 8h baseline (full-time); set when spreadsheet generated.
+  expectedWorkingDays    Int?
+  expectedRegularHours   Decimal? @db.Decimal(10, 2)
+
+  validatedAt       DateTime?
+  validationWarnings Json?
+
+  parameterSetId String?
+  parameterSet   PayrollParameterSet? @relation(fields: [parameterSetId], references: [id], onDelete: SetNull)
+
+  lockedAt DateTime?
+  lockedById String?
+  lockedBy   User?    @relation("PayrollLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewedBy   User?    @relation("PayrollReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  approvedAt DateTime?
+  approvedById String?
+  approvedBy   User?    @relation("PayrollApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  archivedAt DateTime?
+  archivedById String?
+  archivedBy   User?    @relation("PayrollArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries PayrollEntry[]
+  snapshot PayrollSnapshot?
+  generatedDocuments PayrollGeneratedDocument[]
+  includedEmployees PayrollIncludedEmployee[]
+  corrections PayrollCorrection[]
+  documentGenerationArtifacts DocumentGenerationArtifact[]
+  atkExports    PayrollATKExport[]
+  terminationsFinalPayroll Termination[] @relation("TerminationFinalPayroll")
+
+  @@unique([companyId, year, month])
+  @@index([companyId, status])
+  @@index([companyId, year, month])
+  @@index([status])
+  @@map("payrolls")
+}
+
+model PayrollIncludedEmployee {
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([payrollId, employeeId])
+  @@index([employeeId])
+  @@map("payroll_included_employees")
+}
+
+model PayrollCorrection {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  kind PayrollCorrectionKind
+
+  amount Decimal @db.Decimal(14, 2)
+
+  reason String @db.Text
+
+  createdByUserId String?
+  createdBy       User?   @relation("PayrollCorrectionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, payrollId])
+  @@index([payrollId, employeeId])
+  @@map("payroll_corrections")
+}
+
+model PayrollEntry {
+  id String @id @default(cuid())
+
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  status PayrollEntryStatus @default(DRAFT)
+
+  /// Frozen classification for audit trail — contractors must have zero withheld fields by application rule
+  employmentTypeSnapshot EmploymentType
+
+  employerPrimacySnapshot EmployerPrimacy @default(PRIMARY)
+
+  calendarDaysInMonth Int
+  paidDays            Decimal @db.Decimal(6, 2)
+
+  jobTitleSnapshot String?
+
+  compensationBasisSnapshot CompensationBasis?
+
+  contractGrossMonthlySnapshot Decimal? @db.Decimal(14, 2)
+  contractNetMonthlySnapshot   Decimal? @db.Decimal(14, 2)
+
+  expectedWorkingDays    Int?
+  expectedRegularHours   Decimal? @db.Decimal(10, 2)
+  actualRegularHours     Decimal @default(0) @db.Decimal(10, 2)
+
+  paidLeaveHours   Decimal @default(0) @db.Decimal(10, 2)
+  sickLeaveHours   Decimal @default(0) @db.Decimal(10, 2)
+  unpaidLeaveHours Decimal @default(0) @db.Decimal(10, 2)
+
+  /// Premium hours / amounts (frozen at calculation time)
+  overtimeHours   Decimal @default(0) @db.Decimal(10, 2)
+  overtimeAmount  Decimal @default(0) @db.Decimal(14, 2)
+  holidayHours    Decimal @default(0) @db.Decimal(10, 2)
+  holidayAmount   Decimal @default(0) @db.Decimal(14, 2)
+  weekendHours    Decimal @default(0) @db.Decimal(10, 2)
+  weekendAmount   Decimal @default(0) @db.Decimal(14, 2)
+  nightHours      Decimal @default(0) @db.Decimal(10, 2)
+  nightAmount     Decimal @default(0) @db.Decimal(14, 2)
+
+  hourlyRate Decimal @default(0) @db.Decimal(14, 6)
+
+  regularPay           Decimal @default(0) @db.Decimal(14, 2)
+  paidLeavePay         Decimal @default(0) @db.Decimal(14, 2)
+  sickLeavePay         Decimal @default(0) @db.Decimal(14, 2)
+  unpaidLeaveDeduction Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Bonuses increase taxable gross after premium stack (engine applies before statutory contributions).
+  bonuses Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Parapaguesë / zbritje të tjera (jo parapaguesë e veçantë)
+  otherDeductions Decimal @default(0) @db.Decimal(14, 2)
+
+  salaryAdvanceDeduction Decimal @default(0) @db.Decimal(14, 2)
+
+  manualGrossOverride Decimal? @db.Decimal(14, 2)
+  manualNetOverride   Decimal? @db.Decimal(14, 2)
+  manualGrossReason   String?
+  manualNetReason     String?
+
+  notes String? @db.Text
+
+  grossSalary           Decimal @db.Decimal(14, 2)
+  taxableIncome         Decimal @db.Decimal(14, 2)
+  pitWithheld           Decimal @db.Decimal(14, 2)
+  pensionEmployee       Decimal @db.Decimal(14, 2)
+  pensionEmployer       Decimal @db.Decimal(14, 2)
+  otherEmployerCosts    Decimal @default(0) @db.Decimal(14, 2)
+  netPay                Decimal @db.Decimal(14, 2)
+
+  employerTotalCost Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Calculation audit payload (brackets applied, rounding policy version, leave splits, etc.)
+  calculationBreakdown Json?
+
+  isLocked Boolean @default(false)
+
+  payslipDeliveryStatus PayslipDeliveryStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adjustments PayrollAdjustment[]
+
+  @@unique([payrollId, employeeId])
+  @@index([employeeId])
+  @@index([payrollId])
+  @@map("payroll_entries")
+}
+
+/// Company-scoped payroll operation parameters (loaded by engine — never hardcoded in UI).
+model PayrollSettings {
+  id String @id @default(cuid())
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  minimumSalaryMonthly Decimal @db.Decimal(14, 2)
+
+  /// Planned minimum (e.g. €500 from July) — engine picks by anchor date vs minimumSalaryScheduledEffectiveFrom
+  minimumSalaryScheduledAmount Decimal? @db.Decimal(14, 2)
+
+  minimumSalaryScheduledEffectiveFrom DateTime?
+
+  pensionEmployeePercent Decimal @db.Decimal(8, 6)
+  pensionEmployerPercent Decimal @db.Decimal(8, 6)
+
+  overtimeMultiplier Decimal @default(1.3) @db.Decimal(8, 4)
+  weekendMultiplier  Decimal @default(1.5) @db.Decimal(8, 4)
+  holidayMultiplier  Decimal @default(2.0) @db.Decimal(8, 4)
+
+  /// Premium për punë natën — nga PayrollSettings (motor + transparency)
+  nightWorkMultiplier Decimal @default(1.3) @db.Decimal(8, 4)
+
+  /// Orë për ditë pune standarde (full-time default 8) — `expected_hours = working_days × hoursPerWorkingDay`
+  hoursPerWorkingDay Decimal @default(8) @db.Decimal(6, 2)
+
+  /// Normë javore për përshkrimin e overtime (transparency / politikë — default 40h)
+  overtimeWeeklyThresholdHours Decimal @default(40) @db.Decimal(6, 2)
+
+  /// Paga e sëmurë si përqindje e normës (1 = 100 %)
+  sickLeavePayPercent Decimal @default(1) @db.Decimal(8, 6)
+
+  /// Oret maksimum javore të overtime për sinjal paralajmërimi (default 8 sipas kontekstit ligjor)
+  overtimeWeeklyCapHours Decimal @default(8) @db.Decimal(8, 2)
+
+  standardWeeklyHours Decimal @db.Decimal(6, 2)
+
+  /// Lista opsionale ISO `YYYY-MM-DD` për festa shtesë (per kompani / përditësime ligjore)
+  payrollExtraHolidayDates Json?
+
+  /// ISO `YYYY-MM-DD` që nuk trajtohen si festë zyrtare edhe nëse bien në kalendarin bazë
+  payrollExcludedHolidayDates Json?
+
+  /// Për transparency HR (default dritare tipike natë)
+  nightWorkPeriodDescription String @default("22:00–06:00") @db.VarChar(96)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payroll_settings")
+}
+
+/// Company-scoped yearly holiday calendar — drives expected working-day / regular-hour baselines.
+model CompanyHoliday {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Calendar year this configuration row belongs to (e.g. payroll year 2026).
+  calendarYear Int
+
+  /// Observed public holiday date (date-only semantics in UTC).
+  observedOn DateTime @db.Date
+
+  name String
+
+  category CompanyHolidayCategory
+
+  /// When false, the date is ignored for capacity / expected-hours calculations (still stored for audit).
+  isActive Boolean @default(true)
+
+  /// Stable code for imported Kosovo-fixed templates (dedupe on re-import).
+  sourceCode String? @db.VarChar(64)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, calendarYear, observedOn])
+  @@index([companyId, calendarYear])
+  @@map("company_holidays")
+}
+
+model PayrollAdjustment {
+  id String @id @default(cuid())
+
+  payrollEntryId String
+  payrollEntry   PayrollEntry @relation(fields: [payrollEntryId], references: [id], onDelete: Cascade)
+
+  kind PayrollAdjustmentKind
+  label String
+
+  amount Decimal @db.Decimal(14, 2)
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([payrollEntryId])
+  @@map("payroll_adjustments")
+}
+
+/// Immutable payroll archive captured at lock (JSON payload + linked PDF artifacts).
+model PayrollSnapshot {
+  id String @id @default(cuid())
+
+  payrollId String  @unique
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  capturedAt DateTime @default(now())
+
+  capturedByUserId String?
+  capturedBy       User?   @relation("PayrollSnapshotCapturedBy", fields: [capturedByUserId], references: [id], onDelete: SetNull)
+
+  payload Json
+
+  checksum String?
+
+  @@index([companyId])
+  @@map("payroll_snapshots")
+}
+
+model PayrollGeneratedDocument {
+  id String @id @default(cuid())
+
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  kind PayrollDocumentKind
+
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  storageKey String
+  filename   String
+
+  generatedAt DateTime @default(now())
+
+  generatedByUserId String?
+  generatedBy       User?   @relation("PayrollDocumentGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, payrollId])
+  @@index([payrollId, kind])
+  @@map("payroll_generated_documents")
+}
+
+/// ATK payroll declaration workbook (official Excel template + frozen blob).
+model PayrollATKExport {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  storageKey String
+  filename   String
+
+  /// Stable download path e.g. `/api/payroll/atk-exports/{id}`
+  generatedFileUrl String @map("generated_file_url")
+
+  snapshotHash String
+
+  isArchived Boolean @default(false)
+
+  metadataJson Json?
+
+  generatedByUserId String?
+  generatedBy       User?   @relation("PayrollAtkExportGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+  generatedAt DateTime @default(now())
+
+  @@index([companyId, payrollId])
+  @@index([payrollId, isArchived])
+  @@map("payroll_atk_exports")
+}
+
+// -----------------------------------------------------------------------------
+// Universal documents (templates, versions, artifacts) + employment Contract entity
+// -----------------------------------------------------------------------------
+
+/// Logical reusable template library row — DOCX blobs live on DocumentTemplateVersion.
+model DocumentTemplate {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// CONTRACT | LEAVE | TERMINATION | WARNING
+  documentCategory DocumentCategory @default(CONTRACT)
+
+  /// Only when documentCategory = CONTRACT (employment / contractor agreement kind)
+  contractKind ContractKind?
+
+  /// Only when documentCategory = CONTRACT — legal subtype (afat i caktuar, etc.)
+  templateSubtype DocumentTemplateSubtype?
+
+  /// Legacy merge-field HTML — superseded by DOCX versions for new uploads
+  bodyHtml String? @db.Text
+
+  isActive Boolean @default(true)
+
+  /// Stable key for Largimet DOCX routing (must match TerminationType); unique per company when set.
+  terminationWorkflowKey String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions  DocumentTemplateVersion[]
+  contracts Contract[]
+  generationArtifactsFromTemplate DocumentGenerationArtifact[] @relation("GenerationArtifactDocumentTemplate")
+
+  @@index([companyId])
+  @@index([companyId, documentCategory])
+  @@unique([companyId, terminationWorkflowKey])
+  @@map("document_templates")
+}
+
+model DocumentTemplateVersion {
+  id String @id @default(cuid())
+
+  templateId String
+  template   DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  versionNumber Int
+
+  sourceFormat DocumentSourceFormat @default(DOCX)
+
+  sourceStorageKey String
+  originalFilename String?
+
+  detectedPlaceholders Json?
+  /// Ordered placeholder keys matching underline blanks in the DOCX (1st blank → fields[0], …).
+  underlineFieldOrder Json?
+  /// How the template encodes fillable fields (tags, blanks, or both).
+  detectionMode TemplateDetectionMode?
+  /// Detected underscore blank metadata [{ index, xmlPart, originalText, paragraphPreview, suggestedKey? }].
+  detectedBlankFields Json?
+  /// Admin-confirmed mapping { blankFields: [...], placeholders: [...] }.
+  mappingJson Json?
+  isMapped Boolean @default(false)
+  placeholderSchemaVersion String @default("v1")
+
+  locale String @default("sq")
+
+  isPublished Boolean @default(false)
+
+  changelog String?
+  uploadedAt DateTime @default(now())
+
+  uploadedByUserId String?
+  uploadedBy       User?   @relation("DocumentTemplateVersionUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  contracts           Contract[]
+  generationArtifacts DocumentGenerationArtifact[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId, isPublished])
+  @@map("document_template_versions")
+}
+
+model Contract {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  documentTemplateId String?
+  documentTemplate   DocumentTemplate? @relation(fields: [documentTemplateId], references: [id], onDelete: SetNull)
+
+  documentTemplateVersionId String?
+  documentTemplateVersion   DocumentTemplateVersion? @relation(fields: [documentTemplateVersionId], references: [id], onDelete: SetNull)
+
+  kind   ContractKind
+  status ContractStatus @default(DRAFT)
+
+  referenceCode String?
+
+  effectiveDate DateTime
+  endDate       DateTime?
+
+  signedAt DateTime?
+
+  storedPdfUrl String?
+
+  generationStatus DocumentGenerationStatus @default(PENDING)
+  generationError  String?                  @db.Text
+
+  payload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([companyId, status])
+  @@index([companyId, status, endDate])
+  @@index([documentTemplateVersionId])
+  @@map("contracts")
+}
+
+/// Append-only immutable rows: never mutate file keys or mergedPayload after insert.
+/// Multiple ARCHIVED_FINAL rows per subject are allowed (regenerate = new row + optional supersedes link).
+model DocumentGenerationArtifact {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  payrollId String?
+  payroll   Payroll? @relation(fields: [payrollId], references: [id], onDelete: SetNull)
+
+  documentTemplateId String?
+  documentTemplate   DocumentTemplate? @relation("GenerationArtifactDocumentTemplate", fields: [documentTemplateId], references: [id], onDelete: SetNull)
+
+  subjectKind DocumentSubjectKind
+  subjectId   String
+
+  /// Denormalized from template for filtering (must match template.documentCategory)
+  documentCategory DocumentCategory
+
+  templateVersionId String
+  templateVersion   DocumentTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+
+  kind DocumentGenerationArtifactKind
+
+  title           String
+  displayFilename String
+
+  mergedPayload Json
+
+  detectedPlaceholderKeys Json?
+
+  /// Optional schema version for mergedPayload shape evolution (e-sign / QR hooks).
+  snapshotSchemaVersion String?
+
+  generatedDocxStorageKey String?
+  generatedPdfStorageKey  String?
+
+  docxSha256 String?
+  pdfSha256  String?
+
+  generationStatus DocumentGenerationStatus @default(SUCCEEDED)
+  generationError  String?                  @db.Text
+
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  supersedesArtifactId String?
+  supersedesArtifact   DocumentGenerationArtifact?  @relation("ArtifactSupersedesChain", fields: [supersedesArtifactId], references: [id], onDelete: SetNull)
+  supersededByArtifacts  DocumentGenerationArtifact[] @relation("ArtifactSupersedesChain")
+
+  createdAt DateTime @default(now())
+
+  createdByUserId String?
+  createdBy       User?   @relation("DocumentArtifactCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  leaveDocuments LeaveDocument[]
+  timelineEvents DocumentTimelineEvent[]
+  terminationsAsGenerated Termination[] @relation("TerminationGeneratedDocument")
+
+  @@index([subjectKind, subjectId, createdAt])
+  @@index([subjectKind, subjectId, kind])
+  @@index([templateVersionId])
+  @@index([companyId])
+  @@index([companyId, documentCategory])
+  @@index([companyId, employeeId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([companyId, payrollId])
+  @@index([documentTemplateId])
+  @@map("document_generation_artifacts")
+}
+
+/// Dokumentet-specific timeline rows (artifact-scoped); pair with EmployeeTimelineEvent when employee-linked.
+model DocumentTimelineEvent {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  generatedDocumentId String
+  generatedDocument   DocumentGenerationArtifact @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+
+  eventType String
+
+  metadata Json? @map("metadata_json")
+
+  createdAt DateTime @default(now())
+
+  createdByUserId String?
+  createdBy       User?   @relation("DocumentTimelineCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([generatedDocumentId])
+  @@index([companyId, employeeId])
+  @@map("document_timeline_events")
+}
+
+/// Canonical placeholder registry (seeded; merged at runtime with code defaults).
+model PlaceholderRegistry {
+  id String @id @default(cuid())
+
+  placeholderKey String @unique
+
+  label String
+
+  category String
+
+  exampleValue String?
+
+  description String?
+
+  isRequired Boolean @default(false)
+
+  /// Dot-path hint for resolver (e.g. employee.firstName).
+  sourcePath String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("placeholder_registry")
+}
+
+model DisciplinaryWarning {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  issuedAt DateTime @default(now())
+
+  summary String @db.Text
+
+  severity String?
+
+  status DisciplinaryWarningStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([companyId, status])
+  @@map("disciplinary_warnings")
+}
+
+// -----------------------------------------------------------------------------
+// Leave requests & balances (Pushimet — operational workflow; Kosovo Law 03/L-212 aligned engines)
+// -----------------------------------------------------------------------------
+
+/// Effective-dated tenant leave rule parameters (collective agreements, HR overrides).
+model LeavePolicyParameterSet {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  minimumAnnualWorkingDays      Decimal @default(20) @db.Decimal(6, 2)
+  hazardousMinimumWorkingDays   Decimal @default(30) @db.Decimal(6, 2)
+  monthlyAccrualDays            Decimal @default(1.666666666666667) @db.Decimal(14, 9)
+
+  tenureBonusEveryYears       Int     @default(5)
+  tenureBonusDaysPerBlock     Decimal @default(1) @db.Decimal(4, 2)
+  specialCategoryExtraDays    Decimal @default(2) @db.Decimal(4, 2)
+
+  firstYearGateMonths Int @default(6)
+
+  carryOverExpiryMonth Int @default(6)
+  carryOverExpiryDay   Int @default(30)
+
+  splitLeaveMinWorkingDays Int     @default(10)
+  enforceSplitLeaveRule    Boolean @default(false)
+
+  blockNegativeBalance       Boolean @default(true)
+  warnInsufficientBalance    Boolean @default(true)
+  warnSplitLeaveViolation    Boolean @default(true)
+  warnCarryOverExpiry        Boolean @default(true)
+
+  enableTenureBonus            Boolean @default(true)
+  enableSpecialCategoryExtra   Boolean @default(true)
+
+  collectiveAgreementJson Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, effectiveFrom])
+  @@map("leave_policy_parameter_sets")
+}
+
+/// Append-only monthly accrual postings for audit (Art 36 models).
+model LeaveAccrualLedger {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  periodYear  Int
+  periodMonth Int
+
+  accruedDays Decimal @db.Decimal(10, 4)
+  basisJson   Json
+  ruleVersion String
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, employeeId, periodYear, periodMonth])
+  @@map("leave_accrual_ledger")
+}
+
+model LeaveBalance {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  leaveType LeaveType
+
+  year Int
+
+  yearlyQuota    Decimal @db.Decimal(8, 2)
+  usedDays       Decimal @default(0) @db.Decimal(8, 2)
+  remainingDays  Decimal @db.Decimal(8, 2)
+  carryOverDays  Decimal @default(0) @db.Decimal(8, 2)
+
+  accruedYtd           Decimal @default(0) @db.Decimal(8, 2)
+  entitlementFullYear  Decimal? @db.Decimal(8, 2)
+  carryIn              Decimal @default(0) @db.Decimal(8, 2)
+  carryExpiresAt       DateTime?
+  computedFromRuleVersion String?
+  breakdown                 Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, employeeId, leaveType, year])
+  @@index([companyId, employeeId])
+  @@index([companyId, year])
+  @@index([employeeId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type    LeaveType
+  subtype LeaveSubtype @default(NONE)
+
+  status LeaveRequestStatus @default(DRAFT)
+
+  startDate DateTime
+  endDate   DateTime
+
+  /// Calendar-inclusive duration (all days in range).
+  totalDays Decimal? @db.Decimal(8, 2)
+
+  /// Mon–Fri working days excluding configured holidays (operational basis).
+  workingDays Decimal? @db.Decimal(8, 2)
+
+  /// Expected leave hours (workingDays × company daily norm unless overridden).
+  totalHours Decimal? @db.Decimal(10, 2)
+
+  isPaid         Boolean @default(true)
+  affectsPayroll Boolean @default(true)
+
+  reason           String? @db.Text
+  rejectionReason String? @db.Text
+
+  /// Art 34.2 sick-during-annual — linked interruption request (future workflow consumes).
+  interruptedByLeaveRequestId String?
+  interruptedBy               LeaveRequest? @relation("LeaveInterruption", fields: [interruptedByLeaveRequestId], references: [id], onDelete: SetNull)
+  interruptingLeaves          LeaveRequest[] @relation("LeaveInterruption")
+
+  /// Snapshot of superseded metrics when leave converted/interrupted (audit).
+  supersedesWorkingDaysSnapshot Json?
+
+  decidedAt DateTime?
+  decidedByMembershipId String?
+  decidedByMembership    UserCompanyMembership? @relation("LeaveDecidedBy", fields: [decidedByMembershipId], references: [id], onDelete: SetNull)
+
+  createdByUserId String?
+  createdBy       User?   @relation("LeaveCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  documents LeaveDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([employeeId, startDate])
+  @@map("leave_requests")
+}
+
+model LeaveDocument {
+  id String @id @default(cuid())
+
+  leaveRequestId String
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  generatedDocumentId String
+  artifact            DocumentGenerationArtifact @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([leaveRequestId, generatedDocumentId])
+  @@index([generatedDocumentId])
+  @@map("leave_documents")
+}
+
+// -----------------------------------------------------------------------------
+// Terminations
+// -----------------------------------------------------------------------------
+
+model Termination {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type   TerminationType
+  status TerminationStatus @default(DRAFT)
+
+  terminationDate DateTime
+  noticeDate      DateTime?
+  lastWorkingDay  DateTime
+
+  noticeDays     Int?
+  severanceAmount Decimal? @db.Decimal(14, 2)
+
+  reason  String? @db.Text
+  details String? @db.Text
+
+  finalPayrollRequired Boolean @default(true)
+
+  finalPayrollId String?
+  finalPayroll   Payroll? @relation("TerminationFinalPayroll", fields: [finalPayrollId], references: [id], onDelete: SetNull)
+
+  generatedDocumentId String?
+  generatedDocument   DocumentGenerationArtifact? @relation("TerminationGeneratedDocument", fields: [generatedDocumentId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedBy   User?     @relation("TerminationApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+
+  createdById String?
+  createdBy   User?     @relation("TerminationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employmentPeriods EmploymentPeriod[]
+  checklists        TerminationChecklist[]
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@index([companyId, terminationDate])
+  @@map("terminations")
+}
+
+model TerminationChecklist {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  terminationId String
+  termination   Termination @relation(fields: [terminationId], references: [id], onDelete: Cascade)
+
+  itemKey String
+
+  label String
+
+  isCompleted Boolean @default(false)
+
+  completedById String?
+  completedBy   User?     @relation("TerminationChecklistCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([terminationId])
+  @@unique([terminationId, itemKey])
+  @@map("termination_checklists")
+}
+
+// -----------------------------------------------------------------------------
+// Reports (definitions + async jobs)
+// -----------------------------------------------------------------------------
+
+model ReportDefinition {
+  id String @id @default(cuid())
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  code        String // stable identifier e.g. PAYROLL_REGISTER_MONTHLY
+  displayName String
+  description String?
+
+  defaultFormat ReportOutputFormat @default(PDF)
+
+  /// Parameter schema version for UI rendering / validation
+  parameterSchema Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs ReportJob[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("report_definitions")
+}
+
+model ReportJob {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  definitionId String
+  definition   ReportDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+
+  status ReportJobStatus @default(QUEUED)
+
+  format ReportOutputFormat
+
+  parameters Json?
+
+  artifactUrl String?
+  errorMessage String? @db.Text
+
+  requestedByUserId String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([definitionId])
+  @@map("report_jobs")
+}
+
+/// Archived operational export from Raportet (Excel/PDF/CSV blobs in company asset storage).
+model GeneratedReport {
+  id String @id @default(cuid())
+
+  companyId String @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  reportType ReportType @map("report_type")
+  title      String
+
+  storageKey       String
+  generatedFileUrl String @map("file_url")
+
+  fileFormat ReportOutputFormat @map("file_format")
+
+  filtersJson Json @map("filters_json")
+
+  generatedByUserId String? @map("generated_by")
+  generatedBy       User?   @relation("GeneratedReportAuthor", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  isArchived Boolean   @default(false) @map("is_archived")
+  archivedAt DateTime? @map("archived_at")
+
+  rowCount         Int?
+  previewTruncated Boolean @default(false)
+
+  filterPayrollId    String? @map("filter_payroll_id")
+  filterYear         Int?    @map("filter_year")
+  filterMonth        Int?    @map("filter_month")
+  filterDepartmentId String? @map("filter_department_id")
+  filterEmployeeId   String? @map("filter_employee_id")
+
+  exportLogs ReportExportLog[]
+
+  @@index([companyId])
+  @@index([companyId, reportType])
+  @@index([companyId, generatedAt])
+  @@index([fileFormat])
+  @@index([companyId, isArchived])
+  @@index([companyId, filterPayrollId])
+  @@index([companyId, filterYear, filterMonth])
+  @@map("generated_reports")
+}
+
+model ReportExportLog {
+  id String @id @default(cuid())
+
+  companyId String @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  generatedReportId String @map("generated_report_id")
+  generatedReport   GeneratedReport @relation(fields: [generatedReportId], references: [id], onDelete: Cascade)
+
+  action ReportExportAction
+
+  performedByUserId String? @map("performed_by")
+  performedBy       User?   @relation("ReportExportLogActor", fields: [performedByUserId], references: [id], onDelete: SetNull)
+
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  metadataJson Json? @map("metadata_json")
+
+  @@index([companyId])
+  @@index([companyId, generatedReportId, performedAt])
+  @@map("report_export_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Employee timeline & notifications (operational visibility)
+// -----------------------------------------------------------------------------
+
+model EmployeeTimelineEvent {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  occurredAt DateTime @default(now())
+
+  /// Stable code e.g. CONTRACT_GENERATED, LEAVE_APPROVED, PAYROLL_LOCKED
+  eventType String
+
+  severity TimelineEventSeverity?
+
+  subjectKind String?
+  subjectId   String?
+
+  title String
+  body  String? @db.Text
+
+  metadata Json?
+
+  actorUserId String?
+  actor       User? @relation("TimelineActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  actorMembershipId String?
+  actorMembership   UserCompanyMembership? @relation("TimelineActorMembership", fields: [actorMembershipId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, employeeId, occurredAt(sort: Desc)])
+  @@index([companyId, eventType, occurredAt])
+  @@map("employee_timeline_events")
+}
+
+model NotificationOutbox {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  targetUserId String?
+  targetUser   User?   @relation("NotificationTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  channel NotificationChannel
+  topic   NotificationTopic
+
+  payload Json
+
+  scheduledFor DateTime
+  processedAt  DateTime?
+
+  attempts  Int    @default(0)
+  lastError String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, topic, scheduledFor])
+  @@map("notification_outbox")
+}
+
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  channels      Json?
+  mutedTopics   Json?
+  digestFrequency String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@map("notification_preferences")
+}
+
+/// HR-readable activity feed (diff-sized payloads); pair with AuditLog for technical CRUD trails.
+model DomainActivity {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  entityType String
+  entityId   String
+
+  verb DomainActivityVerb
+
+  actorUserId String?
+  actor       User?   @relation("DomainActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  occurredAt DateTime @default(now())
+
+  summary String
+  payload Json?
+
+  @@index([companyId, occurredAt])
+  @@index([entityType, entityId])
+  @@map("domain_activities")
+}
+
+// -----------------------------------------------------------------------------
+// Audit log (entity mutations — complement Prisma timestamps)
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorUserId String?
+  actor       User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  companyId String?
+
+  entityType String // e.g. Payroll, PayrollEntry
+  entityId   String
+
+  action String
+  /// CREATE, UPDATE, DELETE, LOCK, UNLOCK, APPROVE, REJECT — align with application constants.
+
+  diff Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

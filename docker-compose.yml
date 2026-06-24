@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pagapro
+      POSTGRES_PASSWORD: pagapro
+      POSTGRES_DB: pagapro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pagapro_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pagapro -d pagapro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pagapro_pg_data:
