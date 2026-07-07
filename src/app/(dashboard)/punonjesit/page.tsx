@@ -43,12 +43,14 @@ export default async function PunonjesitPage({
   const statusRaw = first(sp.status);
   const employmentTypeRaw = first(sp.employmentType);
   const departmentId = first(sp.departmentId);
+  const documentsMissing = first(sp.documentsMissing) === "1";
 
   const filters: EmployeeFiltersDto = {
     search: q || undefined,
     status: STATUSES.has(statusRaw) ? (statusRaw as EmployeeFiltersDto["status"]) : "",
     employmentType: TYPES.has(employmentTypeRaw) ? (employmentTypeRaw as EmployeeFiltersDto["employmentType"]) : "",
     departmentId: departmentId || "",
+    documentsMissing: documentsMissing || undefined,
   };
 
   let data;
@@ -71,12 +73,18 @@ export default async function PunonjesitPage({
     status: filters.status ?? "",
     employmentType: filters.employmentType ?? "",
     departmentId: filters.departmentId ?? "",
+    documentsMissing,
   };
 
   return (
     <div className="space-y-8">
       <EmployeesFilters departments={data.departments} defaults={defaults} />
-      <EmployeesPageClient employees={data.employees} departments={data.departments} />
+      <EmployeesPageClient
+        employees={data.employees}
+        departments={data.departments}
+        jobTitles={data.jobTitles}
+        documentsMissingFilter={documentsMissing}
+      />
     </div>
   );
 }

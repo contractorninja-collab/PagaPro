@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import type { DocumentCategory } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { getEmployeeDetailAction } from "@/modules/employees/actions/employee-actions";
-import type { DepartmentOptionDto, EmployeeDetailDto } from "@/modules/employees/types";
+import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import {
   EMPLOYMENT_TYPE_LABELS,
@@ -121,7 +121,16 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
           <Row label="Lloji" value={<EmployeeTypeBadge employmentType={e.employmentType} />} />
           <Row label="Lloji i punës" value={WORK_ARRANGEMENT_LABELS[e.workArrangement]} />
           <Row label="Pozita" value={e.jobTitle ?? "—"} />
+          <Row
+            label="Përshkrimi i punës"
+            value={e.jobDescription ?? "—"}
+            className="whitespace-pre-wrap leading-relaxed"
+          />
           <Row label="Departamenti" value={e.departmentName ?? "—"} />
+          <Row
+            label="Muaj pune praktike"
+            value={e.probationMonths && e.probationMonths > 0 ? `${e.probationMonths}` : "—"}
+          />
           <Row label="Data e punësimit" value={formatSqDate(e.hireDate)} />
           <Row label="Data e largimit" value={formatSqDate(e.terminationDate)} />
           <Row label="Arsyeja e largimit" value={e.terminationReason ?? "—"} />
@@ -426,9 +435,11 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
 export function EmployeeProfileShell(props: {
   employee: EmployeeDetailDto;
   departments: DepartmentOptionDto[];
+  jobTitles: JobTitleOptionDto[];
   documentCenter?: EmployeeProfileDocumentsBundle;
+  openEditDocuments?: boolean;
 }) {
-  const { employee: initial, departments, documentCenter } = props;
+  const { employee: initial, departments, jobTitles, documentCenter, openEditDocuments = false } = props;
   const router = useRouter();
   const [employee, setEmployee] = useState(initial);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -437,13 +448,26 @@ export function EmployeeProfileShell(props: {
     setEmployee(initial);
   }, [initial]);
 
+  const canEdit = employee.status !== "TERMINATED";
+
+  useEffect(() => {
+    if (!openEditDocuments || !canEdit) return;
+    setSheetOpen(true);
+  }, [openEditDocuments, canEdit]);
+
+  useEffect(() => {
+    if (!sheetOpen || !openEditDocuments) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("documents-missing-flag")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [sheetOpen, openEditDocuments]);
+
   const reload = async () => {
     const d = await getEmployeeDetailAction(employee.id);
     if (d) setEmployee(d);
     router.refresh();
   };
-
-  const canEdit = employee.status !== "TERMINATED";
 
   const bundle: EmployeeProfileDocumentsBundle = documentCenter ?? {
     employeeId: employee.id,
@@ -481,6 +505,26 @@ export function EmployeeProfileShell(props: {
           <p className="text-sm text-muted-foreground">Profili është i mbyllur (i larguar).</p>
         )}
       </div>
+
+      {employee.documentsMissing ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 border-l-4 border-l-amber-500 bg-amber-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm font-semibold text-foreground">Dokumentacion i paplotë</p>
+              <p className="text-xs text-muted-foreground">
+                Ky punonjës është shënuar me dokumentacion të paplotë. Përditësoni statusin ose ngarkoni dokumentet
+                e nevojshme.
+              </p>
+            </div>
+          </div>
+          {canEdit ? (
+            <Button type="button" variant="outlinePrimary" size="sm" className="shrink-0" onClick={() => setSheetOpen(true)}>
+              Rregullo dokumentacionin
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Tabs defaultValue="summary" className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
@@ -524,6 +568,7 @@ export function EmployeeProfileShell(props: {
           employeeId={employee.id}
           initialDetail={employee}
           departments={departments}
+          jobTitles={jobTitles}
           onSuccess={() => void reload()}
         />
       ) : null}

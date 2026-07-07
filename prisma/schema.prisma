@@ -23,6 +23,11 @@ enum CompanyStatus {
   ARCHIVED
 }
 
+enum JobTitleStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum UserStatus {
   INVITED
   ACTIVE
@@ -107,6 +112,7 @@ enum PayrollDocumentKind {
   REGISTER_WITH_TOTALS
   REGISTER_SIGNATURE_LIST
   EMPLOYEE_PAYSLIP
+  PAYSLIPS_PRINT_BUNDLE
 }
 
 enum PayrollEntryStatus {
@@ -141,6 +147,8 @@ enum LeaveSubtype {
   LEHONI_FAZA_PUNEDHENESI_70
   LEHONI_FAZA_QEVERIA_50
   LEHONI_FAZA_FUNDIT_PA_PAGESE
+  /// Lëndim në punë / sëmundje profesionale — jashtë kuotës 20-ditore të pushimit mjekësor të rregullt.
+  LENDIM_PUNE_OSE_SEMUNDJE_PROFESIONALE
 }
 
 enum LeaveRequestStatus {
@@ -149,6 +157,18 @@ enum LeaveRequestStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum AnnualLeaveAccrualMode {
+  UPFRONT
+  MONTHLY
+  STATUTORY_FIRST_YEAR
+}
+
+enum AnnualLeaveRoundingMode {
+  NONE
+  HALF_DAY
+  FULL_DAY
 }
 
 enum ContractKind {
@@ -377,6 +397,7 @@ model Company {
   settings             CompanySetting?
   memberships          UserCompanyMembership[]
   departments          Department[]
+  jobTitles            JobTitle[]
   employees            Employee[]
   payrolls             Payroll[]
   payrollParameterSets PayrollParameterSet[]
@@ -439,7 +460,15 @@ model CompanyConfiguration {
 
   annualLeaveDaysDefault   Decimal? @db.Decimal(6, 2)
   personalLeaveDaysDefault Decimal? @db.Decimal(6, 2)
+  /// Ditë pune pushim mjekësor i rregullt në vit kalendarik (parazgjedhje aplikacioni: 20).
+  medicalLeaveDaysDefault  Decimal? @db.Decimal(6, 2)
   medicalLeavePolicyNote   String?  @db.Text
+
+  /// Ditë pune javore të kompanisë — baza e kuotës vjetore = workingDaysPerWeek × 4 (parazgjedhje 5 → 20 ditë).
+  workingDaysPerWeek Decimal? @db.Decimal(4, 2)
+  annualLeaveAccrualMode     AnnualLeaveAccrualMode     @default(MONTHLY)
+  annualLeaveRoundingMode    AnnualLeaveRoundingMode    @default(NONE)
+  allowNegativeAnnualLeaveBalance Boolean @default(false)
 
   /// Company-level switches — notification worker filters on these before enqueueing.
   notifyContractExpiring Boolean @default(true)
@@ -462,6 +491,10 @@ model AuthorizedRepresentative {
 
   sortOrder Int @default(0)
 
+  /// Optional link to the employee this representative maps to; job title is sourced from the employee.
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
   fullName String
   position String?
 
@@ -472,6 +505,7 @@ model AuthorizedRepresentative {
   updatedAt DateTime @updatedAt
 
   @@index([companyId, sortOrder])
+  @@index([employeeId])
   @@map("authorized_representatives")
 }
 
@@ -625,6 +659,35 @@ model Department {
   @@map("departments")
 }
 
+model JobTitle {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title String
+  department String?
+  level String?
+
+  description      String @db.Text
+  responsibilities String? @db.Text
+  requirements     String? @db.Text
+
+  status JobTitleStatus @default(ACTIVE)
+
+  createdByUserId String?
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+
+  @@unique([companyId, title])
+  @@index([companyId, status, title])
+  @@map("job_titles")
+}
+
 model Employee {
   id String @id @default(cuid())
 
@@ -633,6 +696,9 @@ model Employee {
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  jobTitleId String?
+  jobTitleProfile JobTitle? @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
 
   /// Optional link if employee signs in to a future portal
   userId String?
@@ -664,6 +730,7 @@ model Employee {
   terminationDate    DateTime?
   terminationReason  String? @db.Text
   jobTitle           String?
+  probationMonths    Int?
 
   /// Orët kontraktuale javore (UI default 40)
   weeklyHours Decimal @default(40) @db.Decimal(6, 2)
@@ -726,10 +793,12 @@ model Employee {
   documentGenerationArtifacts DocumentGenerationArtifact[]
   documentTimelineEvents      DocumentTimelineEvent[]
   leaveAccrualLedgerEntries   LeaveAccrualLedger[]
+  authorizedRepresentatives   AuthorizedRepresentative[]
 
   @@unique([companyId, personalId])
   @@index([companyId, lastName, firstName])
   @@index([companyId])
+  @@index([jobTitleId])
   @@index([companyId, status])
   @@index([companyId, employmentType])
   @@index([companyId, email])
@@ -1127,7 +1196,8 @@ model PayrollSettings {
 
   overtimeMultiplier Decimal @default(1.3) @db.Decimal(8, 4)
   weekendMultiplier  Decimal @default(1.5) @db.Decimal(8, 4)
-  holidayMultiplier  Decimal @default(2.0) @db.Decimal(8, 4)
+  /// Festë — +50% si fundjava (Ligji i Punës i Kosovës)
+  holidayMultiplier  Decimal @default(1.5) @db.Decimal(8, 4)
 
   /// Premium për punë natën — nga PayrollSettings (motor + transparency)
   nightWorkMultiplier Decimal @default(1.3) @db.Decimal(8, 4)
@@ -1408,6 +1478,14 @@ model Contract {
 
   storedPdfUrl String?
 
+  jobTitleSnapshot String?
+  jobDepartmentSnapshot String?
+  jobLevelSnapshot String?
+  jobDescriptionSnapshot String? @db.Text
+  jobResponsibilitiesSnapshot String? @db.Text
+  jobRequirementsSnapshot String? @db.Text
+  jobSnapshotGeneratedAt DateTime?
+
   generationStatus DocumentGenerationStatus @default(PENDING)
   generationError  String?                  @db.Text
 
@@ -1665,6 +1743,7 @@ model LeaveBalance {
 
   yearlyQuota    Decimal @db.Decimal(8, 2)
   usedDays       Decimal @default(0) @db.Decimal(8, 2)
+  pendingDays    Decimal @default(0) @db.Decimal(8, 2)
   remainingDays  Decimal @db.Decimal(8, 2)
   carryOverDays  Decimal @default(0) @db.Decimal(8, 2)
 

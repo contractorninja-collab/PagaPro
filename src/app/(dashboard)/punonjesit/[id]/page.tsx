@@ -10,9 +10,18 @@ import {
   listContractsForEmployee,
   listPayrollGeneratedDocsForEmployee,
 } from "@/modules/documents/services/document-queries";
+import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import { resolveActiveCompanyId } from "@/server/company-scope";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function first(v: string | string[] | undefined): string {
+  if (Array.isArray(v)) return v[0] ?? "";
+  return v ?? "";
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
@@ -27,8 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function EmployeeProfilePage({ params }: Props) {
+export default async function EmployeeProfilePage({ params, searchParams }: Props) {
   const { id } = await params;
+  const sp = await searchParams;
+  const openEditDocuments = first(sp.edit) === "documents";
   const companyId = await resolveActiveCompanyId();
 
   if (!companyId) {
@@ -44,13 +55,15 @@ export default async function EmployeeProfilePage({ params }: Props) {
   let genDocs;
   let contracts;
   let payrollDocs;
+  let jobTitles;
   try {
-    [employee, departments, genDocs, contracts, payrollDocs] = await Promise.all([
+    [employee, departments, genDocs, contracts, payrollDocs, jobTitles] = await Promise.all([
       getEmployeeById(companyId, id),
       listDepartmentsForCompany(companyId),
       listArtifactsForEmployee(companyId, id),
       listContractsForEmployee(companyId, id),
       listPayrollGeneratedDocsForEmployee(companyId, id),
+      listActiveJobTitleOptions(companyId),
     ]);
   } catch (err) {
     console.error("[pagapro] EmployeeProfilePage: load failed", err);
@@ -94,6 +107,12 @@ export default async function EmployeeProfilePage({ params }: Props) {
   };
 
   return (
-    <EmployeeProfileShell employee={employee} departments={departments} documentCenter={documentCenter} />
+    <EmployeeProfileShell
+      employee={employee}
+      departments={departments}
+      jobTitles={jobTitles}
+      documentCenter={documentCenter}
+      openEditDocuments={openEditDocuments}
+    />
   );
 }

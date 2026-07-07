@@ -57,6 +57,13 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
       if (res.code === "INVALID_DEPARTMENT") {
         return { ok: false, error: "Departamenti i zgjedhur nuk është valid." };
       }
+      if (res.code === "INVALID_JOB_TITLE") {
+        return {
+          ok: false,
+          error: "Pozita e zgjedhur nuk është aktive ose nuk ekziston.",
+          fieldErrors: { jobTitleId: ["Zgjidhni një pozitë aktive."] },
+        };
+      }
       if (res.code === "DB_ERROR") {
         let msg = "Ruajtja në databazë dështoi.";
         if (res.message && /column|does not exist|relation|Unknown arg/i.test(res.message)) {
@@ -129,6 +136,13 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
       }
       if (res.code === "INVALID_DEPARTMENT") {
         return { ok: false, error: "Departamenti i zgjedhur nuk është valid." };
+      }
+      if (res.code === "INVALID_JOB_TITLE") {
+        return {
+          ok: false,
+          error: "Pozita e zgjedhur nuk është aktive ose nuk ekziston.",
+          fieldErrors: { jobTitleId: ["Zgjidhni një pozitë aktive."] },
+        };
       }
       if (res.code === "DB_ERROR") {
         let msg = "Përditësimi në databazë dështoi.";

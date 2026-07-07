@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,15 +8,22 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEmployeeDetailAction } from "@/modules/employees/actions/employee-actions";
-import type { EmployeeDetailDto, EmployeeListRowDto, DepartmentOptionDto } from "@/modules/employees/types";
+import type {
+  DepartmentOptionDto,
+  EmployeeDetailDto,
+  EmployeeListRowDto,
+  JobTitleOptionDto,
+} from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import { EmployeesTable } from "@/modules/employees/components/employees-table";
 
 export function EmployeesPageClient(props: {
   employees: EmployeeListRowDto[];
   departments: DepartmentOptionDto[];
+  jobTitles: JobTitleOptionDto[];
+  documentsMissingFilter?: boolean;
 }) {
-  const { employees, departments } = props;
+  const { employees, departments, jobTitles, documentsMissingFilter = false } = props;
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -76,7 +84,21 @@ export function EmployeesPageClient(props: {
     <>
       <PageHeader
         title="Punonjësit"
-        description="Regjistri i punonjësve dhe kontraktorëve — i izoluar për kompaninë aktive."
+        description={
+          documentsMissingFilter ? (
+            "Punonjës me dokumentacion të paplotë — i izoluar për kompaninë aktive."
+          ) : departments.length === 0 ? (
+            <>
+              Regjistri i punonjësve dhe kontraktorëve — i izoluar për kompaninë aktive.{" "}
+              <Link href="/konfigurime?tab=departamentet" className="text-primary underline-offset-4 hover:underline">
+                Krijoni departamentet
+              </Link>{" "}
+              për t&apos;i caktuar punonjësve.
+            </>
+          ) : (
+            "Regjistri i punonjësve dhe kontraktorëve — i izoluar për kompaninë aktive."
+          )
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {loadingDetail ? <Skeleton className="h-9 w-36" /> : null}
@@ -98,6 +120,7 @@ export function EmployeesPageClient(props: {
         employeeId={editId}
         initialDetail={detail}
         departments={departments}
+        jobTitles={jobTitles}
         onSuccess={() => router.refresh()}
       />
     </>

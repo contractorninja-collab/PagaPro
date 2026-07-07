@@ -43,6 +43,24 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     labelSq: "Pozita",
   },
   {
+    key: "employee_job_description",
+    requiredByDefault: false,
+    sources: ["employee"],
+    labelSq: "Përshkrimi i punës",
+  },
+  {
+    key: "employee_job_responsibilities",
+    requiredByDefault: false,
+    sources: ["employee"],
+    labelSq: "Përgjegjësitë e punës",
+  },
+  {
+    key: "employee_job_requirements",
+    requiredByDefault: false,
+    sources: ["employee"],
+    labelSq: "Kërkesat e punës",
+  },
+  {
     key: "employee_department",
     requiredByDefault: false,
     sources: ["employee"],
@@ -183,6 +201,20 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
       sources: ["contract_runtime"],
       applicableCategories: ["CONTRACT"],
       labelSq: "Kompensimi i udhëtimit zyrtar",
+    },
+    {
+      key: "probation_months",
+      requiredByDefault: false,
+      sources: ["employee"],
+      applicableCategories: ["CONTRACT"],
+      labelSq: "Muajt e punÃ«s praktike",
+    },
+    {
+      key: "probation_period",
+      requiredByDefault: false,
+      sources: ["employee"],
+      applicableCategories: ["CONTRACT"],
+      labelSq: "Periudha e punÃ«s praktike",
     },
   ],
   LEAVE: [

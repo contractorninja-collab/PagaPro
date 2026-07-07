@@ -38,10 +38,13 @@ Templates are registered per company, published as v1, and editable via **Dokume
 | `employee_name` | Full name |
 | `employee_personal_number` | Personal ID |
 | `employee_position` | Job title |
+| `employee_job_description` | Job description from the employee profile/job title |
 | `employee_department` | Department name |
 | `employee_address` | Employee address |
 | `contract_start_date` | User-selected start date |
 | `contract_end_date` | User-selected end date (fixed-term only) |
+| `probation_period` | Employee profile probation months as text, for example `1 Muaj` |
+| `probation_months` | Employee profile probation months as a number |
 | `salary_gross` | Monthly gross salary |
 | `authorized_person_name` | Authorized signatory |
 | `authorized_person_position` | Signatory position |

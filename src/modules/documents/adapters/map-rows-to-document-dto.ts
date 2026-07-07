@@ -10,6 +10,10 @@ export function mapEmployeeRowToContractDto(row: {
   lastName: string;
   personalId: string | null;
   jobTitle?: string | null;
+  jobDescription?: string | null;
+  jobResponsibilities?: string | null;
+  jobRequirements?: string | null;
+  probationMonths?: number | null;
   departmentName?: string | null;
   addressLine: string | null;
   addressCity: string | null;
@@ -40,6 +44,10 @@ export function mapEmployeeRowToContractDto(row: {
     lastName: row.lastName,
     personalId: row.personalId,
     jobTitle: row.jobTitle ?? null,
+    jobDescription: row.jobDescription ?? null,
+    jobResponsibilities: row.jobResponsibilities ?? null,
+    jobRequirements: row.jobRequirements ?? null,
+    probationMonths: row.probationMonths ?? null,
     departmentName: row.departmentName ?? undefined,
     addressLine: row.addressLine,
     addressCity: row.addressCity,

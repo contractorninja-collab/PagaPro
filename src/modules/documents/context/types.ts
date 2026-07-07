@@ -5,6 +5,10 @@ export interface EmployeeContractDto {
   lastName: string;
   personalId: string | null;
   jobTitle: string | null;
+  jobDescription?: string | null;
+  jobResponsibilities?: string | null;
+  jobRequirements?: string | null;
+  probationMonths?: number | null;
   /** Department display name for templates */
   departmentName?: string | null;
   addressLine: string | null;

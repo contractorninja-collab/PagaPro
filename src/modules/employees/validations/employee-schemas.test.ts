@@ -13,7 +13,8 @@ const minimal = {
   addressCity: null,
   addressCountry: null,
   departmentId: null,
-  jobTitle: null,
+  jobTitleId: "clxjobtitle00000123456789ab",
+  jobTitle: "Punonjës",
   hireDate: "2020-01-15",
   status: "ACTIVE",
   employmentType: "EMPLOYEE",
@@ -41,5 +42,22 @@ describe("employeeUpsertSchema", () => {
     const r = employeeUpsertSchema.safeParse({ ...minimal, departmentId: "" });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.departmentId).toBeNull();
+  });
+
+  it("rejects missing jobTitleId (Pozita is required)", () => {
+    const r = employeeUpsertSchema.safeParse({ ...minimal, jobTitleId: "" });
+    expect(r.success).toBe(false);
+  });
+
+  it("accepts optional whole-number probation months", () => {
+    const empty = employeeUpsertSchema.safeParse({ ...minimal, probationMonths: "" });
+    expect(empty.success).toBe(true);
+    if (empty.success) expect(empty.data.probationMonths).toBeNull();
+
+    for (const months of [0, 1, 6]) {
+      const r = employeeUpsertSchema.safeParse({ ...minimal, probationMonths: months });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.probationMonths).toBe(months);
+    }
   });
 });

@@ -45,7 +45,17 @@ export const employeeUpsertSchema = z
     addressCountry: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
 
     departmentId: z.preprocess(emptyToNull, z.string().cuid().nullable().optional()),
-    jobTitle: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
+    jobTitleId: z.string().cuid("Zgjidhni një pozitë valide"),
+    jobTitle: z.string().trim().max(200).optional(),
+    probationMonths: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? null : v),
+      z.coerce
+        .number()
+        .int("Muajt e punës praktike duhet të jenë numër i plotë")
+        .min(0, "Muajt e punës praktike nuk mund të jenë negativ")
+        .nullable()
+        .optional(),
+    ),
     hireDate: z.preprocess((v) => {
       if (v instanceof Date) return v;
       if (typeof v === "string" && v.trim()) return new Date(v);

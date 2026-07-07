@@ -1,14 +1,18 @@
 "use client";
 
-import { Upload, UserPlus, X } from "lucide-react";
+import { UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/patterns/page-header";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
 import { HolidaySettingsPanel } from "@/components/konfigurime/holiday-settings-panel";
 import { LeaveMonthlyAccrualPanel } from "@/components/konfigurime/leave-monthly-accrual-panel";
 import { KonfigurimePageSkeleton } from "@/components/konfigurime/konfigurime-skeleton";
+import { DepartmentsSettingsPanel } from "@/modules/departments/components/departments-settings-panel";
+import { JobTitlesSettingsPanel } from "@/modules/job-titles/components/job-titles-settings-panel";
+import type { KonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,8 +30,6 @@ type RepDraft = KonfigurimeRepresentativeDto & { rowKey: string };
 function assignRepresentativeRowKeys(list: KonfigurimeRepresentativeDto[]): RepDraft[] {
   return list.map((r) => ({ ...r, rowKey: r.id ?? randomClientId() }));
 }
-
-type KonfigurimeTabId = "kompania" | "autorizuari" | "pagat" | "festat" | "dokumentet" | "pushimet" | "njoftimet";
 
 function flattenKonfigurimeFieldErrors(raw?: Record<string, string[]>): Record<string, string> {
   if (!raw) return {};
@@ -112,78 +114,20 @@ function NotificationToggle({
   );
 }
 
-function AssetUploadSlot({
-  label,
-  previewUrl,
-  disabled,
-  onSelectFile,
-  onClear,
+export function KonfigurimeConfigurator({
+  initial,
+  className,
+  initialTab = "kompania",
 }: {
-  label: string;
-  previewUrl: string | null;
-  disabled?: boolean;
-  onSelectFile: (file: File | null) => void;
-  onClear: () => void;
+  initial: KonfigurimePageDto;
+  className?: string;
+  initialTab?: KonfigurimeTabId;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div className="space-y-2">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        className="sr-only"
-        disabled={disabled}
-        onChange={(e) => {
-          const f = e.target.files?.[0] ?? null;
-          if (f) onSelectFile(f);
-          e.target.value = "";
-        }}
-      />
-      <div className="flex flex-wrap items-start gap-3">
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={disabled}
-          className="justify-center"
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="mr-2 h-4 w-4" aria-hidden />
-          Ngarko
-        </Button>
-        {previewUrl ? (
-          <div className="relative h-24 w-40 overflow-hidden rounded-md border bg-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element -- blob: and same-origin API URLs */}
-            <img src={previewUrl} alt="" className="h-full w-full object-contain" />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1 h-7 w-7 bg-background/90"
-              disabled={disabled}
-              onClick={onClear}
-              aria-label="Hiq imazhin"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Asnjë skedar i zgjedhur.</p>
-        )}
-      </div>
-      <p className="text-[11px] text-muted-foreground">PNG, JPEG ose WebP · maks. 3 MB</p>
-    </div>
-  );
-}
-
-export function KonfigurimeConfigurator({ initial, className }: { initial: KonfigurimePageDto; className?: string }) {
   const router = useRouter();
   const { pending, submit } = useKonfigurimeSave();
   const [mounted, setMounted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<KonfigurimeTabId>("kompania");
+  const [activeTab, setActiveTab] = useState<KonfigurimeTabId>(initialTab);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const clearFieldErrorsByPrefix = useCallback((prefix: string) => {
@@ -213,55 +157,27 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
   const [cfg, setCfg] = useState(initial.configuration);
   const [reps, setReps] = useState<RepDraft[]>(() => assignRepresentativeRowKeys(initial.representatives));
 
-  const [sigFiles, setSigFiles] = useState<Record<string, File | undefined>>({});
-  const [stampFiles, setStampFiles] = useState<Record<string, File | undefined>>({});
-
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
     setCompany(initial.company);
     setCfg(initial.configuration);
     setReps(assignRepresentativeRowKeys(initial.representatives));
-    setSigFiles({});
-    setStampFiles({});
     setFieldErrors({});
     setFormError(null);
   }, [initial]);
 
-  const blobUrls = useMemo(() => {
-    const urls: Record<string, { sig?: string; stamp?: string }> = {};
-    for (const [rowKey, f] of Object.entries(sigFiles)) {
-      if (f) {
-        if (!urls[rowKey]) urls[rowKey] = {};
-        urls[rowKey].sig = URL.createObjectURL(f);
-      }
-    }
-    for (const [rowKey, f] of Object.entries(stampFiles)) {
-      if (f) {
-        if (!urls[rowKey]) urls[rowKey] = {};
-        urls[rowKey].stamp = URL.createObjectURL(f);
-      }
-    }
-    return urls;
-  }, [sigFiles, stampFiles]);
-
-  useEffect(() => {
-    return () => {
-      for (const ent of Object.values(blobUrls)) {
-        if (ent.sig) URL.revokeObjectURL(ent.sig);
-        if (ent.stamp) URL.revokeObjectURL(ent.stamp);
-      }
-    };
-  }, [blobUrls]);
-
   const fixPayloadRepresentativeKeys = () =>
     reps.map((r) => ({
-      fullName: r.fullName,
-      position: r.position,
-      signatureStorageKey: sigFiles[r.rowKey] ? null : r.signatureStorageKey ?? null,
-      stampStorageKey: stampFiles[r.rowKey] ? null : r.stampStorageKey ?? null,
+      employeeId: r.employeeId ?? "",
+      signatureStorageKey: r.signatureStorageKey ?? null,
+      stampStorageKey: r.stampStorageKey ?? null,
     }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -290,6 +206,11 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
         generalDocumentPrefix: cfg.generalDocumentPrefix,
         annualLeaveDaysDefault: parseOptionalNumber(cfg.annualLeaveDaysDefault),
         personalLeaveDaysDefault: parseOptionalNumber(cfg.personalLeaveDaysDefault),
+        medicalLeaveDaysDefault: parseOptionalNumber(cfg.medicalLeaveDaysDefault),
+        workingDaysPerWeek: parseOptionalNumber(cfg.workingDaysPerWeek),
+        annualLeaveAccrualMode: cfg.annualLeaveAccrualMode,
+        annualLeaveRoundingMode: cfg.annualLeaveRoundingMode,
+        allowNegativeAnnualLeaveBalance: cfg.allowNegativeAnnualLeaveBalance,
         medicalLeavePolicyNote: cfg.medicalLeavePolicyNote,
         notifyContractExpiring: cfg.notifyContractExpiring,
         notifyPayrollReminders: cfg.notifyPayrollReminders,
@@ -300,15 +221,6 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
 
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
-    for (let i = 0; i < reps.length; i++) {
-      const row = reps[i];
-      if (!row) continue;
-      const rowKey = row.rowKey;
-      const s = sigFiles[rowKey];
-      const t = stampFiles[rowKey];
-      if (s) fd.append(`signature_${i}`, s);
-      if (t) fd.append(`stamp_${i}`, t);
-    }
 
     try {
       const result = await submit(fd);
@@ -322,21 +234,11 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
         return;
       }
       toast.success("Konfigurimet u ruajtën me sukses.");
-      setSigFiles({});
-      setStampFiles({});
       router.refresh();
     } catch {
       toast.error("Gabim papritur gjatë ruajtjes.");
       setFormError("Gabim papritur gjatë ruajtjes.");
     }
-  };
-
-  const previewFor = (rep: RepDraft, kind: "sig" | "stamp") => {
-    const blob = blobUrls[rep.rowKey]?.[kind === "sig" ? "sig" : "stamp"];
-    if (blob) return blob;
-    const key = kind === "sig" ? rep.signatureStorageKey : rep.stampStorageKey;
-    if (key) return `/api/konfigurime/asset?key=${encodeURIComponent(key)}`;
-    return null;
   };
 
   const patchRep = (rowKey: string, patch: Partial<KonfigurimeRepresentativeDto>) => {
@@ -349,6 +251,7 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
       ...prev,
       {
         rowKey: randomClientId(),
+        employeeId: null,
         fullName: "",
         position: null,
         signatureStorageKey: null,
@@ -362,16 +265,6 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
     if (!victim || reps.length <= 1) return;
     clearFieldErrorsByPrefix("representatives");
     setReps((prev) => prev.filter((r) => r.rowKey !== victim.rowKey));
-    setSigFiles((prev) => {
-      const next = { ...prev };
-      delete next[victim.rowKey];
-      return next;
-    });
-    setStampFiles((prev) => {
-      const next = { ...prev };
-      delete next[victim.rowKey];
-      return next;
-    });
   };
 
   if (!mounted) {
@@ -402,6 +295,8 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:h-10 sm:flex-nowrap">
             <TabsTrigger value="kompania">Kompania</TabsTrigger>
             <TabsTrigger value="autorizuari">Personi i autorizuar</TabsTrigger>
+            <TabsTrigger value="departamentet">Departamentet</TabsTrigger>
+            <TabsTrigger value="pozitat">Pozitat</TabsTrigger>
             <TabsTrigger value="pagat">Pagat</TabsTrigger>
             <TabsTrigger value="festat">Festat</TabsTrigger>
             <TabsTrigger value="dokumentet">Dokumentet</TabsTrigger>
@@ -445,20 +340,6 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
                         setCompany((c) => ({ ...c, fiscalNumber: e.target.value || null }));
                       }}
                       placeholder="812345678"
-                      disabled={pending}
-                    />
-                  </FormField>
-                  <FormField label="NRB" error={fieldErrors["company.businessRegistrationNumber"]}>
-                    <Input
-                      id="company-nrb"
-                      className={cn(fieldErrors["company.businessRegistrationNumber"] && "border-destructive ring-1 ring-destructive/35")}
-                      aria-invalid={Boolean(fieldErrors["company.businessRegistrationNumber"]) || undefined}
-                      value={company.businessRegistrationNumber ?? ""}
-                      onChange={(e) => {
-                        clearFieldErrorKey("company.businessRegistrationNumber");
-                        setCompany((c) => ({ ...c, businessRegistrationNumber: e.target.value || null }));
-                      }}
-                      placeholder="Numri i regjistrimit të biznesit"
                       disabled={pending}
                     />
                   </FormField>
@@ -535,7 +416,7 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle>Përfaqësuesit e autorizuar</CardTitle>
-                  <CardDescription>Nënshkrimi dhe vula në dokumente zyrtare dhe kontrata.</CardDescription>
+                  <CardDescription>Personat që nënshkruajnë dokumentet zyrtare dhe kontratat.</CardDescription>
                 </div>
                 <Button type="button" variant="secondary" size="sm" onClick={addRep} disabled={pending} className="shrink-0">
                   <UserPlus className="mr-2 h-4 w-4" />
@@ -568,74 +449,77 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
                         </Button>
                       ) : null}
                     </div>
-                    <div className={fieldGrid}>
-                      <FormField label="Emri i plotë" required error={fieldErrors[`representatives.${idx}.fullName`]}>
-                        <Input
-                          id={`rep-name-${rep.rowKey}`}
-                          className={cn(fieldErrors[`representatives.${idx}.fullName`] && "border-destructive ring-1 ring-destructive/35")}
-                          aria-invalid={Boolean(fieldErrors[`representatives.${idx}.fullName`]) || undefined}
-                          value={rep.fullName}
-                          onChange={(e) => {
-                            clearFieldErrorKey(`representatives.${idx}.fullName`);
-                            patchRep(rep.rowKey, { fullName: e.target.value });
-                          }}
-                          placeholder="Emri dhe mbiemri"
-                          disabled={pending}
-                        />
-                      </FormField>
-                      <FormField label="Pozita" error={fieldErrors[`representatives.${idx}.position`]}>
-                        <Input
-                          id={`rep-role-${rep.rowKey}`}
-                          className={cn(fieldErrors[`representatives.${idx}.position`] && "border-destructive ring-1 ring-destructive/35")}
-                          aria-invalid={Boolean(fieldErrors[`representatives.${idx}.position`]) || undefined}
-                          value={rep.position ?? ""}
-                          onChange={(e) => {
-                            clearFieldErrorKey(`representatives.${idx}.position`);
-                            patchRep(rep.rowKey, { position: e.target.value || null });
-                          }}
-                          placeholder="p.sh. Drejtor menaxhues"
-                          disabled={pending}
-                        />
-                      </FormField>
-                    </div>
-                    <div className={cn(fieldGrid, "mt-8 gap-8")}>
-                      <AssetUploadSlot
-                        label="Nënshkrimi (imazh)"
-                        previewUrl={previewFor(rep, "sig")}
-                        disabled={pending}
-                        onSelectFile={(file) => {
-                          if (!file) return;
-                          setSigFiles((prev) => ({ ...prev, [rep.rowKey]: file }));
-                          patchRep(rep.rowKey, { signatureStorageKey: null });
-                        }}
-                        onClear={() => {
-                          setSigFiles((prev) => {
-                            const next = { ...prev };
-                            delete next[rep.rowKey];
-                            return next;
-                          });
-                          patchRep(rep.rowKey, { signatureStorageKey: null });
-                        }}
-                      />
-                      <AssetUploadSlot
-                        label="Vula (imazh)"
-                        previewUrl={previewFor(rep, "stamp")}
-                        disabled={pending}
-                        onSelectFile={(file) => {
-                          if (!file) return;
-                          setStampFiles((prev) => ({ ...prev, [rep.rowKey]: file }));
-                          patchRep(rep.rowKey, { stampStorageKey: null });
-                        }}
-                        onClear={() => {
-                          setStampFiles((prev) => {
-                            const next = { ...prev };
-                            delete next[rep.rowKey];
-                            return next;
-                          });
-                          patchRep(rep.rowKey, { stampStorageKey: null });
-                        }}
-                      />
-                    </div>
+                    {(() => {
+                      const selectedEmployee =
+                        initial.employees.find((emp) => emp.id === rep.employeeId) ?? null;
+                      const linkedButInactive = Boolean(rep.employeeId) && !selectedEmployee;
+                      const positionValue = selectedEmployee?.jobTitle ?? rep.position ?? "";
+                      return (
+                        <div className={fieldGrid}>
+                          <FormField
+                            label="Punonjësi"
+                            required
+                            hint="Përfaqësuesi zgjidhet nga punonjësit e regjistruar."
+                            error={fieldErrors[`representatives.${idx}.employeeId`]}
+                          >
+                            <select
+                              id={`rep-employee-${rep.rowKey}`}
+                              className={cn(
+                                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                fieldErrors[`representatives.${idx}.employeeId`] && "border-destructive ring-1 ring-destructive/35",
+                              )}
+                              aria-invalid={Boolean(fieldErrors[`representatives.${idx}.employeeId`]) || undefined}
+                              value={rep.employeeId ?? ""}
+                              onChange={(e) => {
+                                clearFieldErrorKey(`representatives.${idx}.employeeId`);
+                                const emp = initial.employees.find((x) => x.id === e.target.value) ?? null;
+                                patchRep(rep.rowKey, {
+                                  employeeId: emp?.id ?? null,
+                                  fullName: emp?.fullName ?? "",
+                                  position: emp?.jobTitle ?? null,
+                                });
+                              }}
+                              disabled={pending}
+                            >
+                              <option value="">Zgjidhni punonjësin</option>
+                              {linkedButInactive ? (
+                                <option value={rep.employeeId ?? ""}>
+                                  {rep.fullName || "Punonjës joaktiv"} (joaktiv)
+                                </option>
+                              ) : null}
+                              {initial.employees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.fullName}
+                                </option>
+                              ))}
+                            </select>
+                            {initial.employees.length === 0 ? (
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                Nuk ka punonjës aktivë — regjistroni një punonjës te{" "}
+                                <Link href="/punonjesit" className="text-primary underline-offset-4 hover:underline">
+                                  Punonjësit
+                                </Link>
+                                .
+                              </p>
+                            ) : null}
+                          </FormField>
+                          <FormField label="Pozita" hint="Plotësohet automatikisht nga pozita e punonjësit.">
+                            <Input
+                              id={`rep-role-${rep.rowKey}`}
+                              value={positionValue}
+                              placeholder="—"
+                              readOnly
+                              disabled
+                            />
+                            {rep.employeeId && !positionValue ? (
+                              <p className="mt-2 text-xs text-destructive">
+                                Ky punonjës nuk ka pozitë. Vendosni pozitën te profili i punonjësit.
+                              </p>
+                            ) : null}
+                          </FormField>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </CardContent>
@@ -748,6 +632,14 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
             </Card>
           </TabsContent>
 
+          <TabsContent value="departamentet">
+            <DepartmentsSettingsPanel initialDepartments={initial.departments} />
+          </TabsContent>
+
+          <TabsContent value="pozitat">
+            <JobTitlesSettingsPanel initialJobTitles={initial.jobTitles} />
+          </TabsContent>
+
           <TabsContent value="festat">
             <HolidaySettingsPanel
               defaultYear={initial.holidaySettings.defaultYear}
@@ -819,7 +711,10 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
               <Card>
                 <CardHeader>
                   <CardTitle>Pushimet — kuota referuese</CardTitle>
-                  <CardDescription>Kuotat e paracaktuara për politikën e kompanisë dhe motorin e lejeve.</CardDescription>
+                  <CardDescription>
+                    Kuotat e paracaktuara për politikën e kompanisë. Pushimi mjekësor i rregullt është 20 ditë pune në vit
+                    (parazgjedhje ligjore); lëndimi në punë regjistrohet si nën-lloj i veçantë.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className={fieldGrid}>
@@ -858,9 +753,53 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
                       />
                     </FormField>
                     <FormField
-                      label="Leje mjekësore"
+                      label="Ditë pune / javë"
+                      hint="Baza e pushimit vjetor = ditë pune × 4 (parazgjedhje 5 → 20 ditë)."
+                      error={fieldErrors["configuration.workingDaysPerWeek"]}
+                    >
+                      <Input
+                        id="leave-workweek"
+                        className={cn(
+                          "tabular-nums",
+                          fieldErrors["configuration.workingDaysPerWeek"] && "border-destructive ring-1 ring-destructive/35",
+                        )}
+                        aria-invalid={Boolean(fieldErrors["configuration.workingDaysPerWeek"]) || undefined}
+                        value={cfg.workingDaysPerWeek ?? ""}
+                        onChange={(e) => {
+                          clearFieldErrorKey("configuration.workingDaysPerWeek");
+                          setCfg((c) => ({ ...c, workingDaysPerWeek: e.target.value || null }));
+                        }}
+                        placeholder="5"
+                        inputMode="decimal"
+                        disabled={pending}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Pushim mjekësor (ditë pune/vit)"
+                      hint="Parazgjedhja ligjore: 20 ditë pune në vit kalendarik. Lëndimi në punë / sëmundja profesionale nuk përdor këtë kuotë."
+                      error={fieldErrors["configuration.medicalLeaveDaysDefault"]}
+                    >
+                      <Input
+                        id="leave-medical-days"
+                        className={cn(
+                          "tabular-nums",
+                          fieldErrors["configuration.medicalLeaveDaysDefault"] && "border-destructive ring-1 ring-destructive/35",
+                        )}
+                        aria-invalid={Boolean(fieldErrors["configuration.medicalLeaveDaysDefault"]) || undefined}
+                        value={cfg.medicalLeaveDaysDefault ?? ""}
+                        onChange={(e) => {
+                          clearFieldErrorKey("configuration.medicalLeaveDaysDefault");
+                          setCfg((c) => ({ ...c, medicalLeaveDaysDefault: e.target.value || null }));
+                        }}
+                        placeholder="20"
+                        inputMode="decimal"
+                        disabled={pending}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Shënime HR — pushim mjekësor"
                       className="md:col-span-2"
-                      hint="Shënime HR për politikën e lejes. Në payroll, përqindja e pages së orëve të sëmurë kontrollohet nga PayrollSettings.sickLeavePayPercent (parazgjedhje 100%); shih docs/payroll/kosovo-labor-law-notes.md."
+                      hint="Politika shtesë e kompanisë, përfshirë trajtimin e lëndimit në punë (jashtë kuotës 20-ditore)."
                       error={fieldErrors["configuration.medicalLeavePolicyNote"]}
                     >
                       <Input
@@ -872,7 +811,7 @@ export function KonfigurimeConfigurator({ initial, className }: { initial: Konfi
                           clearFieldErrorKey("configuration.medicalLeavePolicyNote");
                           setCfg((c) => ({ ...c, medicalLeavePolicyNote: e.target.value || null }));
                         }}
-                        placeholder="Sipas politikës së kompanisë / mjekësit"
+                        placeholder="P.sh. procedura për lëndim në punë, raport mjekësor…"
                         disabled={pending}
                       />
                     </FormField>

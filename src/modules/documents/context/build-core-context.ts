@@ -19,6 +19,21 @@ function resolveCompanyAddress(company: CompanyContractDto, settings: CompanySet
   );
 }
 
+function resolveDocumentPlace(company: CompanyContractDto, settings: CompanySettingContractDto | null): string {
+  const configuredAddress = settings?.companyAddressLine?.trim() || company.addressLine?.trim();
+  if (configuredAddress) {
+    const parts = configuredAddress
+      .split(/[,;\n]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const candidate = parts.at(-1) ?? configuredAddress;
+    const withoutPostalCode = candidate.replace(/\b\d{4,6}\b/g, "").trim();
+    if (withoutPostalCode) return withoutPostalCode;
+  }
+
+  return company.city?.trim() || "Prishtinë";
+}
+
 function stripTrailingZeros(value: string | null | undefined): string {
   if (!value) return "";
   return value.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
@@ -29,6 +44,11 @@ function resolveDailyHours(weeklyHours: string | null | undefined): string {
   if (!Number.isFinite(weekly) || weekly <= 0) return "";
   const daily = weekly / 5;
   return stripTrailingZeros(daily.toFixed(2));
+}
+
+function formatProbationPeriod(months: number | null | undefined): string {
+  if (months == null || months <= 0) return "";
+  return `${months} Muaj`;
 }
 
 /** Company letterhead slice when no employee is bound (OTHER / annex templates). */
@@ -45,6 +65,11 @@ export function buildCompanyScopedPlaceholderContext(params: {
     employee_name: "",
     employee_last_name: "",
     employee_position: "",
+    employee_job_description: "",
+    employee_job_responsibilities: "",
+    employee_job_requirements: "",
+    probation_months: "",
+    probation_period: "",
     employee_personal_number: "",
     employee_department: "",
     employee_address: "",
@@ -54,7 +79,7 @@ export function buildCompanyScopedPlaceholderContext(params: {
     company_nrb: company.businessRegistrationNumber ?? "",
     company_address: address,
     company_city: company.city ?? "",
-    document_place: company.city ?? "Prishtinë",
+    document_place: resolveDocumentPlace(company, settings),
     authorized_person: settings?.authorizedRepresentativeName ?? "",
     authorized_person_name: settings?.authorizedRepresentativeName ?? "",
     authorized_position: settings?.authorizedRepresentativePosition ?? "",
@@ -84,6 +109,11 @@ export function buildCoreOrganizationalContext(
     employee_full_name: `${employee.firstName} ${employee.lastName}`.trim(),
     employee_name: `${employee.firstName} ${employee.lastName}`.trim(),
     employee_position: employee.jobTitle ?? "",
+    employee_job_description: employee.jobDescription ?? "",
+    employee_job_responsibilities: employee.jobResponsibilities ?? "",
+    employee_job_requirements: employee.jobRequirements ?? "",
+    probation_months: employee.probationMonths && employee.probationMonths > 0 ? String(employee.probationMonths) : "",
+    probation_period: formatProbationPeriod(employee.probationMonths),
     employee_personal_number: employee.personalId ?? "",
     employee_department: employee.departmentName?.trim() ?? "",
     employee_address: employeeAddress,
@@ -105,7 +135,7 @@ export function buildCoreOrganizationalContext(
     authorized_person_name: settings?.authorizedRepresentativeName ?? "",
     authorized_position: settings?.authorizedRepresentativePosition ?? "",
     authorized_person_position: settings?.authorizedRepresentativePosition ?? "",
-    document_place: company.city ?? "Prishtinë",
+    document_place: resolveDocumentPlace(company, settings),
   };
 
   if (address) {

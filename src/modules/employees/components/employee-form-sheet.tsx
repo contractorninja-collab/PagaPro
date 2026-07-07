@@ -1,9 +1,19 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,8 +29,8 @@ import {
   updateEmployeeAction,
   type EmployeeActionResult,
 } from "@/modules/employees/actions/employee-actions";
-import type { EmployeeDetailDto } from "@/modules/employees/types";
-import type { DepartmentOptionDto } from "@/modules/employees/types";
+import { createDepartmentAction } from "@/modules/departments/actions/department-actions";
+import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto } from "@/modules/employees/types";
 import {
   GENDER_LABELS,
   WORK_ARRANGEMENT_LABELS,
@@ -43,7 +53,9 @@ export interface EmployeeFormValues {
   addressCity: string;
   addressCountry: string;
   departmentId: string;
+  jobTitleId: string;
   jobTitle: string;
+  probationMonths: string;
   hireDate: string;
   status: "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "SUSPENDED";
   employmentType: "EMPLOYEE" | "CONTRACTOR";
@@ -74,7 +86,9 @@ function defaults(): EmployeeFormValues {
     addressCity: "",
     addressCountry: "XK",
     departmentId: "",
+    jobTitleId: "",
     jobTitle: "",
+    probationMonths: "",
     hireDate: new Date().toISOString().slice(0, 10),
     status: "ACTIVE",
     employmentType: "EMPLOYEE",
@@ -107,7 +121,9 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     addressCity: e.addressCity ?? "",
     addressCountry: e.addressCountry ?? "XK",
     departmentId: e.departmentId ?? "",
+    jobTitleId: e.jobTitleId ?? "",
     jobTitle: e.jobTitle ?? "",
+    probationMonths: e.probationMonths == null ? "" : String(e.probationMonths),
     hireDate: isoDateInput(e.hireDate),
     status:
       e.status === "TERMINATED"
@@ -152,7 +168,9 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     addressCity: v.addressCity || null,
     addressCountry: v.addressCountry || null,
     departmentId: v.departmentId || null,
-    jobTitle: v.jobTitle || null,
+    jobTitleId: v.jobTitleId,
+    jobTitle: v.jobTitle,
+    probationMonths: v.probationMonths === "" ? null : Number(v.probationMonths),
     hireDate: v.hireDate,
     status: v.status,
     employmentType: v.employmentType,
@@ -178,12 +196,22 @@ export function EmployeeFormSheet(props: {
   employeeId?: string;
   initialDetail?: EmployeeDetailDto | null;
   departments: DepartmentOptionDto[];
+  jobTitles: JobTitleOptionDto[];
   onSuccess?: () => void;
 }) {
-  const { open, onOpenChange, mode, employeeId, initialDetail, departments, onSuccess } = props;
+  const { open, onOpenChange, mode, employeeId, initialDetail, departments, jobTitles, onSuccess } = props;
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [values, setValues] = useState<EmployeeFormValues>(defaults);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOptionDto[]>(departments);
+  const [deptDialogOpen, setDeptDialogOpen] = useState(false);
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [deptCreatePending, setDeptCreatePending] = useState(false);
+
+  useEffect(() => {
+    setDepartmentOptions(departments);
+  }, [departments]);
 
   useEffect(() => {
     if (!open) return;
@@ -252,20 +280,84 @@ export function EmployeeFormSheet(props: {
     }
   };
 
-  const departmentOptions = useMemo(
+  const departmentSelectOptions = useMemo(
     () =>
-      departments.map((d) => (
+      departmentOptions.map((d) => (
         <option key={d.id} value={d.id}>
           {d.name}
         </option>
       )),
-    [departments],
+    [departmentOptions],
   );
+
+  const selectedJobTitle = useMemo(
+    () => jobTitles.find((jobTitle) => jobTitle.id === values.jobTitleId) ?? null,
+    [jobTitles, values.jobTitleId],
+  );
+
+  const jobTitleSelectOptions = useMemo(() => {
+    const options = [...jobTitles];
+    if (
+      mode === "edit" &&
+      initialDetail?.jobTitleId &&
+      !options.some((jobTitle) => jobTitle.id === initialDetail.jobTitleId)
+    ) {
+      options.push({
+        id: initialDetail.jobTitleId,
+        title: initialDetail.jobTitle ?? "Pozitë e arkivuar",
+        department: initialDetail.departmentName,
+        level: null,
+        description: initialDetail.jobDescription ?? "",
+        responsibilities: initialDetail.jobResponsibilities,
+        requirements: initialDetail.jobRequirements,
+        status: initialDetail.jobTitleStatus ?? "ARCHIVED",
+      });
+    }
+    return options.map((jobTitle) => (
+      <option key={jobTitle.id} value={jobTitle.id} disabled={jobTitle.status !== "ACTIVE"}>
+        {jobTitle.title}
+        {jobTitle.department ? ` - ${jobTitle.department}` : ""}
+        {jobTitle.level ? ` (${jobTitle.level})` : ""}
+        {jobTitle.status !== "ACTIVE" ? " - arkivuar" : ""}
+      </option>
+    ));
+  }, [initialDetail, jobTitles, mode]);
+
+  const handleQuickCreateDepartment = async () => {
+    const name = newDepartmentName.trim();
+    if (!name) {
+      toast.error("Shkruani emrin e departamentit.");
+      return;
+    }
+    setDeptCreatePending(true);
+    try {
+      const res = await createDepartmentAction({ name });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setDepartmentOptions((prev) => {
+        const next = [...prev, { id: res.id, name: res.name }].sort((a, b) =>
+          a.name.localeCompare(b.name, "sq"),
+        );
+        return next;
+      });
+      setValues((s) => ({ ...s, departmentId: res.id }));
+      clearKey("departmentId");
+      setNewDepartmentName("");
+      setDeptDialogOpen(false);
+      toast.success(`Departamenti «${res.name}» u krijua dhe u zgjodh.`);
+      router.refresh();
+    } finally {
+      setDeptCreatePending(false);
+    }
+  };
 
   const errClass = (key: string) =>
     cn(fieldErrors[key] && "border-destructive ring-1 ring-destructive/35");
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-y-auto">
         <SheetHeader>
@@ -396,16 +488,36 @@ export function EmployeeFormSheet(props: {
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Punësimi</h3>
             <div className={fieldGrid}>
-              <FormField label="Pozita" error={fieldErrors.jobTitle}>
-                <Input
-                  className={errClass("jobTitle")}
-                  value={values.jobTitle}
+              <FormField label="Pozita" required error={fieldErrors.jobTitleId}>
+                <select
+                  className={cn(
+                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    errClass("jobTitleId"),
+                  )}
+                  value={values.jobTitleId}
                   onChange={(e) => {
-                    clearKey("jobTitle");
-                    setValues((s) => ({ ...s, jobTitle: e.target.value }));
+                    clearKey("jobTitleId");
+                    const jobTitle = jobTitles.find((item) => item.id === e.target.value);
+                    setValues((s) => ({
+                      ...s,
+                      jobTitleId: e.target.value,
+                      jobTitle: jobTitle?.title ?? s.jobTitle,
+                    }));
                   }}
-                  disabled={pending}
-                />
+                  disabled={pending || jobTitles.length === 0}
+                >
+                  <option value="">Zgjidh pozitën</option>
+                  {jobTitleSelectOptions}
+                </select>
+                {jobTitles.length === 0 ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    Së pari krijoni pozita te Konfigurimet &gt; Pozitat.
+                  </p>
+                ) : selectedJobTitle ? (
+                  <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
+                    {selectedJobTitle.description}
+                  </p>
+                ) : null}
               </FormField>
               <FormField label="Departamenti" error={fieldErrors.departmentId}>
                 <select
@@ -421,8 +533,28 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 >
                   <option value="">Pa departamenti</option>
-                  {departmentOptions}
+                  {departmentSelectOptions}
                 </select>
+                <div className="mt-2 flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto justify-start px-0 text-xs"
+                    disabled={pending || deptCreatePending}
+                    onClick={() => setDeptDialogOpen(true)}
+                  >
+                    + Shto departament
+                  </Button>
+                  {departmentOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Nuk ka departamente — krijoni një këtu ose te{" "}
+                      <Link href="/konfigurime?tab=departamentet" className="text-primary underline-offset-4 hover:underline">
+                        Konfigurimet
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
+                </div>
               </FormField>
               <FormField label="Data e punësimit" required error={fieldErrors.hireDate}>
                 <Input
@@ -434,6 +566,22 @@ export function EmployeeFormSheet(props: {
                     setValues((s) => ({ ...s, hireDate: e.target.value }));
                   }}
                   disabled={pending}
+                />
+              </FormField>
+              <FormField label="Muaj pune praktike" error={fieldErrors.probationMonths}>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  className={cn("tabular-nums", errClass("probationMonths"))}
+                  value={values.probationMonths}
+                  onChange={(e) => {
+                    clearKey("probationMonths");
+                    setValues((s) => ({ ...s, probationMonths: e.target.value }));
+                  }}
+                  disabled={pending}
+                  placeholder="p.sh. 3"
                 />
               </FormField>
               <FormField label="Statusi" error={fieldErrors.status}>
@@ -641,7 +789,7 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 />
               </FormField>
-              <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-4 py-3">
+              <div id="documents-missing-flag" className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-4 py-3">
                 <div className="space-y-1">
                   <Label>Dokumente mungojnë</Label>
                   <p className="text-xs text-muted-foreground">Për gjurmueshmëri HR — jo payroll.</p>
@@ -666,5 +814,40 @@ export function EmployeeFormSheet(props: {
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog open={deptDialogOpen} onOpenChange={setDeptDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Shto departament</DialogTitle>
+          <DialogDescription>
+            Departamenti do të jetë i disponueshëm për të gjithë punonjësit e kompanisë.
+          </DialogDescription>
+        </DialogHeader>
+        <FormField label="Emri i departamentit">
+          <Input
+            value={newDepartmentName}
+            onChange={(e) => setNewDepartmentName(e.target.value)}
+            placeholder="p.sh. Financa"
+            disabled={deptCreatePending}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleQuickCreateDepartment();
+              }
+            }}
+          />
+        </FormField>
+        <DialogFooter>
+          <Button type="button" variant="secondary" disabled={deptCreatePending} onClick={() => setDeptDialogOpen(false)}>
+            Anulo
+          </Button>
+          <Button type="button" disabled={deptCreatePending} onClick={() => void handleQuickCreateDepartment()}>
+            {deptCreatePending ? "Duke ruajtur…" : "Krijo departament"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

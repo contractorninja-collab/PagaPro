@@ -6,8 +6,9 @@ import type {
   EmployeeFiltersDto,
   EmployeeListRowDto,
   EmployeesPageDataDto,
-  DepartmentOptionDto,
 } from "@/modules/employees/types";
+import { listDepartmentsForCompany } from "@/modules/departments/services/department-service";
+import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import type { EmployeeUpsertInput } from "@/modules/employees/validations/employee-schemas";
 import {
   appendDomainEmployeeActivity,
@@ -36,12 +37,14 @@ function mapListRow(e: {
   personalId: string;
   email: string | null;
   jobTitle: string | null;
+  jobTitleId: string | null;
   departmentId: string | null;
   status: EmploymentStatus;
   employmentType: import("@prisma/client").EmploymentType;
   baseSalaryMonthly: Prisma.Decimal;
   hireDate: Date;
   department: { name: string } | null;
+  jobTitleProfile: { description: string; status: "ACTIVE" | "ARCHIVED" } | null;
 }): EmployeeListRowDto {
   return {
     id: e.id,
@@ -50,6 +53,8 @@ function mapListRow(e: {
     personalId: e.personalId,
     email: e.email,
     jobTitle: e.jobTitle,
+    jobTitleId: e.jobTitleId,
+    jobDescription: e.jobTitleProfile?.description ?? null,
     departmentId: e.departmentId,
     departmentName: e.department?.name ?? null,
     status: e.status,
@@ -59,14 +64,7 @@ function mapListRow(e: {
   };
 }
 
-export async function listDepartmentsForCompany(companyId: string): Promise<DepartmentOptionDto[]> {
-  const rows = await prisma.department.findMany({
-    where: { companyId },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
-  return rows;
-}
+export { listDepartmentsForCompany } from "@/modules/departments/services/department-service";
 
 export async function getEmployeesPageData(
   companyId: string,
@@ -89,21 +87,29 @@ export async function getEmployeesPageData(
       filters.status ? { status: filters.status } : {},
       filters.employmentType ? { employmentType: filters.employmentType } : {},
       filters.departmentId ? { departmentId: filters.departmentId } : {},
+      filters.documentsMissing
+        ? { documentsMissing: true, status: { not: "TERMINATED" } }
+        : {},
     ],
   };
 
-  const [employees, departments] = await Promise.all([
+  const [employees, departments, jobTitles] = await Promise.all([
     prisma.employee.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      include: { department: { select: { name: true } } },
+      include: {
+        department: { select: { name: true } },
+        jobTitleProfile: { select: { description: true, status: true } },
+      },
     }),
     listDepartmentsForCompany(companyId),
+    listActiveJobTitleOptions(companyId),
   ]);
 
   return {
     employees: employees.map(mapListRow),
     departments,
+    jobTitles,
   };
 }
 
@@ -112,6 +118,15 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     where: { id, companyId },
     include: {
       department: { select: { name: true } },
+      jobTitleProfile: {
+        select: {
+          id: true,
+          description: true,
+          responsibilities: true,
+          requirements: true,
+          status: true,
+        },
+      },
       emergencyContacts: {
         where: { isPrimary: true },
         take: 1,
@@ -144,6 +159,12 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     departmentId: e.departmentId,
     departmentName: e.department?.name ?? null,
     jobTitle: e.jobTitle,
+    jobTitleId: e.jobTitleId,
+    jobDescription: e.jobTitleProfile?.description ?? null,
+    jobResponsibilities: e.jobTitleProfile?.responsibilities ?? null,
+    jobRequirements: e.jobTitleProfile?.requirements ?? null,
+    jobTitleStatus: e.jobTitleProfile?.status ?? null,
+    probationMonths: e.probationMonths,
     hireDate: toIso(e.hireDate),
     status: e.status,
     employmentType: e.employmentType,
@@ -296,9 +317,15 @@ export async function createEmployee(
   actorUserId: string | null,
 ): Promise<
   | { ok: true; id: string }
-  | { ok: false; code: "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "DB_ERROR"; message?: string }
+  | { ok: false; code: "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "INVALID_JOB_TITLE" | "DB_ERROR"; message?: string }
 > {
   try {
+    const selectedJobTitle = await prisma.jobTitle.findFirst({
+      where: { id: input.jobTitleId, companyId, status: "ACTIVE" },
+      select: { id: true, title: true },
+    });
+    if (!selectedJobTitle) return { ok: false, code: "INVALID_JOB_TITLE" };
+
     if (input.departmentId) {
       const d = await prisma.department.findFirst({
         where: { id: input.departmentId, companyId },
@@ -312,6 +339,7 @@ export async function createEmployee(
         data: {
           companyId,
           departmentId: input.departmentId ?? undefined,
+          jobTitleId: selectedJobTitle.id,
           employmentType: input.employmentType,
           status: input.status,
           workArrangement: input.workArrangement,
@@ -323,7 +351,8 @@ export async function createEmployee(
           phone: input.phone ?? undefined,
           email: input.email ?? undefined,
           hireDate: input.hireDate,
-          jobTitle: input.jobTitle ?? undefined,
+          jobTitle: selectedJobTitle.title,
+          probationMonths: input.probationMonths ?? undefined,
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
           baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
@@ -381,13 +410,13 @@ export async function updateEmployee(
   | { ok: true }
   | {
       ok: false;
-      code: "NOT_FOUND" | "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "TERMINATED_LOCKED" | "DB_ERROR";
+      code: "NOT_FOUND" | "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "INVALID_JOB_TITLE" | "TERMINATED_LOCKED" | "DB_ERROR";
       message?: string;
     }
 > {
   const existing = await prisma.employee.findFirst({
     where: { id: employeeId, companyId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, jobTitleId: true },
   });
   if (!existing) return { ok: false, code: "NOT_FOUND" };
   if (existing.status === "TERMINATED") return { ok: false, code: "TERMINATED_LOCKED" };
@@ -400,12 +429,24 @@ export async function updateEmployee(
     if (!d) return { ok: false, code: "INVALID_DEPARTMENT" };
   }
 
+  const selectedJobTitle = await prisma.jobTitle.findFirst({
+    where: { id: input.jobTitleId, companyId },
+    select: { id: true, title: true, status: true },
+  });
+  if (
+    !selectedJobTitle ||
+    (selectedJobTitle.status !== "ACTIVE" && existing.jobTitleId !== selectedJobTitle.id)
+  ) {
+    return { ok: false, code: "INVALID_JOB_TITLE" };
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.employee.update({
         where: { id: employeeId },
         data: {
           departmentId: input.departmentId ?? null,
+          jobTitleId: selectedJobTitle.id,
           employmentType: input.employmentType,
           status: input.status,
           workArrangement: input.workArrangement,
@@ -417,7 +458,8 @@ export async function updateEmployee(
           phone: input.phone ?? null,
           email: input.email ?? null,
           hireDate: input.hireDate,
-          jobTitle: input.jobTitle ?? null,
+          jobTitle: selectedJobTitle.title,
+          probationMonths: input.probationMonths ?? null,
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
           baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,

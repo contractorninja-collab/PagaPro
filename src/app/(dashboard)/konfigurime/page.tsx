@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { KonfigurimeRouteShell } from "@/components/konfigurime/konfigurime-route-shell";
+import { parseKonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
 import { loadKonfigurimePageDto } from "@/modules/konfigurime/services/konfigurime-service";
 import { resolveActiveCompanyId } from "@/server/company-scope";
 
@@ -7,8 +8,19 @@ export const metadata: Metadata = {
   title: "Konfigurimet",
 };
 
-export default async function KonfigurimePage() {
+function first(v: string | string[] | undefined): string {
+  if (Array.isArray(v)) return v[0] ?? "";
+  return v ?? "";
+}
+
+export default async function KonfigurimePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const companyId = await resolveActiveCompanyId();
+  const sp = await searchParams;
+  const initialTab = parseKonfigurimeTabId(first(sp.tab));
 
   if (!companyId) {
     return (
@@ -48,5 +60,5 @@ export default async function KonfigurimePage() {
     );
   }
 
-  return <KonfigurimeRouteShell initial={initial} />;
+  return <KonfigurimeRouteShell initial={initial} initialTab={initialTab} />;
 }

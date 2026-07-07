@@ -22,6 +22,8 @@ export interface EmployeeListRowDto {
   personalId: string;
   email: string | null;
   jobTitle: string | null;
+  jobTitleId: string | null;
+  jobDescription: string | null;
   departmentId: string | null;
   departmentName: string | null;
   status: EmploymentStatus;
@@ -52,6 +54,12 @@ export interface EmployeeDetailDto {
   departmentId: string | null;
   departmentName: string | null;
   jobTitle: string | null;
+  jobTitleId: string | null;
+  jobDescription: string | null;
+  jobResponsibilities: string | null;
+  jobRequirements: string | null;
+  jobTitleStatus: "ACTIVE" | "ARCHIVED" | null;
+  probationMonths: number | null;
   hireDate: string;
   status: EmploymentStatus;
   employmentType: EmploymentType;
@@ -74,9 +82,21 @@ export interface DepartmentOptionDto {
   name: string;
 }
 
+export interface JobTitleOptionDto {
+  id: string;
+  title: string;
+  department: string | null;
+  level: string | null;
+  description: string;
+  responsibilities: string | null;
+  requirements: string | null;
+  status: "ACTIVE" | "ARCHIVED";
+}
+
 export interface EmployeesPageDataDto {
   employees: EmployeeListRowDto[];
   departments: DepartmentOptionDto[];
+  jobTitles: JobTitleOptionDto[];
 }
 
 export interface EmployeeFiltersDto {
@@ -84,4 +104,5 @@ export interface EmployeeFiltersDto {
   status?: EmploymentStatus | "";
   employmentType?: EmploymentType | "";
   departmentId?: string | "";
+  documentsMissing?: boolean;
 }

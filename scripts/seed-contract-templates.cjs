@@ -70,6 +70,17 @@ function buildBundledMapping(entry, detection) {
   };
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 async function seedContractTemplatesForCompany(prisma, companyId) {
   const dir = contractsDir();
   const entries = loadContractManifest();
@@ -118,7 +129,7 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
 
     const existingPublished = await prisma.documentTemplateVersion.findFirst({
       where: { templateId: template.id, isPublished: true },
-      select: { id: true, sourceStorageKey: true },
+      select: { id: true, sourceStorageKey: true, mappingJson: true },
     });
     if (existingPublished) {
       let publishedIsSameRealFile = false;
@@ -129,7 +140,8 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
       } catch {
         publishedIsSameRealFile = false;
       }
-      if (publishedIsSameRealFile) continue;
+      const publishedHasSameMapping = stableJson(existingPublished.mappingJson) === stableJson(mappingJson);
+      if (publishedIsSameRealFile && publishedHasSameMapping) continue;
     }
 
     const agg = await prisma.documentTemplateVersion.aggregate({

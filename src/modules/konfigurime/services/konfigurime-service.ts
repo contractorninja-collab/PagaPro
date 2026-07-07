@@ -6,14 +6,25 @@ import {
   listCompanyHolidaysDto,
   maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty,
 } from "@/modules/payroll/services/company-holiday-service";
+import { listDepartmentsWithEmployeeCounts } from "@/modules/departments/services/department-service";
+import type { DepartmentWithEmployeeCountDto } from "@/modules/departments/services/department-service";
+import { listJobTitlesForCompany, type JobTitleDto } from "@/modules/job-titles/services/job-title-service";
 import { syncPayrollSettingsFromKonfigurime } from "@/modules/payroll/services/payroll-settings-service";
+import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 
 export interface KonfigurimeRepresentativeDto {
   id?: string;
+  employeeId: string | null;
   fullName: string;
   position: string | null;
   signatureStorageKey: string | null;
   stampStorageKey: string | null;
+}
+
+export interface KonfigurimeEmployeeOptionDto {
+  id: string;
+  fullName: string;
+  jobTitle: string | null;
 }
 
 export interface KonfigurimePageDto {
@@ -38,6 +49,11 @@ export interface KonfigurimePageDto {
     generalDocumentPrefix: string | null;
     annualLeaveDaysDefault: string | null;
     personalLeaveDaysDefault: string | null;
+    medicalLeaveDaysDefault: string | null;
+    workingDaysPerWeek: string | null;
+    annualLeaveAccrualMode: "UPFRONT" | "MONTHLY" | "STATUTORY_FIRST_YEAR";
+    annualLeaveRoundingMode: "NONE" | "HALF_DAY" | "FULL_DAY";
+    allowNegativeAnnualLeaveBalance: boolean;
     medicalLeavePolicyNote: string | null;
     notifyContractExpiring: boolean;
     notifyPayrollReminders: boolean;
@@ -48,6 +64,9 @@ export interface KonfigurimePageDto {
     defaultYear: number;
     holidays: CompanyHolidayDto[];
   };
+  departments: DepartmentWithEmployeeCountDto[];
+  jobTitles: JobTitleDto[];
+  employees: KonfigurimeEmployeeOptionDto[];
 }
 
 function decToString(v: Prisma.Decimal | null | undefined): string | null {
@@ -74,6 +93,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
 
   let representatives: KonfigurimeRepresentativeDto[] = row.authorizedRepresentatives.map((r) => ({
     id: r.id,
+    employeeId: r.employeeId ?? null,
     fullName: r.fullName,
     position: r.position ?? null,
     signatureStorageKey: r.signatureStorageKey ?? null,
@@ -83,6 +103,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
   if (!representatives.length && row.settings?.authorizedRepresentativeName) {
     representatives = [
       {
+        employeeId: null,
         fullName: row.settings.authorizedRepresentativeName,
         position: row.settings.authorizedRepresentativePosition ?? null,
         signatureStorageKey: row.settings.authorizedSignatureStorageKey ?? null,
@@ -94,6 +115,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
   if (!representatives.length) {
     representatives = [
       {
+        employeeId: null,
         fullName: "",
         position: null,
         signatureStorageKey: null,
@@ -105,7 +127,22 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
   const cfg = row.configuration;
 
   const defaultHolidayYear = new Date().getUTCFullYear();
-  const holidays = await listCompanyHolidaysDto(row.id, defaultHolidayYear);
+  const [holidays, departments, jobTitles, employeeRows] = await Promise.all([
+    listCompanyHolidaysDto(row.id, defaultHolidayYear),
+    listDepartmentsWithEmployeeCounts(row.id),
+    listJobTitlesForCompany(row.id),
+    prisma.employee.findMany({
+      where: { companyId: row.id, status: "ACTIVE" },
+      select: { id: true, firstName: true, lastName: true, jobTitle: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+  ]);
+
+  const employees: KonfigurimeEmployeeOptionDto[] = employeeRows.map((e) => ({
+    id: e.id,
+    fullName: `${e.firstName} ${e.lastName}`.trim(),
+    jobTitle: e.jobTitle ?? null,
+  }));
 
   return {
     companyId: row.id,
@@ -132,6 +169,12 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
       annualLeaveDaysDefault: cfg?.annualLeaveDaysDefault != null ? decToString(cfg.annualLeaveDaysDefault) : null,
       personalLeaveDaysDefault:
         cfg?.personalLeaveDaysDefault != null ? decToString(cfg.personalLeaveDaysDefault) : null,
+      medicalLeaveDaysDefault:
+        cfg?.medicalLeaveDaysDefault != null ? decToString(cfg.medicalLeaveDaysDefault) : null,
+      workingDaysPerWeek: cfg?.workingDaysPerWeek != null ? decToString(cfg.workingDaysPerWeek) : null,
+      annualLeaveAccrualMode: cfg?.annualLeaveAccrualMode ?? "MONTHLY",
+      annualLeaveRoundingMode: cfg?.annualLeaveRoundingMode ?? "NONE",
+      allowNegativeAnnualLeaveBalance: cfg?.allowNegativeAnnualLeaveBalance ?? false,
       medicalLeavePolicyNote: cfg?.medicalLeavePolicyNote ?? null,
       notifyContractExpiring: cfg?.notifyContractExpiring ?? true,
       notifyPayrollReminders: cfg?.notifyPayrollReminders ?? true,
@@ -142,6 +185,9 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
       defaultYear: defaultHolidayYear,
       holidays,
     },
+    departments,
+    jobTitles,
+    employees,
   };
 }
 
@@ -171,6 +217,13 @@ function configurationPrimitives(payload: KonfigurimePayloadValidated["configura
       payload.annualLeaveDaysDefault != null ? new Prisma.Decimal(payload.annualLeaveDaysDefault) : null,
     personalLeaveDaysDefault:
       payload.personalLeaveDaysDefault != null ? new Prisma.Decimal(payload.personalLeaveDaysDefault) : null,
+    medicalLeaveDaysDefault:
+      payload.medicalLeaveDaysDefault != null ? new Prisma.Decimal(payload.medicalLeaveDaysDefault) : null,
+    workingDaysPerWeek:
+      payload.workingDaysPerWeek != null ? new Prisma.Decimal(payload.workingDaysPerWeek) : null,
+    annualLeaveAccrualMode: payload.annualLeaveAccrualMode ?? "MONTHLY",
+    annualLeaveRoundingMode: payload.annualLeaveRoundingMode ?? "NONE",
+    allowNegativeAnnualLeaveBalance: payload.allowNegativeAnnualLeaveBalance ?? false,
     medicalLeavePolicyNote: payload.medicalLeavePolicyNote ?? null,
     notifyContractExpiring: payload.notifyContractExpiring,
     notifyPayrollReminders: payload.notifyPayrollReminders,
@@ -223,6 +276,15 @@ export async function persistKonfigurimeSave(
   payload: KonfigurimePayloadValidated,
   assetKeys: Map<number, { signatureStorageKey?: string; stampStorageKey?: string }>,
 ): Promise<void> {
+  const priorLeaveConfig = await prisma.companyConfiguration.findUnique({
+    where: { companyId },
+    select: {
+      medicalLeaveDaysDefault: true,
+      annualLeaveDaysDefault: true,
+      workingDaysPerWeek: true,
+    },
+  });
+
   const hadPayrollSettings = await prisma.payrollSettings.findUnique({
     where: { companyId },
     select: { id: true },
@@ -250,13 +312,29 @@ export async function persistKonfigurimeSave(
       update: cfgData,
     });
 
+    const employeeIds = Array.from(new Set(payload.representatives.map((r) => r.employeeId)));
+    const employeeRows = await tx.employee.findMany({
+      where: { id: { in: employeeIds }, companyId },
+      select: { id: true, firstName: true, lastName: true, jobTitle: true },
+    });
+    const employeeById = new Map(employeeRows.map((e) => [e.id, e]));
+
     const reps = payload.representatives.map((r, idx) => {
       const patch = assetKeys.get(idx);
+      const employee = employeeById.get(r.employeeId);
+      if (!employee) {
+        throw new Error("REPRESENTATIVE_EMPLOYEE_NOT_FOUND");
+      }
+      const jobTitle = employee.jobTitle?.trim();
+      if (!jobTitle) {
+        throw new Error("REPRESENTATIVE_EMPLOYEE_MISSING_JOB_TITLE");
+      }
       return {
         companyId,
         sortOrder: idx,
-        fullName: r.fullName.trim(),
-        position: r.position ?? null,
+        employeeId: employee.id,
+        fullName: `${employee.firstName} ${employee.lastName}`.trim(),
+        position: jobTitle,
         signatureStorageKey:
           patch?.signatureStorageKey ?? r.signatureStorageKey ?? null,
         stampStorageKey: patch?.stampStorageKey ?? r.stampStorageKey ?? null,
@@ -299,6 +377,26 @@ export async function persistKonfigurimeSave(
       await maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty(companyId);
     }
   }
+
+  const leaveConfigChanged =
+    decToString(priorLeaveConfig?.medicalLeaveDaysDefault ?? null) !==
+      (payload.configuration.medicalLeaveDaysDefault != null
+        ? String(payload.configuration.medicalLeaveDaysDefault)
+        : null) ||
+    decToString(priorLeaveConfig?.annualLeaveDaysDefault ?? null) !==
+      (payload.configuration.annualLeaveDaysDefault != null
+        ? String(payload.configuration.annualLeaveDaysDefault)
+        : null) ||
+    decToString(priorLeaveConfig?.workingDaysPerWeek ?? null) !==
+      (payload.configuration.workingDaysPerWeek != null
+        ? String(payload.configuration.workingDaysPerWeek)
+        : null);
+
+  if (leaveConfigChanged) {
+    const year = new Date().getUTCFullYear();
+    await syncLeaveBalancesForCompanyYear(companyId, year);
+    await syncLeaveBalancesForCompanyYear(companyId, year - 1);
+  }
 }
 
 /** Read helpers for payroll / leave / documents engines — fetch merged company configuration. */
@@ -330,6 +428,11 @@ export async function getCompanyOperationalSnapshot(companyId: string) {
     leave: {
       annualLeaveDaysDefault: c.annualLeaveDaysDefault,
       personalLeaveDaysDefault: c.personalLeaveDaysDefault,
+      medicalLeaveDaysDefault: c.medicalLeaveDaysDefault,
+      workingDaysPerWeek: c.workingDaysPerWeek,
+      annualLeaveAccrualMode: c.annualLeaveAccrualMode,
+      annualLeaveRoundingMode: c.annualLeaveRoundingMode,
+      allowNegativeAnnualLeaveBalance: c.allowNegativeAnnualLeaveBalance,
       medicalLeavePolicyNote: c.medicalLeavePolicyNote,
     },
     notifications: {

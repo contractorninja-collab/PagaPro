@@ -99,6 +99,12 @@ export async function buildMergedPlaceholderContext(
       lastName: string;
       personalId: string;
       jobTitle: string | null;
+      jobTitleProfile?: {
+        description: string;
+        responsibilities: string | null;
+        requirements: string | null;
+      } | null;
+      probationMonths?: number | null;
       departmentName?: string | null;
       addressLine: string | null;
       addressCity: string | null;
@@ -114,6 +120,10 @@ export async function buildMergedPlaceholderContext(
       lastName: row.lastName,
       personalId: row.personalId,
       jobTitle: row.jobTitle,
+      jobDescription: row.jobTitleProfile?.description ?? null,
+      jobResponsibilities: row.jobTitleProfile?.responsibilities ?? null,
+      jobRequirements: row.jobTitleProfile?.requirements ?? null,
+      probationMonths: row.probationMonths ?? null,
       departmentName: row.departmentName,
       addressLine: row.addressLine,
       addressCity: row.addressCity,
@@ -146,7 +156,16 @@ export async function buildMergedPlaceholderContext(
       if (params.employeeId) {
         const employee = await prisma.employee.findFirst({
           where: { id: params.employeeId, companyId: params.companyId },
-          include: { department: { select: { name: true } } },
+          include: {
+            department: { select: { name: true } },
+            jobTitleProfile: {
+              select: {
+                description: true,
+                responsibilities: true,
+                requirements: true,
+              },
+            },
+          },
         });
         if (!employee) throw new Error("Punonjësi nuk u gjet.");
         const dates = resolveContractDates(employee.hireDate, employee.terminationDate ?? null);
@@ -156,6 +175,10 @@ export async function buildMergedPlaceholderContext(
             lastName: employee.lastName,
             personalId: employee.personalId,
             jobTitle: employee.jobTitle,
+            jobDescription: employee.jobTitleProfile?.description ?? null,
+            jobResponsibilities: employee.jobTitleProfile?.responsibilities ?? null,
+            jobRequirements: employee.jobTitleProfile?.requirements ?? null,
+            probationMonths: employee.probationMonths,
             departmentName: employee.department?.name ?? null,
             addressLine: employee.addressLine,
             addressCity: employee.addressCity,
@@ -179,7 +202,19 @@ export async function buildMergedPlaceholderContext(
       // Back-compat: subjectId refers to a Contract row (legacy artifacts / regeneration).
       const contract = await prisma.contract.findFirst({
         where: { id: params.subjectId, companyId: params.companyId },
-        include: { employee: true },
+        include: {
+          employee: {
+            include: {
+              jobTitleProfile: {
+                select: {
+                  description: true,
+                  responsibilities: true,
+                  requirements: true,
+                },
+              },
+            },
+          },
+        },
       });
       if (!contract) throw new Error("Kontrata nuk u gjet.");
       const { employee } = contract;
@@ -189,7 +224,11 @@ export async function buildMergedPlaceholderContext(
           firstName: employee.firstName,
           lastName: employee.lastName,
           personalId: employee.personalId,
-          jobTitle: employee.jobTitle,
+          jobTitle: contract.jobTitleSnapshot ?? employee.jobTitle,
+          jobDescription: contract.jobDescriptionSnapshot ?? employee.jobTitleProfile?.description ?? null,
+          jobResponsibilities: contract.jobResponsibilitiesSnapshot ?? employee.jobTitleProfile?.responsibilities ?? null,
+          jobRequirements: contract.jobRequirementsSnapshot ?? employee.jobTitleProfile?.requirements ?? null,
+          probationMonths: employee.probationMonths,
           addressLine: employee.addressLine,
           addressCity: employee.addressCity,
           addressCountry: employee.addressCountry,
