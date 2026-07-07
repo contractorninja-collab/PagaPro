@@ -10,12 +10,21 @@ export interface AnnualQuotaBreakdown {
   totalBeforeFirstYearClamp: number;
 }
 
+export function deriveBaseAnnualDaysFromWorkweek(workingDaysPerWeek: number, policyMinimum = 0): number {
+  const weekDays = workingDaysPerWeek > 0 ? workingDaysPerWeek : 5;
+  const fromWorkweek = weekDays * 4;
+  return Math.max(Math.max(0, policyMinimum), fromWorkweek);
+}
+
 /**
  * Compose Kosovo-aligned annual working-day quota (Arts 32, 32.3, 32.4 + tenure steps).
- * Values are working days (not calendar days). Caller applies Art 35 first-year clamp separately.
+ * Base = max(policyMinimum, workingDaysPerWeek × 4). Values are working days (not calendar days).
+ * Caller applies Art 35 first-year clamp separately.
  */
 export function composeAnnualWorkingDayQuota(input: {
-  /** From LeavePolicyParameterSet.minimumAnnualWorkingDays */
+  /** Company working days per week (default 5 → 20 annual base). */
+  workingDaysPerWeek: number;
+  /** From LeavePolicyParameterSet.minimumAnnualWorkingDays — legal floor */
   policyMinimum: number;
   /** CompanyConfiguration.annualLeaveDaysDefault — optional uplift */
   companyAnnualDefault: number | null | undefined;
@@ -30,7 +39,7 @@ export function composeAnnualWorkingDayQuota(input: {
   enableSpecialCategoryExtra: boolean;
   eligibleSpecialCategories: boolean;
 }): { total: number; breakdown: AnnualQuotaBreakdown } {
-  const baseMinimum = Math.max(0, Number(input.policyMinimum) || 0);
+  const baseMinimum = deriveBaseAnnualDaysFromWorkweek(input.workingDaysPerWeek, Number(input.policyMinimum) || 0);
   const company = input.companyAnnualDefault != null ? Number(input.companyAnnualDefault) : NaN;
   const companyBump = Number.isFinite(company) ? Math.max(0, company - baseMinimum) : 0;
   const afterCompany = baseMinimum + Math.max(0, companyBump);

@@ -112,6 +112,19 @@ export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKon
   try {
     await persistKonfigurimeSave(companyId, parsed.data, assetKeys);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "REPRESENTATIVE_EMPLOYEE_NOT_FOUND") {
+      return {
+        ok: false,
+        error: "Punonjësi i zgjedhur për përfaqësues nuk u gjet. Zgjidhni një punonjës aktiv.",
+      };
+    }
+    if (msg === "REPRESENTATIVE_EMPLOYEE_MISSING_JOB_TITLE") {
+      return {
+        ok: false,
+        error: "Punonjësi i zgjedhur nuk ka Pozitë. Vendosni pozitën te profili i punonjësit dhe provoni sërish.",
+      };
+    }
     console.error(e);
     return { ok: false, error: "Ruajtja në databazë dështoi." };
   }

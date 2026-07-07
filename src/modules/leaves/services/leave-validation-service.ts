@@ -88,39 +88,54 @@ async function balanceGateForAnnual(params: {
 
   await syncLeaveBalancesForEmployeeYear(params.companyId, params.employeeId, params.yearUtc);
 
-  const policy = await resolveLeavePolicyParameterSet(
-    params.companyId,
-    new Date(Date.UTC(params.yearUtc, 11, 31, 12, 0, 0, 0)),
-  );
-
-  const row = await prisma.leaveBalance.findUnique({
-    where: {
-      companyId_employeeId_leaveType_year: {
-        companyId: params.companyId,
-        employeeId: params.employeeId,
-        leaveType: "PUSHIM_VJETOR",
-        year: params.yearUtc,
+  const [policy, cfg, row] = await Promise.all([
+    resolveLeavePolicyParameterSet(
+      params.companyId,
+      new Date(Date.UTC(params.yearUtc, 11, 31, 12, 0, 0, 0)),
+    ),
+    prisma.companyConfiguration.findUnique({
+      where: { companyId: params.companyId },
+      select: { allowNegativeAnnualLeaveBalance: true },
+    }),
+    prisma.leaveBalance.findUnique({
+      where: {
+        companyId_employeeId_leaveType_year: {
+          companyId: params.companyId,
+          employeeId: params.employeeId,
+          leaveType: "PUSHIM_VJETOR",
+          year: params.yearUtc,
+        },
       },
-    },
-    select: { remainingDays: true },
-  });
+      select: { remainingDays: true, pendingDays: true, breakdown: true },
+    }),
+  ]);
 
   const remaining = row?.remainingDays?.toNumber() ?? 0;
+  const pendingExisting = row?.pendingDays?.toNumber() ?? 0;
+  const available = remaining - pendingExisting;
+  const blockNegative = cfg?.allowNegativeAnnualLeaveBalance
+    ? false
+    : policy.blockNegativeBalance;
 
   const blocks = [];
   const warnings = [];
 
-  if (policy.blockNegativeBalance && params.requestedWorkingDays > remaining + 1e-9) {
+  const breakdown = row?.breakdown as { entitlement?: { warnings?: LeaveValidationResult["warnings"] } } | null;
+  if (breakdown?.entitlement?.warnings?.length) {
+    warnings.push(...breakdown.entitlement.warnings);
+  }
+
+  if (blockNegative && params.requestedWorkingDays > available + 1e-9) {
     blocks.push({
       code: LeaveValidationCode.INSUFFICIENT_BALANCE_BLOCK,
-      message: `Për pushimin vjetor nuk ka ditë të mjaftueshme (mbeten ~${remaining.toFixed(2)}, kërkohen ${params.requestedWorkingDays.toFixed(2)} ditë pune).`,
-      metadata: { remaining, requestedWorkingDays: params.requestedWorkingDays },
+      message: `Për pushimin vjetor nuk ka ditë të mjaftueshme (mbeten ~${available.toFixed(2)} pas kërkesave në pritje, kërkohen ${params.requestedWorkingDays.toFixed(2)} ditë pune).`,
+      metadata: { remaining, pendingExisting, requestedWorkingDays: params.requestedWorkingDays },
     });
-  } else if (policy.warnInsufficientBalance && params.requestedWorkingDays > remaining + 1e-9) {
+  } else if (policy.warnInsufficientBalance && params.requestedWorkingDays > available + 1e-9) {
     warnings.push({
       code: LeaveValidationCode.INSUFFICIENT_BALANCE_WARN,
-      message: `Balanca e pushimit vjetor është nën kërkesën (mbeten ~${remaining.toFixed(2)} ditë pune).`,
-      metadata: { remaining, requestedWorkingDays: params.requestedWorkingDays },
+      message: `Balanca e akumuluar e pushimit vjetor është nën kërkesën (mbeten ~${available.toFixed(2)} ditë pune).`,
+      metadata: { remaining, pendingExisting, requestedWorkingDays: params.requestedWorkingDays },
     });
   }
 

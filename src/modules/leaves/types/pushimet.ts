@@ -35,9 +35,11 @@ export type PushimetBalanceRowDto = {
   leaveType: LeaveType;
   year: number;
   yearlyQuota: string;
-  usedDays: string;
-  remainingDays: string;
+  accruedDays: string;
   carryOverDays: string;
+  usedDays: string;
+  pendingDays: string;
+  remainingDays: string;
 };
 
 export type PushimetEmployeeOptionDto = { id: string; label: string };

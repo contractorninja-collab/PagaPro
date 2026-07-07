@@ -2,25 +2,124 @@
 
 import Link from "next/link";
 import type { PayrollPeriodStatus } from "@prisma/client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PayrollStatusBadge } from "@/modules/payroll/components/payroll-status-badge";
 import { formatIsoDateUtcDdMmYyyy } from "@/modules/payroll/helpers/display-date";
-import { MoreHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type PayrollStep = {
+  key: PayrollPeriodStatus | "DONE";
+  label: string;
+};
+
+const PAYROLL_STEPS: PayrollStep[] = [
+  { key: "DRAFT", label: "Draft" },
+  { key: "REVIEWED", label: "Shqyrtim" },
+  { key: "APPROVED", label: "Miratim" },
+  { key: "LOCKED", label: "Kyçur" },
+  { key: "ARCHIVED", label: "Arkivuar" },
+];
+
+const STATUS_ORDER: Record<PayrollPeriodStatus, number> = {
+  DRAFT: 0,
+  REVIEWED: 1,
+  APPROVED: 2,
+  LOCKED: 3,
+  ARCHIVED: 4,
+};
+
+type PrimaryAction = {
+  label: string;
+  handler: (id: string) => void;
+} | null;
+
+function getPrimaryAction(
+  status: PayrollPeriodStatus,
+  handlers: {
+    onReview: (id: string) => void;
+    onApprove: (id: string) => void;
+    onLock: (id: string) => void;
+    onArchive: (id: string) => void;
+  },
+): PrimaryAction {
+  switch (status) {
+    case "DRAFT":
+      return { label: "Shëno të shqyrtuar →", handler: handlers.onReview };
+    case "REVIEWED":
+      return { label: "Mirato →", handler: handlers.onApprove };
+    case "APPROVED":
+      return { label: "Kyç payroll →", handler: handlers.onLock };
+    case "LOCKED":
+      return { label: "Arkivo", handler: handlers.onArchive };
+    default:
+      return null;
+  }
+}
+
+function isComplete(status: PayrollPeriodStatus): boolean {
+  return status === "ARCHIVED";
+}
+
+function needsAction(status: PayrollPeriodStatus): boolean {
+  return status === "DRAFT" || status === "REVIEWED" || status === "APPROVED";
+}
+
+function ProgressRail({ status }: { status: PayrollPeriodStatus }) {
+  const currentIndex = STATUS_ORDER[status];
+
+  return (
+    <div className="flex items-center gap-0" role="list" aria-label="Hapat e payroll">
+      {PAYROLL_STEPS.map((step, i) => {
+        const isDone = i < currentIndex;
+        const isActive = i === currentIndex;
+        const isIdle = i > currentIndex;
+
+        return (
+          <div key={step.key} className="flex flex-1 items-center" role="listitem">
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-medium",
+                  isDone && "border-emerald-300 bg-emerald-50 text-emerald-800",
+                  isActive && "border-blue-300 bg-blue-50 text-blue-800 ring-2 ring-blue-100",
+                  isIdle && "border-border bg-muted text-muted-foreground",
+                )}
+                aria-current={isActive ? "step" : undefined}
+              >
+                {isDone ? (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                    <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <span>{i + 1}</span>
+                )}
+              </div>
+              <span
+                className={cn(
+                  "text-[9px] leading-tight text-center w-12",
+                  isActive && "font-medium text-blue-700",
+                  isDone && "text-emerald-700",
+                  isIdle && "text-muted-foreground",
+                )}
+              >
+                {step.label}
+              </span>
+            </div>
+            {i < PAYROLL_STEPS.length - 1 && (
+              <div
+                className={cn(
+                  "mb-3.5 h-px flex-1",
+                  i < currentIndex ? "bg-emerald-200" : "bg-border",
+                )}
+                aria-hidden
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export type PayrollListRow = {
   id: string;
@@ -35,6 +134,109 @@ export type PayrollListRow = {
   createdAt: string;
 };
 
+function PayrollCard({
+  row,
+  onRegenerate,
+  onReview,
+  onApprove,
+  onLock,
+  onArchive,
+  onPdf,
+}: {
+  row: PayrollListRow;
+  onRegenerate: (id: string) => void;
+  onReview: (id: string) => void;
+  onApprove: (id: string) => void;
+  onLock: (id: string) => void;
+  onArchive: (id: string) => void;
+  onPdf: (id: string) => void;
+}) {
+  const primary = getPrimaryAction(row.status, { onReview, onApprove, onLock, onArchive });
+  const complete = isComplete(row.status);
+  const active = needsAction(row.status);
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border bg-card transition-shadow",
+        active && "border-blue-200 shadow-sm",
+        complete && "border-border opacity-60",
+        !active && !complete && "border-border",
+      )}
+    >
+      {/* Card header */}
+      <div className="flex items-start justify-between gap-3 p-4 pb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/pagat/${row.id}`}
+              className="text-sm font-semibold text-foreground hover:underline"
+            >
+              {row.monthLabel}
+            </Link>
+            <PayrollStatusBadge status={row.status} />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {row.employeeCount} punonjës · €{row.totalGross} bruto · €{row.totalNet} neto
+          </p>
+        </div>
+
+        {/* Primary CTA — only for actionable statuses */}
+        {primary && (
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0 text-xs"
+            onClick={() => primary.handler(row.id)}
+          >
+            {primary.label}
+          </Button>
+        )}
+      </div>
+
+      {/* Progress rail */}
+      <div className="border-t border-border/60 px-4 py-3">
+        <ProgressRail status={row.status} />
+      </div>
+
+      {/* Secondary actions footer */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5">
+        <Button asChild variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">
+          <Link href={`/pagat/${row.id}`}>Hap detajet</Link>
+        </Button>
+
+        {row.status === "DRAFT" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            type="button"
+            onClick={() => onRegenerate(row.id)}
+          >
+            Ripëllogarit
+          </Button>
+        )}
+
+        {(row.status === "APPROVED" || row.status === "LOCKED") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            type="button"
+            onClick={() => onPdf(row.id)}
+          >
+            Gjenero PDF
+          </Button>
+        )}
+
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {formatIsoDateUtcDdMmYyyy(row.createdAt)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function PayrollsTable(props: {
   rows: PayrollListRow[];
   onRegenerate: (id: string) => void;
@@ -46,150 +248,28 @@ export function PayrollsTable(props: {
 }) {
   const { rows, onRegenerate, onReview, onApprove, onLock, onArchive, onPdf } = props;
 
-  return (
-    <>
-      <div className="hidden rounded-lg border border-border bg-card md:block">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead>Muaji</TableHead>
-              <TableHead>Kompania</TableHead>
-              <TableHead className="text-right">Punonjësit</TableHead>
-              <TableHead className="text-right">Bruto Totale</TableHead>
-              <TableHead className="text-right">Neto Totale</TableHead>
-              <TableHead>Statusi</TableHead>
-              <TableHead>Krijuar</TableHead>
-              <TableHead className="w-[52px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
-                  Nuk ka periudha pagë. Krijoni një payroll për të filluar.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.monthLabel}</TableCell>
-                  <TableCell className="max-w-[180px] truncate text-muted-foreground">{r.companyLabel}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.employeeCount}</TableCell>
-                  <TableCell className="text-right tabular-nums">€{r.totalGross}</TableCell>
-                  <TableCell className="text-right tabular-nums">€{r.totalNet}</TableCell>
-                  <TableCell>
-                    <PayrollStatusBadge status={r.status} />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {formatIsoDateUtcDdMmYyyy(r.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Veprime">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/pagat/${r.id}`}>Shiko payroll</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {r.status === "DRAFT" ? (
-                          <DropdownMenuItem onClick={() => onRegenerate(r.id)}>Ripëllogarit</DropdownMenuItem>
-                        ) : null}
-                        {r.status === "DRAFT" ? (
-                          <DropdownMenuItem onClick={() => onReview(r.id)}>Shëno të shqyrtuar</DropdownMenuItem>
-                        ) : null}
-                        {r.status === "REVIEWED" ? (
-                          <DropdownMenuItem onClick={() => onApprove(r.id)}>Mirato</DropdownMenuItem>
-                        ) : null}
-                        {r.status === "APPROVED" ? (
-                          <DropdownMenuItem onClick={() => onLock(r.id)}>Kyç payroll</DropdownMenuItem>
-                        ) : null}
-                        {r.status === "APPROVED" ? (
-                          <DropdownMenuItem onClick={() => onPdf(r.id)}>Paraprakisht: gjenero PDF</DropdownMenuItem>
-                        ) : null}
-                        {r.status === "LOCKED" ? (
-                          <DropdownMenuItem onClick={() => onArchive(r.id)}>Arkivo</DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-card py-12 text-center text-sm text-muted-foreground">
+        Nuk ka periudha pagë. Krijoni një payroll për të filluar.
       </div>
+    );
+  }
 
-      <div className="space-y-3 md:hidden">
-        {rows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card py-10 text-center text-sm text-muted-foreground">
-            Nuk ka periudha pagë.
-          </div>
-        ) : (
-          rows.map((r) => (
-            <div key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold leading-tight">{r.monthLabel}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{r.companyLabel}</p>
-                </div>
-                <PayrollStatusBadge status={r.status} />
-              </div>
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Punonjësit</dt>
-                  <dd className="tabular-nums font-medium">{r.employeeCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Bruto</dt>
-                  <dd className="tabular-nums font-medium">€{r.totalGross}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Neto</dt>
-                  <dd className="tabular-nums font-medium">€{r.totalNet}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Krijuar</dt>
-                  <dd className="text-xs">{formatIsoDateUtcDdMmYyyy(r.createdAt)}</dd>
-                </div>
-              </dl>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="secondary">
-                  <Link href={`/pagat/${r.id}`}>Hap</Link>
-                </Button>
-                {r.status === "DRAFT" ? (
-                  <Button size="sm" variant="secondary" type="button" onClick={() => onRegenerate(r.id)}>
-                    Ripëllogarit
-                  </Button>
-                ) : null}
-                {r.status === "REVIEWED" ? (
-                  <Button size="sm" variant="secondary" type="button" onClick={() => onApprove(r.id)}>
-                    Mirato
-                  </Button>
-                ) : null}
-                {r.status === "APPROVED" ? (
-                  <Button size="sm" type="button" onClick={() => onLock(r.id)}>
-                    Kyç
-                  </Button>
-                ) : null}
-                {r.status === "APPROVED" ? (
-                  <Button size="sm" variant="secondary" type="button" onClick={() => onPdf(r.id)}>
-                    PDF
-                  </Button>
-                ) : null}
-                {r.status === "LOCKED" ? (
-                  <Button size="sm" variant="secondary" type="button" onClick={() => onArchive(r.id)}>
-                    Arkivo
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </>
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <PayrollCard
+          key={row.id}
+          row={row}
+          onRegenerate={onRegenerate}
+          onReview={onReview}
+          onApprove={onApprove}
+          onLock={onLock}
+          onArchive={onArchive}
+          onPdf={onPdf}
+        />
+      ))}
+    </div>
   );
 }

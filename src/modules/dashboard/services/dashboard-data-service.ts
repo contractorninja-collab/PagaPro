@@ -21,6 +21,7 @@ import type {
 } from "../types/dashboard-types";
 import { daysBetweenUtc, endOfUtcDay, startOfUtcDay, utcMonthWindow } from "../helpers/dashboard-time";
 import { buildOperationalAlerts } from "./dashboard-alerts-service";
+import { buildRecommendedActions } from "./dashboard-recommended-actions-service";
 
 function decStr(v: null | undefined | { toString(): string }): string {
   if (v == null) return "0";
@@ -96,7 +97,7 @@ export async function loadDashboardOperationalData(
     employmentTypeGroups,
     deptGroups,
     departments,
-    documentsMissingCount,
+    documentsMissingRows,
     correctionsOpen,
   ] = await Promise.all([
     prisma.employee.count({ where: { ...empBase, status: "ACTIVE" } }),
@@ -281,12 +282,14 @@ export async function loadDashboardOperationalData(
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    prisma.employee.count({
+    prisma.employee.findMany({
       where: {
         companyId,
         documentsMissing: true,
         status: { not: "TERMINATED" },
       },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.payrollCorrection.count({
       where: {
@@ -300,6 +303,13 @@ export async function loadDashboardOperationalData(
     where: { companyId },
     select: { minimumSalaryMonthly: true },
   });
+
+  const registerPdfGenerated =
+    payrollRow != null
+      ? (await prisma.payrollGeneratedDocument.count({
+          where: { payrollId: payrollRow.id, kind: "REGISTER_WITH_TOTALS" },
+        })) > 0
+      : false;
 
   const belowMin =
     settingsRow != null
@@ -453,7 +463,7 @@ export async function loadDashboardOperationalData(
     byDepartment: byDepartment.sort((a, b) => b.count - a.count),
   };
 
-  const payloadWithoutAlerts: Omit<DashboardOperationalPayload, "alerts"> = {
+  const payloadWithoutAlerts: Omit<DashboardOperationalPayload, "alerts" | "recommendedActions"> = {
     filters,
     summary,
     payroll,
@@ -466,15 +476,28 @@ export async function loadDashboardOperationalData(
     distribution,
   };
 
+  const documentsMissingEmployees = documentsMissingRows.map((e) => ({
+    id: e.id,
+    fullName: `${e.firstName} ${e.lastName}`.trim(),
+  }));
+
   const alerts = buildOperationalAlerts({
     ...payloadWithoutAlerts,
     payrollSettingsPresent: settingsRow != null,
     belowMinimumEmployees: belowMin,
-    documentsMissingEmployees: documentsMissingCount,
+    documentsMissingEmployees,
     openPayrollCorrections: correctionsOpen,
     expiringContractsTotal: contractsExpiringWithin30Days,
     payrollRowExists: payrollRow != null,
+    registerPdfGenerated,
   });
 
-  return { ...payloadWithoutAlerts, alerts };
+  const recommendedActions = buildRecommendedActions({
+    ...payloadWithoutAlerts,
+    payrollRowExists: payrollRow != null,
+    documentsMissingEmployees,
+    registerPdfGenerated,
+  });
+
+  return { ...payloadWithoutAlerts, alerts, recommendedActions };
 }

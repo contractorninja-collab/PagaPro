@@ -9,18 +9,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
+import { PanelHeader } from "@/components/patterns/page-header";
 import type { ContractExpiryRow } from "../types/dashboard-types";
 import { CONTRACT_KIND_LABELS_SQ } from "../helpers/dashboard-labels";
 
 export function DashboardContractExpiryTable({ rows }: { rows: ContractExpiryRow[] }) {
   return (
-    <div id="contracts-expiry" className="scroll-mt-24 rounded-lg border border-border/80 bg-card">
-      <div className="border-b border-border/60 px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Kontrata që skadojnë (30 ditë)</h2>
-        <p className="text-xs text-muted-foreground">Lista operative për rinovim.</p>
-      </div>
+    <div id="contracts-expiry" className="scroll-mt-24 surface-card flex h-full flex-col">
+      <PanelHeader
+        title="Kontrata që skadojnë së shpejti"
+        description="Lista operative për rinovim."
+      />
       {rows.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="surface-card-body py-8 text-center text-sm text-muted-foreground">
           Nuk ka kontrata aktive me datë mbarimi në këtë dritare.
         </p>
       ) : (
@@ -45,7 +46,7 @@ export function DashboardContractExpiryTable({ rows }: { rows: ContractExpiryRow
                   <TableCell className="tabular-nums">{formatSqDate(r.endDateIso)}</TableCell>
                   <TableCell className="text-right">
                     <Badge
-                      variant={r.urgency === "7" ? "destructive" : r.urgency === "14" ? "warning" : "secondary"}
+                      variant={r.urgency === "7" ? "destructive" : r.urgency === "14" ? "warning" : "muted"}
                     >
                       {r.daysRemaining}d
                     </Badge>

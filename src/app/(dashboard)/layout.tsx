@@ -42,8 +42,27 @@ export default async function DashboardLayout({
     console.error("[pagapro] DashboardLayout: company lookup failed — UI continues without tenant label.", err);
   }
 
+  let alertCount = 0;
+  try {
+    const { loadDashboardOperationalData } = await import(
+      "@/modules/dashboard/services/dashboard-data-service"
+    );
+    const { parseDashboardFilters } = await import(
+      "@/modules/dashboard/helpers/dashboard-time"
+    );
+    const dashData = await loadDashboardOperationalData(companyId, parseDashboardFilters({}));
+    alertCount = dashData.alerts?.length ?? 0;
+  } catch {
+    alertCount = 0;
+  }
+
   return (
-    <AppShell activeCompanyLabel={activeCompanyLabel} userLabel={user.displayName} userEmail={user.email}>
+    <AppShell
+      activeCompanyLabel={activeCompanyLabel}
+      userLabel={user.displayName}
+      userEmail={user.email}
+      alertCount={alertCount}
+    >
       {children}
     </AppShell>
   );

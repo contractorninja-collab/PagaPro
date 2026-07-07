@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyFirstYearGateClamp,
   composeAnnualWorkingDayQuota,
+  deriveBaseAnnualDaysFromWorkweek,
   fullYearsOfServiceUtc,
 } from "@/modules/leaves/engine/kosovo-annual-quota";
 
 const baseQuotaInput = {
+  workingDaysPerWeek: 5,
   policyMinimum: 20,
   companyAnnualDefault: null as number | null,
   isHazardous: false,
@@ -20,6 +22,19 @@ const baseQuotaInput = {
 };
 
 describe("kosovo-annual-quota", () => {
+  it("derives 20 base days from 5-day workweek", () => {
+    expect(deriveBaseAnnualDaysFromWorkweek(5, 20)).toBe(20);
+  });
+
+  it("derives 24 base days from 6-day workweek", () => {
+    const r = composeAnnualWorkingDayQuota({
+      ...baseQuotaInput,
+      workingDaysPerWeek: 6,
+    });
+    expect(r.breakdown.baseMinimum).toBe(24);
+    expect(r.total).toBe(24);
+  });
+
   it("raises hazardous floor above policy minimum", () => {
     const r = composeAnnualWorkingDayQuota({
       ...baseQuotaInput,

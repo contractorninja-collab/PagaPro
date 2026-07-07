@@ -5,9 +5,14 @@ const emptyToNull = (v: unknown): unknown => {
   return v;
 };
 
-/** Representative row — storage keys may come from existing DB or new uploads merged server-side. */
+/**
+ * Representative row — the signatory is selected from the company's employees.
+ * `fullName`/`position` are derived server-side from the linked employee; storage
+ * keys may come from existing DB or new uploads merged server-side.
+ */
 export const konfigurimeRepresentativeSchema = z.object({
-  fullName: z.string().min(1, "Emri i plotë është i detyrueshëm").max(200),
+  employeeId: z.string().cuid("Zgjidhni një punonjës për përfaqësuesin"),
+  fullName: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
   position: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
   signatureStorageKey: z.preprocess(emptyToNull, z.string().max(512).nullable().optional()),
   stampStorageKey: z.preprocess(emptyToNull, z.string().max(512).nullable().optional()),
@@ -47,6 +52,15 @@ export const konfigurimeConfigurationSchema = z.object({
   generalDocumentPrefix: z.preprocess(emptyToNull, z.string().max(48).nullable().optional()),
   annualLeaveDaysDefault: optionalLeaveDays,
   personalLeaveDaysDefault: optionalLeaveDays,
+  medicalLeaveDaysDefault: optionalLeaveDays,
+  workingDaysPerWeek: z.preprocess((v) => {
+    if (v === "" || v === null || v === undefined) return null;
+    const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+    return Number.isFinite(n) ? n : null;
+  }, z.number().min(1).max(7).nullable()),
+  annualLeaveAccrualMode: z.enum(["UPFRONT", "MONTHLY", "STATUTORY_FIRST_YEAR"]).optional(),
+  annualLeaveRoundingMode: z.enum(["NONE", "HALF_DAY", "FULL_DAY"]).optional(),
+  allowNegativeAnnualLeaveBalance: z.boolean().optional(),
   medicalLeavePolicyNote: z.preprocess(emptyToNull, z.string().max(5000).nullable().optional()),
   notifyContractExpiring: z.boolean(),
   notifyPayrollReminders: z.boolean(),

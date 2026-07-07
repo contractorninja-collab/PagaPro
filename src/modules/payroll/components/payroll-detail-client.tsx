@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -127,6 +127,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   const canGenerateAtk =
     atkStatusEligible && (payroll.status === "LOCKED" ? latestAtkExport === undefined : true);
 
+  const [tab, setTab] = useState("spreadsheet");
   const [advancedEntry, setAdvancedEntry] = useState<(typeof data.entries)[0] | null>(null);
   const [bonusInput, setBonusInput] = useState("");
   const [deductInput, setDeductInput] = useState("");
@@ -173,13 +174,37 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   }
 
   async function exec(label: string, p: Promise<PayrollActionResult<unknown>>) {
-    const r = await p;
-    if (!r.ok) {
-      toast.error("error" in r ? r.error : "Veprimi dështoi.");
-      return;
+    try {
+      const r = await p;
+      if (!r.ok) {
+        toast.error("error" in r ? r.error : "Veprimi dështoi.");
+        return;
+      }
+      toast.success(label);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Veprimi dështoi për një gabim të papritur.");
     }
-    toast.success(label);
-    router.refresh();
+  }
+
+  const [pdfPending, setPdfPending] = useState(false);
+
+  async function generatePdfs() {
+    setPdfPending(true);
+    try {
+      const r = await generatePayrollPdfsAction(payroll.id);
+      if (!r.ok) {
+        toast.error("error" in r ? r.error : "Gjenerimi i PDF dështoi.");
+        return;
+      }
+      toast.success("PDF-t u gjeneruan. Po hapet skeda PDF për shkarkim.");
+      setTab("documents");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gjenerimi i PDF dështoi për një gabim të papritur.");
+    } finally {
+      setPdfPending(false);
+    }
   }
 
   const correctionEmployees = data.entries.map((e) => ({
@@ -322,7 +347,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         </Card>
       ) : null}
 
-      <Tabs defaultValue="spreadsheet" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/50 p-1 lg:inline-flex lg:w-auto">
           <TabsTrigger value="spreadsheet">Spreadsheet</TabsTrigger>
           <TabsTrigger value="documents">PDF</TabsTrigger>
@@ -362,29 +387,113 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
           ) : null}
         </TabsContent>
 
-        <TabsContent value="documents" className="mt-4 space-y-3">
+        <TabsContent value="documents" className="mt-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            PDF-t kryesore gjenerohen automatikisht në momentin e kyçjes. Para kyçjes mund të përdorni paraprakisht veprimin &quot;Gjenero
-            PDF&quot; (vetëm për APPROVED). Pas kyçjes, rigjenerimi është i ndaluar — shkarkoni nga lista.
+            Fletëpagesat profesionale përfshijnë të ardhurat, zbritjet, neton dhe të dhënat bankare. Skedari quhet sipas
+            punonjësit dhe muajit (p.sh. <code className="rounded bg-muted px-1 text-xs">Ajeti_Arines_Qershor_2026.pdf</code>
+            ). Për printim masiv, përdorni paketën e kombinuar më poshtë.
           </p>
           {data.documents.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ende nuk janë gjeneruar PDF.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {data.documents.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
-                >
-                  <span className="font-medium">{d.filename}</span>
-                  <Button variant="secondary" size="sm" asChild>
-                    <a href={`/api/payroll-documents/${d.id}`} target="_blank" rel="noreferrer">
-                      Shkarko
-                    </a>
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            (() => {
+              const bundle = data.documents.find((d) => d.kind === "PAYSLIPS_PRINT_BUNDLE");
+              const payslips = data.documents.filter((d) => d.kind === "EMPLOYEE_PAYSLIP");
+              const registers = data.documents.filter(
+                (d) => d.kind === "REGISTER_WITH_TOTALS" || d.kind === "REGISTER_SIGNATURE_LIST",
+              );
+
+              return (
+                <>
+                  {bundle ? (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Printim masiv — të gjitha fletëpagesat</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-wrap items-center gap-2">
+                        <p className="w-full text-xs text-muted-foreground">
+                          {bundle.filename} — {payslips.length} fletëpagesa në një PDF (një faqe për punonjës).
+                        </p>
+                        <Button variant="default" size="sm" asChild>
+                          <a
+                            href={`/api/payroll-documents/${bundle.id}?inline=1`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Printer className="mr-1.5 h-3.5 w-3.5" />
+                            Printo të gjitha
+                          </a>
+                        </Button>
+                        <Button variant="secondary" size="sm" asChild>
+                          <a href={`/api/payroll-documents/${bundle.id}`} target="_blank" rel="noreferrer">
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Shkarko paketën
+                          </a>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  {payslips.length > 0 ? (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Fletëpagesat e punonjësve</h3>
+                      <ul className="space-y-2 text-sm">
+                        {payslips.map((d) => (
+                          <li
+                            key={d.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium">{d.employeeName ?? d.filename}</p>
+                              <p className="truncate text-xs text-muted-foreground">{d.filename}</p>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <Button variant="outlinePrimary" size="sm" asChild>
+                                <a
+                                  href={`/api/payroll-documents/${d.id}?inline=1`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  <Printer className="mr-1 h-3.5 w-3.5" />
+                                  Printo
+                                </a>
+                              </Button>
+                              <Button variant="secondary" size="sm" asChild>
+                                <a href={`/api/payroll-documents/${d.id}`} target="_blank" rel="noreferrer">
+                                  <Download className="mr-1 h-3.5 w-3.5" />
+                                  Shkarko
+                                </a>
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {registers.length > 0 ? (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Listat e pagave</h3>
+                      <ul className="space-y-2 text-sm">
+                        {registers.map((d) => (
+                          <li
+                            key={d.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
+                          >
+                            <span className="font-medium">{d.filename}</span>
+                            <Button variant="secondary" size="sm" asChild>
+                              <a href={`/api/payroll-documents/${d.id}`} target="_blank" rel="noreferrer">
+                                Shkarko
+                              </a>
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()
           )}
         </TabsContent>
 
@@ -566,8 +675,8 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
               <Button size="sm" className="flex-1" type="button" onClick={() => void exec("Kyçur.", lockPayrollAction(payroll.id))}>
                 Kyç
               </Button>
-              <Button size="sm" variant="secondary" className="flex-1" type="button" onClick={() => void exec("PDF.", generatePayrollPdfsAction(payroll.id))}>
-                PDF paraprak
+              <Button size="sm" variant="secondary" className="flex-1" type="button" disabled={pdfPending} onClick={() => void generatePdfs()}>
+                {pdfPending ? "Duke gjeneruar…" : "PDF paraprak"}
               </Button>
             </>
           ) : null}
@@ -605,8 +714,8 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             <Button type="button" onClick={() => void exec("Kyçur.", lockPayrollAction(payroll.id))}>
               Kyç payroll & snapshot
             </Button>
-            <Button type="button" variant="secondary" onClick={() => void exec("PDF.", generatePayrollPdfsAction(payroll.id))}>
-              Paraprakisht: gjenero PDF
+            <Button type="button" variant="secondary" disabled={pdfPending} onClick={() => void generatePdfs()}>
+              {pdfPending ? "Duke gjeneruar…" : "Paraprakisht: gjenero PDF"}
             </Button>
           </>
         ) : null}

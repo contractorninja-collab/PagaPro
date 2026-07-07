@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,23 +21,7 @@ import {
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import { payrollImpactLabel } from "@/modules/leaves/helpers/payroll-impact-label";
-import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
 import type { PushimetLeaveRowDto } from "@/modules/leaves/types/pushimet";
-
-function statusBadgeVariant(status: PushimetLeaveRowDto["status"]): "default" | "secondary" | "warning" | "destructive" | "outline" {
-  switch (status) {
-    case "APPROVED":
-      return "default";
-    case "PENDING":
-      return "warning";
-    case "REJECTED":
-      return "destructive";
-    case "DRAFT":
-      return "secondary";
-    default:
-      return "outline";
-  }
-}
 
 export function LeaveRequestsTable(props: {
   rows: PushimetLeaveRowDto[];
@@ -91,7 +75,7 @@ export function LeaveRequestsTable(props: {
               <TableCell className="tabular-nums">{formatSqDate(row.endDateIso)}</TableCell>
               <TableCell className="tabular-nums text-muted-foreground">{row.workingDays ?? row.totalDays ?? "—"}</TableCell>
               <TableCell>
-                <Badge variant={statusBadgeVariant(row.status)}>{LEAVE_STATUS_LABELS_SQ[row.status]}</Badge>
+                <LeaveStatusBadge status={row.status} />
               </TableCell>
               <TableCell className="max-w-[140px] text-xs leading-snug text-muted-foreground">
                 {payrollImpactLabel(row)}

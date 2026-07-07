@@ -1,37 +1,51 @@
 import { Prisma } from "@prisma/client";
 import type { LeaveType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { KOSOVO_REGULAR_MEDICAL_LEAVE_WORKING_DAYS } from "@/modules/leaves/constants/kosovo-law";
 import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
-import { leaveTypesWithBalance } from "@/modules/leaves/helpers/leave-type-metadata";
-import { accruedYtdLinearMonths } from "@/modules/leaves/engine/accrual-models";
-import {
-  applyFirstYearGateClamp,
-  composeAnnualWorkingDayQuota,
-  fullYearsOfServiceUtc,
-} from "@/modules/leaves/engine/kosovo-annual-quota";
+import { calculateAnnualLeaveEntitlement } from "@/modules/leaves/engine/annual-leave-entitlement-engine";
 import { carryOverExpiryUtcEndOfDay } from "@/modules/leaves/engine/carry-over";
+import { fullYearsOfServiceUtc } from "@/modules/leaves/engine/kosovo-annual-quota";
+import { isOccupationalMedicalLeave, leaveTypesWithBalance } from "@/modules/leaves/helpers/leave-type-metadata";
 import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
 import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 import { uninterruptedCalendarMonthsUtc } from "@/modules/leaves/services/leave-tenure-service";
+
+export function resolveMedicalLeaveYearlyQuota(
+  medicalLeaveDaysDefault: Prisma.Decimal | null | undefined,
+): Prisma.Decimal {
+  if (medicalLeaveDaysDefault != null) {
+    return medicalLeaveDaysDefault;
+  }
+  return new Prisma.Decimal(KOSOVO_REGULAR_MEDICAL_LEAVE_WORKING_DAYS);
+}
+
+function resolveWorkingDaysPerWeek(cfg: { workingDaysPerWeek: Prisma.Decimal | null } | null): number {
+  const n = cfg?.workingDaysPerWeek?.toNumber();
+  return n != null && n > 0 ? n : 5;
+}
 
 function quotaForNonAnnualType(
   type: LeaveType,
   annual: Prisma.Decimal | null | undefined,
   personal: Prisma.Decimal | null | undefined,
+  medical: Prisma.Decimal | null | undefined,
 ): Prisma.Decimal {
-  const dAnnual = annual ?? new Prisma.Decimal(20);
   const dPersonal = personal ?? new Prisma.Decimal(5);
-  const sickDefault = new Prisma.Decimal(40);
   switch (type) {
-    case "PUSHIM_VJETOR":
-      return dAnnual;
     case "PUSHIM_PERSONAL":
       return dPersonal;
     case "PUSHIM_MJEKESOR":
-      return sickDefault;
+      return resolveMedicalLeaveYearlyQuota(medical);
     default:
       return new Prisma.Decimal(0);
   }
+}
+
+function clipRangeToYear(start: Date, end: Date, yearStart: Date, yearEnd: Date) {
+  const rs = start > yearStart ? start : yearStart;
+  const re = end < yearEnd ? end : yearEnd;
+  return rs <= re ? { rs, re } : null;
 }
 
 async function sumApprovedWorkingDaysForTypeInYear(
@@ -55,18 +69,116 @@ async function sumApprovedWorkingDaysForTypeInYear(
     select: {
       startDate: true,
       endDate: true,
+      subtype: true,
     },
   });
 
   let total = new Prisma.Decimal(0);
   for (const r of reqs) {
-    const rs = r.startDate > yearStart ? r.startDate : yearStart;
-    const re = r.endDate < yearEnd ? r.endDate : yearEnd;
-    if (rs > re) continue;
-    const part = await computeLeaveMetrics(companyId, rs, re);
+    if (leaveType === "PUSHIM_MJEKESOR" && isOccupationalMedicalLeave(r.subtype)) {
+      continue;
+    }
+    const clip = clipRangeToYear(r.startDate, r.endDate, yearStart, yearEnd);
+    if (!clip) continue;
+    const part = await computeLeaveMetrics(companyId, clip.rs, clip.re);
     total = total.add(new Prisma.Decimal(part.workingDays));
   }
 
+  return total;
+}
+
+async function sumNetAnnualUsedDays(
+  companyId: string,
+  employeeId: string,
+  year: number,
+): Promise<{ usedDays: number; hasMedicalOverlap: boolean; segments: number[] }> {
+  const yearStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+  const [annualReqs, medicalReqs] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: {
+        companyId,
+        employeeId,
+        type: "PUSHIM_VJETOR",
+        status: "APPROVED",
+        affectsPayroll: true,
+        AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
+      },
+      select: { startDate: true, endDate: true, workingDays: true },
+    }),
+    prisma.leaveRequest.findMany({
+      where: {
+        companyId,
+        employeeId,
+        type: "PUSHIM_MJEKESOR",
+        status: "APPROVED",
+        affectsPayroll: true,
+        subtype: { not: "LENDIM_PUNE_OSE_SEMUNDJE_PROFESIONALE" },
+        AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
+      },
+      select: { startDate: true, endDate: true },
+    }),
+  ]);
+
+  let total = 0;
+  let hasMedicalOverlap = false;
+  const segments: number[] = [];
+
+  for (const annual of annualReqs) {
+    const clip = clipRangeToYear(annual.startDate, annual.endDate, yearStart, yearEnd);
+    if (!clip) continue;
+
+    const grossMetrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    let overlapDays = 0;
+
+    for (const medical of medicalReqs) {
+      const overlapStart = new Date(
+        Math.max(clip.rs.getTime(), medical.startDate.getTime(), yearStart.getTime()),
+      );
+      const overlapEnd = new Date(
+        Math.min(clip.re.getTime(), medical.endDate.getTime(), yearEnd.getTime()),
+      );
+      if (overlapStart > overlapEnd) continue;
+      const overlapMetrics = await computeLeaveMetrics(companyId, overlapStart, overlapEnd);
+      overlapDays += overlapMetrics.workingDays;
+      hasMedicalOverlap = true;
+    }
+
+    const netSegment = Math.max(0, grossMetrics.workingDays - overlapDays);
+    total += netSegment;
+    if (netSegment > 0) segments.push(netSegment);
+  }
+
+  return { usedDays: total, hasMedicalOverlap, segments };
+}
+
+async function sumPendingAnnualDays(companyId: string, employeeId: string, year: number): Promise<number> {
+  const yearStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+  const pending = await prisma.leaveRequest.findMany({
+    where: {
+      companyId,
+      employeeId,
+      type: "PUSHIM_VJETOR",
+      status: "PENDING",
+      AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
+    },
+    select: { workingDays: true, startDate: true, endDate: true },
+  });
+
+  let total = 0;
+  for (const row of pending) {
+    if (row.workingDays != null) {
+      total += row.workingDays.toNumber();
+      continue;
+    }
+    const clip = clipRangeToYear(row.startDate, row.endDate, yearStart, yearEnd);
+    if (!clip) continue;
+    const metrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    total += metrics.workingDays;
+  }
   return total;
 }
 
@@ -90,6 +202,8 @@ export async function syncLeaveBalancesForEmployeeYear(
   const cfg = await prisma.companyConfiguration.findUnique({ where: { companyId } });
   const annualCfg = cfg?.annualLeaveDaysDefault;
   const personal = cfg?.personalLeaveDaysDefault;
+  const medical = cfg?.medicalLeaveDaysDefault;
+  const workingDaysPerWeek = resolveWorkingDaysPerWeek(cfg);
 
   const employee = await prisma.employee.findFirst({
     where: { id: employeeId, companyId },
@@ -105,6 +219,7 @@ export async function syncLeaveBalancesForEmployeeYear(
   });
   if (!employee) return;
 
+  const calculationDate = new Date();
   const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
   const policy = await resolveLeavePolicyParameterSet(companyId, yearEnd);
 
@@ -121,7 +236,7 @@ export async function syncLeaveBalancesForEmployeeYear(
 
   const types = leaveTypesWithBalance();
 
-  let prevAnnualRemaining = new Prisma.Decimal(0);
+  let prevAnnualRemaining = 0;
   if (year > 1971) {
     const prev = await prisma.leaveBalance.findUnique({
       where: {
@@ -134,88 +249,125 @@ export async function syncLeaveBalancesForEmployeeYear(
       },
       select: { remainingDays: true },
     });
-    if (prev) prevAnnualRemaining = prev.remainingDays;
+    if (prev) prevAnnualRemaining = Math.max(0, prev.remainingDays.toNumber());
   }
 
+  const carryExpiresAt =
+    prevAnnualRemaining > 0
+      ? carryOverExpiryUtcEndOfDay({
+          originYear: year - 1,
+          expiryMonth: policy.carryOverExpiryMonth,
+          expiryDay: policy.carryOverExpiryDay,
+        })
+      : null;
+
   for (const lt of types) {
-    let yearlyQuota: Prisma.Decimal;
-    let usedDays: Prisma.Decimal;
-    let carry = new Prisma.Decimal(0);
-    let entitlementFullYearNum: number | null = null;
-    let accruedYtdNum = 0;
-    let carryExpiresAt: Date | null = null;
-    let breakdown: Record<string, unknown> | undefined;
-
     if (lt === "PUSHIM_VJETOR") {
-      const { total: composedQuota, breakdown: composedBreakdown } = composeAnnualWorkingDayQuota({
-        policyMinimum: policy.minimumAnnualWorkingDays.toNumber(),
-        companyAnnualDefault: annualCfg?.toNumber() ?? null,
-        isHazardous: employee.isHazardousPosition,
-        hazardousMinimum: policy.hazardousMinimumWorkingDays.toNumber(),
-        fullYearsOfService: fullYears,
-        tenureEveryYears: policy.tenureBonusEveryYears,
-        tenureDaysPerBlock: policy.tenureBonusDaysPerBlock.toNumber(),
-        enableTenure: policy.enableTenureBonus,
-        specialExtraDays: policy.specialCategoryExtraDays.toNumber(),
-        enableSpecialCategoryExtra: policy.enableSpecialCategoryExtra,
-        eligibleSpecialCategories: eligibleSpecial,
-      });
-
-      const entitlementWorkingDays = applyFirstYearGateClamp({
-        fullAnnualQuota: composedQuota,
-        uninterruptedMonths,
-        gateMonths: policy.firstYearGateMonths,
-      });
-
-      entitlementFullYearNum = entitlementWorkingDays;
-      yearlyQuota = new Prisma.Decimal(entitlementWorkingDays);
-
-      carry = Prisma.Decimal.max(prevAnnualRemaining, 0);
-      carryExpiresAt = carry.gt(0)
-        ? carryOverExpiryUtcEndOfDay({
-            originYear: year - 1,
-            expiryMonth: policy.carryOverExpiryMonth,
-            expiryDay: policy.carryOverExpiryDay,
-          })
-        : null;
-
-      usedDays = await sumApprovedWorkingDaysForTypeInYear(companyId, employeeId, lt, year);
-
-      const ledgerSum = await sumLedgerAccrualForAnnualYear(companyId, employeeId, year);
       const yearStartClip =
         serviceAnchor > new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0))
           ? serviceAnchor
           : new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
-      const endClip =
-        clipEnd < yearEnd ? clipEnd : yearEnd;
+      const endClip = clipEnd < yearEnd ? clipEnd : yearEnd;
       const monthsWorked = uninterruptedCalendarMonthsUtc(yearStartClip, endClip) || 0;
 
-      accruedYtdNum =
-        ledgerSum > 0
-          ? ledgerSum
-          : accruedYtdLinearMonths({
-              monthsWorkedInYear: monthsWorked,
-              monthlyRate: policy.monthlyAccrualDays.toNumber(),
-              capAtAnnualEntitlement: entitlementWorkingDays,
-            });
+      const [{ usedDays, hasMedicalOverlap, segments }, pendingDays, ledgerSum] = await Promise.all([
+        sumNetAnnualUsedDays(companyId, employeeId, year),
+        sumPendingAnnualDays(companyId, employeeId, year),
+        sumLedgerAccrualForAnnualYear(companyId, employeeId, year),
+      ]);
 
-      breakdown = {
+      const entitlement = calculateAnnualLeaveEntitlement({
+        workingDaysPerWeek,
+        companyAnnualDefault: annualCfg?.toNumber() ?? null,
+        policyMinimum: policy.minimumAnnualWorkingDays.toNumber(),
+        hazardousMinimum: policy.hazardousMinimumWorkingDays.toNumber(),
+        tenureEveryYears: policy.tenureBonusEveryYears,
+        tenureDaysPerBlock: policy.tenureBonusDaysPerBlock.toNumber(),
+        specialCategoryExtraDays: policy.specialCategoryExtraDays.toNumber(),
+        firstYearGateMonths: policy.firstYearGateMonths,
+        monthlyAccrualDays: policy.monthlyAccrualDays.toNumber(),
+        carryOverExpiryMonth: policy.carryOverExpiryMonth,
+        carryOverExpiryDay: policy.carryOverExpiryDay,
+        splitLeaveMinWorkingDays: policy.splitLeaveMinWorkingDays,
+        enableTenureBonus: policy.enableTenureBonus,
+        enableSpecialCategoryExtra: policy.enableSpecialCategoryExtra,
+        accrualMode: cfg?.annualLeaveAccrualMode ?? "MONTHLY",
+        roundingMode: cfg?.annualLeaveRoundingMode ?? "NONE",
+        uninterruptedMonths,
+        fullYearsOfService: fullYears,
+        monthsWorkedInYear: monthsWorked,
+        isHazardous: employee.isHazardousPosition,
+        eligibleSpecialCategories: eligibleSpecial,
+        calculationDate,
+        usedApprovedDays: usedDays,
+        pendingRequestedDays: pendingDays,
+        carriedOverFromPreviousYear: prevAnnualRemaining,
+        carryOverExpiresAt: carryExpiresAt,
+        ledgerAccruedYtd: ledgerSum,
+        approvedAnnualSegmentWorkingDays: segments,
+        hasMedicalOverlapAudit: hasMedicalOverlap,
+      });
+
+      const yearlyQuota = new Prisma.Decimal(entitlement.yearlyEntitlementDays);
+      const used = new Prisma.Decimal(entitlement.usedApprovedDays);
+      const pending = new Prisma.Decimal(entitlement.pendingRequestedDays);
+      const carry = new Prisma.Decimal(entitlement.carriedOverFromPreviousYear);
+      const remaining = new Prisma.Decimal(entitlement.remainingAccruedDays);
+
+      const breakdown = {
         ruleVersion: LEAVE_ENGINE_RULE_VERSION,
-        composedQuotaBreakdown: composedBreakdown,
-        firstYearGate: {
-          uninterruptedMonths,
-          gateMonths: policy.firstYearGateMonths,
-          entitlementAfterGate: entitlementWorkingDays,
+        entitlement: {
+          ...entitlement,
+          carryOverExpiresAt: entitlement.carryOverExpiresAt?.toISOString() ?? null,
         },
-        carryIn: carry.toString(),
-        accruedYtdSource: ledgerSum > 0 ? "ledger" : "synthetic_monthly_linear",
       };
-    } else {
-      yearlyQuota = quotaForNonAnnualType(lt, annualCfg, personal);
-      usedDays = await sumApprovedWorkingDaysForTypeInYear(companyId, employeeId, lt, year);
+
+      await prisma.leaveBalance.upsert({
+        where: {
+          companyId_employeeId_leaveType_year: {
+            companyId,
+            employeeId,
+            leaveType: lt,
+            year,
+          },
+        },
+        create: {
+          companyId,
+          employeeId,
+          leaveType: lt,
+          year,
+          yearlyQuota,
+          usedDays: used,
+          pendingDays: pending,
+          remainingDays: remaining,
+          carryOverDays: carry,
+          accruedYtd: new Prisma.Decimal(entitlement.accruedDaysToDate),
+          entitlementFullYear: yearlyQuota,
+          carryIn: carry,
+          carryExpiresAt: entitlement.carriedOverFromPreviousYear > 0 ? carryExpiresAt : null,
+          computedFromRuleVersion: LEAVE_ENGINE_RULE_VERSION,
+          breakdown: breakdown as unknown as Prisma.InputJsonValue,
+        },
+        update: {
+          yearlyQuota,
+          usedDays: used,
+          pendingDays: pending,
+          remainingDays: remaining,
+          carryOverDays: carry,
+          accruedYtd: new Prisma.Decimal(entitlement.accruedDaysToDate),
+          entitlementFullYear: yearlyQuota,
+          carryIn: carry,
+          carryExpiresAt: entitlement.carriedOverFromPreviousYear > 0 ? carryExpiresAt : null,
+          computedFromRuleVersion: LEAVE_ENGINE_RULE_VERSION,
+          breakdown: breakdown as unknown as Prisma.InputJsonValue,
+        },
+      });
+      continue;
     }
 
-    const remaining = yearlyQuota.add(carry).sub(usedDays);
+    const yearlyQuota = quotaForNonAnnualType(lt, annualCfg, personal, medical);
+    const usedDays = await sumApprovedWorkingDaysForTypeInYear(companyId, employeeId, lt, year);
+    const remaining = yearlyQuota.sub(usedDays);
 
     await prisma.leaveBalance.upsert({
       where: {
@@ -233,37 +385,42 @@ export async function syncLeaveBalancesForEmployeeYear(
         year,
         yearlyQuota,
         usedDays,
+        pendingDays: new Prisma.Decimal(0),
         remainingDays: remaining,
-        carryOverDays: carry,
-        accruedYtd: new Prisma.Decimal(lt === "PUSHIM_VJETOR" ? accruedYtdNum : 0),
-        entitlementFullYear:
-          lt === "PUSHIM_VJETOR" && entitlementFullYearNum != null
-            ? new Prisma.Decimal(entitlementFullYearNum)
-            : null,
-        carryIn: lt === "PUSHIM_VJETOR" ? carry : new Prisma.Decimal(0),
-        carryExpiresAt: lt === "PUSHIM_VJETOR" ? carryExpiresAt : null,
-        computedFromRuleVersion: lt === "PUSHIM_VJETOR" ? LEAVE_ENGINE_RULE_VERSION : null,
-        breakdown:
-          lt === "PUSHIM_VJETOR" ? ((breakdown ?? null) as Prisma.InputJsonValue | undefined) : Prisma.JsonNull,
+        carryOverDays: new Prisma.Decimal(0),
+        accruedYtd: new Prisma.Decimal(0),
+        entitlementFullYear: null,
+        carryIn: new Prisma.Decimal(0),
+        carryExpiresAt: null,
+        computedFromRuleVersion: null,
+        breakdown: Prisma.JsonNull,
       },
       update: {
         yearlyQuota,
         usedDays,
+        pendingDays: new Prisma.Decimal(0),
         remainingDays: remaining,
-        carryOverDays: carry,
-        accruedYtd: new Prisma.Decimal(lt === "PUSHIM_VJETOR" ? accruedYtdNum : 0),
-        entitlementFullYear:
-          lt === "PUSHIM_VJETOR" && entitlementFullYearNum != null
-            ? new Prisma.Decimal(entitlementFullYearNum)
-            : null,
-        carryIn: lt === "PUSHIM_VJETOR" ? carry : new Prisma.Decimal(0),
-        carryExpiresAt: lt === "PUSHIM_VJETOR" ? carryExpiresAt : null,
-        computedFromRuleVersion: lt === "PUSHIM_VJETOR" ? LEAVE_ENGINE_RULE_VERSION : null,
-        breakdown:
-          lt === "PUSHIM_VJETOR" ? ((breakdown ?? null) as Prisma.InputJsonValue | undefined) : Prisma.JsonNull,
+        carryOverDays: new Prisma.Decimal(0),
+        accruedYtd: new Prisma.Decimal(0),
+        entitlementFullYear: null,
+        carryIn: new Prisma.Decimal(0),
+        carryExpiresAt: null,
+        computedFromRuleVersion: null,
+        breakdown: Prisma.JsonNull,
       },
     });
   }
+}
+
+export async function syncLeaveBalancesForCompanyYear(companyId: string, year: number): Promise<number> {
+  const employees = await prisma.employee.findMany({
+    where: { companyId },
+    select: { id: true },
+  });
+  for (const employee of employees) {
+    await syncLeaveBalancesForEmployeeYear(companyId, employee.id, year);
+  }
+  return employees.length;
 }
 
 export async function listLeaveBalancesForEmployee(companyId: string, employeeId: string, year: number) {

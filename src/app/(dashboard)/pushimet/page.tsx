@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { LeaveRequestStatus, LeaveSubtype, LeaveType } from "@prisma/client";
+import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 import {
   leaveDashboardStats,
   listActiveEmployeesPicklist,
@@ -180,6 +181,7 @@ export default async function PushimetPage({
   let templatesRaw;
   let balancesRaw;
   try {
+    await syncLeaveBalancesForCompanyYear(companyId, year);
     ;[rowsRaw, pendingRaw, stats, employeesRaw, departmentsRaw, templatesRaw, balancesRaw] = await Promise.all([
       listLeaveRequestsFiltered(companyId, filters),
       listPendingLeaveRequests(companyId),
@@ -227,9 +229,11 @@ export default async function PushimetPage({
     leaveType: b.leaveType,
     year: b.year,
     yearlyQuota: b.yearlyQuota.toString(),
-    usedDays: b.usedDays.toString(),
-    remainingDays: b.remainingDays.toString(),
+    accruedDays: b.accruedYtd.toString(),
     carryOverDays: b.carryOverDays.toString(),
+    usedDays: b.usedDays.toString(),
+    pendingDays: b.pendingDays.toString(),
+    remainingDays: b.remainingDays.toString(),
   }));
 
   return (

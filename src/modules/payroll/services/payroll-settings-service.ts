@@ -88,7 +88,7 @@ export async function syncPayrollSettingsFromKonfigurime(
 
   let overtimeMul = new PrismaNs.Decimal("1.3");
   let weekendMul = new PrismaNs.Decimal("1.5");
-  let holidayMul = new PrismaNs.Decimal("2.0");
+  let holidayMul = new PrismaNs.Decimal("1.5");
   let nightMul = new PrismaNs.Decimal("1.3");
   if (active?.premiumRules && typeof active.premiumRules === "object" && !Array.isArray(active.premiumRules)) {
     const pr = active.premiumRules as Record<string, unknown>;
@@ -174,7 +174,7 @@ export async function ensurePayrollSettingsRow(companyId: string): Promise<void>
 
   let overtimeMul = new PrismaNs.Decimal("1.3");
   let weekendMul = new PrismaNs.Decimal("1.5");
-  let holidayMul = new PrismaNs.Decimal("2.0");
+  let holidayMul = new PrismaNs.Decimal("1.5");
   let nightMul = new PrismaNs.Decimal("1.3");
   if (active?.premiumRules && typeof active.premiumRules === "object" && !Array.isArray(active.premiumRules)) {
     const pr = active.premiumRules as Record<string, unknown>;

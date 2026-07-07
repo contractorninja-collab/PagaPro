@@ -34,7 +34,13 @@ import {
   generateLeaveDocumentAction,
   rejectLeaveRequestAction,
 } from "@/modules/leaves/actions/leave-actions";
-import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
+import {
+  LEAVE_TYPE_HELP_SQ,
+  LEAVE_TYPE_LABELS_SQ,
+  LEAVE_SUBTYPE_LABELS_SQ,
+  medicalLeaveSubtypeLabel,
+  subtypesForLeaveType,
+} from "@/modules/leaves/helpers/leave-type-metadata";
 import type {
   PushimetBalanceRowDto,
   PushimetCalendarChipDto,
@@ -265,7 +271,8 @@ export function PushimetDashboardClient(props: {
           <div>
             <h2 className="text-sm font-semibold text-foreground">Gjendje ditësh (balanca)</h2>
             <p className="text-xs text-muted-foreground">
-              Bazuar në kuota vjetore të kompanisë dhe pushimet e miratuara.{" "}
+              Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe pushimi
+              mjekësor i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.{" "}
               <span className="font-medium text-amber-800 dark:text-amber-200">
                 Vlerat negative alarmojnë HR para miratimit.
               </span>
@@ -273,22 +280,25 @@ export function PushimetDashboardClient(props: {
           </div>
         </div>
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <Table className="table-dense min-w-[720px]">
+          <Table className="table-dense min-w-[960px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Punonjësi</TableHead>
                 <TableHead>Departamenti</TableHead>
                 <TableHead>Lloji</TableHead>
                 <TableHead>Viti</TableHead>
-                <TableHead>Kuota</TableHead>
+                <TableHead>Kuota vjetore</TableHead>
+                <TableHead>Akumuluar</TableHead>
+                <TableHead>Bartur</TableHead>
                 <TableHead>Përdorur</TableHead>
+                <TableHead>Në pritje</TableHead>
                 <TableHead>Mbetur</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {props.balances.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                     Nuk ka të dhëna balancë për vitin e filtrit — do të popullohet kur miratohen pushimet.
                   </TableCell>
                 </TableRow>
@@ -302,7 +312,16 @@ export function PushimetDashboardClient(props: {
                       <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
                       <TableCell className="tabular-nums">{b.year}</TableCell>
                       <TableCell className="tabular-nums">{b.yearlyQuota}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
+                      </TableCell>
                       <TableCell className="tabular-nums">{b.usedDays}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
+                      </TableCell>
                       <TableCell className="tabular-nums">
                         {neg ? (
                           <Badge variant="destructive">{b.remainingDays}</Badge>
@@ -471,10 +490,13 @@ export function PushimetDashboardClient(props: {
                   </option>
                 ))}
               </select>
+              {newForm.type === "PUSHIM_MJEKESOR" && LEAVE_TYPE_HELP_SQ.PUSHIM_MJEKESOR ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">{LEAVE_TYPE_HELP_SQ.PUSHIM_MJEKESOR}</p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <label htmlFor="nl-subtype" className="text-xs font-medium text-muted-foreground">
-                Nën-lloji (Art 39 / Atersi / Lehonie)
+                {newForm.type === "PUSHIM_MJEKESOR" ? "Nën-lloji mjekësor" : "Nën-lloji (Art 39 / Atersi / Lehonie)"}
               </label>
               <select
                 id="nl-subtype"
@@ -482,9 +504,9 @@ export function PushimetDashboardClient(props: {
                 onChange={(e) => setNewForm((s) => ({ ...s, subtype: e.target.value as LeaveSubtype }))}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {(Object.keys(LEAVE_SUBTYPE_LABELS_SQ) as LeaveSubtype[]).map((k) => (
+                {subtypesForLeaveType(newForm.type).map((k) => (
                   <option key={k} value={k}>
-                    {LEAVE_SUBTYPE_LABELS_SQ[k]}
+                    {newForm.type === "PUSHIM_MJEKESOR" ? medicalLeaveSubtypeLabel(k) : LEAVE_SUBTYPE_LABELS_SQ[k]}
                   </option>
                 ))}
               </select>

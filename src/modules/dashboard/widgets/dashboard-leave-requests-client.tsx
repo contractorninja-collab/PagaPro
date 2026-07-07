@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
+import { PanelHeader } from "@/components/patterns/page-header";
 import {
   approveLeaveRequestAction,
   rejectLeaveRequestAction,
@@ -39,18 +41,13 @@ export function DashboardLeaveRequestsClient(props: {
   }
 
   return (
-    <div id="leave-requests" className="scroll-mt-24 rounded-lg border border-border/80 bg-card">
-      <div className="flex flex-col gap-2 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Pushimet</h2>
-          <p className="text-xs text-muted-foreground">
-            Sot: <span className="font-medium text-foreground">{props.today.approved}</span> miratuar ·{" "}
-            <span className="font-medium text-foreground">{props.today.rejected}</span> refuzuar
-          </p>
-        </div>
-      </div>
+    <div id="leave-requests" className="scroll-mt-24 surface-card">
+      <PanelHeader
+        title="Pushimet"
+        description={`Sot: ${props.today.approved} miratuar · ${props.today.rejected} refuzuar`}
+      />
       {props.pending.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nuk ka kërkesa në pritje.</p>
+        <p className="surface-card-body py-8 text-center text-sm text-muted-foreground">Nuk ka kërkesa në pritje.</p>
       ) : (
         <div className="overflow-x-auto">
           <Table className="table-dense">
@@ -72,7 +69,7 @@ export function DashboardLeaveRequestsClient(props: {
                   <TableCell className="tabular-nums">{formatSqDate(row.startDateIso)}</TableCell>
                   <TableCell className="tabular-nums">{formatSqDate(row.endDateIso)}</TableCell>
                   <TableCell>
-                    <Badge variant="warning">Në pritje</Badge>
+                    <LeaveStatusBadge status={row.status} />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">

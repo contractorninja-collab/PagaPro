@@ -1,66 +1,54 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatEur } from "@/modules/employees/components/employees-labels";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
+import { PayrollStatusBadge } from "@/modules/payroll/components/payroll-status-badge";
 import type { DashboardPayrollSlice } from "../types/dashboard-types";
-import { PAYROLL_STATUS_LABELS_SQ } from "../helpers/dashboard-labels";
 
 export function DashboardPayrollPanel({ payroll }: { payroll: DashboardPayrollSlice }) {
   const label = payrollMonthLabel(payroll.year, payroll.month);
-  const statusLabel = payroll.status ? PAYROLL_STATUS_LABELS_SQ[payroll.status] : null;
+  const hasPayroll = payroll.payrollId != null && payroll.status != null;
 
   return (
-    <Card className="border-border/80 shadow-none">
-      <CardHeader className="flex flex-col gap-2 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <CardTitle className="text-base font-semibold">Statusi i pagës</CardTitle>
-          <CardDescription className="text-sm">
-            Periudha: <span className="font-medium text-foreground">{label}</span>
-          </CardDescription>
+    <section
+      aria-labelledby="dashboard-payroll-hero-title"
+      className="surface-card payroll-card"
+    >
+      <div className="payroll-card-content">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="dashboard-payroll-hero-title" className="text-lg font-bold leading-tight text-[#0f172a]">
+            Payroll — {label}
+          </h2>
+          {payroll.status ? (
+            <PayrollStatusBadge status={payroll.status} />
+          ) : (
+            <Badge variant="muted">Pa payroll</Badge>
+          )}
         </div>
-        {payroll.status ? (
-          <Badge
-            variant={
-              payroll.status === "LOCKED" || payroll.status === "APPROVED"
-                ? "success"
-                : payroll.status === "DRAFT"
-                  ? "warning"
-                  : "secondary"
-            }
-            className="w-fit shrink-0"
-          >
-            {statusLabel}
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="w-fit">
-            Pa payroll
-          </Badge>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4 pt-4">
-        <div className="grid gap-4 sm:grid-cols-3">
+
+        <dl className="payroll-metrics">
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Punonjës në spreadsheet</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">{payroll.employeeCount}</p>
+            <dt className="sr-only">Punonjës</dt>
+            <dd className="payroll-metric">
+              {payroll.employeeCount} punonjës
+            </dd>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Bruto totale</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">{formatEur(payroll.totals.grossSalary)}</p>
+            <dt className="sr-only">Bruto totale</dt>
+            <dd className="payroll-metric">{formatEur(payroll.totals.grossSalary)} bruto</dd>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Kosto punëdhënësi</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {formatEur(payroll.totals.employerTotalCost)}
-            </p>
+            <dt className="sr-only">Kosto punëdhënësi</dt>
+            <dd className="payroll-metric">{formatEur(payroll.totals.employerTotalCost)} kosto punëdhënësi</dd>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+        </dl>
+
+        <div className="payroll-actions">
           <Button size="sm" asChild>
             <Link href="/pagat">Hap pagat</Link>
           </Button>
-          {payroll.payrollId ? (
+          {hasPayroll ? (
             <>
               <Button size="sm" variant="secondary" asChild>
                 <Link href={`/pagat/${payroll.payrollId}`}>Vazhdo shqyrtimin</Link>
@@ -75,7 +63,30 @@ export function DashboardPayrollPanel({ payroll }: { payroll: DashboardPayrollSl
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
+  );
+}
+
+export function DashboardPayrollPanelSkeleton() {
+  return (
+    <div aria-hidden className="surface-card payroll-card">
+      <div className="payroll-card-content">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="h-6 w-52 max-w-full rounded bg-muted" />
+          <div className="h-6 w-20 rounded-full bg-muted" />
+        </div>
+        <div className="payroll-metrics">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-5 w-full max-w-[160px] rounded bg-muted" />
+          ))}
+        </div>
+        <div className="payroll-actions">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-9 w-28 rounded-md bg-muted" />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -2,43 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { Settings2 } from "lucide-react";
 import { PagaProLogo } from "@/components/branding/logo";
 import { SIDEBAR_MODULES } from "@/components/layout/nav-config";
+import { sidebarItemClass } from "@/components/layout/sidebar-styles";
 
 export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 z-30 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-4">
+    <aside className="sidebar-shell">
+      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-[18px]">
         <PagaProLogo variant="onDark" asLink aria-label="PagaPRO — ballina" />
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-0.5" aria-label="Moduli kryesor">
+      <nav className="sidebar-nav" aria-label="Moduli kryesor">
         {SIDEBAR_MODULES.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-foreground"
-                  : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <Link key={item.href} href={item.href} className={sidebarItemClass(active)}>
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
               <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
       <div className="border-t border-sidebar-border p-3">
-        <p className="text-[11px] leading-relaxed text-sidebar-muted">
-          Versioni UI · opsacional
-        </p>
+        <Link href="/konfigurime" className="sidebar-footer-link">
+          <Settings2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>Konfigurimet · v1.0.0</span>
+        </Link>
       </div>
     </aside>
   );

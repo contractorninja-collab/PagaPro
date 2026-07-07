@@ -68,7 +68,7 @@ const config: Config = {
       boxShadow: {
         /** Flat operational surfaces — no glow */
         sm: "0 1px 2px 0 rgb(15 23 42 / 0.06)",
-        card: "0 1px 3px 0 rgb(15 23 42 / 0.08)",
+        card: "0 1px 2px rgba(15, 23, 42, 0.04)",
       },
       keyframes: {
         "fade-in": {

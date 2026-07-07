@@ -1,14 +1,17 @@
 import type {
+  AtkRegime,
   CalculationBreakdownPayload,
   EmployerPrimacy,
   EmploymentType,
   LegislationSnapshot,
   PayrollCalculationIssue,
   PayrollCalculationResult,
+  PayrollHrTransparency,
+  PitBreakdown,
 } from "./types";
 import { calculateEmployeeLine } from "./payroll-calculator";
 import { D } from "./money/decimal";
-import { roundMoneyEUR } from "./money/rounding";
+import { roundMoneyEUR, ROUNDING_POLICY_VERSION } from "./money/rounding";
 import { computePremiumPays } from "./gross/premiums";
 import { solveEquivalentMonthlyGrossForTargetNet } from "./net-gross-solver";
 import { buildPayrollHrTransparency } from "./payroll-transparency";
@@ -143,6 +146,9 @@ export function computePayrollSpreadsheetLine(
 
   const expectedReg = D(line.expectedRegularHours);
   const denom = expectedReg.gt(0) ? expectedReg : D("173.33");
+  // Norma orare = paga bruto mujore ÷ orët e pritura të kalendarit (jo orët e punuara).
+  // Pagesa e rregullt = norma × orët e punuara — orët që mungojnë pa pushim zbriten automatikisht.
+  // Me pushime të paguara/mjekësore, norma mbetet e njëjtë që regular + leave të arrijë pagën kontraktuale.
 
   /** Full-precision quotient (classic sheet col 6 implicit rate) — do not round before × hours. */
   let hourlyPrecise: ReturnType<typeof D>;
@@ -210,6 +216,35 @@ export function computePayrollSpreadsheetLine(
     grossSubject = roundMoneyEUR(D(line.manualGrossOverride));
   }
 
+  const transparencyCalendar = {
+    expectedWorkingDays: calendarSnapshot.expectedWorkingDays,
+    hoursPerWorkingDay: calendarSnapshot.hoursPerWorkingDay,
+    expectedRegularHours: calendarSnapshot.expectedRegularHours,
+    weekdayPublicHolidaysExcluded: calendarSnapshot.weekdayPublicHolidayDates,
+    overtimeWeeklyThresholdHours: calendarSnapshot.overtimeWeeklyThresholdHours,
+    overtimeWarningWeeklyHours: calendarSnapshot.overtimeWarningWeeklyHours,
+    standardWeeklyHours: calendarSnapshot.standardWeeklyHours,
+    weekendDefinition:
+      "Fundjavë (weekend_hours): orët e së shtunës dhe së dielës; në motor: normë_orare × orë × weekend_multiplier nga PayrollSettings (grupi «F» në fleta klasike kur shumëzuesi përkon me politikat tuaja).",
+    holidayDefinition:
+      "Festë (holiday_hours): orët në ditë festive publike; në motor: normë_orare × orë × holiday_multiplier nga PayrollSettings. Ditët festive në javën e punës përjashtohen nga orët e pritura mujore sipas kalendarit të payroll-it (bazë Kosovë + lista në PayrollSettings).",
+    nightWindowDescription: calendarSnapshot.nightWorkPeriodDescription,
+  };
+
+  // Leje pa pagesë / muaj pa punë: kur bruto-subjekti del ≤ 0, pagesa është 0.
+  // Motori statutor bazë refuzon bruto ≤ 0 (dhe zbaton pagën minimale), prandaj e
+  // shkurtojmë këtu pa e prekur atë motor dhe kthejmë një rresht plotësisht zero.
+  if (grossSubject.lte(0)) {
+    return buildZeroSalaryLine({
+      employee,
+      line,
+      snapshot,
+      sickLeavePayPercent,
+      hourlyPrecise,
+      transparencyCalendar,
+    });
+  }
+
   const statutory = calculateEmployeeLine(
     {
       employmentType: "EMPLOYEE",
@@ -233,21 +268,6 @@ export function computePayrollSpreadsheetLine(
 
   const pensionEr = D(statutory.value.pensionEmployer);
   const employerTotalCost = roundMoneyEUR(grossSubject.plus(pensionEr));
-
-  const transparencyCalendar = {
-    expectedWorkingDays: calendarSnapshot.expectedWorkingDays,
-    hoursPerWorkingDay: calendarSnapshot.hoursPerWorkingDay,
-    expectedRegularHours: calendarSnapshot.expectedRegularHours,
-    weekdayPublicHolidaysExcluded: calendarSnapshot.weekdayPublicHolidayDates,
-    overtimeWeeklyThresholdHours: calendarSnapshot.overtimeWeeklyThresholdHours,
-    overtimeWarningWeeklyHours: calendarSnapshot.overtimeWarningWeeklyHours,
-    standardWeeklyHours: calendarSnapshot.standardWeeklyHours,
-    weekendDefinition:
-      "Fundjavë (weekend_hours): orët e së shtunës dhe së dielës; në motor: normë_orare × orë × weekend_multiplier nga PayrollSettings (grupi «F» në fleta klasike kur shumëzuesi përkon me politikat tuaja).",
-    holidayDefinition:
-      "Festë (holiday_hours): orët në ditë festive publike; në motor: normë_orare × orë × holiday_multiplier nga PayrollSettings. Ditët festive në javën e punës përjashtohen nga orët e pritura mujore sipas kalendarit të payroll-it (bazë Kosovë + lista në PayrollSettings).",
-    nightWindowDescription: calendarSnapshot.nightWorkPeriodDescription,
-  };
 
   const payrollTransparency = buildPayrollHrTransparency({
     employerPrimacy: employee.employerPrimacy,
@@ -336,6 +356,146 @@ export function computePayrollSpreadsheetLine(
       salaryAdvanceDeduction: advance.toFixed(2),
       netPay: netPay.toFixed(2),
       employerTotalCost: employerTotalCost.toFixed(2),
+      breakdown: mergedBreakdown as unknown as Record<string, unknown>,
+    },
+  };
+}
+
+/**
+ * Rresht plotësisht zero (leje pa pagesë / muaj pa punë). Nuk thërret motorin statutor bazë,
+ * i cili refuzon bruto ≤ 0 dhe zbaton pagën minimale; këtu pagesa është qëllimisht 0.
+ */
+function buildZeroSalaryLine(params: {
+  employee: SpreadsheetEmployeeInput;
+  line: SpreadsheetLineComputationInput;
+  snapshot: LegislationSnapshot;
+  sickLeavePayPercent: string;
+  hourlyPrecise: ReturnType<typeof D>;
+  transparencyCalendar: PayrollHrTransparency["calendar"];
+}): PayrollCalculationResult<SpreadsheetLineComputed> {
+  const ZERO = "0.00";
+  const { employee, line, snapshot, sickLeavePayPercent, hourlyPrecise, transparencyCalendar } =
+    params;
+
+  const atkRegime: AtkRegime =
+    employee.employerPrimacy === "SECONDARY" ? "SECONDARY_FLAT_10" : "PRIMARY_PROGRESSIVE";
+
+  const zeroPit: PitBreakdown =
+    atkRegime === "SECONDARY_FLAT_10"
+      ? {
+          atkRegime: "SECONDARY_FLAT_10",
+          pitBaseKind: snapshot.secondaryEmployerPitBase,
+          pitBaseAmount: ZERO,
+          flatRate: snapshot.secondaryEmployerFlatRate,
+          pitWithheld: ZERO,
+        }
+      : {
+          atkRegime: "PRIMARY_PROGRESSIVE",
+          taxableIncome: ZERO,
+          pitWithheld: ZERO,
+          bracketSlices: [],
+        };
+
+  const statutoryBreakdown: CalculationBreakdownPayload = {
+    rulesVersion: snapshot.rulesVersion,
+    snapshotId: snapshot.snapshotId,
+    effectiveFromIso: snapshot.effectiveFromIso,
+    roundingPolicyVersion: ROUNDING_POLICY_VERSION,
+    employerPrimacy: employee.employerPrimacy,
+    atkRegime,
+    gross: {
+      regularPay: ZERO,
+      overtimePay: ZERO,
+      holidayPay: ZERO,
+      weekendPay: ZERO,
+      nightPay: ZERO,
+      bonuses: ZERO,
+      grossSalary: ZERO,
+    },
+    pension: { pensionEmployee: ZERO, pensionEmployer: ZERO },
+    taxableIncome: ZERO,
+    pit: zeroPit,
+    netPay: ZERO,
+  };
+
+  const payrollTransparency = buildPayrollHrTransparency({
+    employerPrimacy: employee.employerPrimacy,
+    compensationBasis: employee.compensationBasis,
+    baseSalaryMonthly: employee.baseSalaryMonthly,
+    targetNetMonthly: employee.targetNetMonthly,
+    snapshot,
+    calendar: transparencyCalendar,
+    buckets: {
+      actualRegularHours: line.actualRegularHours,
+      paidLeaveHours: line.paidLeaveHours,
+      sickLeaveHours: line.sickLeaveHours,
+      unpaidLeaveHours: line.unpaidLeaveHours,
+      overtimeHours: line.overtimeHours,
+      weekendHours: line.weekendHours,
+      holidayHours: line.holidayHours,
+      nightHours: line.nightHours,
+    },
+    sickLeavePayPercent,
+    premiumRules: snapshot.premiumRules,
+    hourlyRate: hourlyPrecise.toFixed(6),
+    amounts: {
+      regularPay: ZERO,
+      paidLeavePay: ZERO,
+      sickLeavePay: ZERO,
+      unpaidLeaveDeduction: ZERO,
+      overtimeAmount: ZERO,
+      weekendAmount: ZERO,
+      holidayAmount: ZERO,
+      nightAmount: ZERO,
+      bonuses: ZERO,
+      grossSalary: ZERO,
+      employerTotalCost: ZERO,
+      netPay: ZERO,
+    },
+    statutoryBreakdown,
+    spreadsheetDeductions: {
+      otherDeductionsExAdvance: ZERO,
+      salaryAdvanceDeduction: ZERO,
+    },
+  });
+
+  const mergedBreakdown: CalculationBreakdownPayload = {
+    ...statutoryBreakdown,
+    spreadsheet: {
+      expectedWorkingDays: line.expectedWorkingDays,
+      expectedRegularHours: line.expectedRegularHours,
+      paidLeavePay: ZERO,
+      sickLeavePay: ZERO,
+      unpaidLeaveDeduction: ZERO,
+      salaryAdvanceDeduction: ZERO,
+      otherDeductionsExAdvance: ZERO,
+      zeroSalary: true,
+    },
+    payrollTransparency,
+  };
+
+  return {
+    ok: true,
+    value: {
+      hourlyRate: hourlyPrecise.toFixed(6),
+      regularPay: ZERO,
+      paidLeavePay: ZERO,
+      sickLeavePay: ZERO,
+      unpaidLeaveDeduction: ZERO,
+      overtimeAmount: ZERO,
+      weekendAmount: ZERO,
+      holidayAmount: ZERO,
+      nightAmount: ZERO,
+      bonuses: ZERO,
+      grossSalary: ZERO,
+      taxableIncome: ZERO,
+      pitWithheld: ZERO,
+      pensionEmployee: ZERO,
+      pensionEmployer: ZERO,
+      otherDeductions: ZERO,
+      salaryAdvanceDeduction: ZERO,
+      netPay: ZERO,
+      employerTotalCost: ZERO,
       breakdown: mergedBreakdown as unknown as Record<string, unknown>,
     },
   };

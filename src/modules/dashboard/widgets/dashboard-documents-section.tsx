@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DOCUMENT_CATEGORY_LABELS, formatArtifactKind } from "@/modules/documents/components/document-labels";
+import { PanelHeader } from "@/components/patterns/page-header";
 import type { DocumentCategoryCount, RecentDocumentRow } from "../types/dashboard-types";
 
 export function DashboardDocumentsSection(props: {
@@ -17,21 +18,21 @@ export function DashboardDocumentsSection(props: {
   recent: RecentDocumentRow[];
 }) {
   return (
-    <div className="rounded-lg border border-border/80 bg-card">
-      <div className="border-b border-border/60 px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Dokumentet</h2>
-        <p className="text-xs text-muted-foreground">Gjenerimet e fundit dhe shpërndarja sipas llojit (muaji i filtrit).</p>
-      </div>
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
+    <div className="surface-card flex h-full flex-col">
+      <PanelHeader
+        title="Dokumentet"
+        description="Gjenerimet e fundit dhe shpërndarja sipas llojit (muaji i filtrit)."
+      />
+      <div className="grid gap-4 surface-card-body lg:grid-cols-2">
         <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Për kategori (final)</p>
+          <p className="card-label mb-2">Për kategori (final)</p>
           {props.byCategory.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nuk ka dokumente për muajin.</p>
           ) : (
             <ul className="flex flex-wrap gap-2">
               {props.byCategory.map((c) => (
                 <li key={c.category}>
-                  <Badge variant="outline">
+                  <Badge variant="muted">
                     {DOCUMENT_CATEGORY_LABELS[c.category]}: {c.count}
                   </Badge>
                 </li>

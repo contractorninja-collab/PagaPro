@@ -10,6 +10,9 @@ export const KOSOVO_STANDARD_WORKDAY_HOURS = 8;
 /** Art 32 — minimum annual paid leave operationalised as working days (4 weeks × Mon–Fri at full-time). */
 export const KOSOVO_MINIMUM_ANNUAL_WORKING_DAYS = 20;
 
+/** Regular medical leave — working days per calendar year (Ligji 03/L-212; not occupational injury). */
+export const KOSOVO_REGULAR_MEDICAL_LEAVE_WORKING_DAYS = 20;
+
 /** Art 32.3 — hazardous employment minimum annual leave (working days). */
 export const KOSOVO_HAZARDOUS_MINIMUM_ANNUAL_WORKING_DAYS = 30;
 
@@ -25,6 +28,9 @@ export const KOSOVO_FIRST_YEAR_GATE_MONTHS = 6;
 
 /** Art 36 — linear monthly accrual toward annual entitlement (20 working days / 12 months). */
 export const KOSOVO_MONTHLY_ACCRUAL_WORKING_DAYS = 20 / 12;
+
+/** Statutory minimum monthly accrual for first-year / partial-year cases (Art 35). */
+export const KOSOVO_STATUTORY_MIN_MONTHLY_ACCRUAL_DAYS = 1.666666666666667;
 
 /** Art 37.6 — carry-over usage deadline (following calendar year). */
 export const KOSOVO_CARRY_OVER_EXPIRY_MONTH = 6; // June (1–12)

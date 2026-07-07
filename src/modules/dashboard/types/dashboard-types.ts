@@ -99,6 +99,11 @@ export interface EmployeeDistributionSlice {
   byDepartment: Array<{ departmentId: string | null; departmentName: string; count: number }>;
 }
 
+export interface DocumentsMissingEmployeeRef {
+  id: string;
+  fullName: string;
+}
+
 export type OperationalAlertSeverity = "info" | "warning" | "critical";
 
 export interface OperationalAlert {
@@ -107,6 +112,13 @@ export interface OperationalAlert {
   title: string;
   detail?: string;
   href?: string;
+  actionLabel?: string;
+}
+
+export interface RecommendedAction {
+  id: string;
+  label: string;
+  href: string;
 }
 
 export interface DashboardOperationalPayload {
@@ -121,4 +133,5 @@ export interface DashboardOperationalPayload {
   recentDocuments: RecentDocumentRow[];
   distribution: EmployeeDistributionSlice;
   alerts: OperationalAlert[];
+  recommendedActions: RecommendedAction[];
 }

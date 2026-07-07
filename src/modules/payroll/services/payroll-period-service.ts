@@ -183,7 +183,12 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
     include: {
       parameterSet: true,
       snapshot: true,
-      generatedDocuments: { orderBy: { generatedAt: "desc" } },
+      generatedDocuments: {
+        orderBy: { generatedAt: "desc" },
+        include: {
+          employee: { select: { firstName: true, lastName: true } },
+        },
+      },
       atkExports: {
         orderBy: { generatedAt: "desc" },
         include: {
@@ -375,6 +380,7 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
       filename: d.filename,
       generatedAt: d.generatedAt.toISOString(),
       employeeId: d.employeeId,
+      employeeName: d.employee ? `${d.employee.firstName} ${d.employee.lastName}` : null,
     })),
     atkExports: payroll.atkExports.map((x) => ({
       id: x.id,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,9 +61,11 @@ export type PushimetBalanceSerialized = {
   leaveType: PushimetLeaveRowDto["type"];
   year: number;
   yearlyQuota: string;
-  usedDays: string;
-  remainingDays: string;
+  accruedDays: string;
   carryOverDays: string;
+  usedDays: string;
+  pendingDays: string;
+  remainingDays: string;
 };
 
 export function PushimetDetailClient(props: {
@@ -177,9 +180,7 @@ export function PushimetDetailClient(props: {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimi</h1>
-            <Badge variant={row.status === "PENDING" ? "warning" : row.status === "APPROVED" ? "success" : "secondary"}>
-              {LEAVE_STATUS_LABELS_SQ[row.status]}
-            </Badge>
+            <LeaveStatusBadge status={row.status} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {row.employeeName}
@@ -339,6 +340,10 @@ export function PushimetDetailClient(props: {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Gjendje ditësh sipas vitit</h2>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe pushimi mjekësor
+          i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.
+        </p>
         {props.balancesByYear.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nuk ka të dhëna balancë për punonjësin.</p>
         ) : (
@@ -351,8 +356,11 @@ export function PushimetDetailClient(props: {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lloji</TableHead>
-                    <TableHead>Kuota</TableHead>
+                    <TableHead>Kuota vjetore</TableHead>
+                    <TableHead>Akumuluar</TableHead>
+                    <TableHead>Bartur</TableHead>
                     <TableHead>Përdorur</TableHead>
+                    <TableHead>Në pritje</TableHead>
                     <TableHead>Mbetur</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -361,7 +369,16 @@ export function PushimetDetailClient(props: {
                     <TableRow key={b.id}>
                       <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
                       <TableCell className="tabular-nums">{b.yearlyQuota}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
+                      </TableCell>
                       <TableCell className="tabular-nums">{b.usedDays}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
+                      </TableCell>
                       <TableCell className="tabular-nums">
                         {parseFloat(b.remainingDays) < 0 ? (
                           <Badge variant="destructive">{b.remainingDays}</Badge>

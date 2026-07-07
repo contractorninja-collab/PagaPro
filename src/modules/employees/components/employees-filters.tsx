@@ -6,6 +6,7 @@ export interface EmployeesFilterValues {
   status: string;
   employmentType: string;
   departmentId: string;
+  documentsMissing: boolean;
 }
 
 /** Filtrim server-side përmes GET — pa JavaScript të domosdoshëm */
@@ -17,6 +18,9 @@ export function EmployeesFilters(props: {
 
   return (
     <form action="/punonjesit" method="get" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm md:flex-row md:flex-wrap md:items-end">
+      {defaults.documentsMissing ? (
+        <input type="hidden" name="documentsMissing" value="1" />
+      ) : null}
       <div className="flex min-w-[200px] flex-1 flex-col gap-1">
         <label htmlFor="emp-q" className="text-xs font-medium text-muted-foreground">
           Kërko
@@ -89,12 +93,17 @@ export function EmployeesFilters(props: {
           Filtro
         </button>
         <Link
-          href="/punonjesit"
+          href={defaults.documentsMissing ? "/punonjesit?documentsMissing=1" : "/punonjesit"}
           className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted"
         >
           Pastro
         </Link>
       </div>
+      {defaults.documentsMissing ? (
+        <p className="w-full text-xs text-muted-foreground">
+          Filtri aktiv: vetëm punonjës me dokumentacion të paplotë.
+        </p>
+      ) : null}
     </form>
   );
 }

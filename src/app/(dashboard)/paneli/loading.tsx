@@ -1,36 +1,40 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardSummaryCardsSkeleton } from "@/modules/dashboard/widgets/dashboard-summary-cards";
+import { DashboardAlertsPanelSkeleton } from "@/modules/dashboard/widgets/dashboard-alerts-panel";
+import { DashboardPayrollPanelSkeleton } from "@/modules/dashboard/widgets/dashboard-payroll-panel";
+import { DashboardFiltersBarSkeleton } from "@/modules/dashboard/widgets/dashboard-filters-bar";
+import { DashboardKpiCardsSkeleton } from "@/modules/dashboard/widgets/dashboard-summary-cards";
 
 export default function PaneliLoading() {
   return (
-    <div className="space-y-8 pb-24 md:pb-8">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-48 max-w-full" />
-        <Skeleton className="h-4 w-full max-w-xl" />
+    <div className="dashboard-container pb-24 md:pb-8">
+      <div className="mb-6 space-y-6">
+        <div className="page-header space-y-2 border-b border-border">
+          <Skeleton className="h-8 w-52 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+          <Skeleton className="h-9 w-36 rounded-md" />
+        </div>
+        <DashboardFiltersBarSkeleton />
       </div>
-      <Skeleton className="h-[120px] w-full rounded-lg" />
-      <Skeleton className="h-40 w-full rounded-lg" />
-      <DashboardSummaryCardsSkeleton />
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="border-border/80 shadow-none">
-          <CardHeader>
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="h-3 w-52" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </CardContent>
-        </Card>
-        <Card className="border-border/80 shadow-none">
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-32 w-full" />
-          </CardContent>
-        </Card>
+
+      <div className="dashboard-main-grid mb-5">
+        <DashboardPayrollPanelSkeleton />
+        <DashboardAlertsPanelSkeleton />
+      </div>
+
+      <div className="dashboard-grid">
+        <DashboardKpiCardsSkeleton />
+        <div className="card-half">
+          <Skeleton className="surface-card h-64 w-full" />
+        </div>
+        <div className="card-half">
+          <Skeleton className="surface-card h-64 w-full" />
+        </div>
+        <div className="card-half">
+          <Skeleton className="surface-card h-64 w-full" />
+        </div>
+        <div className="card-half">
+          <Skeleton className="surface-card h-64 w-full" />
+        </div>
       </div>
     </div>
   );

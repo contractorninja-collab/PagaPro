@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Building2, ChevronDown } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +15,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PagaProLogoCompact, PagaProMark } from "@/components/branding/logo";
 import { logoutAction } from "@/modules/auth/actions/auth-actions";
+import { cn } from "@/lib/utils";
+import { AlertsSheet } from "@/components/layout/alerts-sheet";
 
 function initialsOf(label: string | null | undefined): string {
   const trimmed = label?.trim();
@@ -29,10 +31,12 @@ export function AppHeader({
   activeCompanyLabel,
   userLabel,
   userEmail,
+  alertCount,
 }: {
   activeCompanyLabel: string | null;
   userLabel?: string | null;
   userEmail?: string | null;
+  alertCount?: number;
 }) {
   const pathname = usePathname();
   const tenantMissing = activeCompanyLabel == null;
@@ -53,38 +57,17 @@ export function AppHeader({
           <PagaProMark size={28} rounded="sm" />
           <PagaProLogoCompact ariaHidden />
         </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="max-w-[min(100%,18rem)] shrink truncate md:max-w-[min(100%,20rem)]"
-              aria-label="Ndërro kompaninë"
-            >
-              <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-              <span className={tenantMissing ? "truncate text-amber-700 dark:text-amber-400" : "truncate"}>
-                {tenantMissing ? "Nuk ka kompani aktive" : activeCompanyLabel}
-              </span>
-              <ChevronDown className="h-4 w-4 shrink-0 opacity-60" aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel>Kompania aktive</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled className="text-muted-foreground">
-              {tenantMissing
-                ? "Vendosni kompaninë (cookie pp_active_company_id ose zgjedhja Dev te Pagat)."
-                : "Ndërrimi i kompanive së shpejti."}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex max-w-[min(100%,18rem)] shrink items-center gap-2 rounded-md border border-input bg-secondary px-3 py-1.5 text-sm md:max-w-[min(100%,20rem)]">
+          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className={cn("truncate", tenantMissing ? "text-amber-700 dark:text-amber-400" : "text-foreground")}>
+            {tenantMissing ? "Nuk ka kompani aktive" : activeCompanyLabel}
+          </span>
+        </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
         <span className="sr-only">Faqja aktive: {pathname}</span>
-        <Button variant="ghost" size="icon" type="button" aria-label="Njoftime">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        <AlertsSheet initialCount={alertCount ?? 0} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full" aria-label="Profili">

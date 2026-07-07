@@ -9,18 +9,17 @@ const LABELS: Record<PayrollPeriodStatus, string> = {
   ARCHIVED: "I arkivuar",
 };
 
-const VARIANT: Record<PayrollPeriodStatus, "secondary" | "warning" | "success" | "default" | "outline"> = {
-  DRAFT: "secondary",
-  REVIEWED: "warning",
+const VARIANT: Record<
+  PayrollPeriodStatus,
+  "warning" | "info" | "success" | "default" | "muted"
+> = {
+  DRAFT: "warning",
+  REVIEWED: "info",
   APPROVED: "success",
   LOCKED: "default",
-  ARCHIVED: "outline",
+  ARCHIVED: "muted",
 };
 
 export function PayrollStatusBadge({ status }: { status: PayrollPeriodStatus }) {
-  return (
-    <Badge variant={VARIANT[status]} className="whitespace-nowrap">
-      {LABELS[status]}
-    </Badge>
-  );
+  return <Badge variant={VARIANT[status]}>{LABELS[status]}</Badge>;
 }

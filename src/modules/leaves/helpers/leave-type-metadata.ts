@@ -1,4 +1,5 @@
 import type { LeaveSubtype, LeaveType } from "@prisma/client";
+import { KOSOVO_REGULAR_MEDICAL_LEAVE_WORKING_DAYS } from "@/modules/leaves/constants/kosovo-law";
 
 /** Albanian operational labels + payroll defaults (centralized; UI imports from here). */
 export const LEAVE_TYPE_LABELS_SQ: Record<LeaveType, string> = {
@@ -12,6 +13,7 @@ export const LEAVE_TYPE_LABELS_SQ: Record<LeaveType, string> = {
 
 export const LEAVE_SUBTYPE_LABELS_SQ: Record<LeaveSubtype, string> = {
   NONE: "—",
+  LENDIM_PUNE_OSE_SEMUNDJE_PROFESIONALE: "Lëndim në punë / sëmundje profesionale",
   MARTESE: "Martesë (Art 39)",
   VDEKJE_FAMILJARE: "Vdekje familjare (Art 39)",
   LINDJE_FEMIJE: "Lindje fëmije (Art 39)",
@@ -22,6 +24,33 @@ export const LEAVE_SUBTYPE_LABELS_SQ: Record<LeaveSubtype, string> = {
   LEHONI_FAZA_QEVERIA_50: "Lehonie — faza Qeveria 50% (Art 49)",
   LEHONI_FAZA_FUNDIT_PA_PAGESE: "Lehonie — faza fundit pa pagesë (Art 49)",
 };
+
+export const OCCUPATIONAL_MEDICAL_LEAVE_SUBTYPE: LeaveSubtype = "LENDIM_PUNE_OSE_SEMUNDJE_PROFESIONALE";
+
+export const LEAVE_TYPE_HELP_SQ: Partial<Record<LeaveType, string>> = {
+  PUSHIM_MJEKESOR: `Pushim mjekësor i rregullt: deri në ${KOSOVO_REGULAR_MEDICAL_LEAVE_WORKING_DAYS} ditë pune në vit kalendarik. Lëndimi në punë ose sëmundja profesionale regjistrohet si nën-lloj i veçantë dhe nuk konsumon këtë kuotë.`,
+};
+
+export function isOccupationalMedicalLeave(subtype: LeaveSubtype | null | undefined): boolean {
+  return (subtype ?? "NONE") === OCCUPATIONAL_MEDICAL_LEAVE_SUBTYPE;
+}
+
+/** Subtypes offered when creating a medical leave request. */
+export function medicalLeaveSubtypesForForm(): LeaveSubtype[] {
+  return ["NONE", OCCUPATIONAL_MEDICAL_LEAVE_SUBTYPE];
+}
+
+export function medicalLeaveSubtypeLabel(subtype: LeaveSubtype): string {
+  if (subtype === "NONE") return "Pushim mjekësor i rregullt";
+  return LEAVE_SUBTYPE_LABELS_SQ[subtype];
+}
+
+export function subtypesForLeaveType(type: LeaveType): LeaveSubtype[] {
+  if (type === "PUSHIM_MJEKESOR") return medicalLeaveSubtypesForForm();
+  return (Object.keys(LEAVE_SUBTYPE_LABELS_SQ) as LeaveSubtype[]).filter(
+    (k) => k !== OCCUPATIONAL_MEDICAL_LEAVE_SUBTYPE,
+  );
+}
 
 /** Default flags when creating a request — HR may override before submit. Subtypes refine payroll classification. */
 export function defaultPaidAndPayrollFlags(

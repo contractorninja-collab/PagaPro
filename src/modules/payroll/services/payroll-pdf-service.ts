@@ -1,23 +1,109 @@
 import { randomUUID } from "node:crypto";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import type { PDFFont } from "pdf-lib";
+import type { Company, CompanySetting, Employee, EmployeeBankAccount, Payroll, PayrollEntry } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { payrollDocumentPdfKey } from "@/modules/documents/engine/storage/payroll-path-keys";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import { decimalToPlain } from "@/modules/payroll/helpers/money-format";
-import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
 import { appendPayrollDomainActivity } from "@/modules/payroll/services/payroll-audit-service";
 import { PAYROLL_TIMELINE } from "@/modules/payroll/constants/timeline";
+import {
+  buildProfessionalPayslipPdf,
+  mergePayslipPdfs,
+  type PayslipPdfInput,
+} from "@/modules/payroll/pdf/payslip-pdf-builder";
+import { buildPayrollRegisterPdf } from "@/modules/payroll/pdf/payroll-register-pdf-builder";
+import { buildPayslipBundleFilename, buildPayslipFilename } from "@/modules/payroll/pdf/payslip-filename";
 
-async function drawTitle(
-  page: { drawText: (t: string, o: object) => void },
-  title: string,
-  y: number,
-  font: PDFFont,
-) {
-  page.drawText(toPdfStandardFontText(title), { x: 40, y, size: 14, font });
-  return y - 28;
+type PayrollEntryWithEmployee = PayrollEntry & {
+  employee: Employee & { bankAccounts: EmployeeBankAccount[] };
+};
+
+function resolveCompanyAddress(company: Company, settings: CompanySetting | null): string {
+  return (
+    settings?.companyAddressLine?.trim() ||
+    company.addressLine?.trim() ||
+    ""
+  );
+}
+
+function resolveCityLine(company: Company): string {
+  return [company.postalCode, company.city, company.country].filter(Boolean).join(" ");
+}
+
+function resolveEmployeeBank(employee: Employee & { bankAccounts: EmployeeBankAccount[] }) {
+  const primary =
+    employee.bankAccounts.find((a) => a.isPrimary && (a.validTo == null || a.validTo > new Date())) ??
+    employee.bankAccounts[0];
+  return {
+    bankName: primary?.bankName ?? employee.bankName ?? null,
+    iban: primary?.iban ?? employee.bankAccountIban ?? null,
+    accountHolder: primary?.accountHolderName ?? `${employee.firstName} ${employee.lastName}`,
+    bicSwift: primary?.bicSwift ?? null,
+  };
+}
+
+function buildPayslipInput(params: {
+  pay: Payroll;
+  entry: PayrollEntryWithEmployee;
+  company: Company;
+  settings: CompanySetting | null;
+  documentRef: string;
+}): PayslipPdfInput {
+  const { pay, entry, company, settings, documentRef } = params;
+  const bank = resolveEmployeeBank(entry.employee);
+  const payDate = pay.lockedAt ?? pay.approvedAt ?? new Date();
+
+  return {
+    company: {
+      displayName: company.tradeName?.trim() || company.legalName,
+      legalName: company.legalName,
+      addressLine: resolveCompanyAddress(company, settings),
+      cityLine: resolveCityLine(company),
+      fiscalNumber: company.fiscalNumber,
+      businessNumber: company.businessRegistrationNumber,
+      phone: company.phone,
+      email: company.email,
+    },
+    employee: {
+      fullName: `${entry.employee.firstName} ${entry.employee.lastName}`,
+      personalId: entry.employee.personalId,
+      jobTitle: entry.jobTitleSnapshot ?? entry.employee.jobTitle,
+      ...bank,
+    },
+    period: {
+      year: pay.year,
+      month: pay.month,
+      periodLabel: payrollMonthLabel(pay.year, pay.month),
+      currency: pay.currency,
+      payDateLabel: payDate.toLocaleDateString("sq-XK", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }),
+    },
+    amounts: {
+      hourlyRate: decimalToPlain(entry.hourlyRate),
+      actualRegularHours: decimalToPlain(entry.actualRegularHours),
+      regularPay: decimalToPlain(entry.regularPay),
+      paidLeavePay: decimalToPlain(entry.paidLeavePay),
+      sickLeavePay: decimalToPlain(entry.sickLeavePay),
+      overtimeAmount: decimalToPlain(entry.overtimeAmount),
+      weekendAmount: decimalToPlain(entry.weekendAmount),
+      holidayAmount: decimalToPlain(entry.holidayAmount),
+      nightAmount: decimalToPlain(entry.nightAmount),
+      bonuses: decimalToPlain(entry.bonuses),
+      unpaidLeaveDeduction: decimalToPlain(entry.unpaidLeaveDeduction),
+      grossSalary: decimalToPlain(entry.grossSalary),
+      pensionEmployee: decimalToPlain(entry.pensionEmployee),
+      pitWithheld: decimalToPlain(entry.pitWithheld),
+      salaryAdvanceDeduction: decimalToPlain(entry.salaryAdvanceDeduction),
+      otherDeductions: decimalToPlain(entry.otherDeductions),
+      netPay: decimalToPlain(entry.netPay),
+      pensionEmployer: decimalToPlain(entry.pensionEmployer),
+    },
+    documentRef,
+  };
 }
 
 export async function generatePayrollPdfArtifacts(params: {
@@ -50,7 +136,13 @@ async function generatePayrollPdfArtifactsInner(params: {
     include: {
       company: true,
       entries: {
-        include: { employee: true },
+        include: {
+          employee: {
+            include: {
+              bankAccounts: { orderBy: [{ isPrimary: "desc" }, { validFrom: "desc" }] },
+            },
+          },
+        },
         orderBy: [{ employee: { lastName: "asc" } }, { employee: { firstName: "asc" } }],
       },
     },
@@ -63,145 +155,123 @@ async function generatePayrollPdfArtifactsInner(params: {
   if (payroll.entries.length === 0) return { ok: false, error: "Nuk ka rreshta pagë për të gjeneruar PDF." };
 
   const pay = payroll;
-
+  const settings = await prisma.companySetting.findUnique({ where: { companyId: params.companyId } });
   const cfg = await prisma.companyConfiguration.findUnique({ where: { companyId: params.companyId } });
   const prefix = (cfg?.payrollPdfPrefix ?? "PP").replace(/[^a-zA-Z0-9_-]/g, "") || "PP";
   const monthSlug = `${pay.year}-${String(pay.month).padStart(2, "0")}`;
-  const brand = pay.company.tradeName?.trim() || pay.company.legalName;
 
   const storage = getCompanyAssetStorage();
+  const payDate = pay.lockedAt ?? pay.approvedAt ?? new Date();
+  const companyPdf = {
+    displayName: pay.company.tradeName?.trim() || pay.company.legalName,
+    legalName: pay.company.legalName,
+    addressLine: resolveCompanyAddress(pay.company, settings),
+    cityLine: resolveCityLine(pay.company),
+    fiscalNumber: pay.company.fiscalNumber,
+    businessNumber: pay.company.businessRegistrationNumber,
+    phone: pay.company.phone,
+    email: pay.company.email,
+  };
+  const periodLabel = payrollMonthLabel(pay.year, pay.month);
+  const payDateLabel = payDate.toLocaleDateString("sq-XK", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
-  const rows = pay.entries.map((e) => ({
+  const registerRows = pay.entries.map((e) => ({
     name: `${e.employee.firstName} ${e.employee.lastName}`,
     gross: decimalToPlain(e.grossSalary),
     net: decimalToPlain(e.netPay),
     personalId: e.employee.personalId,
   }));
 
-  async function buildRegister(withAmounts: boolean): Promise<Uint8Array> {
-    const pdf = await PDFDocument.create();
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    let page = pdf.addPage([595.28, 841.89]);
-    let y = 800;
-
-    y = await drawTitle(
-      page,
-      withAmounts ? `Lista e pagave — ${brand}` : `Lista për nënshkrime — ${brand}`,
-      y,
-      bold,
-    );
-    page.drawText(toPdfStandardFontText(`${payrollMonthLabel(pay.year, pay.month)} · ${pay.currency}`), {
-      x: 40,
-      y,
-      size: 10,
-      font,
-      color: rgb(0.2, 0.2, 0.2),
-    });
-    y -= 36;
-
-    page.drawText(toPdfStandardFontText("#"), { x: 40, y, size: 9, font: bold });
-    page.drawText(toPdfStandardFontText("Punonjësi"), { x: 70, y, size: 9, font: bold });
-    page.drawText(toPdfStandardFontText("Numri personal"), { x: 280, y, size: 9, font: bold });
-    if (withAmounts) {
-      page.drawText(toPdfStandardFontText("Bruto"), { x: 400, y, size: 9, font: bold });
-      page.drawText(toPdfStandardFontText("Neto"), { x: 480, y, size: 9, font: bold });
-    }
-    y -= 16;
-
-    rows.forEach((r, idx) => {
-      if (y < 60) {
-        page = pdf.addPage([595.28, 841.89]);
-        y = 800;
-      }
-      page.drawText(toPdfStandardFontText(String(idx + 1)), { x: 40, y, size: 9, font });
-      page.drawText(toPdfStandardFontText(r.name.slice(0, 42)), { x: 70, y, size: 9, font });
-      page.drawText(toPdfStandardFontText(r.personalId), { x: 280, y, size: 9, font });
-      if (withAmounts) {
-        page.drawText(toPdfStandardFontText(r.gross), { x: 400, y, size: 9, font });
-        page.drawText(toPdfStandardFontText(r.net), { x: 480, y, size: 9, font });
-      }
-      y -= 14;
-    });
-
-    return pdf.save();
-  }
-
-  async function buildPayslip(employeeName: string, gross: string, net: string, pid: string): Promise<Uint8Array> {
-    const pdf = await PDFDocument.create();
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const page = pdf.addPage([595.28, 841.89]);
-    let y = 780;
-    page.drawText(toPdfStandardFontText(`${brand}`), { x: 40, y, size: 12, font });
-    y -= 22;
-    page.drawText(toPdfStandardFontText(`Fletëpagesë — ${payrollMonthLabel(pay.year, pay.month)}`), {
-      x: 40,
-      y,
-      size: 11,
-      font,
-    });
-    y -= 28;
-    page.drawText(toPdfStandardFontText(`Punonjësi: ${employeeName}`), { x: 40, y, size: 10, font });
-    y -= 16;
-    page.drawText(toPdfStandardFontText(`Numri personal: ${pid}`), { x: 40, y, size: 10, font });
-    y -= 22;
-    page.drawText(toPdfStandardFontText(`Bruto: EUR ${gross}`), { x: 40, y, size: 10, font });
-    y -= 16;
-    page.drawText(toPdfStandardFontText(`Neto: EUR ${net}`), { x: 40, y, size: 10, font });
-    return pdf.save();
-  }
+  const registerBase = {
+    company: companyPdf,
+    periodLabel,
+    currency: pay.currency,
+    payDateLabel,
+    rows: registerRows,
+  };
 
   await prisma.payrollGeneratedDocument.deleteMany({ where: { payrollId: pay.id } });
 
   const buffers: Array<{
-    kind: "REGISTER_WITH_TOTALS" | "REGISTER_SIGNATURE_LIST" | "EMPLOYEE_PAYSLIP";
+    kind: "REGISTER_WITH_TOTALS" | "REGISTER_SIGNATURE_LIST" | "EMPLOYEE_PAYSLIP" | "PAYSLIPS_PRINT_BUNDLE";
     employeeId?: string;
     body: Uint8Array;
     filename: string;
+    storageSuffix: "register_totals" | "register_signatures" | "payslip" | "payslips_bundle";
   }> = [];
 
-  const regTotals = await buildRegister(true);
+  const regTotals = await buildPayrollRegisterPdf({
+    ...registerBase,
+    withAmounts: true,
+    documentRef: `${prefix}-REG-${monthSlug}`,
+  });
   buffers.push({
     kind: "REGISTER_WITH_TOTALS",
     body: regTotals,
     filename: `${prefix}_lista_me_shuma_${monthSlug}.pdf`,
+    storageSuffix: "register_totals",
   });
 
-  const regSig = await buildRegister(false);
+  const regSig = await buildPayrollRegisterPdf({
+    ...registerBase,
+    withAmounts: false,
+    documentRef: `${prefix}-SIG-${monthSlug}`,
+  });
   buffers.push({
     kind: "REGISTER_SIGNATURE_LIST",
     body: regSig,
     filename: `${prefix}_lista_nenshkrimet_${monthSlug}.pdf`,
+    storageSuffix: "register_signatures",
   });
 
-  for (const e of pay.entries) {
-    const slip = await buildPayslip(
-      `${e.employee.firstName} ${e.employee.lastName}`,
-      decimalToPlain(e.grossSalary),
-      decimalToPlain(e.netPay),
-      e.employee.personalId,
-    );
+  const payslipBodies: Uint8Array[] = [];
+
+  for (const [idx, e] of pay.entries.entries()) {
+    const documentRef = `${prefix}-${monthSlug}-${String(idx + 1).padStart(3, "0")}`;
+    const slipInput = buildPayslipInput({
+      pay,
+      entry: e,
+      company: pay.company,
+      settings,
+      documentRef,
+    });
+    const slip = await buildProfessionalPayslipPdf(slipInput);
+    payslipBodies.push(slip);
     buffers.push({
       kind: "EMPLOYEE_PAYSLIP",
       employeeId: e.employeeId,
       body: slip,
-      filename: `${prefix}_fletepagese_${e.employee.personalId}_${monthSlug}.pdf`,
+      filename: buildPayslipFilename({
+        firstName: e.employee.firstName,
+        lastName: e.employee.lastName,
+        year: pay.year,
+        month: pay.month,
+      }),
+      storageSuffix: "payslip",
+    });
+  }
+
+  if (payslipBodies.length > 0) {
+    const bundle = await mergePayslipPdfs(payslipBodies);
+    buffers.push({
+      kind: "PAYSLIPS_PRINT_BUNDLE",
+      body: bundle,
+      filename: buildPayslipBundleFilename(pay.year, pay.month, prefix),
+      storageSuffix: "payslips_bundle",
     });
   }
 
   for (const b of buffers) {
     const id = randomUUID();
-    const suffix =
-      b.kind === "REGISTER_WITH_TOTALS"
-        ? "register_totals"
-        : b.kind === "REGISTER_SIGNATURE_LIST"
-          ? "register_signatures"
-          : "payslip";
     const key = payrollDocumentPdfKey({
       companyId: params.companyId,
       payrollId: pay.id,
       documentId: id,
-      suffix,
+      suffix: b.storageSuffix,
     });
     await storage.put(key, Buffer.from(b.body), { contentType: "application/pdf" });
     await prisma.payrollGeneratedDocument.create({
