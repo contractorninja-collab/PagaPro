@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LargimetDetailClient } from "@/modules/terminations/components/largimet-detail-client";
 import { getTerminationDetailBundle } from "@/modules/terminations/services/termination-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -12,16 +12,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function LargimetDetailPage({ params }: Props) {
-  const companyId = await resolveActiveCompanyId();
+  const { companyId } = await requireCompanyContextPage();
   const { id } = await params;
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive.</p>
-      </div>
-    );
-  }
 
   let bundle;
   try {

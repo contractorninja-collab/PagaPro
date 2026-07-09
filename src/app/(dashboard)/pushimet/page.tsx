@@ -21,7 +21,7 @@ import type {
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Pushimet",
@@ -131,21 +131,7 @@ export default async function PushimetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimet</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code>, variablën{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>, ose në development
-          përdorni <code className="rounded bg-muted px-1.5 py-0.5 text-xs">POST /api/dev/active-company</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const now = new Date();

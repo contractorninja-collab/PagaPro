@@ -12,15 +12,16 @@ import {
   setCompanyHolidayActive,
   updateCompanyHoliday,
 } from "@/modules/payroll/services/company-holiday-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 const categorySchema = z.enum(["KOSOVO_OFFICIAL_FIXED", "KOSOVO_OFFICIAL_MOVABLE", "COMPANY_CUSTOM"]);
 
 const yearSchema = z.number().int().min(2000).max(2100);
 
 async function companyIdOrError(): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
-  const id = await resolveActiveCompanyId();
-  return id ? { ok: true, companyId: id } : { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  return { ok: true, companyId: result.context.companyId };
 }
 
 export async function loadCompanyHolidaysAction(

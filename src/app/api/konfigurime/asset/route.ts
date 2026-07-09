@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { assertCompanyScopedStorageKey, resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { assertCompanyScopedStorageKey } from "@/server/company-scope";
 
 function contentTypeForKey(key: string): string {
   const lower = key.toLowerCase();
@@ -13,10 +14,11 @@ function contentTypeForKey(key: string): string {
 
 /** Streams an authorized-representative asset after tenant + prefix checks. */
 export async function GET(req: NextRequest) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return new Response("Missing active company", { status: 401 });
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return companyContextHttpError(result.reason);
   }
+  const { companyId } = result.context;
 
   const key = req.nextUrl.searchParams.get("key")?.trim();
   if (!key) {

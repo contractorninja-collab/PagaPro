@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { KonfigurimeRouteShell } from "@/components/konfigurime/konfigurime-route-shell";
 import { parseKonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
 import { loadKonfigurimePageDto } from "@/modules/konfigurime/services/konfigurime-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Konfigurimet",
@@ -18,24 +18,9 @@ export default async function KonfigurimePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
+  const { companyId } = await requireCompanyContextPage();
   const sp = await searchParams;
   const initialTab = parseKonfigurimeTabId(first(sp.tab));
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Konfigurimet</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code>, variablën e mjedisit{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>, ose në development
-          përdorni <code className="rounded bg-muted px-1.5 py-0.5 text-xs">POST /api/dev/active-company</code> me{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{`{"companyId":"..."}`}</code>.
-        </p>
-      </div>
-    );
-  }
 
   let initial;
   try {

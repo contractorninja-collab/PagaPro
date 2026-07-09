@@ -4,7 +4,12 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
-import { createSession, destroySession, getCurrentUser } from "@/modules/auth/services/session";
+import {
+  createSession,
+  destroyAllSessionsForUser,
+  destroySession,
+  getCurrentUser,
+} from "@/modules/auth/services/session";
 import { ACTIVE_COMPANY_COOKIE } from "@/server/company-scope";
 
 export type AuthActionResult =
@@ -131,6 +136,9 @@ export async function changePasswordAction(raw: unknown): Promise<AuthActionResu
         mustChangePassword: false,
       },
     });
+
+    await destroyAllSessionsForUser(user.id);
+    await createSession(user.id);
 
     return { ok: true, redirectTo: user.isPlatformAdmin ? "/admin" : "/paneli" };
   } catch (err) {

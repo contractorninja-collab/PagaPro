@@ -6,7 +6,7 @@ import {
 } from "@/modules/documents/services/document-queries";
 import type { DetectedBlankField } from "@/modules/documents/types/template-mapping";
 import { parseMappingJson } from "@/modules/documents/validators/document-template-validator";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export default async function TemplateMappingPage({
   params,
@@ -15,8 +15,7 @@ export default async function TemplateMappingPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) notFound();
+  const { companyId } = await requireCompanyContextPage();
 
   const { id } = await params;
   const sp = await searchParams;

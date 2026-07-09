@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
 import { logPayrollAtkExportDownloaded } from "@/modules/payroll/atk/services/atk-payroll-export-service";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return companyContextHttpError(result.reason);
   }
+  const { companyId, user } = result.context;
 
   const { id } = await context.params;
 
@@ -26,7 +27,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       companyId,
       payrollId: doc.payrollId,
       exportId: doc.id,
-      actorUserId: null,
+      actorUserId: user.id,
     });
     return new NextResponse(new Uint8Array(buf), {
       headers: {

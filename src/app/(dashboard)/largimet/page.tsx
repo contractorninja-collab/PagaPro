@@ -4,7 +4,7 @@ import {
   listEmployeesForTerminationPicker,
   listTerminationsForCompany,
 } from "@/modules/terminations/services/termination-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Largimet",
@@ -21,20 +21,7 @@ export default async function LargimetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold text-foreground">Largimet</h1>
-        <p className="text-sm text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code> ose{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const yearRaw = Number(first(sp, "year"));

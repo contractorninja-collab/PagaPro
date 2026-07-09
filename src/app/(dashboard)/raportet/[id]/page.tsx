@@ -4,15 +4,14 @@ import { RaportetDetailClient } from "@/modules/reports/components/raportet-deta
 import { previewReportInput } from "@/modules/reports/services/report-generation-service";
 import { getGeneratedReportDetail } from "@/modules/reports/services/report-query-service";
 import { categoryForReportType, REPORT_CATEGORY_LABEL_SQ } from "@/modules/reports/types";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Detaji raportit",
 };
 
 export default async function RaportetDetailPage(props: { params: Promise<{ id: string }> }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) notFound();
+  const { companyId } = await requireCompanyContextPage();
 
   const { id } = await props.params;
 

@@ -11,7 +11,7 @@ import {
   jobTitleIdSchema,
   jobTitleUpsertSchema,
 } from "@/modules/job-titles/validation/job-title-schemas";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 const REVALIDATE_PATHS = ["/konfigurime", "/punonjesit", "/dokumentet"] as const;
 
@@ -19,9 +19,13 @@ function revalidateJobTitlePaths(): void {
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
 }
 
-async function companyIdOrError(): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
-  const id = await resolveActiveCompanyId();
-  return id ? { ok: true, companyId: id } : { ok: false, error: "Nuk ka kompani aktive." };
+async function companyIdOrError(): Promise<
+  { ok: true; companyId: string; userId: string } | { ok: false; error: string }
+> {
+  const result = await getCompanyContext();
+  return result.ok
+    ? { ok: true, companyId: result.context.companyId, userId: result.context.user.id }
+    : { ok: false, error: companyContextErrorMessage(result.reason) };
 }
 
 function mutationError(
@@ -60,7 +64,7 @@ export async function saveJobTitleAction(
     };
   }
 
-  const res = await upsertJobTitle(company.companyId, parsed.data, null);
+  const res = await upsertJobTitle(company.companyId, parsed.data, company.userId);
   if (!res.ok) return mutationError(res.code, res.message);
 
   revalidateJobTitlePaths();
@@ -76,7 +80,7 @@ export async function archiveJobTitleAction(
   const parsed = jobTitleIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pozitës nuk është valide." };
 
-  const res = await setJobTitleArchived(company.companyId, parsed.data.id, true, null);
+  const res = await setJobTitleArchived(company.companyId, parsed.data.id, true, company.userId);
   if (!res.ok) return mutationError(res.code, res.message);
 
   revalidateJobTitlePaths();
@@ -92,7 +96,7 @@ export async function restoreJobTitleAction(
   const parsed = jobTitleIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pozitës nuk është valide." };
 
-  const res = await setJobTitleArchived(company.companyId, parsed.data.id, false, null);
+  const res = await setJobTitleArchived(company.companyId, parsed.data.id, false, company.userId);
   if (!res.ok) return mutationError(res.code, res.message);
 
   revalidateJobTitlePaths();

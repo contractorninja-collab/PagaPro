@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "pp_session";
 
 /**
- * Lightweight gate: redirect to /hyrje when no session cookie is present.
- * Authoritative, DB-backed checks live in the (dashboard)/(admin) layouts and server actions.
+ * Fast presence-only gate for pages: redirect to /hyrje when no session cookie
+ * is present. Authoritative DB-backed session + membership checks live in
+ * getCompanyContext (src/server/company-context.ts), which server actions,
+ * API routes, and layouts/pages call.
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,6 +25,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except API routes (own auth: company cookie / job secrets), Next internals, and static assets.
+  // Everything except API routes (which gate via getCompanyContext / job secrets), Next internals, and static assets.
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

@@ -5,15 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DOCUMENT_CATEGORY_LABELS } from "@/modules/documents/components/document-labels";
 import { getDocumentTemplateDetail } from "@/modules/documents/services/document-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export default async function TemplateDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) notFound();
+  const { companyId } = await requireCompanyContextPage();
 
   const { id } = await params;
   const template = await getDocumentTemplateDetail(companyId, id);

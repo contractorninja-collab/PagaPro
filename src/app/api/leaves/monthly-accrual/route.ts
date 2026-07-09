@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { runMonthlyLeaveAccrualForCompany } from "@/modules/leaves/services/leave-accrual-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
 
 const postBodySchema = z.object({
   periodYear: z.number().int().min(1970).max(2100),
@@ -56,19 +56,17 @@ export async function POST(req: Request): Promise<NextResponse> {
       if (bearer) {
         return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
       }
-      companyId = await resolveActiveCompanyId();
-      if (!companyId) {
-        return NextResponse.json({ ok: false, error: "Missing active company" }, { status: 401 });
-      }
+      const ctx = await getCompanyContext();
+      if (!ctx.ok) return companyContextHttpError(ctx.reason);
+      companyId = ctx.context.companyId;
     }
   } else {
     if (bearer) {
       return NextResponse.json({ ok: false, error: "Job secret not configured" }, { status: 503 });
     }
-    companyId = await resolveActiveCompanyId();
-    if (!companyId) {
-      return NextResponse.json({ ok: false, error: "Missing active company" }, { status: 401 });
-    }
+    const ctx = await getCompanyContext();
+    if (!ctx.ok) return companyContextHttpError(ctx.reason);
+    companyId = ctx.context.companyId;
   }
 
   try {

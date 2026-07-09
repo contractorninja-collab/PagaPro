@@ -7,7 +7,7 @@ import {
   listTerminationsForGeneration,
   listWarningsForGeneration,
 } from "@/modules/documents/services/document-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Gjenero dokument — Dokumentet",
@@ -24,14 +24,7 @@ export default async function DokumentetGeneratePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return (
-      <div className="py-12">
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive.</p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const initialEmployeeId = first(sp, "employeeId");
