@@ -368,6 +368,27 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
       labelSq: "Lloji i ndërprerjes",
     },
     {
+      key: "termination_type_label",
+      requiredByDefault: false,
+      sources: ["document_metadata"],
+      applicableCategories: ["TERMINATION"],
+      labelSq: "Lloji i ndërprerjes (shqip)",
+    },
+    {
+      key: "termination_status_label",
+      requiredByDefault: false,
+      sources: ["document_metadata"],
+      applicableCategories: ["TERMINATION"],
+      labelSq: "Statusi (shqip)",
+    },
+    {
+      key: "termination_notice_date",
+      requiredByDefault: false,
+      sources: ["document_metadata"],
+      applicableCategories: ["TERMINATION"],
+      labelSq: "Data e paralajmërimit",
+    },
+    {
       key: "termination_notice_days",
       requiredByDefault: false,
       sources: ["document_metadata"],

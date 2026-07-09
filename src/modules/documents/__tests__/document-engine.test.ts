@@ -7,6 +7,7 @@ import {
   validatePlaceholdersForRender,
 } from "../engine";
 import { buildLeavePlaceholderMap } from "../context/leave-context";
+import { buildTerminationPlaceholderMap } from "../context/termination-context";
 
 describe("parsePlaceholdersFromText", () => {
   it("extracts unique snake_case keys", () => {
@@ -50,6 +51,28 @@ describe("buildLeavePlaceholderMap", () => {
     expect(m.leave_working_days).toBe("8");
     expect(m.leave_quota_days).toBe("");
     expect(m.leave_remaining_days).toBe("");
+  });
+});
+
+describe("buildTerminationPlaceholderMap", () => {
+  it("resolves Albanian type/status labels, notice date, and severance", () => {
+    const m = buildTerminationPlaceholderMap({
+      terminationDate: new Date(Date.UTC(2026, 5, 30)),
+      lastWorkingDay: new Date(Date.UTC(2026, 5, 30)),
+      noticeDate: new Date(Date.UTC(2026, 4, 31)),
+      type: "NGA_PUNEDHENESI",
+      status: "COMPLETED",
+      noticeDays: 30,
+      severanceAmount: "500",
+      reason: "Arsye ekonomike",
+      details: "Ristrukturim i njësisë.",
+    });
+    expect(m.termination_type_label).toBe("Nga punëdhënësi");
+    expect(m.termination_status_label).toBe("I përfunduar");
+    expect(m.termination_notice_days).toBe("30");
+    expect(m.termination_notice_date).not.toBe("");
+    expect(m.termination_severance).toContain("500");
+    expect(m.termination_reason).toBe("Arsye ekonomike");
   });
 });
 

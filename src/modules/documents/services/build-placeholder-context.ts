@@ -313,6 +313,7 @@ export async function buildMergedPlaceholderContext(
         {
           terminationDate: term.terminationDate,
           lastWorkingDay: term.lastWorkingDay,
+          noticeDate: term.noticeDate,
           type: term.type,
           status: term.status,
           noticeDays: term.noticeDays,
