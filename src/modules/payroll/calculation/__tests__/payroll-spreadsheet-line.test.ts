@@ -51,6 +51,8 @@ const employeeGross1000 = {
   compensationBasis: "GROSS_MONTHLY" as const,
   targetNetMonthly: null,
   exemptFromMinimumSalary: false,
+  applyTrust: true,
+  applyTax: true,
 };
 
 describe("computePayrollSpreadsheetLine — hourly × hours (full-precision rate)", () => {

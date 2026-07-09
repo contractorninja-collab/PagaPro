@@ -41,6 +41,8 @@ export interface SpreadsheetEmployeeInput {
   compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY";
   targetNetMonthly: string | null;
   exemptFromMinimumSalary: boolean;
+  applyTrust: boolean;
+  applyTax: boolean;
 }
 
 function parseNonNegativeHours(
@@ -159,6 +161,8 @@ export function computePayrollSpreadsheetLine(
       snapshot,
       employerPrimacy: employee.employerPrimacy,
       enforceMinimumGross: !employee.exemptFromMinimumSalary,
+      applyTrust: employee.applyTrust,
+      applyTax: employee.applyTax,
     });
     if (!solved) {
       return {
@@ -255,6 +259,8 @@ export function computePayrollSpreadsheetLine(
       bonusAmount: "0",
       otherDeductions: roundMoneyEUR(otherDed.plus(advance)).toFixed(2),
       enforceMinimumGross: !employee.exemptFromMinimumSalary,
+      applyTrust: employee.applyTrust,
+      applyTax: employee.applyTax,
     },
     snapshot,
   );

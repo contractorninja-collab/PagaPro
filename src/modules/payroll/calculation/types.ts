@@ -10,8 +10,6 @@ export type AtkRegime = "PRIMARY_PROGRESSIVE" | "SECONDARY_FLAT_10" | "CONTRACTO
 
 export type SecondaryEmployerPitBaseKind = "TAXABLE_AFTER_PENSION" | "GROSS";
 
-export type ContractorWithholdingMode = "NONE" | "SECONDARY_FLAT_10";
-
 export type PremiumStackPolicy = "additive" | "max_only" | "explicit_order";
 
 export interface PremiumRules {
@@ -197,36 +195,13 @@ export interface CalculateEmployeeLineInput {
   bonusAmount?: string;
   otherDeductions?: string;
   enforceMinimumGross?: boolean;
+  /** Apply pension (Trust) contributions; default true. When false, employee & employer pension are 0. */
+  applyTrust?: boolean;
+  /** Apply income-tax (PIT) withholding; default true. When false, PIT withheld is 0. */
+  applyTax?: boolean;
 }
 
 export interface CalculateEmployeeLineOutput {
-  grossSalary: string;
-  taxableIncome: string;
-  pitWithheld: string;
-  pensionEmployee: string;
-  pensionEmployer: string;
-  otherDeductions: string;
-  netPay: string;
-  breakdown: CalculationBreakdownPayload;
-}
-
-export interface CalculateContractorLineInput {
-  hours: HourBreakdown;
-  rates: HourlyRates;
-  grossSalaryOverride?: string;
-  bonusAmount?: string;
-  contractorWithholdingMode?: ContractorWithholdingMode;
-  employerPrimacy?: EmployerPrimacy;
-  applyTrustContributions?: boolean;
-  pensionEmployeeRate?: string;
-  pensionEmployerRate?: string;
-  secondaryEmployerFlatRate?: string;
-  secondaryEmployerPitBase?: SecondaryEmployerPitBaseKind;
-  pitRules?: PitRulesSnapshot;
-  otherDeductions?: string;
-}
-
-export interface CalculateContractorLineOutput {
   grossSalary: string;
   taxableIncome: string;
   pitWithheld: string;

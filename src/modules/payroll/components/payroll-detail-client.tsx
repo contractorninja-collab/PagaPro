@@ -549,6 +549,31 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Libri i Pagave / Përmbledhja Financiare (Pagat per ATK)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Eksportoni të gjitha të dhënat dhe llogaritjet e plota të motorit të payroll-it (përfshirë orët, bruto pagën, trustin, tatimin, bonuset dhe avanset) në një skedar Excel të stiluar me markën PagaPRO ose si skedar CSV.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outlinePrimary" size="sm" asChild>
+                  <a href={`/api/payroll/${payroll.id}/export-financial?format=xlsx`} download>
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                    Shkarko Excel (Branded)
+                  </a>
+                </Button>
+                <Button variant="secondary" size="sm" asChild>
+                  <a href={`/api/payroll/${payroll.id}/export-financial?format=csv`} download>
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                    Shkarko CSV
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <div>
             <h3 className="mb-2 text-sm font-semibold text-foreground">Historia e eksporteve ATK</h3>
             {data.atkExports.length === 0 ? (
