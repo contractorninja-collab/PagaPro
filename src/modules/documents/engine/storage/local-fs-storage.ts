@@ -36,6 +36,10 @@ export class LocalFsDocumentStorage implements DocumentStorage {
       return false;
     }
   }
+
+  async delete(key: string): Promise<void> {
+    await fs.rm(this.resolve(key), { force: true });
+  }
 }
 
 /** @deprecated Use LocalFsDocumentStorage */

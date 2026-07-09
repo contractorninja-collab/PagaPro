@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type { ReportOutputFormat, ReportType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { safeDeleteAsset } from "@/lib/company-asset-storage";
+import { getCompanyContext, companyContextErrorMessage } from "@/server/company-context";
 import { previewReportInput, generateStoredReport } from "@/modules/reports/services/report-generation-service";
 import { appendReportExportLog } from "@/modules/reports/services/report-log-service";
 
@@ -19,16 +20,13 @@ function safeRevalidate(path: string): void {
   }
 }
 
-async function requireCompanyId(): Promise<string | null> {
-  return resolveActiveCompanyId();
-}
-
 export async function previewReportAction(input: {
   reportType: ReportType;
   filtersJson: unknown;
 }): Promise<ReportActionResult<{ columns: { key: string; headerSq: string }[]; rows: unknown[]; truncated: boolean }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) return { ok: false, error: "Sesioni nuk përfshin kompani aktiv." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId } = result.context;
   try {
     const res = await previewReportInput({
       companyId,
@@ -53,15 +51,16 @@ export async function generateReportAction(input: {
   filtersJson: unknown;
   format: ReportOutputFormat;
 }): Promise<ReportActionResult<{ id: string }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) return { ok: false, error: "Sesioni nuk përfshin kompani aktiv." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const res = await generateStoredReport({
     companyId,
     reportType: input.reportType,
     filtersRaw: input.filtersJson,
     format: input.format,
-    actorUserId: null,
+    actorUserId: user.id,
     regenerate: false,
   });
   if (!res.ok) return { ok: false, error: res.error };
@@ -72,8 +71,9 @@ export async function generateReportAction(input: {
 export async function regenerateReportAction(input: {
   previousReportId: string;
 }): Promise<ReportActionResult<{ id: string }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) return { ok: false, error: "Sesioni nuk përfshin kompani aktiv." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const prev = await prisma.generatedReport.findFirst({
     where: { id: input.previousReportId, companyId },
@@ -86,11 +86,26 @@ export async function regenerateReportAction(input: {
     reportType: prev.reportType,
     filtersRaw: prev.filtersJson,
     format: prev.fileFormat,
-    actorUserId: null,
+    actorUserId: user.id,
     previousReportId: prev.id,
     regenerate: true,
   });
   if (!res.ok) return { ok: false, error: res.error };
+
+  // Supersede the previous report: archive its row (audit trail kept) and reclaim its blob.
+  await prisma.generatedReport.update({
+    where: { id: prev.id },
+    data: { isArchived: true, archivedAt: new Date() },
+  });
+  await safeDeleteAsset(prev.storageKey);
+  await appendReportExportLog({
+    companyId,
+    generatedReportId: prev.id,
+    action: "ARCHIVED",
+    performedByUserId: user.id,
+    metadataJson: { supersededById: res.id },
+  });
+
   safeRevalidate("/raportet");
   safeRevalidate(`/raportet/${input.previousReportId}`);
   safeRevalidate(`/raportet/${res.id}`);
@@ -98,8 +113,9 @@ export async function regenerateReportAction(input: {
 }
 
 export async function archiveReportAction(input: { id: string }): Promise<ReportActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) return { ok: false, error: "Sesioni nuk përfshin kompani aktiv." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const existing = await prisma.generatedReport.findFirst({
     where: { id: input.id, companyId },
@@ -111,12 +127,14 @@ export async function archiveReportAction(input: { id: string }): Promise<Report
     where: { id: existing.id },
     data: { isArchived: true, archivedAt: new Date() },
   });
+  // Archived reports are retired — reclaim the blob (row + audit log stay for history).
+  await safeDeleteAsset(existing.storageKey);
 
   await appendReportExportLog({
     companyId,
     generatedReportId: existing.id,
     action: "ARCHIVED",
-    performedByUserId: null,
+    performedByUserId: user.id,
     metadataJson: {},
   });
 

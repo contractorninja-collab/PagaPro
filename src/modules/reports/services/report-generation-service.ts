@@ -1,7 +1,7 @@
 import type { ReportOutputFormat, ReportType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
+import { getCompanyAssetStorage, safeDeleteAsset } from "@/lib/company-asset-storage";
 import { assertCompanyScopedStorageKey } from "@/server/company-scope";
 import { generatedReportStorageKey, type ReportFileExt } from "@/modules/reports/helpers/storage-keys";
 import { rowsToXlsxBuffer, financePayrollWorkbookBuffer } from "@/modules/reports/exporters/excel-export";
@@ -221,22 +221,28 @@ export async function generateStoredReport(params: {
     const filtersJson = JSON.parse(JSON.stringify(filters)) as object;
     const denorm = denormalizedFilters(params.reportType, filters);
 
-    await prisma.generatedReport.create({
-      data: {
-        id: reportId,
-        companyId: params.companyId,
-        reportType: params.reportType,
-        title: titleForType(params.reportType),
-        storageKey,
-        generatedFileUrl: `/api/reports/files/${reportId}`,
-        fileFormat: params.format,
-        filtersJson,
-        generatedByUserId: params.actorUserId ?? undefined,
-        rowCount: rows.length,
-        previewTruncated: rows.length > PREVIEW_ROW_CAP,
-        ...denorm,
-      },
-    });
+    try {
+      await prisma.generatedReport.create({
+        data: {
+          id: reportId,
+          companyId: params.companyId,
+          reportType: params.reportType,
+          title: titleForType(params.reportType),
+          storageKey,
+          generatedFileUrl: `/api/reports/files/${reportId}`,
+          fileFormat: params.format,
+          filtersJson,
+          generatedByUserId: params.actorUserId ?? undefined,
+          rowCount: rows.length,
+          previewTruncated: rows.length > PREVIEW_ROW_CAP,
+          ...denorm,
+        },
+      });
+    } catch (err) {
+      // Row insert failed after the blob was written — reclaim the orphaned blob.
+      await safeDeleteAsset(storageKey);
+      throw err;
+    }
 
     await appendReportExportLog({
       companyId: params.companyId,
