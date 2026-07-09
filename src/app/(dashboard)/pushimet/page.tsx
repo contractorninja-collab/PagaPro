@@ -100,6 +100,24 @@ function serializeLeaveRow(
   };
 }
 
+function readAnnualBreakdown(
+  bd: unknown,
+): { projected: number | null; base: number; tenure: number; special: number } | null {
+  if (!bd || typeof bd !== "object") return null;
+  const ent = (bd as { entitlement?: unknown }).entitlement;
+  if (!ent || typeof ent !== "object") return null;
+  const e = ent as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    projected: num(e.remainingYearlyDays),
+    base: num(e.baseAnnualDays) ?? 0,
+    tenure: num(e.experienceExtraDays) ?? 0,
+    special: num(e.protectedCategoryExtraDays) ?? 0,
+  };
+}
+
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
 function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
   return {
     id: row.id,
@@ -207,20 +225,27 @@ export default async function PushimetPage({
     name: t.name,
   }));
 
-  const balances: PushimetBalanceRowDto[] = balancesRaw.map((b) => ({
-    id: b.id,
-    employeeId: b.employeeId,
-    employeeName: `${b.employee.firstName} ${b.employee.lastName}`.trim(),
-    departmentName: b.employee.department?.name ?? null,
-    leaveType: b.leaveType,
-    year: b.year,
-    yearlyQuota: b.yearlyQuota.toString(),
-    accruedDays: b.accruedYtd.toString(),
-    carryOverDays: b.carryOverDays.toString(),
-    usedDays: b.usedDays.toString(),
-    pendingDays: b.pendingDays.toString(),
-    remainingDays: b.remainingDays.toString(),
-  }));
+  const balances: PushimetBalanceRowDto[] = balancesRaw.map((b) => {
+    const isAnnual = b.leaveType === "PUSHIM_VJETOR";
+    const bd = isAnnual ? readAnnualBreakdown(b.breakdown) : null;
+    return {
+      id: b.id,
+      employeeId: b.employeeId,
+      employeeName: `${b.employee.firstName} ${b.employee.lastName}`.trim(),
+      departmentName: b.employee.department?.name ?? null,
+      leaveType: b.leaveType,
+      year: b.year,
+      yearlyQuota: b.yearlyQuota.toString(),
+      accruedDays: b.accruedYtd.toString(),
+      carryOverDays: b.carryOverDays.toString(),
+      usedDays: b.usedDays.toString(),
+      pendingDays: b.pendingDays.toString(),
+      remainingDays: b.remainingDays.toString(),
+      projectedYearEndDays: bd?.projected != null ? String(round2(bd.projected)) : null,
+      carryExpiresIso: b.carryExpiresAt ? b.carryExpiresAt.toISOString() : null,
+      entitlementBreakdown: bd ? { base: bd.base, tenure: bd.tenure, special: bd.special } : null,
+    };
+  });
 
   return (
     <div className="space-y-8">

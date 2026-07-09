@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
+import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
 import type { LeaveSubtype } from "@prisma/client";
@@ -267,75 +268,59 @@ export function PushimetDashboardClient(props: {
       </section>
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Gjendje ditësh (balanca)</h2>
-            <p className="text-xs text-muted-foreground">
-              Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe pushimi
-              mjekësor i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.{" "}
-              <span className="font-medium text-amber-800 dark:text-amber-200">
-                Vlerat negative alarmojnë HR para miratimit.
-              </span>
-            </p>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Pushimi vjetor — bilanci për {props.calendarYear}</h2>
+          <p className="text-xs text-muted-foreground">
+            &quot;Disponueshme tani&quot; = ditët e akumuluara deri sot minus të përdorurat (plus ditët e bartura, nëse
+            aktive). &quot;Fund viti&quot; është projeksioni deri më 31 dhjetor. Festat zyrtare dhe pushimi mjekësor gjatë
+            pushimit vjetor nuk zbriten (Art 34).
+          </p>
+        </div>
+
+        <AnnualLeaveBalancePanel balances={props.balances} year={props.calendarYear} />
+
+        {props.balances.some((b) => b.leaveType !== "PUSHIM_VJETOR") ? (
+          <div className="space-y-2 pt-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Lloje të tjera (kuotë vjetore)
+            </h3>
+            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+              <Table className="table-dense min-w-[640px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Punonjësi</TableHead>
+                    <TableHead>Lloji</TableHead>
+                    <TableHead className="text-right">Kuota</TableHead>
+                    <TableHead className="text-right">Përdorur</TableHead>
+                    <TableHead className="text-right">Mbetur</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {props.balances
+                    .filter((b) => b.leaveType !== "PUSHIM_VJETOR")
+                    .map((b) => {
+                      const neg = parseFloat(b.remainingDays) < 0;
+                      return (
+                        <TableRow key={b.id}>
+                          <TableCell className="font-medium">{b.employeeName}</TableCell>
+                          <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
+                          <TableCell className="text-right tabular-nums">{b.yearlyQuota}</TableCell>
+                          <TableCell className="text-right tabular-nums">{b.usedDays}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {neg ? (
+                              <Badge variant="destructive">{b.remainingDays}</Badge>
+                            ) : (
+                              <span>{b.remainingDays}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <Table className="table-dense min-w-[960px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Punonjësi</TableHead>
-                <TableHead>Departamenti</TableHead>
-                <TableHead>Lloji</TableHead>
-                <TableHead>Viti</TableHead>
-                <TableHead>Kuota vjetore</TableHead>
-                <TableHead>Akumuluar</TableHead>
-                <TableHead>Bartur</TableHead>
-                <TableHead>Përdorur</TableHead>
-                <TableHead>Në pritje</TableHead>
-                <TableHead>Mbetur</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {props.balances.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
-                    Nuk ka të dhëna balancë për vitin e filtrit — do të popullohet kur miratohen pushimet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                props.balances.map((b) => {
-                  const neg = parseFloat(b.remainingDays) < 0;
-                  return (
-                    <TableRow key={b.id}>
-                      <TableCell className="font-medium">{b.employeeName}</TableCell>
-                      <TableCell className="text-muted-foreground">{b.departmentName ?? "—"}</TableCell>
-                      <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
-                      <TableCell className="tabular-nums">{b.year}</TableCell>
-                      <TableCell className="tabular-nums">{b.yearlyQuota}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">{b.usedDays}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {neg ? (
-                          <Badge variant="destructive">{b.remainingDays}</Badge>
-                        ) : (
-                          <span>{b.remainingDays}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        ) : null}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_minmax(280px,360px)]">
