@@ -31,6 +31,10 @@ export const leaveRejectSchema = leaveRequestIdSchema.extend({
     .transform((s) => (s?.trim() ? s.trim() : "Refuzuar nga HR.")),
 });
 
+export const leaveRevokeSchema = leaveRequestIdSchema.extend({
+  reason: z.string().optional().nullable(),
+});
+
 export const leaveGenerateDocSchema = z.object({
   leaveRequestId: z.string().min(1),
   documentTemplateId: z.string().min(1),

@@ -37,15 +37,20 @@ export async function findOverlappingLeaveRequest(
   return rows[0] ?? null;
 }
 
-async function payrollLockedOverlapBlock(params: {
+export async function payrollLockedOverlapBlock(params: {
   companyId: string;
   startDate: Date;
   endDate: Date;
+  /** Also treat ARCHIVED payrolls as finalized (used when revoking an approved leave). */
+  includeArchived?: boolean;
 }): Promise<LeaveValidationResult> {
   const start = params.startDate;
   const end = params.endDate;
   const cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
   const endM = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  const blockingStatuses = params.includeArchived
+    ? (["LOCKED", "APPROVED", "ARCHIVED"] as const)
+    : (["LOCKED", "APPROVED"] as const);
 
   while (cur.getTime() <= endM.getTime()) {
     const y = cur.getUTCFullYear();
@@ -55,7 +60,7 @@ async function payrollLockedOverlapBlock(params: {
         companyId: params.companyId,
         year: y,
         month: m,
-        status: { in: ["LOCKED", "APPROVED"] },
+        status: { in: [...blockingStatuses] },
       },
       select: { id: true },
     });

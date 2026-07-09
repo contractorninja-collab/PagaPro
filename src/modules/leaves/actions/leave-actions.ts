@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { prisma } from "@/lib/prisma";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 import {
   approveLeaveRequest,
   cancelLeaveRequest,
   createDraftLeaveRequest,
   rejectLeaveRequest,
+  revokeApprovedLeaveRequest,
   submitLeaveRequest,
 } from "@/modules/leaves/services/leave-workflow-service";
 import { generateLeavePdfArtifact } from "@/modules/leaves/services/leave-document-service";
@@ -16,6 +18,7 @@ import {
   leaveRejectSchema,
   leaveRequestCreateSchema,
   leaveRequestIdSchema,
+  leaveRevokeSchema,
 } from "@/modules/leaves/validators/leave-schemas";
 import { linkApprovedSickInterruptingAnnualLeave } from "@/modules/leaves/services/leave-interruption-service";
 
@@ -31,11 +34,20 @@ function safeRev(path: string) {
   }
 }
 
+async function activeMembershipId(userId: string, companyId: string): Promise<string | null> {
+  const membership = await prisma.userCompanyMembership.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+    select: { id: true },
+  });
+  return membership?.id ?? null;
+}
+
 export async function linkSickInterruptingAnnualLeaveAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId } = ctx.context;
   const parsed = leaveInterruptLinkSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
   try {
@@ -56,8 +68,9 @@ export async function linkSickInterruptingAnnualLeaveAction(
 export async function createLeaveRequestAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult<{ id: string }>> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId, user } = ctx.context;
   const parsed = leaveRequestCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
   const start = new Date(parsed.data.startDateIso);
@@ -74,7 +87,7 @@ export async function createLeaveRequestAction(
       startDate: start,
       endDate: end,
       reason: parsed.data.reason,
-      createdByUserId: null,
+      createdByUserId: user.id,
     });
     await submitLeaveRequest({ companyId, leaveId: id });
     safeRev("/pushimet");
@@ -86,15 +99,20 @@ export async function createLeaveRequestAction(
 }
 
 export async function approveLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
       ? leaveRequestIdSchema.safeParse({ leaveId: raw })
       : leaveRequestIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
   try {
-    await approveLeaveRequest({ companyId, leaveId: parsed.data.leaveId, decidedByMembershipId: null });
+    await approveLeaveRequest({
+      companyId,
+      leaveId: parsed.data.leaveId,
+      decidedByMembershipId: await activeMembershipId(user.id, companyId),
+    });
     safeRev("/pushimet");
     safeRev("/paneli");
     return { ok: true };
@@ -104,8 +122,9 @@ export async function approveLeaveRequestAction(raw: unknown): Promise<LeaveModu
 }
 
 export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
       ? leaveRejectSchema.safeParse({ leaveId: raw })
@@ -116,7 +135,7 @@ export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModul
       companyId,
       leaveId: parsed.data.leaveId,
       rejectionReason: parsed.data.rejectionReason,
-      decidedByMembershipId: null,
+      decidedByMembershipId: await activeMembershipId(user.id, companyId),
     });
     safeRev("/pushimet");
     safeRev("/paneli");
@@ -127,8 +146,9 @@ export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModul
 }
 
 export async function cancelLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId } = ctx.context;
   const parsed =
     typeof raw === "string"
       ? leaveRequestIdSchema.safeParse({ leaveId: raw })
@@ -144,11 +164,36 @@ export async function cancelLeaveRequestAction(raw: unknown): Promise<LeaveModul
   }
 }
 
+export async function revokeLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId } = ctx.context;
+  const parsed =
+    typeof raw === "string"
+      ? leaveRevokeSchema.safeParse({ leaveId: raw })
+      : leaveRevokeSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+  try {
+    await revokeApprovedLeaveRequest({
+      companyId,
+      leaveId: parsed.data.leaveId,
+      reason: parsed.data.reason,
+    });
+    safeRev("/pushimet");
+    safeRev(`/pushimet/${parsed.data.leaveId}`);
+    safeRev("/paneli");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Revokimi dështoi." };
+  }
+}
+
 export async function generateLeaveDocumentAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult<{ artifactId: string }>> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId, user } = ctx.context;
   const parsed = leaveGenerateDocSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
   try {
@@ -156,6 +201,7 @@ export async function generateLeaveDocumentAction(
       companyId,
       leaveRequestId: parsed.data.leaveRequestId,
       documentTemplateId: parsed.data.documentTemplateId,
+      actorUserId: user.id,
     });
     safeRev("/pushimet");
     safeRev(`/pushimet/${parsed.data.leaveRequestId}`);

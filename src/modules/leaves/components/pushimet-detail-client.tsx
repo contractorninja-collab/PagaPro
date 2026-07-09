@@ -30,6 +30,7 @@ import {
   generateLeaveDocumentAction,
   linkSickInterruptingAnnualLeaveAction,
   rejectLeaveRequestAction,
+  revokeLeaveRequestAction,
 } from "@/modules/leaves/actions/leave-actions";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
@@ -81,6 +82,8 @@ export function PushimetDetailClient(props: {
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revokeReason, setRevokeReason] = useState("");
   const [genOpen, setGenOpen] = useState(false);
   const [genTemplateId, setGenTemplateId] = useState(props.templates[0]?.id ?? "");
   const [linkInterruptOpen, setLinkInterruptOpen] = useState(false);
@@ -122,6 +125,21 @@ export function PushimetDetailClient(props: {
     toast.success("Pushimi u refuzua.");
     setRejectOpen(false);
     setRejectReason("");
+    refresh();
+  }
+
+  async function revokeConfirm() {
+    const r = await revokeLeaveRequestAction({
+      leaveId: row.id,
+      reason: revokeReason.trim() || undefined,
+    });
+    if (!r.ok) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success("Pushimi u revokua dhe balancat u rikthyen.");
+    setRevokeOpen(false);
+    setRevokeReason("");
     refresh();
   }
 
@@ -207,9 +225,14 @@ export function PushimetDetailClient(props: {
             </Button>
           ) : null}
           {row.status === "APPROVED" ? (
-            <Button type="button" variant="secondary" onClick={() => setGenOpen(true)}>
-              Gjenero dokument
-            </Button>
+            <>
+              <Button type="button" variant="secondary" onClick={() => setGenOpen(true)}>
+                Gjenero dokument
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setRevokeOpen(true)}>
+                Revoko
+              </Button>
+            </>
           ) : null}
           <Button variant="ghost" asChild>
             <Link href="/pushimet">Kthehu te lista</Link>
@@ -493,6 +516,32 @@ export function PushimetDetailClient(props: {
             </Button>
             <Button type="button" onClick={() => void rejectConfirm()}>
               Konfirmo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoko pushimin e miratuar</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Pushimi kalon në status të anuluar dhe ditët kthehen në balancë. E pamundur nëse
+            përputhet me një payroll të kyçur. Arsyeja (opsionale):
+          </p>
+          <textarea
+            value={revokeReason}
+            onChange={(e) => setRevokeReason(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setRevokeOpen(false)}>
+              Mbyll
+            </Button>
+            <Button type="button" onClick={() => void revokeConfirm()}>
+              Revoko
             </Button>
           </DialogFooter>
         </DialogContent>

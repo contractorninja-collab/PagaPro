@@ -9,6 +9,7 @@ import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation
 import { syncLeaveBalancesForEmployeeYear } from "@/modules/leaves/services/leave-balance-service";
 import {
   findOverlappingLeaveRequest,
+  payrollLockedOverlapBlock,
   validateLeaveRequestForWorkflow,
 } from "@/modules/leaves/services/leave-validation-service";
 async function appendLeaveTimeline(params: {
@@ -326,6 +327,75 @@ export async function rejectLeaveRequest(params: {
     leaveId: lr.id,
     verb: "REJECTED",
     summary: "Kërkesa e pushimit u refuzua.",
+  });
+}
+
+/**
+ * Revoke an already-APPROVED leave request (APPROVED → CANCELLED) and restore the
+ * consumed balance. Blocked when the leave overlaps a LOCKED/APPROVED payroll month,
+ * because those figures already reflect the leave. Balances are recompute-based, so
+ * re-syncing the affected year(s) after cancelling naturally releases the days.
+ */
+export async function revokeApprovedLeaveRequest(params: {
+  companyId: string;
+  leaveId: string;
+  reason?: string | null;
+}): Promise<void> {
+  const lr = await prisma.leaveRequest.findFirst({
+    where: { id: params.leaveId, companyId: params.companyId },
+  });
+  if (!lr) throw new Error("Kërkesa nuk u gjet.");
+  if (lr.status !== "APPROVED") throw new Error("Vetëm pushimet e miratuara mund të revokohen.");
+
+  const lockBlock = await payrollLockedOverlapBlock({
+    companyId: params.companyId,
+    startDate: lr.startDate,
+    endDate: lr.endDate,
+    includeArchived: true,
+  });
+  if (lockBlock.blocks.length > 0) {
+    throw new Error(
+      lockBlock.blocks[0]?.message ??
+        "Pushimi nuk mund të revokohet sepse përputhet me një payroll të kyçur, të miratuar ose të arkivuar.",
+    );
+  }
+
+  const reason = params.reason?.trim() || null;
+
+  await prisma.leaveRequest.update({
+    where: { id: lr.id },
+    data: {
+      status: "CANCELLED",
+      affectsPayroll: false,
+      rejectionReason: reason,
+    },
+  });
+
+  const y = lr.startDate.getUTCFullYear();
+  await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y);
+  const y2 = lr.endDate.getUTCFullYear();
+  if (y2 !== y) await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y2);
+
+  const yearsSynced = y2 !== y ? [y, y2] : [y];
+
+  await appendLeaveTimeline({
+    companyId: params.companyId,
+    employeeId: lr.employeeId,
+    leaveId: lr.id,
+    eventType: "LEAVE_REVOKED",
+    title: "Pushimi i miratuar u revokua",
+    body: reason ?? undefined,
+    severity: TimelineEventSeverity.WARNING,
+  });
+
+  await appendLeaveDomainActivity({
+    companyId: params.companyId,
+    leaveId: lr.id,
+    verb: "VOIDED",
+    summary: "Pushimi i miratuar u revokua dhe balancat u rikthyen.",
+    payload: JSON.parse(
+      JSON.stringify({ balanceYearsSynced: yearsSynced, reason }),
+    ) as Prisma.InputJsonValue,
   });
 }
 
