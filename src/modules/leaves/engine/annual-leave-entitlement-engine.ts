@@ -1,10 +1,6 @@
 import { Decimal } from "decimal.js";
 import type { AnnualLeaveAccrualMode, AnnualLeaveRoundingMode } from "@prisma/client";
 import {
-  KOSOVO_STATUTORY_MIN_MONTHLY_ACCRUAL_DAYS,
-} from "@/modules/leaves/constants/kosovo-law";
-import { accruedYtdLinearMonths } from "@/modules/leaves/engine/accrual-models";
-import {
   applyFirstYearGateClamp,
   composeAnnualWorkingDayQuota,
 } from "@/modules/leaves/engine/kosovo-annual-quota";
@@ -24,6 +20,7 @@ export interface AnnualLeaveEntitlementResult {
   hazardousWorkMinimumApplied: boolean;
   yearlyEntitlementDays: number;
   accruedDaysToDate: number;
+  accruedDaysToYearEnd: number;
   usedApprovedDays: number;
   pendingRequestedDays: number;
   carriedOverFromPreviousYear: number;
@@ -54,6 +51,10 @@ export interface CalculateAnnualLeaveEntitlementInput {
   uninterruptedMonths: number;
   fullYearsOfService: number;
   monthsWorkedInYear: number;
+  /** Fraction of the year served up to the calculation date (0..1). Preferred day-level basis. */
+  servedFractionToDate?: number;
+  /** Fraction of the year that will be served by year-end (0..1), for the projection. */
+  servedFractionToYearEnd?: number;
   isHazardous: boolean;
   eligibleSpecialCategories: boolean;
   calculationDate: Date;
@@ -87,17 +88,20 @@ function effectiveCarryOver(
   return carriedOver;
 }
 
-function computeAccruedDaysToDate(input: CalculateAnnualLeaveEntitlementInput, yearlyEntitlementDays: number): number {
-  if (input.ledgerAccruedYtd > 0) {
-    return Math.min(input.ledgerAccruedYtd, yearlyEntitlementDays);
-  }
-
+/**
+ * Deterministic, entitlement-scaled accrual to a given fraction of the year.
+ * Independent of whether the (unscheduled) monthly accrual ledger was posted — the
+ * flat 1.6667/month ledger is intentionally NOT consulted here, since it ignores the
+ * employee's real entitlement (tenure / special / hazardous) and disagrees with the
+ * fallback for mid-month hires. Rate is entitlement/12, not a flat company default.
+ */
+function accrueEntitlementToFraction(
+  input: CalculateAnnualLeaveEntitlementInput,
+  yearlyEntitlementDays: number,
+  yearFraction: number,
+): number {
   const gateMonths = Math.max(1, input.firstYearGateMonths);
   const underGate = input.uninterruptedMonths < gateMonths;
-  const monthlyRate = Math.max(
-    input.monthlyAccrualDays,
-    KOSOVO_STATUTORY_MIN_MONTHLY_ACCRUAL_DAYS,
-  );
 
   if (input.accrualMode === "UPFRONT") {
     if (underGate) {
@@ -110,21 +114,24 @@ function computeAccruedDaysToDate(input: CalculateAnnualLeaveEntitlementInput, y
     return yearlyEntitlementDays;
   }
 
+  // Prefer true day-level proration (servedFractionToDate); fall back to
+  // completed-months/12 when the caller did not supply a fraction (unit tests).
+  const fraction =
+    yearFraction >= 0
+      ? Math.max(0, Math.min(1, yearFraction))
+      : Math.max(0, Math.min(1, input.monthsWorkedInYear / 12));
+  const prorated = yearlyEntitlementDays * fraction;
+
   if (input.accrualMode === "STATUTORY_FIRST_YEAR" && underGate) {
-    const statutory = monthlyRate * Math.max(0, input.monthsWorkedInYear);
     const gated = applyFirstYearGateClamp({
       fullAnnualQuota: yearlyEntitlementDays,
       uninterruptedMonths: input.uninterruptedMonths,
       gateMonths,
     });
-    return Math.max(statutory, Math.min(gated, yearlyEntitlementDays));
+    return Math.max(prorated, Math.min(gated, yearlyEntitlementDays));
   }
 
-  return accruedYtdLinearMonths({
-    monthsWorkedInYear: input.monthsWorkedInYear,
-    monthlyRate,
-    capAtAnnualEntitlement: yearlyEntitlementDays,
-  });
+  return Math.min(yearlyEntitlementDays, prorated);
 }
 
 export function calculateAnnualLeaveEntitlement(
@@ -153,7 +160,11 @@ export function calculateAnnualLeaveEntitlement(
 
   const yearlyEntitlementDays = roundLeaveDays(composed.total, input.roundingMode);
   const accruedDaysToDate = roundLeaveDays(
-    computeAccruedDaysToDate(input, yearlyEntitlementDays),
+    accrueEntitlementToFraction(input, yearlyEntitlementDays, input.servedFractionToDate ?? -1),
+    input.roundingMode,
+  );
+  const accruedDaysToYearEnd = roundLeaveDays(
+    accrueEntitlementToFraction(input, yearlyEntitlementDays, input.servedFractionToYearEnd ?? -1),
     input.roundingMode,
   );
 
@@ -173,8 +184,10 @@ export function calculateAnnualLeaveEntitlement(
     activeCarry + accruedDaysToDate - usedApprovedDays,
     input.roundingMode,
   );
+  // Projected by year-end uses accrual-through-year-end (prorated for mid-year
+  // hires), not the full theoretical entitlement.
   const remainingYearlyDays = roundLeaveDays(
-    activeCarry + yearlyEntitlementDays - usedApprovedDays,
+    activeCarry + accruedDaysToYearEnd - usedApprovedDays,
     input.roundingMode,
   );
 
@@ -258,6 +271,7 @@ export function calculateAnnualLeaveEntitlement(
     hazardousWorkMinimumApplied,
     yearlyEntitlementDays,
     accruedDaysToDate,
+    accruedDaysToYearEnd,
     usedApprovedDays,
     pendingRequestedDays,
     carriedOverFromPreviousYear: activeCarry,

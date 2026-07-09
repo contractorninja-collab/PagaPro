@@ -159,4 +159,46 @@ describe("calculateAnnualLeaveEntitlement", () => {
     const r = calculateAnnualLeaveEntitlement({ ...baseInput, hasMedicalOverlapAudit: true });
     expect(r.warnings.some((w) => w.code === "KOSOVO_ANNUAL_MEDICAL_OVERLAP")).toBe(true);
   });
+
+  it("accrues entitlement-scaled + day-prorated and IGNORES the ledger (deterministic)", () => {
+    const r = calculateAnnualLeaveEntitlement({
+      ...baseInput,
+      servedFractionToDate: 0.5,
+      servedFractionToYearEnd: 1,
+      ledgerAccruedYtd: 999, // must not affect the result anymore
+    });
+    expect(r.accruedDaysToDate).toBe(10); // 20 × 0.5
+    expect(r.accruedDaysToYearEnd).toBe(20); // full year projected
+  });
+
+  it("scales accrual beyond 20 for a hazardous (30-day) employee — no flat 20 cap", () => {
+    const r = calculateAnnualLeaveEntitlement({
+      ...baseInput,
+      isHazardous: true,
+      servedFractionToDate: 1,
+      servedFractionToYearEnd: 1,
+    });
+    expect(r.yearlyEntitlementDays).toBe(30);
+    expect(r.accruedDaysToDate).toBe(30);
+  });
+
+  it("prorates a mid-month hire by served days (hired ~Apr 10 → ~266/365 of 20)", () => {
+    const r = calculateAnnualLeaveEntitlement({
+      ...baseInput,
+      servedFractionToDate: 266 / 365,
+      servedFractionToYearEnd: 266 / 365,
+    });
+    expect(r.accruedDaysToDate).toBeCloseTo(14.575, 2);
+  });
+
+  it("projects year-end on accrual-to-year-end, not full entitlement (mid-year hire)", () => {
+    const r = calculateAnnualLeaveEntitlement({
+      ...baseInput,
+      servedFractionToDate: 0.5,
+      servedFractionToYearEnd: 0.75,
+      usedApprovedDays: 2,
+    });
+    expect(r.remainingAccruedDays).toBe(8); // 0 carry + 10 accrued − 2 used (available now)
+    expect(r.remainingYearlyDays).toBe(13); // 0 carry + 15 accrued-by-year-end − 2 used
+  });
 });
