@@ -6,13 +6,14 @@ import type { DocumentCategory } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { getEmployeeDetailAction } from "@/modules/employees/actions/employee-actions";
-import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto } from "@/modules/employees/types";
+import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employees/actions/employee-actions";
+import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto, SalaryChangeDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import {
   EMPLOYMENT_TYPE_LABELS,
@@ -69,6 +70,50 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
         <p className="text-sm text-muted-foreground">Nuk ka të dhëna për momentin.</p>
       </CardContent>
     </Card>
+  );
+}
+
+function RehireControl({
+  employeeId,
+  onDone,
+}: {
+  employeeId: string;
+  onDone: () => void | Promise<void>;
+}) {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!date) {
+      toast.error("Zgjidhni datën e rikthimit.");
+      return;
+    }
+    setBusy(true);
+    const r = await rehireEmployeeAction({ employeeId, rehireDate: date });
+    setBusy(false);
+    if (!r.ok) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success("Punonjësi u rikthye në punë.");
+    await onDone();
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Data e rikthimit</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <Button type="button" disabled={busy} onClick={() => void submit()}>
+        Rikthe në punë
+      </Button>
+    </div>
   );
 }
 
@@ -172,6 +217,45 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SalaryHistoryTab({ rows }: { rows: SalaryChangeDto[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Historiku i pagave</CardTitle>
+        <CardDescription>Ndryshimet e pagës bazë me datë efektive (rritje / rregullime).</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nuk ka ndryshime të regjistruara të pagës.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data efektive</TableHead>
+                <TableHead className="text-right">Nga</TableHead>
+                <TableHead className="text-right">Në</TableHead>
+                <TableHead>Arsyeja</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>{formatSqDate(r.effectiveFromIso)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {r.previousBaseSalary ? formatEur(r.previousBaseSalary) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{formatEur(r.newBaseSalary)}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.reason ?? "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -502,7 +586,10 @@ export function EmployeeProfileShell(props: {
             Ndrysho profilin
           </Button>
         ) : (
-          <p className="text-sm text-muted-foreground">Profili është i mbyllur (i larguar).</p>
+          <div className="space-y-2 md:text-right">
+            <p className="text-sm text-muted-foreground">Profili është i mbyllur (i larguar).</p>
+            <RehireControl employeeId={employee.id} onDone={reload} />
+          </div>
         )}
       </div>
 
@@ -541,7 +628,7 @@ export function EmployeeProfileShell(props: {
           <SummaryTab e={employee} />
         </TabsContent>
         <TabsContent value="payroll" className="mt-6">
-          <EmptyTab title="Pagat" body="Historiku i pagave do të lidhet me motorin e payroll-it." />
+          <SalaryHistoryTab rows={employee.salaryHistory} />
         </TabsContent>
         <TabsContent value="contracts" className="mt-6">
           <ContractsTab rows={bundle.contracts} />

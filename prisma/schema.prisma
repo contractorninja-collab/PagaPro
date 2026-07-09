@@ -415,6 +415,7 @@ model Company {
   notificationPreferences NotificationPreference[]
   employmentPeriods      EmploymentPeriod[]
   employeeEmploymentHistories EmployeeEmploymentHistory[]
+  employeeSalaryChanges  EmployeeSalaryChange[]
 
   configuration           CompanyConfiguration?
   authorizedRepresentatives AuthorizedRepresentative[]
@@ -580,6 +581,7 @@ model User {
   documentArtifactsCreated DocumentGenerationArtifact[] @relation("DocumentArtifactCreatedBy")
   documentTimelineEventsCreated DocumentTimelineEvent[] @relation("DocumentTimelineCreatedBy")
   timelineActorEvents     EmployeeTimelineEvent[]       @relation("TimelineActor")
+  salaryChangesMade       EmployeeSalaryChange[]        @relation("SalaryChangeBy")
   domainActivitiesAuthored DomainActivity[]              @relation("DomainActivityActor")
   notificationPreferences NotificationPreference[]
   targetedNotifications   NotificationOutbox[]          @relation("NotificationTarget")
@@ -787,6 +789,7 @@ model Employee {
   emergencyContacts    EmployeeEmergencyContact[]
   timelineEvents       EmployeeTimelineEvent[]
   employmentHistoryRecords EmployeeEmploymentHistory[]
+  salaryChanges        EmployeeSalaryChange[]
   payrollGeneratedDocs PayrollGeneratedDocument[]
   payrollInclusions    PayrollIncludedEmployee[]
   payrollCorrections   PayrollCorrection[]
@@ -805,6 +808,38 @@ model Employee {
   @@index([email])
   @@index([userId])
   @@map("employees")
+}
+
+/// Effective-dated compensation-change history — one row per salary/basis change (audit of raises).
+model EmployeeSalaryChange {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// When the new compensation takes effect (hire date for the initial record).
+  effectiveFrom DateTime
+
+  /// Null for the initial (hire) record; otherwise the prior monthly gross.
+  previousBaseSalary Decimal? @db.Decimal(14, 2)
+  newBaseSalary      Decimal  @db.Decimal(14, 2)
+
+  compensationBasis CompensationBasis @default(GROSS_MONTHLY)
+  targetNetMonthly  Decimal?          @db.Decimal(14, 2)
+
+  reason String? @db.Text
+
+  changedById String?
+  changedBy   User?   @relation("SalaryChangeBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, employeeId, effectiveFrom(sort: Desc)])
+  @@index([companyId])
+  @@map("employee_salary_changes")
 }
 
 /// HR employment history stream (position/status snapshots). Works alongside EmploymentPeriod legal segments.
