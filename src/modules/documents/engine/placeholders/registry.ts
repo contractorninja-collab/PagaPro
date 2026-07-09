@@ -207,14 +207,14 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
       requiredByDefault: false,
       sources: ["employee"],
       applicableCategories: ["CONTRACT"],
-      labelSq: "Muajt e punÃ«s praktike",
+      labelSq: "Muajt e punës praktike",
     },
     {
       key: "probation_period",
       requiredByDefault: false,
       sources: ["employee"],
       applicableCategories: ["CONTRACT"],
-      labelSq: "Periudha e punÃ«s praktike",
+      labelSq: "Periudha e punës praktike",
     },
   ],
   LEAVE: [

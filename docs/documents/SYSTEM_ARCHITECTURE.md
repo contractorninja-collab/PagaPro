@@ -24,11 +24,13 @@ Templates and artifacts are **category-aware** (`CONTRACT`, `LEAVE`, `TERMINATIO
 4. **Compose registry** — `composePlaceholderRegistry([category])` merges core keys with category extensions; **`validatePlaceholdersForRender(..., registry, ...)`** runs before render.
 5. **Preview** — `generateDocumentFromTemplate` → persist **`DocumentGenerationArtifact`** with `kind = PREVIEW` (append-only history).
 6. **PDF** — convert DOCX→PDF (worker / queue — outside core engine); store **`generatedPdfStorageKey`** on artifact when implemented.
-7. **Archive** — insert **`DocumentGenerationArtifact`** with `kind = ARCHIVED_FINAL`, **`mergedPayload` frozen**, hashes optional; DB **partial unique index** enforces **one `ARCHIVED_FINAL` per (`subjectKind`, `subjectId`)**. For contracts, **`Contract.storedPdfUrl`** remains a list-screen mirror after finalize.
+7. **Archive** — insert **`DocumentGenerationArtifact`** with `kind = ARCHIVED_FINAL`, **`mergedPayload` frozen**, hashes optional. **Multiple `ARCHIVED_FINAL` rows per subject are allowed** — regeneration inserts a new row linked via **`supersedesArtifactId`** (the earlier one-final-per-subject partial unique index was dropped in migration `20260518120000_dokumentet_module_evolution`).
+
+> **Contract entity is decoupled from generation.** Contracts generate employee-driven (`subjectKind = Employee`); the engine does **not** write `Contract` rows, so `Contract.storedPdfUrl` / `generationStatus` are not populated by the current pipeline.
 
 ## IMMUTABILITY
 
-- **`document_generation_artifacts`**: **INSERT-only** in application code (no PATCH after creation).
+- **`document_generation_artifacts`**: the **content snapshot** (`mergedPayload`, `detectedPlaceholderKeys`, `docxSha256`) is frozen at insert. Rows are otherwise **mutable for derived data**: the lazy PDF backfill patches `generatedPdfStorageKey`/`pdfSha256`, and archiving flips `isArchived`.
 - **`ARCHIVED_FINAL`**: legally frozen snapshot of placeholders + blob pointers + hashes.
 
 ## Storage keys
@@ -43,5 +45,4 @@ Neutral prefixes (see `src/modules/documents/engine/storage/path-keys.ts`):
 - Engine (pure): `src/modules/documents/engine/` — detect / validate / render / `generateDocumentFromTemplate`.
 - Context adapters: `src/modules/documents/context/` — core org slice + per-category `Record<string, string>` builders.
 - Orchestration: `src/modules/documents/services/document-generation-service.ts` — load published version, storage get/put, insert artifact.
-
-Legacy imports under `src/modules/contracts/engine` re-export the documents engine for incremental migration.
+- PDF resolution/backfill: `src/modules/documents/services/artifact-pdf-service.ts` (`ensureArtifactPdf`) — shared by the single-artifact and bulk-zip download routes.

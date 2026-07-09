@@ -74,12 +74,6 @@ export function validateMappingJson(
       errors.push(`Fusha ${b.index}: zgjidhni një çelës placeholder.`);
     }
   }
-  for (const key of detectedPlaceholders) {
-    const row = mapping.placeholders.find((p) => p.key === key);
-    if (!row && mapping.placeholders.length > 0 && !mapping.placeholders.some((p) => p.key === key)) {
-      /* optional rows — only validate explicitly listed placeholders */
-    }
-  }
   return errors;
 }
 

@@ -55,13 +55,3 @@ export async function computeLeaveMetrics(
     weekdayHolidayDatesInRange,
   };
 }
-
-/** Slice overlap metrics using the same holiday merge as leave requests (balance consumption, audits). */
-export async function computeLeaveMetricsForApprovedSlice(
-  companyId: string,
-  sliceStart: Date,
-  sliceEnd: Date,
-): Promise<Pick<LeaveMetricsComputed, "workingDays" | "totalHours">> {
-  const m = await computeLeaveMetrics(companyId, sliceStart, sliceEnd);
-  return { workingDays: m.workingDays, totalHours: m.totalHours };
-}
