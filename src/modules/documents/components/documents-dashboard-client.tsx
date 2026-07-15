@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { DocumentCategory } from "@prisma/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarDays,
+  FileSignature,
+  UserMinus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DOCUMENT_CATEGORY_LABELS, formatArtifactKind } from "@/modules/documents/components/document-labels";
+import {
+  DOCUMENT_CATEGORY_LABELS,
+  formatArtifactKind,
+} from "@/modules/documents/components/document-labels";
+import {
+  DocChip,
+  type DocChipTone,
+  docBtnPrimary,
+  docBtnSecondaryDense,
+  docCard,
+  docTableCell,
+  docTableHead,
+} from "@/modules/documents/components/doc-ui";
 
 export interface ArtifactRow {
   id: string;
@@ -37,200 +54,242 @@ export interface DocumentsDashboardClientProps {
     needsMapping: number;
     missingPublished: number;
   };
+  /** Filter toolbar (server-rendered form) slotted between the health strip and the register. */
+  filtersSlot?: ReactNode;
 }
 
-function CategoryBadge({ category }: { category: DocumentCategory }) {
+const CATEGORY_CHIP_TONES: Record<DocumentCategory, DocChipTone> = {
+  CONTRACT: "info",
+  LEAVE: "success",
+  TERMINATION: "destructive",
+  WARNING: "warning",
+  PAYROLL: "neutral",
+  OTHER: "neutral",
+};
+
+function CategoryChip({ category }: { category: DocumentCategory }) {
   return (
-    <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground">
+    <DocChip tone={CATEGORY_CHIP_TONES[category]}>
       {DOCUMENT_CATEGORY_LABELS[category]}
-    </span>
+    </DocChip>
   );
 }
+
+function KindChip({ kind }: { kind: string }) {
+  return (
+    <DocChip tone={kind === "PREVIEW" ? "warning" : "success"} className="uppercase tracking-[0.03em]">
+      {formatArtifactKind(kind)}
+    </DocChip>
+  );
+}
+
+const QUICK_START: Array<{
+  category: DocumentCategory;
+  icon: typeof FileSignature;
+  tile: string;
+  iconColor: string;
+}> = [
+  { category: "CONTRACT", icon: FileSignature, tile: "bg-[#eff6ff]", iconColor: "text-brand-blue" },
+  { category: "LEAVE", icon: CalendarDays, tile: "bg-[#ecfdf5]", iconColor: "text-[#15803d]" },
+  { category: "TERMINATION", icon: UserMinus, tile: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
+  { category: "WARNING", icon: AlertTriangle, tile: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
+];
 
 export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
   const finalCount = props.artifacts.filter((a) => a.kind === "ARCHIVED_FINAL").length;
   const previewCount = props.artifacts.filter((a) => a.kind === "PREVIEW").length;
   const archivedCount = props.artifacts.filter((a) => a.isArchived).length;
 
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthCounts = new Map<DocumentCategory, number>();
+  for (const a of props.artifacts) {
+    if (!a.createdAt.startsWith(monthKey)) continue;
+    monthCounts.set(a.documentCategory, (monthCounts.get(a.documentCategory) ?? 0) + 1);
+  }
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dokumentet HR</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Qendër e strukturuar për printimin e kontratave, pushimeve, largimeve dhe vërejtjeve me shabllone DOCX.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" asChild>
-            <Link href="/dokumentet/templates">Konfigurimi i shablloneve</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/dokumentet/generate">Gjenero dokumente</Link>
-          </Button>
-        </div>
+    <div className="space-y-5">
+      {/* Quick-start category tiles (4a) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {QUICK_START.map(({ category, icon: Icon, tile, iconColor }) => (
+          <Link
+            key={category}
+            href={`/dokumentet/generate?category=${category}`}
+            className={cn(
+              docCard,
+              "group flex items-center gap-3.5 p-4 transition-colors hover:border-[#bfdbfe]",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]",
+                tile,
+              )}
+            >
+              <Icon className={cn("h-[18px] w-[18px]", iconColor)} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-semibold text-[#0f172a]">
+                {DOCUMENT_CATEGORY_LABELS[category]}
+              </span>
+              <span className="block text-[12px] text-[#94a3b8]">
+                {monthCounts.get(category) ?? 0} këtë muaj
+              </span>
+            </span>
+            <ArrowUpRight
+              className="h-4 w-4 shrink-0 text-[#cbd5e1] transition-colors group-hover:text-brand-blue"
+              aria-hidden
+            />
+          </Link>
+        ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Prodhimi i dokumenteve</CardTitle>
-            <CardDescription>Një rrjedhë për një ose shumë punonjës.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Krijoni kontrata, pushime, largime dhe vërejtje nga shabllonet e publikuara.
-            </p>
-            <Button className="w-full" asChild>
-              <Link href="/dokumentet/generate">Hap workflow-in</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Gjendja e shablloneve</CardTitle>
-            <CardDescription>{props.templateSummary.ready} nga {props.templateSummary.total} gati për gjenerim.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{props.templateSummary.ready}</p>
-              <p className="text-[11px] text-muted-foreground">Gati</p>
-            </div>
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{props.templateSummary.needsMapping}</p>
-              <p className="text-[11px] text-muted-foreground">Mapim</p>
-            </div>
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{props.templateSummary.missingPublished}</p>
-              <p className="text-[11px] text-muted-foreground">Publikim</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Arkiva</CardTitle>
-            <CardDescription>Dokumentet finale dhe parapamjet e fundit.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{finalCount}</p>
-              <p className="text-[11px] text-muted-foreground">Finale</p>
-            </div>
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{previewCount}</p>
-              <p className="text-[11px] text-muted-foreground">Preview</p>
-            </div>
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-lg font-semibold">{archivedCount}</p>
-              <p className="text-[11px] text-muted-foreground">Arkiv</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Template-health strip */}
+      <div className={cn(docCard, "flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3")}>
+        <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">
+          Shabllonet ({props.templateSummary.total})
+        </p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] font-medium text-[#334155]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#16a34a]" aria-hidden />
+            {props.templateSummary.ready} gati
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#d97706]" aria-hidden />
+            {props.templateSummary.needsMapping} pa mapim
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#94a3b8]" aria-hidden />
+            {props.templateSummary.missingPublished} pa publikim
+          </span>
+        </div>
+        <Link
+          href="/dokumentet/templates"
+          className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand-blue hover:text-[#1d4ed8]"
+        >
+          Menaxho shabllonet
+          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
       </div>
 
-      <div className="md:hidden space-y-3">
+      {props.filtersSlot}
+
+      {/* Register — mobile cards */}
+      <div className="space-y-3 md:hidden">
         {props.artifacts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nuk ka dokumente për filtrat aktualë.</p>
+          <div className={cn(docCard, "p-6 text-center text-[13px] text-[#64748b]")}>
+            Nuk ka dokumente për filtrat aktualë.
+          </div>
         ) : (
           props.artifacts.map((a) => (
-            <Link
-              key={a.id}
-              href={`/dokumentet/${a.id}`}
-              className="block rounded-lg border border-border bg-card p-4 shadow-sm"
-            >
+            <Link key={a.id} href={`/dokumentet/${a.id}`} className={cn(docCard, "block p-4")}>
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-foreground">{a.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{a.displayFilename}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-semibold text-[#0f172a]">{a.title}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-[#94a3b8]">{a.displayFilename}</p>
                 </div>
-                <CategoryBadge category={a.documentCategory} />
+                <CategoryChip category={a.documentCategory} />
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span>{formatArtifactKind(a.kind)}</span>
-                {a.isArchived ? (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase">
-                    Arkiv
-                  </span>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <KindChip kind={a.kind} />
+                {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
+                {a.employeeLabel ? (
+                  <span className="text-[12px] text-[#64748b]">{a.employeeLabel}</span>
                 ) : null}
-                {a.employeeLabel ? <span>{a.employeeLabel}</span> : null}
               </div>
             </Link>
           ))
         )}
       </div>
 
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Titulli</TableHead>
-              <TableHead>Lloji</TableHead>
-              <TableHead>Shablloni</TableHead>
-              <TableHead>Punonjësi</TableHead>
-              <TableHead>Gjeneruar</TableHead>
-              <TableHead className="text-right">Veprime</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {props.artifacts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                  Nuk ka dokumente për filtrat aktualë.
-                </TableCell>
-              </TableRow>
-            ) : (
-              props.artifacts.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col gap-1">
-                      <span>{a.title}</span>
-                      <span className="text-xs text-muted-foreground">{a.displayFilename}</span>
-                      <div className="flex flex-wrap gap-1">
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                            a.kind === "PREVIEW"
-                              ? "bg-amber-500/15 text-amber-900"
-                              : "bg-emerald-500/15 text-emerald-900",
-                          )}
-                        >
-                          {formatArtifactKind(a.kind)}
-                        </span>
-                        {a.isArchived ? (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase">
-                            Arkiv
-                          </span>
-                        ) : null}
+      {/* Register — desktop table */}
+      <div className={cn(docCard, "hidden overflow-hidden md:block")}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
+          <h2 className="text-[13.5px] font-bold text-[#0f172a]">Regjistri i dokumenteve</h2>
+          <p className="text-[12px] text-[#94a3b8]">
+            {props.artifacts.length} dokumente · {finalCount} finale · {previewCount} parapamje ·{" "}
+            {archivedCount} në arkiv
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] border-collapse text-left">
+            <thead>
+              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <th className={docTableHead}>Dokumenti</th>
+                <th className={docTableHead}>Kategoria</th>
+                <th className={docTableHead}>Shablloni</th>
+                <th className={docTableHead}>Punonjësi</th>
+                <th className={docTableHead}>Gjeneruar</th>
+                <th className={cn(docTableHead, "text-right")}>Veprime</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.artifacts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-[#64748b]">
+                    Nuk ka dokumente për filtrat aktualë.
+                  </td>
+                </tr>
+              ) : (
+                props.artifacts.map((a) => (
+                  <tr
+                    key={a.id}
+                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className={docTableCell}>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/dokumentet/${a.id}`}
+                            className="text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                          >
+                            {a.title}
+                          </Link>
+                          <KindChip kind={a.kind} />
+                          {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
+                        </div>
+                        <span className="text-[12px] text-[#94a3b8]">{a.displayFilename}</span>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <CategoryBadge category={a.documentCategory} />
-                  </TableCell>
-                  <TableCell className="text-sm">{a.templateName}</TableCell>
-                  <TableCell className="text-sm">{a.employeeLabel ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                    {a.createdAtLabel}
-                    {a.authorLabel ? (
-                      <span className="mt-1 block text-[11px]">{a.authorLabel}</span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={`/dokumentet/${a.id}`}>Hap</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    </td>
+                    <td className={docTableCell}>
+                      <CategoryChip category={a.documentCategory} />
+                    </td>
+                    <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
+                      {a.templateName}
+                    </td>
+                    <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
+                      {a.employeeLabel ?? "—"}
+                    </td>
+                    <td className={cn(docTableCell, "whitespace-nowrap")}>
+                      <span className="block text-[12.5px] tabular-nums text-[#64748b]">
+                        {a.createdAtLabel}
+                      </span>
+                      {a.authorLabel ? (
+                        <span className="mt-0.5 block text-[11.5px] text-[#94a3b8]">
+                          {a.authorLabel}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className={cn(docTableCell, "text-right")}>
+                      <Link href={`/dokumentet/${a.id}`} className={docBtnSecondaryDense}>
+                        Hap
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-40 md:hidden">
-        <Button className="w-full shadow-lg" asChild>
-          <Link href="/dokumentet/generate">Gjenero dokumente</Link>
-        </Button>
+        <Link
+          href="/dokumentet/generate"
+          className={cn(docBtnPrimary, "w-full shadow-lg")}
+        >
+          Gjenero dokumente
+        </Link>
       </div>
     </div>
   );

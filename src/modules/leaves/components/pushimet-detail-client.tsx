@@ -4,10 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
-import { Badge } from "@/components/ui/badge";
+import {
+  BTN_DESTRUCTIVE,
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  BTN_SECONDARY_DENSE,
+  LEAVE_CARD,
+  MICRO_LABEL,
+  TonePill,
+} from "@/modules/leaves/components/leave-ui";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,15 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   approveLeaveRequestAction,
   cancelLeaveRequestAction,
@@ -63,11 +62,19 @@ export type PushimetBalanceSerialized = {
   year: number;
   yearlyQuota: string;
   accruedDays: string;
-  carryOverDays: string;
   usedDays: string;
   pendingDays: string;
   remainingDays: string;
+  carryOverDays: string;
 };
+
+const CARD_TITLE = "text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]";
+const HAIRLINE = "my-4 border-t border-[#eef2f7]";
+const DT = "text-[12px] text-[#94a3b8]";
+const DD = "text-[13px] font-medium text-[#111827]";
+const DD_MUTED = "text-[13px] text-[#64748b]";
+const BAL_TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+const BAL_TD = "px-4 py-2.5 tabular-nums";
 
 export function PushimetDetailClient(props: {
   detail: PushimetDetailSerialized;
@@ -193,311 +200,339 @@ export function PushimetDetailClient(props: {
         : "Pas miratimit, sistemi sinjalizon automatikisht payroll-in për periudhat përkatëse.";
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimi</h1>
-            <LeaveStatusBadge status={row.status} />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <>
+      <AppSubBar
+        dense
+        backHref="/pushimet"
+        backLabel="Kthehu te lista"
+        title={`Pushimi — ${LEAVE_TYPE_LABELS_SQ[row.type]}`}
+        status={<LeaveStatusBadge status={row.status} />}
+        description={
+          <>
             {row.employeeName}
-            {row.departmentName ? ` · ${row.departmentName}` : ""}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            ID: <span className="font-mono tabular-nums">{row.id}</span>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 md:justify-end">
-          {row.status === "PENDING" ? (
-            <>
-              <Button type="button" onClick={() => void approve()}>
-                Mirato
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setRejectOpen(true)}>
-                Refuzo
-              </Button>
-            </>
-          ) : null}
-          {row.status === "DRAFT" || row.status === "PENDING" ? (
-            <Button type="button" variant="secondary" onClick={() => void cancel()}>
-              Anulo
-            </Button>
-          ) : null}
-          {row.status === "APPROVED" ? (
-            <>
-              <Button type="button" variant="secondary" onClick={() => setGenOpen(true)}>
-                Gjenero dokument
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setRevokeOpen(true)}>
-                Revoko
-              </Button>
-            </>
-          ) : null}
-          <Button variant="ghost" asChild>
-            <Link href="/pushimet">Kthehu te lista</Link>
-          </Button>
-        </div>
-      </div>
+            {row.departmentName ? ` · ${row.departmentName}` : ""} · ID:{" "}
+            <span className="font-mono tabular-nums">{row.id}</span>
+          </>
+        }
+        actions={
+          <>
+            {row.status === "PENDING" ? (
+              <>
+                <button type="button" className={BTN_PRIMARY} onClick={() => void approve()}>
+                  Mirato
+                </button>
+                <button type="button" className={BTN_DESTRUCTIVE} onClick={() => setRejectOpen(true)}>
+                  Refuzo
+                </button>
+              </>
+            ) : null}
+            {row.status === "DRAFT" || row.status === "PENDING" ? (
+              <button type="button" className={BTN_SECONDARY} onClick={() => void cancel()}>
+                Anulo
+              </button>
+            ) : null}
+            {row.status === "APPROVED" ? (
+              <>
+                <button type="button" className={BTN_PRIMARY} onClick={() => setGenOpen(true)}>
+                  Gjenero dokument
+                </button>
+                <button type="button" className={BTN_SECONDARY} onClick={() => setRevokeOpen(true)}>
+                  Revoko
+                </button>
+              </>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-border/80 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Detajet e kërkesës</h2>
-          <Separator className="my-4" />
-          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Lloji</dt>
-              <dd className="font-medium">{LEAVE_TYPE_LABELS_SQ[row.type]}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Nën-lloji</dt>
-              <dd className="font-medium">{LEAVE_SUBTYPE_LABELS_SQ[row.subtype]}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Ndikimi payroll</dt>
-              <dd className="text-muted-foreground">{payrollImpactLabel(row)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Fillimi</dt>
-              <dd className="font-medium tabular-nums">{formatSqDate(row.startDateIso)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Mbarimi</dt>
-              <dd className="font-medium tabular-nums">{formatSqDate(row.endDateIso)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Ditë kalendari</dt>
-              <dd className="tabular-nums text-muted-foreground">{row.totalDays ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Ditë pune</dt>
-              <dd className="tabular-nums text-muted-foreground">{row.workingDays ?? "—"}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-muted-foreground">Orë të përgjithshme</dt>
-              <dd className="tabular-nums text-muted-foreground">{row.totalHours ?? "—"}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-muted-foreground">Arsyeja</dt>
-              <dd className="whitespace-pre-wrap text-muted-foreground">{row.reason?.trim() || "—"}</dd>
-            </div>
-            {row.rejectionReason ? (
+      <div className="space-y-6">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className={`p-5 ${LEAVE_CARD}`}>
+            <h2 className={CARD_TITLE}>Detajet e kërkesës</h2>
+            <div className={HAIRLINE} />
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <dt className={DT}>Lloji</dt>
+                <dd className={DD}>{LEAVE_TYPE_LABELS_SQ[row.type]}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Nën-lloji</dt>
+                <dd className={DD}>{LEAVE_SUBTYPE_LABELS_SQ[row.subtype]}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Ndikimi payroll</dt>
+                <dd className={DD_MUTED}>{payrollImpactLabel(row)}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Fillimi</dt>
+                <dd className={`${DD} tabular-nums`}>{formatSqDate(row.startDateIso)}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Mbarimi</dt>
+                <dd className={`${DD} tabular-nums`}>{formatSqDate(row.endDateIso)}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Ditë kalendari</dt>
+                <dd className={`${DD_MUTED} tabular-nums`}>{row.totalDays ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className={DT}>Ditë pune</dt>
+                <dd className={`${DD_MUTED} tabular-nums`}>{row.workingDays ?? "—"}</dd>
+              </div>
               <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">Refuzimi</dt>
-                <dd className="whitespace-pre-wrap text-destructive">{row.rejectionReason}</dd>
+                <dt className={DT}>Orë të përgjithshme</dt>
+                <dd className={`${DD_MUTED} tabular-nums`}>{row.totalHours ?? "—"}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className={DT}>Arsyeja</dt>
+                <dd className={`${DD_MUTED} whitespace-pre-wrap`}>{row.reason?.trim() || "—"}</dd>
+              </div>
+              {row.rejectionReason ? (
+                <div className="sm:col-span-2">
+                  <dt className={DT}>Refuzimi</dt>
+                  <dd className="whitespace-pre-wrap text-[13px] text-[#dc2626]">{row.rejectionReason}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className={DT}>Vendimi</dt>
+                <dd className={DD_MUTED}>
+                  {row.decidedAtIso ? formatSqDate(row.decidedAtIso) : "—"}
+                  {row.decidedByLabel ? ` · ${row.decidedByLabel}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className={DT}>Krijuar nga</dt>
+                <dd className={DD_MUTED}>{props.detail.createdByLabel ?? "—"}</dd>
+              </div>
+            </dl>
+            {row.type === "PUSHIM_VJETOR" && row.status === "APPROVED" ? (
+              <div className="mt-4 space-y-2 border-t border-[#eef2f7] pt-4">
+                <p className={MICRO_LABEL}>Ndërprerje gjatë pushimit vjetor (Art 34.2)</p>
+                {row.interruptedByLeaveRequestId ? (
+                  <p className="text-[13px] text-[#64748b]">
+                    I lidhur me pushimin mjekësor:{" "}
+                    <Link
+                      href={`/pushimet/${row.interruptedByLeaveRequestId}`}
+                      className="font-semibold text-brand-blue underline-offset-4 hover:underline"
+                    >
+                      {row.interruptedByLeaveRequestId.slice(0, 12)}…
+                    </Link>
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[12px] leading-relaxed text-[#64748b]">
+                      Nëse punonjësi është përfshirë nga pushimi mjekësor gjatë këtij intervali, lidhni kërkesën
+                      mjekësore për të shmangur dyfishimin e orëve në payroll.
+                    </p>
+                    <button
+                      type="button"
+                      className={BTN_SECONDARY_DENSE}
+                      onClick={() => setLinkInterruptOpen(true)}
+                    >
+                      Lidh pushim mjekësor…
+                    </button>
+                  </>
+                )}
               </div>
             ) : null}
-            <div>
-              <dt className="text-muted-foreground">Vendimi</dt>
-              <dd className="text-muted-foreground">
-                {row.decidedAtIso ? formatSqDate(row.decidedAtIso) : "—"}
-                {row.decidedByLabel ? ` · ${row.decidedByLabel}` : ""}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Krijuar nga</dt>
-              <dd className="text-muted-foreground">{props.detail.createdByLabel ?? "—"}</dd>
-            </div>
-          </dl>
-          {row.type === "PUSHIM_VJETOR" && row.status === "APPROVED" ? (
-            <div className="mt-4 space-y-2 border-t border-border/80 pt-4">
-              <p className="text-xs font-medium text-muted-foreground">Ndërprerje gjatë pushimit vjetor (Art 34.2)</p>
-              {row.interruptedByLeaveRequestId ? (
-                <p className="text-sm text-muted-foreground">
-                  I lidhur me pushimin mjekësor:{" "}
-                  <Link
-                    href={`/pushimet/${row.interruptedByLeaveRequestId}`}
-                    className="font-medium text-primary underline-offset-4 hover:underline"
+            {row.status === "APPROVED" ? (
+              <p className="mt-4 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-3 text-[12px] leading-relaxed text-[#64748b]">
+                {payrollNarrative}
+              </p>
+            ) : (
+              <p className="mt-4 rounded-[10px] border border-dashed border-[#e2e8f0] p-3 text-[12px] leading-relaxed text-[#64748b]">
+                {payrollNarrative}
+              </p>
+            )}
+          </section>
+
+          <section className={`p-5 ${LEAVE_CARD}`}>
+            <h2 className={CARD_TITLE}>Dokumentet e gjeneruara</h2>
+            <div className={HAIRLINE} />
+            {props.detail.documents.length === 0 ? (
+              <p className="text-[13px] text-[#64748b]">
+                Ende pa dokument. Pas miratimit, gjeneroni nga shabllonet LEAVE dhe arkiva përditësohet
+                automatikisht.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {props.detail.documents.map((d) => (
+                  <li
+                    key={d.leaveDocumentId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#eef2f7] px-3 py-2 transition-colors hover:bg-[#f8fafc]"
                   >
-                    {row.interruptedByLeaveRequestId.slice(0, 12)}…
-                  </Link>
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Nëse punonjësi është përfshirë nga pushimi mjekësor gjatë këtij intervali, lidhni kërkesën mjekësore për
-                    të shmangur dyfishimin e orëve në payroll.
-                  </p>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setLinkInterruptOpen(true)}>
-                    Lidh pushim mjekësor…
-                  </Button>
-                </>
-              )}
-            </div>
-          ) : null}
-          {row.status === "APPROVED" ? (
-            <p className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-              {payrollNarrative}
-            </p>
-          ) : (
-            <p className="mt-4 rounded-md border border-dashed border-border p-3 text-xs leading-relaxed text-muted-foreground">
-              {payrollNarrative}
-            </p>
-          )}
-        </Card>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-semibold text-[#0f172a]">{d.title ?? "Dokument"}</p>
+                      <p className="text-[11.5px] tabular-nums text-[#94a3b8]">
+                        {d.createdAtIso.slice(0, 19).replace("T", " ")}
+                      </p>
+                    </div>
+                    <Link href={`/dokumentet/${d.artifactId}`} className={BTN_SECONDARY_DENSE}>
+                      Hape
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
-        <Card className="border-border/80 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Dokumentet e gjeneruara</h2>
-          <Separator className="my-4" />
-          {props.detail.documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ende pa dokument. Pas miratimit, gjeneroni nga shabllonet LEAVE dhe arkiva përditësohet automatikisht.
+        <section className="space-y-3">
+          <div>
+            <h2 className={CARD_TITLE}>Gjendje ditësh sipas vitit</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#64748b]">
+              Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe
+              pushimi mjekësor i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.
             </p>
+          </div>
+          {props.balancesByYear.length === 0 ? (
+            <p className="text-[13px] text-[#64748b]">Nuk ka të dhëna balancë për punonjësin.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {props.detail.documents.map((d) => (
-                <li key={d.leaveDocumentId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                  <div>
-                    <p className="font-medium text-foreground">{d.title ?? "Dokument"}</p>
-                    <p className="text-xs text-muted-foreground">{d.createdAtIso.slice(0, 19).replace("T", " ")}</p>
-                  </div>
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link href={`/dokumentet/${d.artifactId}`}>Hape</Link>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Gjendje ditësh sipas vitit</h2>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe pushimi mjekësor
-          i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.
-        </p>
-        {props.balancesByYear.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nuk ka të dhëna balancë për punonjësin.</p>
-        ) : (
-          props.balancesByYear.map((group) => (
-            <Card key={group.year} className="overflow-hidden border-border/80 shadow-sm">
-              <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold tabular-nums">
-                Viti {group.year}
+            props.balancesByYear.map((group) => (
+              <div key={group.year} className={`overflow-hidden ${LEAVE_CARD}`}>
+                <div className="border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-2 text-[12px] font-bold tabular-nums text-[#0f172a]">
+                  Viti {group.year}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] border-collapse text-[13px] text-[#111827]">
+                    <thead>
+                      <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                        <th className={BAL_TH}>Lloji</th>
+                        <th className={`${BAL_TH} text-right`}>Kuota vjetore</th>
+                        <th className={`${BAL_TH} text-right`}>Akumuluar</th>
+                        <th className={`${BAL_TH} text-right`}>Bartur</th>
+                        <th className={`${BAL_TH} text-right`}>Përdorur</th>
+                        <th className={`${BAL_TH} text-right`}>Në pritje</th>
+                        <th className={`${BAL_TH} text-right`}>Mbetur</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.rows.map((b) => (
+                        <tr
+                          key={b.id}
+                          className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                        >
+                          <td className="px-4 py-2.5 font-medium text-[#0f172a]">
+                            {LEAVE_TYPE_LABELS_SQ[b.leaveType]}
+                          </td>
+                          <td className={`${BAL_TD} text-right`}>{b.yearlyQuota}</td>
+                          <td className={`${BAL_TD} text-right`}>
+                            {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
+                          </td>
+                          <td className={`${BAL_TD} text-right`}>
+                            {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
+                          </td>
+                          <td className={`${BAL_TD} text-right`}>{b.usedDays}</td>
+                          <td className={`${BAL_TD} text-right`}>
+                            {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
+                          </td>
+                          <td className={`${BAL_TD} text-right`}>
+                            {parseFloat(b.remainingDays) < 0 ? (
+                              <TonePill tone="destructive" size="sm">{b.remainingDays}</TonePill>
+                            ) : (
+                              b.remainingDays
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <Table className="table-dense">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lloji</TableHead>
-                    <TableHead>Kuota vjetore</TableHead>
-                    <TableHead>Akumuluar</TableHead>
-                    <TableHead>Bartur</TableHead>
-                    <TableHead>Përdorur</TableHead>
-                    <TableHead>Në pritje</TableHead>
-                    <TableHead>Mbetur</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {group.rows.map((b) => (
-                    <TableRow key={b.id}>
-                      <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
-                      <TableCell className="tabular-nums">{b.yearlyQuota}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">{b.usedDays}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {parseFloat(b.remainingDays) < 0 ? (
-                          <Badge variant="destructive">{b.remainingDays}</Badge>
-                        ) : (
-                          b.remainingDays
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          ))
-        )}
-      </section>
+            ))
+          )}
+        </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-border/80 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Pushimet në vijim</h2>
-          <Separator className="my-4" />
-          {props.upcoming.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nuk ka pushime aktive në horizont.</p>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className={`p-5 ${LEAVE_CARD}`}>
+            <h2 className={CARD_TITLE}>Pushimet në vijim</h2>
+            <div className={HAIRLINE} />
+            {props.upcoming.length === 0 ? (
+              <p className="text-[13px] text-[#64748b]">Nuk ka pushime aktive në horizont.</p>
+            ) : (
+              <ul className="space-y-2">
+                {props.upcoming.map((u) => (
+                  <li key={u.id}>
+                    <Link
+                      href={`/pushimet/${u.id}`}
+                      className={`flex flex-col rounded-[10px] border px-3 py-2 transition-colors hover:bg-[#f8fafc] ${
+                        u.id === row.id ? "border-brand-blue/50 bg-[#eff6ff]" : "border-[#eef2f7]"
+                      }`}
+                    >
+                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                        {LEAVE_TYPE_LABELS_SQ[u.type]} · {LEAVE_STATUS_LABELS_SQ[u.status]}
+                      </span>
+                      <span className="text-[11.5px] tabular-nums text-[#64748b]">
+                        {formatSqDate(u.startDateIso)} → {formatSqDate(u.endDateIso)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className={`p-5 ${LEAVE_CARD}`}>
+            <h2 className={CARD_TITLE}>Historiku i shkurtër</h2>
+            <div className={HAIRLINE} />
+            {props.history.length === 0 ? (
+              <p className="text-[13px] text-[#64748b]">Nuk ka historik.</p>
+            ) : (
+              <ul className="space-y-2">
+                {props.history.map((h) => (
+                  <li key={h.id}>
+                    <Link
+                      href={`/pushimet/${h.id}`}
+                      className="block rounded-[10px] border border-[#eef2f7] px-3 py-2 transition-colors hover:bg-[#f8fafc]"
+                    >
+                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                        {LEAVE_TYPE_LABELS_SQ[h.type]} · {LEAVE_STATUS_LABELS_SQ[h.status]}
+                      </span>
+                      <span className="block text-[11.5px] tabular-nums text-[#64748b]">
+                        {formatSqDate(h.startDateIso)} → {formatSqDate(h.endDateIso)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <section className={`p-5 ${LEAVE_CARD}`}>
+          <h2 className={CARD_TITLE}>Kronologjia & aktiviteti</h2>
+          <p className="mt-1 text-[12px] text-[#64748b]">
+            Ngjarjet e lidhura me këtë kërkesë (timeline HR + metadata për audit).
+          </p>
+          <div className={HAIRLINE} />
+          {props.timeline.length === 0 ? (
+            <p className="text-[13px] text-[#64748b]">Ende pa ngjarje të lidhura.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {props.upcoming.map((u) => (
-                <li key={u.id}>
-                  <Link
-                    href={`/pushimet/${u.id}`}
-                    className={`flex flex-col rounded-md border px-3 py-2 hover:bg-muted/50 ${u.id === row.id ? "border-primary/60 bg-primary/5" : "border-border"}`}
-                  >
-                    <span className="font-medium">
-                      {LEAVE_TYPE_LABELS_SQ[u.type]} · {LEAVE_STATUS_LABELS_SQ[u.status]}
-                    </span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {formatSqDate(u.startDateIso)} → {formatSqDate(u.endDateIso)}
-                    </span>
-                  </Link>
+            <ul className="space-y-4">
+              {props.timeline.map((ev) => (
+                <li key={ev.id} className="border-l-2 border-[#bfdbfe] pl-4">
+                  <p className="text-[11.5px] tabular-nums text-[#94a3b8]">
+                    {ev.occurredAtIso.slice(0, 19).replace("T", " ")}
+                  </p>
+                  <p className="text-[13.5px] font-semibold text-[#0f172a]">{ev.title}</p>
+                  <p className={MICRO_LABEL}>{ev.eventType}</p>
+                  {ev.actorLabel ? (
+                    <p className="text-[12px] text-[#64748b]">Aktori: {ev.actorLabel}</p>
+                  ) : null}
+                  {ev.body ? (
+                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-[#64748b]">{ev.body}</p>
+                  ) : null}
+                  {ev.metadataJson ? (
+                    <pre className="mt-2 max-h-40 overflow-auto rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] p-2 text-[11px] leading-snug text-[#64748b]">
+                      {ev.metadataJson}
+                    </pre>
+                  ) : null}
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-
-        <Card className="border-border/80 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Historiku i shkurtër</h2>
-          <Separator className="my-4" />
-          {props.history.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nuk ka historik.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {props.history.map((h) => (
-                <li key={h.id}>
-                  <Link href={`/pushimet/${h.id}`} className="block rounded-md border border-border px-3 py-2 hover:bg-muted/50">
-                    <span className="font-medium">
-                      {LEAVE_TYPE_LABELS_SQ[h.type]} · {LEAVE_STATUS_LABELS_SQ[h.status]}
-                    </span>
-                    <span className="block text-xs text-muted-foreground tabular-nums">
-                      {formatSqDate(h.startDateIso)} → {formatSqDate(h.endDateIso)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        </section>
       </div>
-
-      <Card className="border-border/80 p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-foreground">Kronologjia & aktiviteti</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Ngjarjet e lidhura me këtë kërkesë (timeline HR + metadata për audit).
-        </p>
-        <Separator className="my-4" />
-        {props.timeline.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ende pa ngjarje të lidhura.</p>
-        ) : (
-          <ul className="space-y-4">
-            {props.timeline.map((ev) => (
-              <li key={ev.id} className="border-l-2 border-primary/40 pl-4">
-                <p className="text-xs text-muted-foreground tabular-nums">{ev.occurredAtIso.slice(0, 19).replace("T", " ")}</p>
-                <p className="font-medium text-foreground">{ev.title}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{ev.eventType}</p>
-                {ev.actorLabel ? (
-                  <p className="text-xs text-muted-foreground">Aktori: {ev.actorLabel}</p>
-                ) : null}
-                {ev.body ? <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{ev.body}</p> : null}
-                {ev.metadataJson ? (
-                  <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-snug text-muted-foreground">
-                    {ev.metadataJson}
-                  </pre>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>
@@ -604,6 +639,6 @@ export function PushimetDetailClient(props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

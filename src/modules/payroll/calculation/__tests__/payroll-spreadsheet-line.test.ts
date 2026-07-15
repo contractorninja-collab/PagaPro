@@ -145,6 +145,107 @@ describe("computePayrollSpreadsheetLine — hourly × hours (full-precision rate
     expect(r.value.grossSalary).toBe("1000.00");
   });
 
+  it("prorates a partial month (termination): rate uses the FULL calendar month, not the partial line hours", () => {
+    // Largim mes muajit: rreshti pret 88h (11 nga 22 ditë), kalendari i muajit të plotë 176h.
+    // Norma duhet 1000 ÷ 176 → bruto = 88 × normë = 500.00 (jo paga e plotë mujore).
+    const r = computePayrollSpreadsheetLine(
+      employeeGross1000,
+      { ...lineInput({ expectedRegularHours: "88", actualRegularHours: "88" }), expectedWorkingDays: 11 },
+      snapshot,
+      "1",
+      calendarBase,
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    expect(r.value.hourlyRate).toMatch(/^5\.681818/);
+    expect(r.value.regularPay).toBe("500.00");
+    expect(r.value.grossSalary).toBe("500.00");
+  });
+
+  it("deducts unpaid leave exactly once: unpaid hours stay inside regular hours and only the deduction removes them", () => {
+    // Modeli i motorit: actualReg PËRFSHIN orët pa pagesë; zbritja i heq një herë.
+    // 176h reg (16 prej tyre pa pagesë) → bruto = 1000 − 16 × normë = 909.09.
+    const r = computePayrollSpreadsheetLine(
+      employeeGross1000,
+      { ...lineInput(), unpaidLeaveHours: "16" },
+      snapshot,
+      "1",
+      calendarBase,
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    expect(r.value.regularPay).toBe("1000.00");
+    expect(r.value.unpaidLeaveDeduction).toBe("90.91");
+    expect(r.value.grossSalary).toBe("909.09");
+  });
+
+  describe("part-time (20h/javë → 88h muaj, kalendar i shkallëzuar për punonjësin)", () => {
+    const partTimeCalendar: PayrollMonthCalendarSnapshot = {
+      ...calendarBase,
+      expectedRegularHours: "88",
+      hoursPerWorkingDay: "4",
+    };
+    const employeeGross500 = { ...employeeGross1000, baseSalaryMonthly: "500", exemptFromMinimumSalary: true };
+
+    it("preserves contractual gross for a full part-time month (500 ÷ 88 × 88)", () => {
+      const r = computePayrollSpreadsheetLine(
+        employeeGross500,
+        lineInput({ expectedRegularHours: "88", actualRegularHours: "88" }),
+        snapshot,
+        "1",
+        partTimeCalendar,
+      );
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+
+      expect(r.value.hourlyRate).toMatch(/^5\.681818/);
+      expect(r.value.grossSalary).toBe("500.00");
+    });
+
+    it("sick week at 70%: reduction scales to the employee's month (gross 465.91, not 482.95)", () => {
+      // 5 ditë × 4h = 20h mjekësore me 70%: 500×68/88 + 500×14/88 = 386.36 + 79.55.
+      // SHËNIM: 70% këtu teston vetëm mekanikën e shkallëzimit të motorit — në prodhim
+      // statutorySickLeavePayPercent() (Neni 60) e ngre çdo vlerë nën 100% në 100%.
+      const r = computePayrollSpreadsheetLine(
+        employeeGross500,
+        { ...lineInput({ expectedRegularHours: "88", actualRegularHours: "68" }), sickLeaveHours: "20" },
+        snapshot,
+        "0.7",
+        partTimeCalendar,
+      );
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+
+      expect(r.value.regularPay).toBe("386.36");
+      expect(r.value.sickLeavePay).toBe("79.55");
+      expect(r.value.grossSalary).toBe("465.91");
+    });
+
+    it("unpaid week: deduction scales to the employee's month (gross 386.36, not 443.18)", () => {
+      // 20h pa pagesë brenda 88h → zbritja 500×20/88 = 113.64.
+      const r = computePayrollSpreadsheetLine(
+        employeeGross500,
+        { ...lineInput({ expectedRegularHours: "88", actualRegularHours: "88" }), unpaidLeaveHours: "20" },
+        snapshot,
+        "1",
+        partTimeCalendar,
+      );
+
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+
+      expect(r.value.regularPay).toBe("500.00");
+      expect(r.value.unpaidLeaveDeduction).toBe("113.64");
+      expect(r.value.grossSalary).toBe("386.36");
+    });
+  });
+
   it("pays holiday (Festë) hours at the same +50% premium as weekend hours when multipliers are 1.5", () => {
     const snap = kosovo2026AtkDefaults({
       premiumRules: {

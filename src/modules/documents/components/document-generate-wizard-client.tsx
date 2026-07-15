@@ -5,18 +5,30 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { DocumentCategory } from "@prisma/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Download,
+  FileText,
+  Search,
+} from "lucide-react";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { cn } from "@/lib/utils";
 import {
   generateHrDocumentsBatchAction,
   previewPlaceholderValuesAction,
 } from "@/modules/documents/actions/documents-actions";
 import { DOCUMENT_CATEGORY_LABELS } from "@/modules/documents/components/document-labels";
-
-const selectClass =
-  "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+import {
+  DocChip,
+  docBtnPrimary,
+  docBtnSecondary,
+  docBtnSecondaryDense,
+  docCard,
+  docInput,
+  docSelect,
+} from "@/modules/documents/components/doc-ui";
 
 const workflowCategories: DocumentCategory[] = ["CONTRACT", "LEAVE", "TERMINATION", "WARNING", "OTHER"];
 
@@ -33,6 +45,55 @@ export interface GenerateTemplateOption {
 export interface GenerateSubjectOption {
   id: string;
   label: string;
+}
+
+interface PreviewRow {
+  subjectId: string;
+  subject: string;
+  errors: string[];
+  values: Record<string, string>;
+}
+
+function StepCircle({ state, index }: { state: "done" | "active" | "idle"; index: number }) {
+  if (state === "done") {
+    return (
+      <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-brand-blue text-white">
+        <Check className="h-3.5 w-3.5" aria-hidden />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
+        state === "active"
+          ? "border-2 border-brand-blue bg-[#eff6ff] text-brand-blue"
+          : "bg-[#f1f5f9] text-[#94a3b8]",
+      )}
+    >
+      {index + 1}
+    </span>
+  );
+}
+
+function SectionCard({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={docCard}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
+        <h2 className="text-[13.5px] font-bold text-[#0f172a]">{title}</h2>
+        {aside}
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
 }
 
 export function DocumentGenerateWizardClient(props: {
@@ -55,6 +116,7 @@ export function DocumentGenerateWizardClient(props: {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     props.initialEmployeeId ? new Set([props.initialEmployeeId]) : new Set(),
   );
+  const [subjectSearch, setSubjectSearch] = useState("");
   const [documentDate, setDocumentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [contractStart, setContractStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [contractEnd, setContractEnd] = useState(() => {
@@ -62,7 +124,8 @@ export function DocumentGenerateWizardClient(props: {
     d.setFullYear(d.getFullYear() + 1);
     return d.toISOString().slice(0, 10);
   });
-  const [previewRows, setPreviewRows] = useState<Array<{ subject: string; errors: string[] }>>([]);
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
+  const [previewFocusId, setPreviewFocusId] = useState("");
   const [artifactIds, setArtifactIds] = useState<string[]>([]);
   const [failures, setFailures] = useState<Array<{ subjectLabel: string; error: string }>>([]);
 
@@ -82,6 +145,12 @@ export function DocumentGenerateWizardClient(props: {
     return [];
   }, [category, props]);
 
+  const filteredSubjects = useMemo(() => {
+    const q = subjectSearch.trim().toLowerCase();
+    if (!q) return subjectOptions;
+    return subjectOptions.filter((s) => s.label.toLowerCase().includes(q));
+  }, [subjectOptions, subjectSearch]);
+
   const selectedSubjects = subjectOptions.filter((s) => selectedIds.has(s.id));
   const isEmployeeDriven = category === "CONTRACT" || category === "OTHER";
 
@@ -89,7 +158,9 @@ export function DocumentGenerateWizardClient(props: {
     setCategory(nextCategory);
     setTemplateId("");
     setSelectedIds(new Set());
+    setSubjectSearch("");
     setPreviewRows([]);
+    setPreviewFocusId("");
     setArtifactIds([]);
     setFailures([]);
   }
@@ -143,7 +214,7 @@ export function DocumentGenerateWizardClient(props: {
       return;
     }
     startTransition(async () => {
-      const rows: Array<{ subject: string; errors: string[] }> = [];
+      const rows: PreviewRow[] = [];
       for (const subject of selectedSubjects) {
         const res = await previewPlaceholderValuesAction({
           templateVersionId: selectedTemplate!.versionId,
@@ -160,14 +231,22 @@ export function DocumentGenerateWizardClient(props: {
                 : undefined,
         });
         if (!res.ok) {
-          rows.push({ subject: subject.label, errors: [res.error] });
+          rows.push({ subjectId: subject.id, subject: subject.label, errors: [res.error], values: {} });
         } else if (!res.data) {
-          rows.push({ subject: subject.label, errors: ["Preview dështoi."] });
+          rows.push({ subjectId: subject.id, subject: subject.label, errors: ["Preview dështoi."], values: {} });
         } else {
-          rows.push({ subject: subject.label, errors: res.data.errors.map((e) => e.message) });
+          rows.push({
+            subjectId: subject.id,
+            subject: subject.label,
+            errors: res.data.errors.map((e) => e.message),
+            values: res.data.values,
+          });
         }
       }
       setPreviewRows(rows);
+      setPreviewFocusId((prev) =>
+        rows.some((r) => r.subjectId === prev) ? prev : (rows[0]?.subjectId ?? ""),
+      );
       toast.success("Kontrolli i të dhënave u përfundua.");
     });
   }
@@ -215,191 +294,421 @@ export function DocumentGenerateWizardClient(props: {
     URL.revokeObjectURL(url);
   }
 
+  // Step-rail states (presentation only).
+  const steps = [
+    { label: "Lloji", done: Boolean(category) },
+    { label: "Shablloni", done: Boolean(selectedTemplate) },
+    { label: "Marrësit & datat", done: selectedIds.size > 0 },
+    { label: "Kontrollo & gjenero", done: artifactIds.length > 0 },
+  ];
+  const firstOpen = steps.findIndex((s) => !s.done);
+  const activeStep = firstOpen === -1 ? steps.length - 1 : firstOpen;
+
+  const readyCount = previewRows.filter((r) => r.errors.length === 0).length;
+  const blockedCount = previewRows.length - readyCount;
+  const focusedPreview =
+    previewRows.find((r) => r.subjectId === previewFocusId) ?? previewRows[0] ?? null;
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Gjenero dokumente HR</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Një workflow për kontrata, pushime, largime dhe vërejtje, me zgjedhje një nga një ose në grup.
-          </p>
-        </div>
-        <Button variant="secondary" asChild>
-          <Link href="/dokumentet">Kthehu</Link>
-        </Button>
-      </div>
+    <>
+      <AppSubBar
+        dense
+        backHref="/dokumentet"
+        backLabel="Dokumentet"
+        title="Gjenero dokumente HR"
+        description="Një workflow për kontrata, pushime, largime dhe vërejtje, me zgjedhje një nga një ose në grup."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>1. Lloji i dokumentit</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <select
-            className={selectClass}
-            value={category}
-            onChange={(e) => {
-              resetForCategory(e.target.value as DocumentCategory | "");
-            }}
-          >
-            <option value="">Zgjidhni…</option>
-            {workflowCategories.map((c) => (
-              <option key={c} value={c}>
-                {DOCUMENT_CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </CardContent>
-      </Card>
+      <div className="grid items-start gap-5 lg:grid-cols-[230px_minmax(0,1fr)_330px]">
+        {/* Left — step rail */}
+        <aside className={cn(docCard, "p-2 lg:sticky lg:top-6")}>
+          <ol className="m-0 list-none space-y-0.5 p-0">
+            {steps.map((step, i) => {
+              const state: "done" | "active" | "idle" = step.done
+                ? "done"
+                : i === activeStep
+                  ? "active"
+                  : "idle";
+              return (
+                <li
+                  key={step.label}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5",
+                    state === "active" && "bg-[#f8fafc]",
+                  )}
+                >
+                  <StepCircle state={state} index={i} />
+                  <span
+                    className={cn(
+                      "text-[13px]",
+                      state === "active"
+                        ? "font-semibold text-[#0f172a]"
+                        : state === "done"
+                          ? "font-medium text-[#334155]"
+                          : "font-medium text-[#94a3b8]",
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
 
-      {category ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>2. Shablloni</CardTitle>
-            <CardDescription>Vetëm versione të publikuara dhe të mapuara.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {categoryTemplates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nuk ka shabllone të gatshëm — ngarkoni dhe maponi te{" "}
-                <Link href="/dokumentet/templates" className="underline">
-                  Shabllonet
-                </Link>
-                .
-              </p>
-            ) : (
-              <select className={selectClass} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                <option value="">Zgjidhni shabllonin</option>
-                {categoryTemplates.map((t) => (
-                  <option key={t.templateId} value={t.templateId}>
-                    {t.templateName} (v{t.versionNumber})
-                  </option>
-                ))}
-              </select>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {selectedTemplate ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>3. Zgjedhja {isEmployeeDriven ? "e punonjësve" : "e rasteve"}</CardTitle>
-            <CardDescription>Zgjidhni një ose më shumë rreshta për gjenerim masiv.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button type="button" variant="secondary" size="sm" onClick={toggleAllSubjects}>
-              {selectedIds.size === subjectOptions.length ? "Hiq të gjitha" : "Zgjidh të gjitha"}
-            </Button>
-            {subjectOptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nuk ka rreshta të disponueshëm për këtë lloj dokumenti.</p>
-            ) : null}
-            <div className="grid max-h-72 gap-2 overflow-auto rounded-md border border-border p-2">
-              {subjectOptions.map((s) => (
-                <label key={s.id} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-muted/60">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary"
-                    checked={selectedIds.has(s.id)}
-                    onChange={() => toggleSubject(s.id)}
-                  />
-                  <span>{s.label}</span>
-                </label>
-              ))}
+        {/* Center — work area */}
+        <div className="min-w-0 space-y-5">
+          <SectionCard title="1. Lloji i dokumentit">
+            <div className="flex flex-wrap gap-2">
+              {workflowCategories.map((c) => {
+                const active = category === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      if (c !== category) resetForCategory(c);
+                    }}
+                    className={cn(
+                      "inline-flex h-[34px] items-center rounded-[9px] px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      active
+                        ? "bg-brand-blue text-white"
+                        : "border border-[#e2e8f0] bg-white text-[#334155] hover:bg-[#eef2f7]",
+                    )}
+                  >
+                    {DOCUMENT_CATEGORY_LABELS[c]}
+                  </button>
+                );
+              })}
             </div>
-            <p className="text-xs text-muted-foreground">{selectedIds.size} të zgjedhur.</p>
-          </CardContent>
-        </Card>
-      ) : null}
+          </SectionCard>
 
-      {selectedTemplate ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>4. Datat</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Data e dokumentit</Label>
-              <Input type="date" value={documentDate} onChange={(e) => setDocumentDate(e.target.value)} />
-            </div>
-            {category === "CONTRACT" ? (
-              <>
-                <div className="grid gap-2">
-                  <Label>Fillimi i kontratës</Label>
-                  <Input type="date" value={contractStart} onChange={(e) => setContractStart(e.target.value)} />
+          {category ? (
+            <SectionCard
+              title="2. Shablloni"
+              aside={
+                <span className="text-[12px] text-[#94a3b8]">
+                  Vetëm versione të publikuara dhe të mapuara.
+                </span>
+              }
+            >
+              {categoryTemplates.length === 0 ? (
+                <p className="text-[13px] text-[#64748b]">
+                  Nuk ka shabllone të gatshëm — ngarkoni dhe maponi te{" "}
+                  <Link href="/dokumentet/templates" className="font-semibold text-brand-blue hover:underline">
+                    Shabllonet
+                  </Link>
+                  .
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <select
+                    className={cn(docSelect, "w-full")}
+                    value={templateId}
+                    onChange={(e) => setTemplateId(e.target.value)}
+                  >
+                    <option value="">Zgjidhni shabllonin</option>
+                    {categoryTemplates.map((t) => (
+                      <option key={t.templateId} value={t.templateId}>
+                        {t.templateName} (v{t.versionNumber})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTemplate ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#dbeafe] bg-[#eff6ff] px-3 py-2.5">
+                      <FileText className="h-4 w-4 text-brand-blue" aria-hidden />
+                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                        {selectedTemplate.templateName}
+                      </span>
+                      <span className="text-[12px] font-medium text-[#64748b]">
+                        v{selectedTemplate.versionNumber}
+                        {selectedTemplate.templateSubtype ? ` · ${selectedTemplate.templateSubtype}` : ""}
+                      </span>
+                      <DocChip tone="success" className="ml-auto">
+                        I mapuar
+                      </DocChip>
+                    </div>
+                  ) : null}
                 </div>
-                {selectedTemplate.templateSubtype === "AFAT_I_CAKTUAR" ? (
-                  <div className="grid gap-2">
-                    <Label>Mbarimi i kontratës</Label>
-                    <Input type="date" value={contractEnd} onChange={(e) => setContractEnd(e.target.value)} />
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+              )}
+            </SectionCard>
+          ) : null}
 
-      {selectedTemplate ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>5. Parapamje e vlerave</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button type="button" variant="secondary" disabled={pending} onClick={loadPreview}>
-              Ngarko parapamjen
-            </Button>
-            {previewRows.length > 0 ? (
-              <div className="max-h-64 space-y-2 overflow-auto rounded border p-2 text-sm">
-                {previewRows.map((r) => (
-                  <div key={r.subject} className="rounded-md bg-muted/40 p-3">
-                    <p className="font-medium">{r.subject}</p>
-                    {r.errors.length === 0 ? (
-                      <p className="mt-1 text-xs text-emerald-700">Gati për gjenerim.</p>
+          {selectedTemplate ? (
+            <SectionCard
+              title={`3. Marrësit & datat ${isEmployeeDriven ? "(punonjësit)" : "(rastet)"}`}
+              aside={
+                <span className="text-[12px] font-semibold text-brand-blue">
+                  {selectedIds.size} të zgjedhur
+                </span>
+              }
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[180px] flex-1">
+                    <Search
+                      className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+                      aria-hidden
+                    />
+                    <input
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      placeholder={isEmployeeDriven ? "Kërko punonjës…" : "Kërko rast…"}
+                      className={cn(docInput, "pl-8")}
+                    />
+                  </div>
+                  <button type="button" className={docBtnSecondaryDense} onClick={toggleAllSubjects}>
+                    {selectedIds.size === subjectOptions.length ? "Hiq të gjitha" : "Zgjidh të gjitha"}
+                  </button>
+                </div>
+
+                {subjectOptions.length === 0 ? (
+                  <p className="text-[13px] text-[#64748b]">
+                    Nuk ka rreshta të disponueshëm për këtë lloj dokumenti.
+                  </p>
+                ) : (
+                  <div className="max-h-72 overflow-auto rounded-[10px] border border-[#eef2f7]">
+                    {filteredSubjects.length === 0 ? (
+                      <p className="px-3 py-4 text-[13px] text-[#94a3b8]">Asnjë përputhje për kërkimin.</p>
                     ) : (
-                      <ul className="mt-1 list-disc pl-5 text-xs text-destructive">
-                        {r.errors.map((e) => <li key={e}>{e}</li>)}
+                      <ul className="m-0 list-none divide-y divide-[#f1f5f9] p-0">
+                        {filteredSubjects.map((s) => {
+                          const checked = selectedIds.has(s.id);
+                          return (
+                            <li key={s.id}>
+                              <label
+                                className={cn(
+                                  "flex cursor-pointer items-center gap-3 px-3 py-2.5 text-[13px] transition-colors",
+                                  checked ? "bg-[#eff6ff]/60" : "hover:bg-[#f8fafc]",
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-[#2563EB]"
+                                  checked={checked}
+                                  onChange={() => toggleSubject(s.id)}
+                                />
+                                <span
+                                  className={cn(
+                                    checked ? "font-semibold text-[#0f172a]" : "font-medium text-[#334155]",
+                                  )}
+                                >
+                                  {s.label}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+                )}
 
-      {selectedTemplate ? (
-        <Button type="button" disabled={pending} onClick={generate}>
-          {pending ? "Duke gjeneruar…" : `Gjenero PDF (${selectedIds.size || 0})`}
-        </Button>
-      ) : null}
-      {artifactIds.length > 0 || failures.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Rezultati i gjenerimit</CardTitle>
-            <CardDescription>{artifactIds.length} dokument(e) të krijuara, {failures.length} dështime.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {artifactIds.length > 1 ? (
-                <Button type="button" variant="secondary" onClick={downloadZip}>
-                  Shkarko ZIP
-                </Button>
+                <div className="grid gap-3 border-t border-[#eef2f7] pt-4 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <label className="text-[12px] font-semibold text-[#64748b]">Data e dokumentit</label>
+                    <input
+                      type="date"
+                      className={cn(docInput, "tabular-nums")}
+                      value={documentDate}
+                      onChange={(e) => setDocumentDate(e.target.value)}
+                    />
+                  </div>
+                  {category === "CONTRACT" ? (
+                    <>
+                      <div className="grid gap-1.5">
+                        <label className="text-[12px] font-semibold text-[#64748b]">Fillimi i kontratës</label>
+                        <input
+                          type="date"
+                          className={cn(docInput, "tabular-nums")}
+                          value={contractStart}
+                          onChange={(e) => setContractStart(e.target.value)}
+                        />
+                      </div>
+                      {selectedTemplate.templateSubtype === "AFAT_I_CAKTUAR" ? (
+                        <div className="grid gap-1.5">
+                          <label className="text-[12px] font-semibold text-[#64748b]">Mbarimi i kontratës</label>
+                          <input
+                            type="date"
+                            className={cn(docInput, "tabular-nums")}
+                            value={contractEnd}
+                            onChange={(e) => setContractEnd(e.target.value)}
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {artifactIds.length > 0 || failures.length > 0 ? (
+            <SectionCard
+              title="Rezultati i gjenerimit"
+              aside={
+                <span className="text-[12px] text-[#94a3b8]">
+                  {artifactIds.length} dokument(e) të krijuara · {failures.length} dështime
+                </span>
+              }
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {artifactIds.length > 1 ? (
+                    <button type="button" className={docBtnSecondaryDense} onClick={downloadZip}>
+                      <Download className="h-3.5 w-3.5" aria-hidden />
+                      Shkarko ZIP
+                    </button>
+                  ) : null}
+                  {artifactIds.map((id) => (
+                    <Link key={id} href={`/dokumentet/${id}`} className={docBtnSecondaryDense}>
+                      Hap dokumentin
+                    </Link>
+                  ))}
+                </div>
+                {failures.length > 0 ? (
+                  <ul className="m-0 list-disc space-y-1 pl-5 text-[13px] text-[#dc2626]">
+                    {failures.map((f) => (
+                      <li key={`${f.subjectLabel}-${f.error}`}>
+                        {f.subjectLabel}: {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </SectionCard>
+          ) : null}
+        </div>
+
+        {/* Right — live preview + readiness */}
+        <div className="min-w-0 space-y-5">
+          <section className={docCard}>
+            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
+              <h2 className="text-[13.5px] font-bold text-[#0f172a]">Parapamja e vlerave</h2>
+              {focusedPreview ? (
+                <DocChip tone={focusedPreview.errors.length === 0 ? "success" : "warning"}>
+                  {focusedPreview.errors.length === 0 ? "Gati" : "Me mungesa"}
+                </DocChip>
               ) : null}
-              {artifactIds.map((id) => (
-                <Button key={id} type="button" variant="secondary" size="sm" asChild>
-                  <Link href={`/dokumentet/${id}`}>Hap dokumentin</Link>
-                </Button>
-              ))}
             </div>
-            {failures.length > 0 ? (
-              <ul className="list-disc pl-5 text-sm text-destructive">
-                {failures.map((f) => <li key={`${f.subjectLabel}-${f.error}`}>{f.subjectLabel}: {f.error}</li>)}
-              </ul>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
+            <div className="p-4">
+              {previewRows.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center">
+                  <FileText className="h-6 w-6 text-[#cbd5e1]" aria-hidden />
+                  <p className="text-[12.5px] text-[#94a3b8]">
+                    Shtypni «Kontrollo» për të parë vlerat e zgjidhura të shabllonit.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {previewRows.length > 1 ? (
+                    <select
+                      className={cn(docSelect, "w-full")}
+                      value={focusedPreview?.subjectId ?? ""}
+                      onChange={(e) => setPreviewFocusId(e.target.value)}
+                    >
+                      {previewRows.map((r) => (
+                        <option key={r.subjectId} value={r.subjectId}>
+                          {r.subject}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-[13px] font-semibold text-[#0f172a]">{focusedPreview?.subject}</p>
+                  )}
+                  <div className="max-h-[340px] overflow-auto rounded-[10px] border border-[#eef2f7] bg-white p-3">
+                    {focusedPreview && Object.keys(focusedPreview.values).length > 0 ? (
+                      <dl className="m-0 space-y-2">
+                        {Object.entries(focusedPreview.values).map(([k, v]) => (
+                          <div key={k} className="border-b border-[#f1f5f9] pb-2 last:border-0 last:pb-0">
+                            <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[#94a3b8]">
+                              {k}
+                            </dt>
+                            <dd
+                              className={cn(
+                                "m-0 mt-0.5 break-words text-[12.5px] font-semibold",
+                                v && v.trim() !== "" ? "text-brand-blue" : "text-[#b45309]",
+                              )}
+                            >
+                              {v && v.trim() !== "" ? v : "— mungon —"}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="text-[12.5px] text-[#94a3b8]">Nuk u zgjidh asnjë vlerë.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className={docCard}>
+            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
+              <h2 className="text-[13.5px] font-bold text-[#0f172a]">Gatishmëria</h2>
+              {previewRows.length > 0 ? (
+                <span className="text-[12px] font-semibold text-[#64748b]">
+                  {readyCount} gati · {blockedCount} me mungesa
+                </span>
+              ) : null}
+            </div>
+            <div className="p-4">
+              {previewRows.length === 0 ? (
+                <p className="text-[12.5px] text-[#94a3b8]">
+                  Kontrolli tregon për çdo marrës nëse të dhënat janë të plota para gjenerimit.
+                </p>
+              ) : (
+                <ul className="m-0 list-none space-y-2.5 p-0">
+                  {previewRows.map((r) => (
+                    <li key={r.subjectId} className="flex items-start gap-2.5">
+                      {r.errors.length === 0 ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16a34a]" aria-hidden />
+                      ) : (
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" aria-hidden />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-[#0f172a]">{r.subject}</p>
+                        {r.errors.length === 0 ? (
+                          <p className="text-[12px] text-[#15803d]">Gati për gjenerim.</p>
+                        ) : (
+                          <ul className="m-0 list-none space-y-0.5 p-0">
+                            {r.errors.map((e) => (
+                              <li key={e} className="text-[12px] text-[#b45309]">
+                                {e}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Sticky footer — Kontrollo / Gjenero */}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-5 md:bottom-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#e2e8f0] bg-white/95 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.07)] backdrop-blur">
+          <p className="text-[13px] font-semibold text-[#0f172a]">
+            {selectedIds.size} dokument(e)
+            <span className="ml-1.5 font-medium text-[#94a3b8]">
+              → {selectedIds.size > 1 ? "ZIP / PDF" : "PDF"}
+            </span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className={docBtnSecondary} disabled={pending} onClick={loadPreview}>
+              Kontrollo
+            </button>
+            <button type="button" className={docBtnPrimary} disabled={pending} onClick={generate}>
+              {pending ? "Duke gjeneruar…" : `Gjenero (${selectedIds.size || 0})`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

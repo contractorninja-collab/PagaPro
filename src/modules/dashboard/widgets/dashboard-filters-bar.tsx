@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import type { DepartmentOptionDto } from "@/modules/employees/types";
@@ -40,31 +41,19 @@ export function DashboardFiltersBar(props: {
 
   if (!editing) {
     return (
-      <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
-        aria-label="Filtrat aktualë të panelit"
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={`Ndrysho filtrat e panelit — periudha ${periodLabel}, departamenti ${departmentLabel}`}
+        className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#e2e8f0] bg-white px-[15px] text-[13.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <p className="text-muted-foreground">
-          Periudha:{" "}
-          <span className="font-medium text-foreground">{periodLabel}</span>
-        </p>
-        <span className="hidden text-border sm:inline" aria-hidden>
+        <span className="whitespace-nowrap">{periodLabel}</span>
+        <span className="text-[#cbd5e1]" aria-hidden>
           ·
         </span>
-        <p className="text-muted-foreground">
-          Departamenti:{" "}
-          <span className="font-medium text-foreground">{departmentLabel}</span>
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 px-2 text-muted-foreground hover:text-foreground"
-          onClick={() => setEditing(true)}
-        >
-          Ndrysho filtrat
-        </Button>
-      </div>
+        <span className="max-w-[140px] truncate">{departmentLabel}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-[#94a3b8]" aria-hidden />
+      </button>
     );
   }
 
@@ -143,10 +132,8 @@ export function DashboardFiltersBar(props: {
 
 export function DashboardFiltersBarSkeleton() {
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      <div className="h-4 w-40 rounded bg-muted" />
-      <div className="h-4 w-36 rounded bg-muted" />
-      <div className="h-8 w-28 rounded bg-muted" />
+    <div className="flex flex-wrap items-center gap-2.5">
+      <div className="h-10 w-48 rounded-[10px] border border-[#e2e8f0] bg-muted" />
     </div>
   );
 }

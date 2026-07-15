@@ -47,7 +47,7 @@ export async function linkSickInterruptingAnnualLeaveAction(
 ): Promise<LeaveModuleActionResult> {
   const ctx = await getCompanyContext();
   if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
-  const { companyId } = ctx.context;
+  const { companyId, user } = ctx.context;
   const parsed = leaveInterruptLinkSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
   try {
@@ -55,10 +55,12 @@ export async function linkSickInterruptingAnnualLeaveAction(
       companyId,
       annualLeaveId: parsed.data.annualLeaveId,
       sickLeaveId: parsed.data.sickLeaveId,
+      actorUserId: user.id,
     });
     safeRev("/pushimet");
     safeRev(`/pushimet/${parsed.data.annualLeaveId}`);
     safeRev(`/pushimet/${parsed.data.sickLeaveId}`);
+    safeRev("/pagat");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Lidhja dështoi." };
@@ -112,9 +114,11 @@ export async function approveLeaveRequestAction(raw: unknown): Promise<LeaveModu
       companyId,
       leaveId: parsed.data.leaveId,
       decidedByMembershipId: await activeMembershipId(user.id, companyId),
+      actorUserId: user.id,
     });
     safeRev("/pushimet");
     safeRev("/paneli");
+    safeRev("/pagat");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Miratimi dështoi." };
@@ -167,7 +171,7 @@ export async function cancelLeaveRequestAction(raw: unknown): Promise<LeaveModul
 export async function revokeLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
   const ctx = await getCompanyContext();
   if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
-  const { companyId } = ctx.context;
+  const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
       ? leaveRevokeSchema.safeParse({ leaveId: raw })
@@ -178,10 +182,12 @@ export async function revokeLeaveRequestAction(raw: unknown): Promise<LeaveModul
       companyId,
       leaveId: parsed.data.leaveId,
       reason: parsed.data.reason,
+      actorUserId: user.id,
     });
     safeRev("/pushimet");
     safeRev(`/pushimet/${parsed.data.leaveId}`);
     safeRev("/paneli");
+    safeRev("/pagat");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Revokimi dështoi." };

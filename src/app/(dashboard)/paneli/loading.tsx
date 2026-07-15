@@ -1,41 +1,95 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardAlertsPanelSkeleton } from "@/modules/dashboard/widgets/dashboard-alerts-panel";
-import { DashboardPayrollPanelSkeleton } from "@/modules/dashboard/widgets/dashboard-payroll-panel";
 import { DashboardFiltersBarSkeleton } from "@/modules/dashboard/widgets/dashboard-filters-bar";
+import { DashboardPayrollPanelSkeleton } from "@/modules/dashboard/widgets/dashboard-payroll-panel";
 import { DashboardKpiCardsSkeleton } from "@/modules/dashboard/widgets/dashboard-summary-cards";
+
+function QueueRowSkeleton() {
+  return (
+    <div className="flex items-center gap-[15px] rounded-xl border border-[#e2e8f0] border-l-[3px] border-l-[#e2e8f0] bg-white px-[18px] py-4">
+      <Skeleton className="h-[38px] w-[38px] rounded-[10px]" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+      <Skeleton className="h-9 w-24 rounded-[9px]" />
+    </div>
+  );
+}
 
 export default function PaneliLoading() {
   return (
-    <div className="dashboard-container pb-24 md:pb-8">
-      <div className="mb-6 space-y-6">
-        <div className="page-header space-y-2 border-b border-border">
-          <Skeleton className="h-8 w-52 max-w-full" />
-          <Skeleton className="h-4 w-full max-w-xl" />
-          <Skeleton className="h-9 w-36 rounded-md" />
+    <>
+      {/* Sub-bar */}
+      <div className="-mx-4 -mt-4 mb-6 border-b border-[#e2e8f0] bg-white px-4 py-[22px] md:-mx-10 md:-mt-6 md:px-10">
+        <Skeleton className="mb-1.5 h-3 w-44" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+          <Skeleton className="h-8 w-56" />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <DashboardFiltersBarSkeleton />
+            <Skeleton className="h-10 w-40 rounded-[10px]" />
+          </div>
         </div>
-        <DashboardFiltersBarSkeleton />
       </div>
 
-      <div className="dashboard-main-grid mb-5">
-        <DashboardPayrollPanelSkeleton />
-        <DashboardAlertsPanelSkeleton />
-      </div>
+      {/* Body — 1fr / 400px grid */}
+      <div className="pb-24 md:pb-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="min-w-0 space-y-[22px]">
+            <div>
+              <div className="mb-4 flex items-baseline justify-between">
+                <Skeleton className="h-5 w-44" />
+                <Skeleton className="h-3 w-36" />
+              </div>
+              <div className="flex flex-col gap-[11px]">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <QueueRowSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[14px] border border-[#e2e8f0] bg-white px-[22px] py-5">
+              <div className="flex items-start justify-between">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-6 w-28" />
+              </div>
+              <div className="mt-4 flex h-24 items-end gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-full max-w-[44px] flex-1 rounded-t-md" />
+                ))}
+              </div>
+            </div>
+          </div>
 
-      <div className="dashboard-grid">
-        <DashboardKpiCardsSkeleton />
-        <div className="card-half">
-          <Skeleton className="surface-card h-64 w-full" />
+          <div className="min-w-0 space-y-[18px]">
+            <DashboardPayrollPanelSkeleton />
+            <div className="grid grid-cols-2 gap-3">
+              <DashboardKpiCardsSkeleton />
+            </div>
+            <div className="rounded-[14px] border border-[#e2e8f0] bg-white p-5">
+              <Skeleton className="mb-3 h-4 w-36" />
+              <Skeleton className="mb-4 h-[9px] w-full rounded-md" />
+              <div className="space-y-2.5">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-3 w-full" />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="card-half">
-          <Skeleton className="surface-card h-64 w-full" />
-        </div>
-        <div className="card-half">
-          <Skeleton className="surface-card h-64 w-full" />
-        </div>
-        <div className="card-half">
-          <Skeleton className="surface-card h-64 w-full" />
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-[#e2e8f0] bg-white p-5">
+              <Skeleton className="mb-2 h-4 w-32" />
+              <Skeleton className="mb-4 h-3 w-56" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <Skeleton key={j} className="h-4 w-full" />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

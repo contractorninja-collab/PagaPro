@@ -2,6 +2,7 @@ import { TimelineEventSeverity } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 import { LEAVE_TIMELINE } from "@/modules/leaves/constants/timeline";
+import { syncDraftPayrollsForLeaveChange } from "@/modules/payroll/services/payroll-leave-sync-service";
 
 function rangesOverlapUtcInclusive(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart.getTime() <= bEnd.getTime() && bStart.getTime() <= aEnd.getTime();
@@ -42,6 +43,7 @@ export async function linkApprovedSickInterruptingAnnualLeave(params: {
   companyId: string;
   annualLeaveId: string;
   sickLeaveId: string;
+  actorUserId?: string | null;
 }): Promise<void> {
   const [annual, sick] = await Promise.all([
     prisma.leaveRequest.findFirst({
@@ -100,6 +102,51 @@ export async function linkApprovedSickInterruptingAnnualLeave(params: {
     title: "Pushim mjekësor — ndërpret pushimin vjetor",
     body: `Pushimi vjetor ${annual.id}: orët e mbivendosjes trajtohen si mjekësor në payroll.`,
   });
+
+  // Zhvendosja paguar→mjekësor ndryshon orët — sinkronizo payroll-et DRAFT të intervalit të mbivendosjes.
+  try {
+    const overlapStart = annual.startDate > sick.startDate ? annual.startDate : sick.startDate;
+    const overlapEnd = annual.endDate < sick.endDate ? annual.endDate : sick.endDate;
+    const sync = await syncDraftPayrollsForLeaveChange({
+      companyId: params.companyId,
+      employeeId: annual.employeeId,
+      startDate: overlapStart,
+      endDate: overlapEnd,
+      actorUserId: params.actorUserId,
+    });
+    if (sync.synced.length > 0) {
+      await appendLeaveTimeline({
+        companyId: params.companyId,
+        employeeId: annual.employeeId,
+        leaveId: annual.id,
+        eventType: "LEAVE_PAYROLL_SYNCED",
+        title: "Payroll (DRAFT) u sinkronizua me ndërprerjen (Art 34.2)",
+        body: sync.synced.map((s) => `${s.month}/${s.year}`).join(", "),
+      });
+    }
+    for (const s of sync.skipped) {
+      await appendLeaveTimeline({
+        companyId: params.companyId,
+        employeeId: annual.employeeId,
+        leaveId: annual.id,
+        eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+        title: `Payroll ${s.month}/${s.year} nuk u sinkronizua automatikisht`,
+        body: s.reason,
+        severity: TimelineEventSeverity.WARNING,
+      });
+    }
+  } catch (err) {
+    console.error("[pagapro] linkApprovedSickInterruptingAnnualLeave: payroll sync failed", err);
+    await appendLeaveTimeline({
+      companyId: params.companyId,
+      employeeId: annual.employeeId,
+      leaveId: annual.id,
+      eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+      title: "Payroll (DRAFT) nuk u sinkronizua me ndërprerjen",
+      body: "Sinkronizimi dështoi — rifreskoni orët e pushimit manualisht në payroll.",
+      severity: TimelineEventSeverity.WARNING,
+    });
+  }
 
   try {
     await prisma.domainActivity.create({

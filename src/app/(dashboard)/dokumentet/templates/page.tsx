@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { TemplatesLibraryClient } from "@/modules/documents/components/templates-library-client";
 import { listDocumentTemplatesWithVersions } from "@/modules/documents/services/document-queries";
 import { requireCompanyContextPage } from "@/server/company-context";
@@ -48,15 +47,5 @@ export default async function DokumentetTemplatesPage() {
     })),
   }));
 
-  return (
-    <div className="space-y-6">
-      <Link
-        href="/dokumentet"
-        className="inline-flex text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-      >
-        ← Kthehu te dokumentet
-      </Link>
-      <TemplatesLibraryClient templates={rows} />
-    </div>
-  );
+  return <TemplatesLibraryClient templates={rows} />;
 }

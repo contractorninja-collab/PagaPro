@@ -58,7 +58,7 @@ export function DashboardQuickActions() {
       <div className="hidden md:block">
         <ActionsMenu
           trigger={
-            <Button size="sm" variant="secondary">
+            <Button className="h-10 rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white shadow-none hover:bg-[#1d4ed8]">
               Veprime të Shpejta
               <ChevronDown className="ml-1 h-4 w-4" aria-hidden />
             </Button>
@@ -66,11 +66,11 @@ export function DashboardQuickActions() {
         />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e2e8f0] bg-white/95 p-3 backdrop-blur md:hidden">
         <ActionsMenu
           align="end"
           trigger={
-            <Button size="sm" variant="secondary" className="w-full">
+            <Button className="h-10 w-full rounded-[10px] bg-brand-blue text-[13.5px] font-semibold text-white shadow-none hover:bg-[#1d4ed8]">
               Veprime të Shpejta
               <ChevronDown className="ml-1 h-4 w-4" aria-hidden />
             </Button>

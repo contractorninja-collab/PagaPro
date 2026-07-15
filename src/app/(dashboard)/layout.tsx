@@ -1,4 +1,5 @@
-import { AppShell } from "@/components/layout/app-shell";
+import { AppTopNav } from "@/components/layout/app-top-nav";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyContextPage } from "@/server/company-context";
 
@@ -37,13 +38,17 @@ export default async function DashboardLayout({
   }
 
   return (
-    <AppShell
-      activeCompanyLabel={activeCompanyLabel}
-      userLabel={user.displayName}
-      userEmail={user.email}
-      alertCount={alertCount}
-    >
-      {children}
-    </AppShell>
+    <div className="flex min-h-screen flex-col bg-brand-canvas">
+      <AppTopNav
+        activeCompanyLabel={activeCompanyLabel}
+        userLabel={user.displayName}
+        userEmail={user.email}
+        alertCount={alertCount}
+      />
+      <main className="flex-1 bg-brand-canvas px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-10 md:pt-6 md:pb-9">
+        {children}
+      </main>
+      <MobileNav />
+    </div>
   );
 }

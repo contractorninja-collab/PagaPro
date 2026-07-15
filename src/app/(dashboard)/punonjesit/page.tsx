@@ -62,15 +62,26 @@ export default async function PunonjesitPage({
     documentsMissing,
   };
 
+  // URL that toggles the documentsMissing quick-filter while preserving the other applied filters.
+  const toggleParams = new URLSearchParams();
+  if (q) toggleParams.set("q", q);
+  if (filters.status) toggleParams.set("status", filters.status);
+  if (filters.employmentType) toggleParams.set("employmentType", filters.employmentType);
+  if (filters.departmentId) toggleParams.set("departmentId", filters.departmentId);
+  if (!documentsMissing) toggleParams.set("documentsMissing", "1");
+  const documentsMissingToggleHref = toggleParams.toString()
+    ? `/punonjesit?${toggleParams.toString()}`
+    : "/punonjesit";
+
   return (
-    <div className="space-y-8">
-      <EmployeesFilters departments={data.departments} defaults={defaults} />
-      <EmployeesPageClient
-        employees={data.employees}
-        departments={data.departments}
-        jobTitles={data.jobTitles}
-        documentsMissingFilter={documentsMissing}
-      />
-    </div>
+    <EmployeesPageClient
+      employees={data.employees}
+      departments={data.departments}
+      jobTitles={data.jobTitles}
+      documentsMissingFilter={documentsMissing}
+      documentsMissingToggleHref={documentsMissingToggleHref}
+      filtersActive={Boolean(q || filters.status || filters.employmentType || filters.departmentId || documentsMissing)}
+      filters={<EmployeesFilters departments={data.departments} defaults={defaults} />}
+    />
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { Download, Printer } from "lucide-react";
+import type { PayrollPeriodStatus } from "@prisma/client";
+import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,10 +32,32 @@ import {
   updatePayrollEntryAction,
   validatePayrollAction,
 } from "@/modules/payroll/actions/payroll-actions";
-import { PayrollStatusBadge } from "@/modules/payroll/components/payroll-status-badge";
 import { PayrollSpreadsheet } from "@/modules/payroll/components/spreadsheet/payroll-spreadsheet";
 import { PayrollCorrectionsPanel } from "@/modules/payroll/components/corrections/payroll-corrections-panel";
 import { cn } from "@/lib/utils";
+
+/* ------------------------------- 1b style atoms ------------------------------- */
+
+const BTN_P =
+  "inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-brand-blue px-[17px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
+const BTN_S =
+  "inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[9px] border border-[#e2e8f0] bg-white px-[15px] text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
+const BTN_S_BLUE =
+  "inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[9px] border border-[#cddcf4] bg-white px-[15px] text-[13px] font-semibold text-brand-blue transition-colors hover:bg-[#eff6ff] disabled:pointer-events-none disabled:opacity-50";
+const BTN_SM_P =
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-blue px-3 text-xs font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
+const BTN_SM_S =
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e2e8f0] bg-white px-3 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
+const BTN_SM_BLUE =
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#cddcf4] bg-white px-3 text-xs font-semibold text-brand-blue transition-colors hover:bg-[#eff6ff] disabled:pointer-events-none disabled:opacity-50";
+
+const CARD = "rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+const CARD_TITLE = "border-b border-[#eef2f7] px-5 py-3 text-[13px] font-bold text-[#0f172a]";
+
+const SEG_TRIGGER =
+  "rounded-[7px] px-[15px] py-[7px] text-[13px] font-medium text-[#64748b] transition-colors hover:text-[#334155] data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-[#0f172a] data-[state=active]:shadow-[0_1px_2px_rgba(15,23,42,0.08)]";
+
+/* ------------------------------------------------------------------------------ */
 
 /** Plain payroll decimal string → EUR display (e.g. €999,999.99) without clipping large amounts. */
 function formatPayrollEuro(amountStr: string): string {
@@ -57,11 +79,12 @@ function formatHeadcount(raw: string): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(n));
 }
 
+/** 9a — wide right-aligned totals card (Bruto, Neto accent, Tatimi, Trust 1, Trust 2, Punonjës). */
 function PayrollTotalsSummaryCard(props: { data: PayrollDetailDto }) {
   const { totals } = props.data;
   const headcountStr = formatHeadcount(String(totals.headcount));
 
-  const rows: Array<{
+  const cells: Array<{
     label: string;
     display: string;
     netHighlight?: boolean;
@@ -76,43 +99,51 @@ function PayrollTotalsSummaryCard(props: { data: PayrollDetailDto }) {
 
   return (
     <div
-      className={cn(
-        "sticky top-4 z-10 ml-auto w-fit max-w-none shrink-0 self-start overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#FFFFFF]",
-        "shadow-[0_1px_3px_rgba(0,0,0,0.07)]",
-        "dark:border-border dark:bg-card dark:shadow-sm",
-      )}
+      aria-label="Totalet"
+      className="max-w-[calc(100vw-32px)] overflow-x-auto rounded-xl border border-[#e5e7eb] bg-white px-5 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.07)] sm:max-w-[calc(100vw-360px)] xl:max-w-none"
     >
-      <div className="px-7 py-4">
-        <h2 className="mb-3 border-b border-[#E5E7EB] pb-[10px] text-[13px] font-semibold leading-none tracking-tight text-foreground dark:border-border">
-          Totalet
-        </h2>
-        <div className="flex w-full flex-row flex-nowrap items-stretch gap-0">
-          {rows.map((row, i) => (
-            <div
-              key={row.label}
+      <div className="flex flex-nowrap items-stretch">
+        {cells.map((cell, i) => (
+          <div
+            key={cell.label}
+            className={cn(
+              "flex flex-col items-end justify-end gap-1 px-[15px] first:pl-0 last:pr-0",
+              i > 0 && "border-l border-[#e5e7eb]",
+            )}
+          >
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase leading-none tracking-[0.07em] text-[#9ca3af]">
+              {cell.label}
+            </span>
+            <span
               className={cn(
-                "flex min-w-[100px] flex-1 flex-col items-end justify-end gap-1 px-3 first:pl-0 last:pr-0",
-                i > 0 && "border-l border-[#E5E7EB] dark:border-border",
+                "whitespace-nowrap text-[17px] font-bold leading-tight tracking-tight text-[#111827] [font-variant-numeric:tabular-nums]",
+                cell.netHighlight && "font-extrabold text-[#1d4ed8]",
               )}
+              title={cell.display}
             >
-              <span className="whitespace-nowrap text-[10px] font-medium uppercase leading-none tracking-[0.07em] text-[#9CA3AF] dark:text-muted-foreground">
-                {row.label}
-              </span>
-              <span
-                className={cn(
-                  "whitespace-nowrap text-[18px] font-bold leading-tight tracking-tight text-[#111827] [font-variant-numeric:tabular-nums] dark:text-foreground",
-                  row.netHighlight && "font-extrabold text-[#1D4ED8] dark:text-blue-400",
-                )}
-                title={row.display}
-              >
-                {row.display}
-              </span>
-            </div>
-          ))}
-        </div>
+              {cell.display}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
+}
+
+const SUB_BAR_STATUS: Record<
+  PayrollPeriodStatus,
+  { tone: "info" | "success" | "warning" | "destructive" | "neutral" | "locked"; label: string }
+> = {
+  DRAFT: { tone: "warning", label: "Draft" },
+  REVIEWED: { tone: "info", label: "Në shqyrtim" },
+  APPROVED: { tone: "success", label: "I miratuar" },
+  LOCKED: { tone: "locked", label: "I kyçur" },
+  ARCHIVED: { tone: "neutral", label: "I arkivuar" },
+};
+
+function PayrollSubBarStatus({ status }: { status: PayrollPeriodStatus }) {
+  const s = SUB_BAR_STATUS[status];
+  return <SubBarStatus tone={s.tone}>{s.label}</SubBarStatus>;
 }
 
 export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
@@ -212,81 +243,48 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
     label: `${e.employeeName} (${e.personalId})`,
   }));
 
-  return (
-    <div className="space-y-6 pb-24 lg:pb-8">
-      <div className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-start lg:gap-6">
-        <div className="min-w-0 w-full flex-1 space-y-3 lg:pr-2">
-          <Button variant="ghost" size="sm" asChild className="-ml-2 w-fit gap-1 px-2">
-            <Link href="/pagat">
-              <ArrowLeft className="h-4 w-4" />
-              Pagat
-            </Link>
-          </Button>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{payroll.monthLabel}</h1>
-            <PayrollStatusBadge status={payroll.status} />
-          </div>
-          <p className="text-sm text-muted-foreground">{data.companyLabel}</p>
-          {data.workingCalendar ? (
-            <div className="max-w-2xl space-y-2 text-sm leading-relaxed text-muted-foreground">
-              <p>
-                <span className="font-medium text-foreground/90">Kalendari (motor):</span>{" "}
-                {data.workingCalendar.expectedWorkingDays} ditë pune ·{" "}
-                {data.workingCalendar.expectedRegularHours} orë (
-                {data.workingCalendar.hoursPerWorkingDay}h/ditë nga PayrollSettings).
-              </p>
-              {data.workingCalendar.weekdayPublicHolidayDates.length > 0 ? (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-foreground/85">
-                    Festa publike në ditë pune këtë muaj
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.workingCalendar.weekdayPublicHolidayDates.map((d) => (
-                      <span
-                        key={d}
-                        className="inline-flex rounded-md border border-border/80 bg-muted/40 px-2 py-0.5 font-mono text-xs tabular-nums text-foreground"
-                      >
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : payroll.expectedWorkingDays != null ? (
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Kalendari i ruajtur në payroll: {payroll.expectedWorkingDays} ditë ·{" "}
-              {payroll.expectedRegularHours ?? "—"} orë të pritura.
-            </p>
-          ) : null}
-        </div>
+  // Sub-bar description: company · working calendar · public holidays (kept from the old body block).
+  const calendarSummary = data.workingCalendar
+    ? `${data.workingCalendar.expectedWorkingDays} ditë pune · ${data.workingCalendar.expectedRegularHours} orë (${data.workingCalendar.hoursPerWorkingDay}h/ditë)`
+    : payroll.expectedWorkingDays != null
+      ? `${payroll.expectedWorkingDays} ditë pune · ${payroll.expectedRegularHours ?? "—"} orë të pritura`
+      : null;
+  const holidaySummary =
+    data.workingCalendar && data.workingCalendar.weekdayPublicHolidayDates.length > 0
+      ? `Festë publike: ${data.workingCalendar.weekdayPublicHolidayDates.join(", ")}.`
+      : null;
+  const subBarDescription = [[data.companyLabel, calendarSummary].filter(Boolean).join(" · "), holidaySummary]
+    .filter(Boolean)
+    .join(" ");
 
-        <PayrollTotalsSummaryCard data={data} />
-      </div>
+  return (
+    <>
+      <AppSubBar
+        dense
+        backHref="/pagat"
+        backLabel="Pagat"
+        title={payroll.monthLabel}
+        status={<PayrollSubBarStatus status={payroll.status} />}
+        description={subBarDescription || undefined}
+        actions={<PayrollTotalsSummaryCard data={data} />}
+      />
+      <div className="space-y-5 pb-24 lg:pb-8">
 
       {payroll.validationWarnings.length > 0 ? (
-        <Card className="border-amber-500/40 bg-amber-500/[0.06]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-950 dark:text-amber-50">
-              Sinjalizime validimi
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              {payroll.validationWarnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <h2 className="mb-2 text-[13px] font-bold text-[#b45309]">Sinjalizime validimi</h2>
+          <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-[#92400e]">
+            {payroll.validationWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {data.operationalSettings ? (
-        <Card className="border-border bg-muted/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Parametrat operative (payroll_settings)</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+        <section className={CARD}>
+          <h2 className={CARD_TITLE}>Parametrat operative (payroll_settings)</h2>
+          <div className="grid gap-x-4 gap-y-2 px-5 py-4 text-xs leading-relaxed text-[#64748b] sm:grid-cols-2 lg:grid-cols-4">
             <p>
               Minimalja (bazë): €{data.operationalSettings.minimumSalaryMonthly}
             </p>
@@ -318,55 +316,103 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             </p>
             <p>
               Pushimi mjekësor (% e normës): {(Number(data.operationalSettings.sickLeavePayPercent) * 100).toFixed(2)}%
-              — parazgjedhje ligjore/kompani; shih dokumentacionin.
+              — Neni 60, Ligji i Punës: 100% është minimumi ligjor dhe zbatohet automatikisht si dysheme.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ) : null}
 
       {draftEditable && data.entries.length === 0 ? (
-        <Card className="border-amber-500/35 bg-amber-500/[0.06]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-950 dark:text-amber-50">
-              Ende nuk ka rreshta për këtë payroll
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
+        <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <h2 className="mb-2 text-[13px] font-bold text-[#b45309]">Ende nuk ka rreshta për këtë payroll</h2>
+          <div className="space-y-2 text-[13px] leading-relaxed text-[#92400e]">
             <p>
               Për të përfshirë punonjësit e përshtatshëm për{" "}
-              <strong className="text-foreground">{payroll.monthLabel}</strong>, shtypni{" "}
-              <strong className="text-foreground">Ripëllogarit punonjësit</strong>.
+              <strong className="font-semibold text-[#78350f]">{payroll.monthLabel}</strong>, shtypni{" "}
+              <strong className="font-semibold text-[#78350f]">Ripëllogarit punonjësit</strong>.
             </p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                Përfshihen vetëm <strong className="text-foreground">EMPLOYEE</strong> (jo kontraktorët), me status{" "}
-                <strong className="text-foreground">ACTIVE</strong> ose <strong className="text-foreground">ON_LEAVE</strong>.
+                Përfshihen vetëm <strong className="font-semibold text-[#78350f]">EMPLOYEE</strong> (jo kontraktorët), me
+                status <strong className="font-semibold text-[#78350f]">ACTIVE</strong> ose{" "}
+                <strong className="font-semibold text-[#78350f]">ON_LEAVE</strong>.
               </li>
             </ul>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ) : null}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/50 p-1 lg:inline-flex lg:w-auto">
-          <TabsTrigger value="spreadsheet">Spreadsheet</TabsTrigger>
-          <TabsTrigger value="documents">PDF</TabsTrigger>
-          <TabsTrigger value="atk">ATK (Excel)</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="corrections">Korrigjimet</TabsTrigger>
+        <TabsList className="h-auto w-fit max-w-full justify-start gap-[3px] rounded-[10px] border-0 bg-[#eef2f7] p-1 text-[#64748b]">
+          <TabsTrigger className={SEG_TRIGGER} value="spreadsheet">
+            Spreadsheet
+          </TabsTrigger>
+          <TabsTrigger className={SEG_TRIGGER} value="documents">
+            PDF
+          </TabsTrigger>
+          <TabsTrigger className={SEG_TRIGGER} value="atk">
+            ATK (Excel)
+          </TabsTrigger>
+          <TabsTrigger className={SEG_TRIGGER} value="timeline">
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger className={SEG_TRIGGER} value="corrections">
+            Korrigjimet
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="spreadsheet" className="mt-4 space-y-3">
-          {draftEditable && data.entries.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outlinePrimary" size="sm" onClick={() => void exec("Validuar.", validatePayrollAction(payroll.id))}>
-                Validizo (sinjalizime)
-              </Button>
-              <p className="self-center text-xs text-muted-foreground">
-                Redaktimi aktiv vetëm në DRAFT; ruajtja autoritative është në server.
-              </p>
-            </div>
+        {/* Workflow action row (desktop) */}
+        <div className="mt-4 hidden flex-wrap items-center gap-2.5 lg:flex">
+          {draftEditable ? (
+            <button type="button" className={BTN_P} onClick={() => void exec("Ripëllogaritur.", regeneratePayrollAction(payroll.id))}>
+              Ripëllogarit punonjësit
+            </button>
           ) : null}
+          {payroll.status === "DRAFT" ? (
+            <button type="button" className={BTN_S} onClick={() => void exec("Shqyrtuar.", reviewPayrollAction(payroll.id))}>
+              Shëno të shqyrtuar
+            </button>
+          ) : null}
+          {payroll.status === "REVIEWED" ? (
+            <>
+              <button type="button" className={BTN_P} onClick={() => void exec("Miratuar.", approvePayrollAction(payroll.id))}>
+                Mirato për kyçje
+              </button>
+              <button
+                type="button"
+                className={BTN_S_BLUE}
+                onClick={() => void exec("Draft.", returnPayrollReviewToDraftAction(payroll.id))}
+              >
+                Kthe në draft (nga shqyrtimi)
+              </button>
+            </>
+          ) : null}
+          {payroll.status === "APPROVED" ? (
+            <>
+              <button type="button" className={BTN_P} onClick={() => void exec("Kyçur.", lockPayrollAction(payroll.id))}>
+                Kyç payroll & snapshot
+              </button>
+              <button type="button" className={BTN_S} disabled={pdfPending} onClick={() => void generatePdfs()}>
+                {pdfPending ? "Duke gjeneruar…" : "Paraprakisht: gjenero PDF"}
+              </button>
+            </>
+          ) : null}
+          {payroll.status === "LOCKED" ? (
+            <button type="button" className={BTN_S} onClick={() => void exec("Arkivuar.", archivePayrollAction(payroll.id))}>
+              Arkivo
+            </button>
+          ) : null}
+          {draftEditable && data.entries.length > 0 ? (
+            <button type="button" className={BTN_S} onClick={() => void exec("Validuar.", validatePayrollAction(payroll.id))}>
+              Validizo (sinjalizime)
+            </button>
+          ) : null}
+          <span className="ml-auto text-xs text-[#94a3b8]">
+            Redaktimi aktiv vetëm në DRAFT · ruajtja autoritative në server
+          </span>
+        </div>
+
+        <TabsContent value="spreadsheet" className="mt-4 space-y-3">
           <PayrollSpreadsheet
             payrollId={payroll.id}
             status={payroll.status}
@@ -376,25 +422,28 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             pensionEmployerPercent={data.operationalSettings?.pensionEmployerPercent}
           />
           {draftEditable && data.entries.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <span className="w-full text-xs text-muted-foreground">Mbivendosje manuale bruto/neto (me arsye):</span>
-              {data.entries.map((e) => (
-                <Button key={e.id} type="button" size="sm" variant="secondary" onClick={() => openAdvanced(e)}>
-                  Avancuar · {e.employeeName.split(" ")[0]}
-                </Button>
-              ))}
+            <div className={cn(CARD, "px-4 py-3")}>
+              <p className="mb-2 text-xs font-semibold text-[#64748b]">Mbivendosje manuale bruto/neto (me arsye):</p>
+              <div className="flex flex-wrap gap-2">
+                {data.entries.map((e) => (
+                  <button key={e.id} type="button" className={BTN_SM_S} onClick={() => openAdvanced(e)}>
+                    Avancuar · {e.employeeName.split(" ")[0]}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4 space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="max-w-3xl text-[13px] leading-relaxed text-[#64748b]">
             Fletëpagesat profesionale përfshijnë të ardhurat, zbritjet, neton dhe të dhënat bankare. Skedari quhet sipas
-            punonjësit dhe muajit (p.sh. <code className="rounded bg-muted px-1 text-xs">Ajeti_Arines_Qershor_2026.pdf</code>
+            punonjësit dhe muajit (p.sh.{" "}
+            <code className="rounded bg-[#f1f5f9] px-1 text-xs text-[#334155]">Ajeti_Arines_Qershor_2026.pdf</code>
             ). Për printim masiv, përdorni paketën e kombinuar më poshtë.
           </p>
           {data.documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ende nuk janë gjeneruar PDF.</p>
+            <p className="text-sm text-[#64748b]">Ende nuk janë gjeneruar PDF.</p>
           ) : (
             (() => {
               const bundle = data.documents.find((d) => d.kind === "PAYSLIPS_PRINT_BUNDLE");
@@ -406,90 +455,95 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
               return (
                 <>
                   {bundle ? (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Printim masiv — të gjitha fletëpagesat</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-wrap items-center gap-2">
-                        <p className="w-full text-xs text-muted-foreground">
+                    <section className={CARD}>
+                      <h3 className={CARD_TITLE}>Printim masiv — të gjitha fletëpagesat</h3>
+                      <div className="flex flex-wrap items-center gap-2 px-5 py-4">
+                        <p className="w-full text-xs text-[#64748b]">
                           {bundle.filename} — {payslips.length} fletëpagesa në një PDF (një faqe për punonjës).
                         </p>
-                        <Button variant="default" size="sm" asChild>
-                          <a
-                            href={`/api/payroll-documents/${bundle.id}?inline=1`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <Printer className="mr-1.5 h-3.5 w-3.5" />
-                            Printo të gjitha
-                          </a>
-                        </Button>
-                        <Button variant="secondary" size="sm" asChild>
-                          <a href={`/api/payroll-documents/${bundle.id}`} target="_blank" rel="noreferrer">
-                            <Download className="mr-1.5 h-3.5 w-3.5" />
-                            Shkarko paketën
-                          </a>
-                        </Button>
-                      </CardContent>
-                    </Card>
+                        <a
+                          className={BTN_SM_P}
+                          href={`/api/payroll-documents/${bundle.id}?inline=1`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Printer className="h-3.5 w-3.5" aria-hidden />
+                          Printo të gjitha
+                        </a>
+                        <a
+                          className={BTN_SM_S}
+                          href={`/api/payroll-documents/${bundle.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="h-3.5 w-3.5" aria-hidden />
+                          Shkarko paketën
+                        </a>
+                      </div>
+                    </section>
                   ) : null}
 
                   {payslips.length > 0 ? (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Fletëpagesat e punonjësve</h3>
-                      <ul className="space-y-2 text-sm">
+                    <section className={CARD}>
+                      <h3 className={CARD_TITLE}>Fletëpagesat e punonjësve</h3>
+                      <ul className="divide-y divide-[#f1f5f9]">
                         {payslips.map((d) => (
                           <li
                             key={d.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
+                            className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
                           >
                             <div className="min-w-0">
-                              <p className="font-medium">{d.employeeName ?? d.filename}</p>
-                              <p className="truncate text-xs text-muted-foreground">{d.filename}</p>
+                              <p className="text-[13px] font-semibold text-[#0f172a]">{d.employeeName ?? d.filename}</p>
+                              <p className="truncate text-xs text-[#94a3b8]">{d.filename}</p>
                             </div>
-                            <div className="flex shrink-0 gap-1">
-                              <Button variant="outlinePrimary" size="sm" asChild>
-                                <a
-                                  href={`/api/payroll-documents/${d.id}?inline=1`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  <Printer className="mr-1 h-3.5 w-3.5" />
-                                  Printo
-                                </a>
-                              </Button>
-                              <Button variant="secondary" size="sm" asChild>
-                                <a href={`/api/payroll-documents/${d.id}`} target="_blank" rel="noreferrer">
-                                  <Download className="mr-1 h-3.5 w-3.5" />
-                                  Shkarko
-                                </a>
-                              </Button>
+                            <div className="flex shrink-0 gap-1.5">
+                              <a
+                                className={BTN_SM_BLUE}
+                                href={`/api/payroll-documents/${d.id}?inline=1`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <Printer className="h-3.5 w-3.5" aria-hidden />
+                                Printo
+                              </a>
+                              <a
+                                className={BTN_SM_S}
+                                href={`/api/payroll-documents/${d.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <Download className="h-3.5 w-3.5" aria-hidden />
+                                Shkarko
+                              </a>
                             </div>
                           </li>
                         ))}
                       </ul>
-                    </div>
+                    </section>
                   ) : null}
 
                   {registers.length > 0 ? (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Listat e pagave</h3>
-                      <ul className="space-y-2 text-sm">
+                    <section className={CARD}>
+                      <h3 className={CARD_TITLE}>Listat e pagave</h3>
+                      <ul className="divide-y divide-[#f1f5f9]">
                         {registers.map((d) => (
                           <li
                             key={d.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
+                            className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
                           >
-                            <span className="font-medium">{d.filename}</span>
-                            <Button variant="secondary" size="sm" asChild>
-                              <a href={`/api/payroll-documents/${d.id}`} target="_blank" rel="noreferrer">
-                                Shkarko
-                              </a>
-                            </Button>
+                            <span className="text-[13px] font-semibold text-[#0f172a]">{d.filename}</span>
+                            <a
+                              className={BTN_SM_S}
+                              href={`/api/payroll-documents/${d.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Shkarko
+                            </a>
                           </li>
                         ))}
                       </ul>
-                    </div>
+                    </section>
                   ) : null}
                 </>
               );
@@ -498,21 +552,21 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         </TabsContent>
 
         <TabsContent value="atk" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Eksporti ATK (Excel — shablloni zyrtar)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <section className={CARD}>
+            <h3 className={CARD_TITLE}>Eksporti ATK (Excel — shablloni zyrtar)</h3>
+            <div className="space-y-3 px-5 py-4 text-[13px] leading-relaxed text-[#64748b]">
               <p>
-                Gjeneroni workbook-un nga <strong className="text-foreground">Mostra Pagave ATK.xlsx</strong> në{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">public/atk_template/</code>. Kontraktorët përjashtohen
-                automatikisht. Në <strong className="text-foreground">LOCKED</strong> eksporti gjenerohet një herë; në{" "}
-                <strong className="text-foreground">APPROVED</strong> mund të rigjenerohet (eksportet e mëparshme arkivohen).
+                Gjeneroni workbook-un nga <strong className="font-semibold text-[#0f172a]">Mostra Pagave ATK.xlsx</strong>{" "}
+                në <code className="rounded bg-[#f1f5f9] px-1 py-0.5 text-xs text-[#334155]">public/atk_template/</code>.
+                Kontraktorët përjashtohen automatikisht. Në{" "}
+                <strong className="font-semibold text-[#0f172a]">LOCKED</strong> eksporti gjenerohet një herë; në{" "}
+                <strong className="font-semibold text-[#0f172a]">APPROVED</strong> mund të rigjenerohet (eksportet e
+                mëparshme arkivohen).
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <button
                   type="button"
-                  size="sm"
+                  className={BTN_SM_P}
                   disabled={!canGenerateAtk || atkPending}
                   onClick={() =>
                     startAtkTransition(() => {
@@ -528,89 +582,85 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
                   }
                 >
                   {atkPending ? "Duke punuar…" : "Gjenero eksportin ATK"}
-                </Button>
+                </button>
                 {latestAtkExport ? (
-                  <Button variant="secondary" size="sm" asChild>
-                    <a href={latestAtkExport.downloadUrl} target="_blank" rel="noreferrer">
-                      Shkarko eksportin aktiv
-                    </a>
-                  </Button>
-                ) : (
-                  <Button variant="secondary" size="sm" type="button" disabled>
+                  <a className={BTN_SM_S} href={latestAtkExport.downloadUrl} target="_blank" rel="noreferrer">
                     Shkarko eksportin aktiv
-                  </Button>
+                  </a>
+                ) : (
+                  <button type="button" className={BTN_SM_S} disabled>
+                    Shkarko eksportin aktiv
+                  </button>
                 )}
               </div>
               {!atkStatusEligible ? (
-                <p className="text-xs">Gjenerimi aktiv vetëm për payroll APPROVED ose LOCKED.</p>
+                <p className="text-xs text-[#94a3b8]">Gjenerimi aktiv vetëm për payroll APPROVED ose LOCKED.</p>
               ) : payroll.status === "LOCKED" && latestAtkExport ? (
-                <p className="text-xs">Payroll i kyçur: përdorni shkarkimin — rigjenerimi është i ndaluar.</p>
+                <p className="text-xs text-[#94a3b8]">
+                  Payroll i kyçur: përdorni shkarkimin — rigjenerimi është i ndaluar.
+                </p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Libri i Pagave / Përmbledhja Financiare (Pagat per ATK)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <section className={CARD}>
+            <h3 className={CARD_TITLE}>Libri i Pagave / Përmbledhja Financiare (Pagat per ATK)</h3>
+            <div className="space-y-3 px-5 py-4 text-[13px] leading-relaxed text-[#64748b]">
               <p>
-                Eksportoni të gjitha të dhënat dhe llogaritjet e plota të motorit të payroll-it (përfshirë orët, bruto pagën, trustin, tatimin, bonuset dhe avanset) në një skedar Excel të stiluar me markën PagaPRO ose si skedar CSV.
+                Eksportoni të gjitha të dhënat dhe llogaritjet e plota të motorit të payroll-it (përfshirë orët, bruto
+                pagën, trustin, tatimin, bonuset dhe avanset) në një skedar Excel të stiluar me markën PagaPRO ose si
+                skedar CSV.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outlinePrimary" size="sm" asChild>
-                  <a href={`/api/payroll/${payroll.id}/export-financial?format=xlsx`} download>
-                    <Download className="mr-1.5 h-3.5 w-3.5" />
-                    Shkarko Excel (Branded)
-                  </a>
-                </Button>
-                <Button variant="secondary" size="sm" asChild>
-                  <a href={`/api/payroll/${payroll.id}/export-financial?format=csv`} download>
-                    <Download className="mr-1.5 h-3.5 w-3.5" />
-                    Shkarko CSV
-                  </a>
-                </Button>
+                <a className={BTN_SM_BLUE} href={`/api/payroll/${payroll.id}/export-financial?format=xlsx`} download>
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Shkarko Excel (Branded)
+                </a>
+                <a className={BTN_SM_S} href={`/api/payroll/${payroll.id}/export-financial?format=csv`} download>
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Shkarko CSV
+                </a>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">Historia e eksporteve ATK</h3>
+          <section className={CARD}>
+            <h3 className={CARD_TITLE}>Historia e eksporteve ATK</h3>
             {data.atkExports.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ende nuk ka eksporte ATK.</p>
+              <p className="px-5 py-4 text-sm text-[#64748b]">Ende nuk ka eksporte ATK.</p>
             ) : (
-              <div className="overflow-x-auto rounded-md border border-border">
+              <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] border-collapse text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                      <th className="px-3 py-2">Koha</th>
-                      <th className="px-3 py-2">Nga</th>
-                      <th className="px-3 py-2">Hash (prefiks)</th>
-                      <th className="px-3 py-2">Arkiv</th>
-                      <th className="px-3 py-2 text-right">Veprime</th>
+                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                      <th className="px-5 py-3 font-bold">Koha</th>
+                      <th className="px-3 py-3 font-bold">Nga</th>
+                      <th className="px-3 py-3 font-bold">Hash (prefiks)</th>
+                      <th className="px-3 py-3 font-bold">Arkiv</th>
+                      <th className="px-5 py-3 text-right font-bold">Veprime</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.atkExports.map((row) => (
-                      <tr key={row.id} className="border-b border-border/80 last:border-0">
-                        <td className="px-3 py-2 whitespace-nowrap tabular-nums text-muted-foreground">
+                      <tr
+                        key={row.id}
+                        className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                      >
+                        <td className="whitespace-nowrap px-5 py-2.5 text-[13px] text-[#64748b] [font-variant-numeric:tabular-nums]">
                           {new Date(row.generatedAt).toLocaleString("sq-XK")}
                         </td>
-                        <td className="px-3 py-2">{row.generatedByLabel ?? "—"}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{row.snapshotHashPrefix}</td>
-                        <td className="px-3 py-2">{row.isArchived ? "Po" : "Jo"}</td>
-                        <td className="px-3 py-2 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="secondary" size="sm" asChild>
-                              <a href={row.downloadUrl} target="_blank" rel="noreferrer">
-                                Shkarko
-                              </a>
-                            </Button>
+                        <td className="px-3 py-2.5 text-[13px] text-[#334155]">{row.generatedByLabel ?? "—"}</td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-[#334155]">{row.snapshotHashPrefix}</td>
+                        <td className="px-3 py-2.5 text-[13px] text-[#334155]">{row.isArchived ? "Po" : "Jo"}</td>
+                        <td className="px-5 py-2.5 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <a className={BTN_SM_S} href={row.downloadUrl} target="_blank" rel="noreferrer">
+                              Shkarko
+                            </a>
                             {payroll.status === "APPROVED" && !row.isArchived ? (
-                              <Button
-                                variant="outlinePrimary"
-                                size="sm"
+                              <button
                                 type="button"
+                                className={BTN_SM_BLUE}
                                 onClick={() =>
                                   void exec(
                                     "Eksporti u arkivua.",
@@ -619,7 +669,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
                                 }
                               >
                                 Arkivo
-                              </Button>
+                              </button>
                             ) : null}
                           </div>
                         </td>
@@ -629,38 +679,43 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
                 </table>
               </div>
             )}
-          </div>
+          </section>
         </TabsContent>
 
         <TabsContent value="timeline" className="mt-4 space-y-4">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold">Aktiviteti</h3>
-            <ul className="space-y-2 text-sm">
+          <section className={CARD}>
+            <h3 className={CARD_TITLE}>Aktiviteti</h3>
+            <ul className="divide-y divide-[#f1f5f9]">
               {data.timeline.map((t) => (
-                <li key={t.id} className="rounded-md border border-border bg-card px-3 py-2">
-                  <span className="font-medium">{t.verb}</span> — {t.summary}
-                  <span className="mt-1 block text-xs text-muted-foreground">
+                <li key={t.id} className="px-5 py-3 text-[13px] leading-relaxed">
+                  <span className="font-semibold text-[#0f172a]">{t.verb}</span>{" "}
+                  <span className="text-[#334155]">— {t.summary}</span>
+                  <span className="mt-1 block text-xs text-[#94a3b8] [font-variant-numeric:tabular-nums]">
                     {new Date(t.occurredAt).toLocaleString("sq-XK")}
                   </span>
                 </li>
               ))}
               {data.timeline.length === 0 ? (
-                <li className="text-muted-foreground">Nuk ka ngjarje ende.</li>
+                <li className="px-5 py-4 text-sm text-[#64748b]">Nuk ka ngjarje ende.</li>
               ) : null}
             </ul>
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold">Audit log</h3>
-            <ul className="space-y-2 text-xs text-muted-foreground">
+          </section>
+          <section className={CARD}>
+            <h3 className={CARD_TITLE}>Audit log</h3>
+            <ul className="divide-y divide-[#f1f5f9]">
               {data.auditTrail.map((a) => (
-                <li key={a.id}>
-                  <span className="font-medium text-foreground">{a.action}</span> —{" "}
-                  {new Date(a.createdAt).toLocaleString("sq-XK")}
+                <li key={a.id} className="px-5 py-2.5 text-xs text-[#64748b]">
+                  <span className="font-semibold text-[#0f172a]">{a.action}</span> —{" "}
+                  <span className="[font-variant-numeric:tabular-nums]">
+                    {new Date(a.createdAt).toLocaleString("sq-XK")}
+                  </span>
                 </li>
               ))}
-              {data.auditTrail.length === 0 ? <li>Nuk ka audit ende.</li> : null}
+              {data.auditTrail.length === 0 ? (
+                <li className="px-5 py-4 text-sm text-[#64748b]">Nuk ka audit ende.</li>
+              ) : null}
             </ul>
-          </div>
+          </section>
         </TabsContent>
 
         <TabsContent value="corrections" className="mt-4">
@@ -673,7 +728,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         </TabsContent>
       </Tabs>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e2e8f0] bg-white/95 p-3 backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-lg flex-wrap gap-2">
           {draftEditable ? (
             <Button size="sm" className="flex-1" type="button" onClick={() => void exec("Ripëllogaritur.", regeneratePayrollAction(payroll.id))}>
@@ -683,6 +738,11 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
           {payroll.status === "DRAFT" ? (
             <Button size="sm" variant="secondary" className="flex-1" type="button" onClick={() => void exec("Shqyrtuar.", reviewPayrollAction(payroll.id))}>
               Shëno të shqyrtuar
+            </Button>
+          ) : null}
+          {draftEditable && data.entries.length > 0 ? (
+            <Button size="sm" variant="secondary" className="flex-1" type="button" onClick={() => void exec("Validuar.", validatePayrollAction(payroll.id))}>
+              Validizo
             </Button>
           ) : null}
           {payroll.status === "REVIEWED" ? (
@@ -711,44 +771,6 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             </Button>
           ) : null}
         </div>
-      </div>
-
-      <div className="hidden flex-wrap gap-2 lg:flex">
-        {draftEditable ? (
-          <Button type="button" onClick={() => void exec("Ripëllogaritur.", regeneratePayrollAction(payroll.id))}>
-            Ripëllogarit punonjësit
-          </Button>
-        ) : null}
-        {payroll.status === "DRAFT" ? (
-          <Button type="button" variant="secondary" onClick={() => void exec("Shqyrtuar.", reviewPayrollAction(payroll.id))}>
-            Shëno të shqyrtuar
-          </Button>
-        ) : null}
-        {payroll.status === "REVIEWED" ? (
-          <>
-            <Button type="button" variant="outlinePrimary" onClick={() => void exec("Draft.", returnPayrollReviewToDraftAction(payroll.id))}>
-              Kthe në draft (nga shqyrtimi)
-            </Button>
-            <Button type="button" onClick={() => void exec("Miratuar.", approvePayrollAction(payroll.id))}>
-              Mirato për kyçje
-            </Button>
-          </>
-        ) : null}
-        {payroll.status === "APPROVED" ? (
-          <>
-            <Button type="button" onClick={() => void exec("Kyçur.", lockPayrollAction(payroll.id))}>
-              Kyç payroll & snapshot
-            </Button>
-            <Button type="button" variant="secondary" disabled={pdfPending} onClick={() => void generatePdfs()}>
-              {pdfPending ? "Duke gjeneruar…" : "Paraprakisht: gjenero PDF"}
-            </Button>
-          </>
-        ) : null}
-        {payroll.status === "LOCKED" ? (
-          <Button type="button" variant="secondary" onClick={() => void exec("Arkivuar.", archivePayrollAction(payroll.id))}>
-            Arkivo
-          </Button>
-        ) : null}
       </div>
 
       <Dialog
@@ -805,6 +827,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

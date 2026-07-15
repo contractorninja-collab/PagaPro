@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useTransition } from "react";
 import { toast } from "sonner";
 import type { DocumentCategory } from "@prisma/client";
+import { AlertTriangle } from "lucide-react";
+import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { docCard } from "@/modules/documents/components/doc-ui";
 import {
   archiveArtifactAction,
   logDocumentDownloadAction,
@@ -91,128 +93,152 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
   }
 
   return (
-    <div className="space-y-8 pb-24 md:pb-8">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <Link
-            href="/dokumentet"
-            className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            ← Dokumentet
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{artifact.title}</h1>
-          <p className="text-sm text-muted-foreground">{artifact.displayFilename}</p>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 font-medium">
+    <>
+      <AppSubBar
+        dense
+        backHref="/dokumentet"
+        backLabel="Dokumentet"
+        title={artifact.title}
+        description={artifact.displayFilename}
+        status={
+          <>
+            <SubBarStatus tone="neutral">
               {DOCUMENT_CATEGORY_LABELS[artifact.documentCategory]}
-            </span>
-            <span className="rounded-md bg-muted px-2 py-0.5 font-medium uppercase">
+            </SubBarStatus>
+            <SubBarStatus tone={artifact.kind === "PREVIEW" ? "warning" : "success"}>
               {artifact.kind === "PREVIEW" ? "Parapamje" : "Final"}
-            </span>
-            {artifact.isArchived ? (
-              <span className="rounded-md bg-muted px-2 py-0.5 font-semibold uppercase text-muted-foreground">
-                Arkiv
-              </span>
-            ) : null}
+            </SubBarStatus>
+            {artifact.isArchived ? <SubBarStatus tone="locked">Arkiv</SubBarStatus> : null}
+          </>
+        }
+        actions={
+          <>
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              {/* PDF is served lazily from the stored DOCX when not yet converted. */}
+              {artifact.hasPdf || artifact.hasDocx ? (
+                <>
+                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("pdf")}>
+                    Parapamje PDF
+                  </Button>
+                  <Button type="button" size="sm" disabled={pending} onClick={() => void download("pdf")}>
+                    Shkarko PDF
+                  </Button>
+                </>
+              ) : (
+                <p className="max-w-xs text-xs text-amber-800">
+                  PDF nuk është disponueshëm
+                  {artifact.generationError ? ` (${artifact.generationError})` : "."}
+                </p>
+              )}
+              {artifact.hasDocx ? (
+                <>
+                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("docx")}>
+                    Parapamje DOCX
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => void download("docx")}>
+                    Shkarko DOCX
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={pending || artifact.isArchived}
+                onClick={() => regenerate()}
+              >
+                Riprovo gjenerimin
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => toggleArchive(!artifact.isArchived)}
+              >
+                {artifact.isArchived ? "Hiq nga arkivi" : "Arkivo"}
+              </Button>
+            </div>
+          </>
+        }
+      />
+      <div className="space-y-5 pb-24 md:pb-8">
+        <div className={cn(docCard, "flex flex-wrap gap-x-8 gap-y-3 px-4 py-3.5")}>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Shablloni</p>
+            <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">
+              {artifact.templateName}{" "}
+              <span className="font-medium text-[#64748b]">v{artifact.templateVersion}</span>
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Shabllon: {artifact.templateName} (v{artifact.templateVersion}) · {artifact.createdAtLabel}
-          </p>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Gjeneruar</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
+              {artifact.createdAtLabel}
+            </p>
+          </div>
           {artifact.employeeLabel ? (
-            <p className="text-xs text-muted-foreground">Punonjësi: {artifact.employeeLabel}</p>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Punonjësi</p>
+              <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">{artifact.employeeLabel}</p>
+            </div>
           ) : null}
           {artifact.payrollLabel ? (
-            <p className="text-xs text-muted-foreground">Pasqyra: {artifact.payrollLabel}</p>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Pasqyra</p>
+              <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
+                {artifact.payrollLabel}
+              </p>
+            </div>
           ) : null}
         </div>
-        <div className="flex flex-col gap-2 md:items-end">
-          <div className="flex flex-wrap gap-2 justify-end">
-            {/* PDF is served lazily from the stored DOCX when not yet converted. */}
-            {artifact.hasPdf || artifact.hasDocx ? (
-              <>
-                <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("pdf")}>
-                  Parapamje PDF
-                </Button>
-                <Button type="button" size="sm" disabled={pending} onClick={() => void download("pdf")}>
-                  Shkarko PDF
-                </Button>
-              </>
-            ) : (
-              <p className="max-w-xs text-xs text-amber-800">
-                PDF nuk është disponueshëm
-                {artifact.generationError ? ` (${artifact.generationError})` : "."}
-              </p>
-            )}
-            {artifact.hasDocx ? (
-              <>
-                <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("docx")}>
-                  Parapamje DOCX
-                </Button>
-                <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => void download("docx")}>
-                  Shkarko DOCX
-                </Button>
-              </>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={pending || artifact.isArchived}
-              onClick={() => regenerate()}
-            >
-              Riprovo gjenerimin
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={pending}
-              onClick={() => toggleArchive(!artifact.isArchived)}
-            >
-              {artifact.isArchived ? "Hiq nga arkivi" : "Arkivo"}
-            </Button>
-          </div>
-        </div>
-      </div>
 
       {missingOrEmpty.length > 0 ? (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base text-amber-950">Placeholderë që mungojnë ose janë bosh</CardTitle>
-            <CardDescription>
-              Këto çelësa u zbuluan në shabllon por vlera është bosh në snapshot-in e gjeneruar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-inside list-disc text-sm text-amber-950">
-              {missingOrEmpty.map((k) => (
-                <li key={k} className="font-mono text-xs">
-                  {k}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" aria-hidden />
+            <div>
+              <p className="text-[13.5px] font-bold text-[#b45309]">
+                Placeholderë që mungojnë ose janë bosh
+              </p>
+              <p className="mt-0.5 text-[12.5px] text-[#92702a]">
+                Këto çelësa u zbuluan në shabllon por vlera është bosh në snapshot-in e gjeneruar.
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {missingOrEmpty.map((k) => (
+                  <span
+                    key={k}
+                    className="rounded-md border border-[#fde68a] bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#b45309]"
+                  >
+                    {k}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Snapshot i placeholderëve</CardTitle>
-          <CardDescription>Të dhënat e përça për dokumentin (readonly).</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-2 text-sm md:grid-cols-2">
+      <div className={docCard}>
+        <div className="border-b border-[#eef2f7] px-4 py-3">
+          <h2 className="text-[13.5px] font-bold text-[#0f172a]">Snapshot i placeholderëve</h2>
+          <p className="mt-0.5 text-[12px] text-[#94a3b8]">Të dhënat e përça për dokumentin (readonly).</p>
+        </div>
+        <div className="p-4">
+          <dl className="grid gap-x-8 gap-y-2.5 md:grid-cols-2">
             {Object.entries(artifact.mergedPayload).map(([k, v]) => (
-              <div key={k} className="border-b border-border/60 pb-2">
-                <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
-                <dd className="mt-0.5 break-words">{v || "—"}</dd>
+              <div key={k} className="border-b border-[#f1f5f9] pb-2.5">
+                <dt className="font-mono text-[11px] text-[#94a3b8]">{k}</dt>
+                <dd className="m-0 mt-0.5 break-words text-[13px] font-medium text-[#111827]">
+                  {v || "—"}
+                </dd>
               </div>
             ))}
           </dl>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t border-border bg-brand-canvas/95 py-3 backdrop-blur md:hidden">
         {artifact.hasPdf || artifact.hasDocx ? (
@@ -226,6 +252,7 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
           </Button>
         ) : null}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

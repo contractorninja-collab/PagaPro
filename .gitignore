@@ -16,6 +16,7 @@
 # IDE / OS
 .DS_Store
 *.pem
+.claude/
 
 # env
 .env
@@ -25,6 +26,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Local development helpers
+scripts/dev-create-test-login.cjs
 
 # Local binary uploads (company signatures / stamps)
 .local-storage/

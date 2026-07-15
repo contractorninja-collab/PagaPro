@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-const selectClass =
-  "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  docBtnPrimaryDense,
+  docBtnSecondaryDense,
+  docCard,
+  docInput,
+  docSelect,
+} from "@/modules/documents/components/doc-ui";
 
 export interface FilterEmployeeOption {
   id: string;
@@ -33,66 +36,93 @@ export interface DocumentsListFiltersProps {
 
 export function DocumentsListFilters(props: DocumentsListFiltersProps) {
   return (
-    <form className="space-y-4 rounded-lg border border-border bg-card p-4" method="get">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div className="grid gap-2 xl:col-span-2">
-          <Label htmlFor="dq">Kërko</Label>
-          <Input id="dq" name="q" placeholder="Titulli, skedari…" defaultValue={props.defaults.q} />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="de">Punonjësi</Label>
-          <select id="de" name="employeeId" className={selectClass} defaultValue={props.defaults.employeeId}>
-            <option value="">Të gjithë</option>
-            {props.employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.lastName} {e.firstName}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="dc">Lloji</Label>
-          <select id="dc" name="documentCategory" className={selectClass} defaultValue={props.defaults.documentCategory}>
-            <option value="">Të gjithë</option>
-            <option value="CONTRACT">Kontratë</option>
-            <option value="LEAVE">Pushim</option>
-            <option value="TERMINATION">Ndërprerje</option>
-            <option value="WARNING">Vërejtje</option>
-            <option value="PAYROLL">Pagë</option>
-            <option value="OTHER">Tjetër</option>
-          </select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="dm">Muaji</Label>
-          <Input id="dm" name="month" type="month" defaultValue={props.defaults.month} />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="da">Arkivi</Label>
-          <select id="da" name="archived" className={selectClass} defaultValue={props.defaults.archived}>
-            <option value="all">Të gjithë</option>
-            <option value="no">Jo të arkivuar</option>
-            <option value="yes">Të arkivuar</option>
-          </select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="dau">Gjeneruar nga</Label>
-          <select id="dau" name="authorId" className={selectClass} defaultValue={props.defaults.authorId}>
-            <option value="">Të gjithë</option>
-            {props.authors.map((a) => (
-              <option key={a.id ?? "unknown"} value={a.id ?? ""}>
-                {a.displayName?.trim() || a.email || a.id || "—"}
-              </option>
-            ))}
-          </select>
-        </div>
+    <form className={cn(docCard, "flex flex-wrap items-center gap-2 p-3")} method="get">
+      <div className="relative w-full min-w-[180px] sm:w-auto sm:flex-1 sm:max-w-[280px]">
+        <Search
+          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+          aria-hidden
+        />
+        <label htmlFor="dq" className="sr-only">
+          Kërko
+        </label>
+        <input
+          id="dq"
+          name="q"
+          placeholder="Kërko titull, skedar…"
+          defaultValue={props.defaults.q}
+          className={cn(docInput, "pl-8")}
+        />
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm">
+
+      <label htmlFor="de" className="sr-only">
+        Punonjësi
+      </label>
+      <select id="de" name="employeeId" className={docSelect} defaultValue={props.defaults.employeeId}>
+        <option value="">Punonjësi: të gjithë</option>
+        {props.employees.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.lastName} {e.firstName}
+          </option>
+        ))}
+      </select>
+
+      <label htmlFor="dc" className="sr-only">
+        Lloji
+      </label>
+      <select
+        id="dc"
+        name="documentCategory"
+        className={docSelect}
+        defaultValue={props.defaults.documentCategory}
+      >
+        <option value="">Lloji: të gjithë</option>
+        <option value="CONTRACT">Kontratë</option>
+        <option value="LEAVE">Pushim</option>
+        <option value="TERMINATION">Ndërprerje</option>
+        <option value="WARNING">Vërejtje</option>
+        <option value="PAYROLL">Pagë</option>
+        <option value="OTHER">Tjetër</option>
+      </select>
+
+      <label htmlFor="dm" className="sr-only">
+        Muaji
+      </label>
+      <input
+        id="dm"
+        name="month"
+        type="month"
+        defaultValue={props.defaults.month}
+        className={cn(docInput, "w-auto min-w-[150px] tabular-nums")}
+      />
+
+      <label htmlFor="da" className="sr-only">
+        Arkivi
+      </label>
+      <select id="da" name="archived" className={docSelect} defaultValue={props.defaults.archived}>
+        <option value="all">Arkivi: të gjithë</option>
+        <option value="no">Jo të arkivuar</option>
+        <option value="yes">Të arkivuar</option>
+      </select>
+
+      <label htmlFor="dau" className="sr-only">
+        Gjeneruar nga
+      </label>
+      <select id="dau" name="authorId" className={docSelect} defaultValue={props.defaults.authorId}>
+        <option value="">Autori: të gjithë</option>
+        {props.authors.map((a) => (
+          <option key={a.id ?? "unknown"} value={a.id ?? ""}>
+            {a.displayName?.trim() || a.email || a.id || "—"}
+          </option>
+        ))}
+      </select>
+
+      <div className="ml-auto flex items-center gap-2">
+        <button type="submit" className={docBtnPrimaryDense}>
           Apliko filtrat
-        </Button>
-        <Button type="reset" variant="secondary" size="sm" asChild>
-          <Link href="/dokumentet">Pastro</Link>
-        </Button>
+        </button>
+        <Link href="/dokumentet" className={docBtnSecondaryDense}>
+          Pastro
+        </Link>
       </div>
     </form>
   );

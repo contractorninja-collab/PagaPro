@@ -12,6 +12,67 @@ import {
   payrollLockedOverlapBlock,
   validateLeaveRequestForWorkflow,
 } from "@/modules/leaves/services/leave-validation-service";
+import { syncDraftPayrollsForLeaveChange } from "@/modules/payroll/services/payroll-leave-sync-service";
+
+/**
+ * Best-effort: pas një ndryshimi të pushimit të miratuar, ripërllogarit rreshtat
+ * përkatës në payroll-et DRAFT të muajve të mbivendosur. Dështimi nuk e bllokon
+ * veprimin e pushimit — regjistrohet në timeline që HR ta rifreskojë manualisht.
+ */
+async function syncDraftPayrollsAfterLeaveChange(params: {
+  companyId: string;
+  employeeId: string;
+  leaveId: string;
+  startDate: Date;
+  endDate: Date;
+  actorUserId?: string | null;
+}): Promise<void> {
+  let sync: Awaited<ReturnType<typeof syncDraftPayrollsForLeaveChange>>;
+  try {
+    sync = await syncDraftPayrollsForLeaveChange({
+      companyId: params.companyId,
+      employeeId: params.employeeId,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      actorUserId: params.actorUserId,
+    });
+  } catch (err) {
+    // Sinkronizimi dështoi tërësisht — lëre gjurmë të dukshme, jo vetëm në konsolë.
+    console.error("[pagapro] syncDraftPayrollsAfterLeaveChange failed", err);
+    await appendLeaveTimeline({
+      companyId: params.companyId,
+      employeeId: params.employeeId,
+      leaveId: params.leaveId,
+      eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+      title: "Payroll (DRAFT) nuk u sinkronizua automatikisht",
+      body: "Sinkronizimi dështoi — rifreskoni orët e pushimit manualisht në payroll.",
+      severity: TimelineEventSeverity.WARNING,
+    });
+    return;
+  }
+
+  if (sync.synced.length > 0) {
+    await appendLeaveTimeline({
+      companyId: params.companyId,
+      employeeId: params.employeeId,
+      leaveId: params.leaveId,
+      eventType: "LEAVE_PAYROLL_SYNCED",
+      title: "Payroll (DRAFT) u sinkronizua me pushimin",
+      body: sync.synced.map((s) => `${s.month}/${s.year}`).join(", "),
+    });
+  }
+  for (const s of sync.skipped) {
+    await appendLeaveTimeline({
+      companyId: params.companyId,
+      employeeId: params.employeeId,
+      leaveId: params.leaveId,
+      eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+      title: `Payroll ${s.month}/${s.year} nuk u sinkronizua automatikisht`,
+      body: s.reason,
+      severity: TimelineEventSeverity.WARNING,
+    });
+  }
+}
 async function appendLeaveTimeline(params: {
   companyId: string;
   employeeId: string;
@@ -209,6 +270,7 @@ export async function approveLeaveRequest(params: {
   companyId: string;
   leaveId: string;
   decidedByMembershipId?: string | null;
+  actorUserId?: string | null;
 }): Promise<void> {
   const lr = await prisma.leaveRequest.findFirst({
     where: { id: params.leaveId, companyId: params.companyId },
@@ -254,6 +316,15 @@ export async function approveLeaveRequest(params: {
   await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y);
   const y2 = lr.endDate.getUTCFullYear();
   if (y2 !== y) await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y2);
+
+  await syncDraftPayrollsAfterLeaveChange({
+    companyId: params.companyId,
+    employeeId: lr.employeeId,
+    leaveId: lr.id,
+    startDate: lr.startDate,
+    endDate: lr.endDate,
+    actorUserId: params.actorUserId,
+  });
 
   const yearsSynced = y2 !== y ? [y, y2] : [y];
 
@@ -340,6 +411,7 @@ export async function revokeApprovedLeaveRequest(params: {
   companyId: string;
   leaveId: string;
   reason?: string | null;
+  actorUserId?: string | null;
 }): Promise<void> {
   const lr = await prisma.leaveRequest.findFirst({
     where: { id: params.leaveId, companyId: params.companyId },
@@ -375,6 +447,15 @@ export async function revokeApprovedLeaveRequest(params: {
   await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y);
   const y2 = lr.endDate.getUTCFullYear();
   if (y2 !== y) await syncLeaveBalancesForEmployeeYear(params.companyId, lr.employeeId, y2);
+
+  await syncDraftPayrollsAfterLeaveChange({
+    companyId: params.companyId,
+    employeeId: lr.employeeId,
+    leaveId: lr.id,
+    startDate: lr.startDate,
+    endDate: lr.endDate,
+    actorUserId: params.actorUserId,
+  });
 
   const yearsSynced = y2 !== y ? [y, y2] : [y];
 

@@ -146,11 +146,19 @@ export function computePayrollSpreadsheetLine(
     };
   }
 
-  const expectedReg = D(line.expectedRegularHours);
-  const denom = expectedReg.gt(0) ? expectedReg : D("173.33");
-  // Norma orare = paga bruto mujore ÷ orët e pritura të kalendarit (jo orët e punuara).
+  // Norma orare = paga bruto mujore ÷ orët e PLOTA mujore të kalendarit — jo orët e
+  // pritura të rreshtit, të cilat për muaj të pjesshëm (largim / punësim mes muajit)
+  // janë pro-rata. Kështu rreshti i pjesshëm paguhet orë × normë (pro-rata e saktë)
+  // dhe rruga e krijimit përputhet me rrugën e përditësimit (PATCH).
   // Pagesa e rregullt = norma × orët e punuara — orët që mungojnë pa pushim zbriten automatikisht.
   // Me pushime të paguara/mjekësore, norma mbetet e njëjtë që regular + leave të arrijë pagën kontraktuale.
+  const calendarReg = D(calendarSnapshot.expectedRegularHours);
+  const expectedReg = D(line.expectedRegularHours);
+  const denom = calendarReg.isFinite() && calendarReg.gt(0)
+    ? calendarReg
+    : expectedReg.gt(0)
+      ? expectedReg
+      : D("173.33");
 
   /** Full-precision quotient (classic sheet col 6 implicit rate) — do not round before × hours. */
   let hourlyPrecise: ReturnType<typeof D>;

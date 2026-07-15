@@ -14,7 +14,7 @@ type Props = {
 };
 
 export default async function PaneliPage({ searchParams }: Props) {
-  const { companyId } = await requireCompanyContextPage();
+  const { companyId, user } = await requireCompanyContextPage();
   const sp = await searchParams;
   const filters = parseDashboardFilters(sp);
 
@@ -23,7 +23,13 @@ export default async function PaneliPage({ searchParams }: Props) {
       listDepartmentsForCompany(companyId),
       loadDashboardOperationalData(companyId, filters),
     ]);
-    return <DashboardOperationalPage data={data} departments={departments} />;
+    return (
+      <DashboardOperationalPage
+        data={data}
+        departments={departments}
+        userDisplayName={user.displayName}
+      />
+    );
   } catch (err) {
     console.error("[pagapro] PaneliPage: load failed", err);
     return (

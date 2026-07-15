@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
-import { Button } from "@/components/ui/button";
+import { Banknote, Check, Clock, FileText, MoreHorizontal, UserMinus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +16,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import {
   createTerminationAction,
   approveTerminationAction,
@@ -61,6 +67,8 @@ export interface EmployeePickerOption {
   hireDate: string;
 }
 
+export type ChecklistProgressMap = Record<string, { done: number; total: number }>;
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString("sq-AL", { timeZone: "UTC" });
@@ -68,6 +76,121 @@ function fmtDate(iso: string) {
     return iso;
   }
 }
+
+/* ── 1b design primitives (module-local) ─────────────────────────────── */
+
+const CARD =
+  "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+
+const BTN_PRIMARY =
+  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_SECONDARY =
+  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#e2e8f0] bg-white px-[18px] text-[13.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_DENSE_PRIMARY =
+  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-[8px] bg-brand-blue px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_DENSE_SECONDARY =
+  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-[8px] border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const FIELD_SELECT =
+  "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+const FIELD_INPUT =
+  "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-brand-blue";
+
+type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
+
+const CHIP_TONES: Record<ChipTone, { chip: string; dot: string }> = {
+  info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
+  success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
+  warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
+  destructive: { chip: "bg-[#fef2f2] text-[#dc2626]", dot: "bg-[#dc2626]" },
+  neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
+  locked: { chip: "bg-brand-navy text-white", dot: "bg-white" },
+};
+
+function StatusChip({
+  tone,
+  children,
+  className,
+}: {
+  tone: ChipTone;
+  children: ReactNode;
+  className?: string;
+}) {
+  const t = CHIP_TONES[tone];
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12px] font-semibold",
+        t.chip,
+        className,
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", t.dot)} aria-hidden />
+      {children}
+    </span>
+  );
+}
+
+const TERMINATION_STATUS_TONES: Record<string, ChipTone> = {
+  DRAFT: "neutral",
+  PENDING_REVIEW: "warning",
+  APPROVED: "info",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
+};
+
+// Mirrors the Albanian labels/tones of PayrollStatusBadge (payroll module).
+const PAYROLL_STATUS_META: Record<string, { label: string; tone: ChipTone }> = {
+  DRAFT: { label: "Draft", tone: "warning" },
+  REVIEWED: { label: "Në shqyrtim", tone: "info" },
+  APPROVED: { label: "I miratuar", tone: "success" },
+  LOCKED: { label: "I kyçur", tone: "locked" },
+  ARCHIVED: { label: "I arkivuar", tone: "neutral" },
+};
+
+function InitialsAvatar({
+  firstName,
+  lastName,
+  className,
+}: {
+  firstName: string;
+  lastName: string;
+  className?: string;
+}) {
+  const initials = `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
+  return (
+    <span
+      className={cn(
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-[12px] font-bold text-white",
+        className,
+      )}
+      aria-hidden
+    >
+      {initials}
+    </span>
+  );
+}
+
+function ChecklistProgress({ done, total }: { done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const complete = total > 0 && done >= total;
+  return (
+    <div className="min-w-[96px] max-w-[130px]">
+      <p className="text-[11px] font-bold tabular-nums text-[#64748b]">
+        {done}/{total}
+      </p>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f7]">
+        <div
+          className={cn("h-full rounded-full transition-all", complete ? "bg-[#16a34a]" : "bg-brand-blue")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ── Register page ────────────────────────────────────────────────────── */
 
 export function LargimetDashboardClient(props: {
   rows: LargimetRowSerialized[];
@@ -79,133 +202,277 @@ export function LargimetDashboardClient(props: {
     year?: number;
     month?: number;
   };
+  checklistProgress?: ChecklistProgressMap;
 }) {
   const [pending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
 
+  const rows = props.rows;
+  const currentYear = new Date().getUTCFullYear();
+  const stats = {
+    inProcess: rows.filter((r) => r.status === "DRAFT" || r.status === "PENDING_REVIEW" || r.status === "APPROVED")
+      .length,
+    inReview: rows.filter((r) => r.status === "PENDING_REVIEW").length,
+    payrollPending: rows.filter(
+      (r) =>
+        r.finalPayrollRequired &&
+        !r.finalPayrollId &&
+        r.status !== "COMPLETED" &&
+        r.status !== "CANCELLED",
+    ).length,
+    completedYear: rows.filter(
+      (r) => r.status === "COMPLETED" && new Date(r.terminationDate).getUTCFullYear() === currentYear,
+    ).length,
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Largimet</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Procesi operativ i largimeve: dokumentet, payroll përfundimtar dhe gjurmimi HR.
-          </p>
-        </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>Krijo Largim</Button>
-          </DialogTrigger>
-          <CreateTerminationDialogContent
-            employees={props.employees}
-            pending={pending}
-            startTransition={startTransition}
-            onDone={() => setCreateOpen(false)}
+    <>
+      <AppSubBar
+        eyebrow="Ndërprerja e marrëdhënies"
+        title="Largimet"
+        description="Procesi operativ i largimeve: dokumentet, payroll përfundimtar dhe gjurmimi HR."
+        actions={
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <button type="button" className={BTN_PRIMARY}>
+                Krijo Largim
+              </button>
+            </DialogTrigger>
+            <CreateTerminationDialogContent
+              employees={props.employees}
+              pending={pending}
+              startTransition={startTransition}
+              onDone={() => setCreateOpen(false)}
+            />
+          </Dialog>
+        }
+      />
+
+      <div className="space-y-5">
+        {/* 4-stat strip */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Në proces"
+            value={stats.inProcess}
+            icon={<UserMinus className="h-[18px] w-[18px]" />}
+            tile="bg-[#eff6ff] text-brand-blue"
           />
-        </Dialog>
-      </div>
+          <StatCard
+            label="Në shqyrtim"
+            value={stats.inReview}
+            icon={<Clock className="h-[18px] w-[18px]" />}
+            tile="bg-[#fffbeb] text-[#b45309]"
+          />
+          <StatCard
+            label="Payroll në pritje"
+            value={stats.payrollPending}
+            icon={<Banknote className="h-[18px] w-[18px]" />}
+            tile="bg-[#fef2f2] text-[#dc2626]"
+          />
+          <StatCard
+            label={`Përfunduar ${currentYear}`}
+            value={stats.completedYear}
+            icon={<Check className="h-[18px] w-[18px]" />}
+            tile="bg-[#ecfdf5] text-[#15803d]"
+          />
+        </div>
 
-      <LargimetFiltersClient filters={props.filters} employees={props.employees} />
+        <LargimetFiltersClient filters={props.filters} employees={props.employees} />
 
-      {props.rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nuk ka largime për këta filtra.</p>
-      ) : (
-        <>
-          <div className="hidden rounded-md border md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Punonjësi</TableHead>
-                  <TableHead>Pozita</TableHead>
-                  <TableHead>Lloji</TableHead>
-                  <TableHead>Data largimit</TableHead>
-                  <TableHead>Dita e fundit</TableHead>
-                  <TableHead>Statusi</TableHead>
-                  <TableHead>Payroll</TableHead>
-                  <TableHead>Dokumenti</TableHead>
-                  <TableHead className="text-right">Veprime</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/punonjesit/${r.employee.id}`} className="underline-offset-4 hover:underline">
-                        {r.employee.firstName} {r.employee.lastName}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{r.employee.jobTitle ?? "—"}</TableCell>
-                    <TableCell>{TERMINATION_TYPE_LABELS[r.type]}</TableCell>
-                    <TableCell>{fmtDate(r.terminationDate)}</TableCell>
-                    <TableCell>{fmtDate(r.lastWorkingDay)}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{TERMINATION_STATUS_LABELS[r.status] ?? r.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {r.finalPayroll ? (
-                        <Link href={`/pagat/${r.finalPayroll.id}`} className="text-sm underline-offset-4 hover:underline">
-                          {r.finalPayroll.month}/{r.finalPayroll.year} ({r.finalPayroll.status})
-                        </Link>
-                      ) : r.finalPayrollRequired ? (
-                        <span className="text-xs text-muted-foreground">Kërkohet</span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {r.generatedDocument ? (
-                        <Link
-                          href={`/dokumentet/${r.generatedDocument.id}`}
-                          className="text-sm underline-offset-4 hover:underline"
+        {rows.length === 0 ? (
+          <div className="rounded-[12px] border border-dashed border-[#e2e8f0] bg-white px-6 py-16 text-center">
+            <p className="text-sm font-semibold text-[#0f172a]">Nuk ka largime për këta filtra.</p>
+            <p className="mt-1.5 text-[13px] text-[#64748b]">
+              Ndryshoni kriteret e filtrimit ose krijoni një largim të ri.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Register table (md+) */}
+            <div className={cn(CARD, "hidden overflow-hidden md:block")}>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1080px] border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+                      <th className="px-4 py-2.5 font-bold">Punonjësi</th>
+                      <th className="px-4 py-2.5 font-bold">Lloji</th>
+                      <th className="px-4 py-2.5 font-bold">Datat</th>
+                      <th className="px-4 py-2.5 font-bold">Statusi</th>
+                      <th className="px-4 py-2.5 font-bold">Payroll final</th>
+                      <th className="px-4 py-2.5 font-bold">Dokumenti</th>
+                      <th className="px-4 py-2.5 font-bold">Checklist</th>
+                      <th className="px-4 py-2.5 text-right font-bold">Veprime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => {
+                      const closed = r.status === "COMPLETED" || r.status === "CANCELLED";
+                      const progress = props.checklistProgress?.[r.id] ?? { done: 0, total: 6 };
+                      return (
+                        <tr
+                          key={r.id}
+                          className={cn(
+                            "border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]",
+                            closed && "opacity-60",
+                          )}
                         >
-                          Hap
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <RowQuickActions row={r} pending={pending} startTransition={startTransition} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="grid gap-3 md:hidden">
-            {props.rows.map((r) => (
-              <div key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">
-                      {r.employee.firstName} {r.employee.lastName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{r.employee.jobTitle ?? "—"}</p>
-                  </div>
-                  <Badge variant="secondary">{TERMINATION_STATUS_LABELS[r.status] ?? r.status}</Badge>
-                </div>
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <dt className="text-muted-foreground">Lloji</dt>
-                    <dd>{TERMINATION_TYPE_LABELS[r.type]}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Data</dt>
-                    <dd>{fmtDate(r.terminationDate)}</dd>
-                  </div>
-                </dl>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="outlinePrimary">
-                    <Link href={`/largimet/${r.id}`}>Hap</Link>
-                  </Button>
-                  <RowQuickActions row={r} pending={pending} startTransition={startTransition} />
-                </div>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <InitialsAvatar firstName={r.employee.firstName} lastName={r.employee.lastName} />
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/punonjesit/${r.employee.id}`}
+                                  className="block truncate font-semibold text-[#0f172a] transition-colors hover:text-brand-blue"
+                                >
+                                  {r.employee.firstName} {r.employee.lastName}
+                                </Link>
+                                <p className="truncate text-[12px] text-[#94a3b8]">
+                                  {r.employee.personalId}
+                                  {r.employee.jobTitle ? ` · ${r.employee.jobTitle}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-[#334155]">{TERMINATION_TYPE_LABELS[r.type]}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium tabular-nums text-[#111827]">{fmtDate(r.terminationDate)}</p>
+                            <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">
+                              Dita e fundit: {fmtDate(r.lastWorkingDay)}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusChip tone={TERMINATION_STATUS_TONES[r.status] ?? "neutral"}>
+                              {TERMINATION_STATUS_LABELS[r.status] ?? r.status}
+                            </StatusChip>
+                          </td>
+                          <td className="px-4 py-3">
+                            <PayrollCell row={r} />
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.generatedDocument ? (
+                              <Link
+                                href={`/dokumentet/${r.generatedDocument.id}`}
+                                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-blue hover:underline"
+                              >
+                                <FileText className="h-3.5 w-3.5" aria-hidden />
+                                Hap
+                              </Link>
+                            ) : (
+                              <span className="text-[12px] text-[#94a3b8]">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <ChecklistProgress done={progress.done} total={progress.total} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <RowNextAction row={r} pending={pending} startTransition={startTransition} />
+                              <RowActionsMenu row={r} pending={pending} startTransition={startTransition} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            </div>
+
+            {/* Mobile cards */}
+            <div className="grid gap-3 md:hidden">
+              {rows.map((r) => {
+                const closed = r.status === "COMPLETED" || r.status === "CANCELLED";
+                const progress = props.checklistProgress?.[r.id] ?? { done: 0, total: 6 };
+                return (
+                  <div key={r.id} className={cn(CARD, "p-4", closed && "opacity-60")}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <InitialsAvatar firstName={r.employee.firstName} lastName={r.employee.lastName} />
+                        <div>
+                          <Link
+                            href={`/punonjesit/${r.employee.id}`}
+                            className="font-semibold text-[#0f172a] hover:text-brand-blue"
+                          >
+                            {r.employee.firstName} {r.employee.lastName}
+                          </Link>
+                          <p className="text-[12px] text-[#94a3b8]">
+                            {r.employee.personalId}
+                            {r.employee.jobTitle ? ` · ${r.employee.jobTitle}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <StatusChip tone={TERMINATION_STATUS_TONES[r.status] ?? "neutral"}>
+                        {TERMINATION_STATUS_LABELS[r.status] ?? r.status}
+                      </StatusChip>
+                    </div>
+                    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12.5px]">
+                      <div>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Lloji</dt>
+                        <dd className="mt-0.5 text-[#334155]">{TERMINATION_TYPE_LABELS[r.type]}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Datat</dt>
+                        <dd className="mt-0.5 tabular-nums text-[#334155]">
+                          {fmtDate(r.terminationDate)}
+                          <span className="text-[#94a3b8]"> → {fmtDate(r.lastWorkingDay)}</span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Payroll</dt>
+                        <dd className="mt-0.5">
+                          <PayrollCell row={r} />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Dokumenti</dt>
+                        <dd className="mt-0.5">
+                          {r.generatedDocument ? (
+                            <Link
+                              href={`/dokumentet/${r.generatedDocument.id}`}
+                              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-blue hover:underline"
+                            >
+                              <FileText className="h-3.5 w-3.5" aria-hidden />
+                              Hap
+                            </Link>
+                          ) : (
+                            <span className="text-[12px] text-[#94a3b8]">—</span>
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-3">
+                      <ChecklistProgress done={progress.done} total={progress.total} />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[#f1f5f9] pt-3">
+                      <Link href={`/largimet/${r.id}`} className={BTN_DENSE_SECONDARY}>
+                        Hap
+                      </Link>
+                      <RowNextAction row={r} pending={pending} startTransition={startTransition} />
+                      <RowActionsMenu row={r} pending={pending} startTransition={startTransition} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function StatCard(props: { label: string; value: number; icon: ReactNode; tile: string }) {
+  return (
+    <div className={cn(CARD, "flex items-center gap-3.5 p-4")}>
+      <span className={cn("flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]", props.tile)}>
+        {props.icon}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">{props.label}</p>
+        <p className="text-[24px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+          {props.value}
+        </p>
+      </div>
     </div>
   );
 }
@@ -221,10 +488,21 @@ function LargimetFiltersClient(props: {
   employees: EmployeePickerOption[];
 }) {
   return (
-    <form className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 md:flex-row md:flex-wrap md:items-end" action="/largimet" method="get">
-      <div className="grid gap-1">
-        <Label className="text-xs">Statusi</Label>
-        <select name="status" defaultValue={props.filters.status ?? "ALL"} className="h-9 rounded-md border px-2 text-sm">
+    <form
+      className={cn(CARD, "flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end")}
+      action="/largimet"
+      method="get"
+    >
+      <div className="grid gap-1.5">
+        <label className={FIELD_LABEL} htmlFor="largimet-filter-status">
+          Statusi
+        </label>
+        <select
+          id="largimet-filter-status"
+          name="status"
+          defaultValue={props.filters.status ?? "ALL"}
+          className={FIELD_SELECT}
+        >
           <option value="ALL">Të gjitha</option>
           <option value="DRAFT">Draft</option>
           <option value="PENDING_REVIEW">Në shqyrtim</option>
@@ -233,9 +511,11 @@ function LargimetFiltersClient(props: {
           <option value="CANCELLED">I anuluar</option>
         </select>
       </div>
-      <div className="grid gap-1">
-        <Label className="text-xs">Lloji</Label>
-        <select name="type" defaultValue={props.filters.type ?? "ALL"} className="h-9 rounded-md border px-2 text-sm">
+      <div className="grid gap-1.5">
+        <label className={FIELD_LABEL} htmlFor="largimet-filter-type">
+          Lloji
+        </label>
+        <select id="largimet-filter-type" name="type" defaultValue={props.filters.type ?? "ALL"} className={FIELD_SELECT}>
           <option value="ALL">Të gjitha</option>
           {(Object.keys(TERMINATION_TYPE_LABELS) as TerminationType[]).map((k) => (
             <option key={k} value={k}>
@@ -244,9 +524,16 @@ function LargimetFiltersClient(props: {
           ))}
         </select>
       </div>
-      <div className="grid gap-1">
-        <Label className="text-xs">Punonjësi</Label>
-        <select name="employeeId" defaultValue={props.filters.employeeId ?? ""} className="h-9 max-w-[220px] rounded-md border px-2 text-sm">
+      <div className="grid gap-1.5">
+        <label className={FIELD_LABEL} htmlFor="largimet-filter-employee">
+          Punonjësi
+        </label>
+        <select
+          id="largimet-filter-employee"
+          name="employeeId"
+          defaultValue={props.filters.employeeId ?? ""}
+          className={cn(FIELD_SELECT, "max-w-[220px]")}
+        >
           <option value="">Të gjithë</option>
           {props.employees.map((e) => (
             <option key={e.id} value={e.id}>
@@ -255,93 +542,179 @@ function LargimetFiltersClient(props: {
           ))}
         </select>
       </div>
-      <div className="grid gap-1">
-        <Label className="text-xs">Viti</Label>
-        <Input name="year" type="number" className="h-9 w-28" defaultValue={props.filters.year ?? ""} placeholder="2026" />
+      <div className="grid gap-1.5">
+        <label className={FIELD_LABEL} htmlFor="largimet-filter-year">
+          Viti
+        </label>
+        <input
+          id="largimet-filter-year"
+          name="year"
+          type="number"
+          className={cn(FIELD_INPUT, "w-28")}
+          defaultValue={props.filters.year ?? ""}
+          placeholder="2026"
+        />
       </div>
-      <div className="grid gap-1">
-        <Label className="text-xs">Muaji</Label>
-        <Input name="month" type="number" min={1} max={12} className="h-9 w-24" defaultValue={props.filters.month ?? ""} placeholder="1-12" />
+      <div className="grid gap-1.5">
+        <label className={FIELD_LABEL} htmlFor="largimet-filter-month">
+          Muaji
+        </label>
+        <input
+          id="largimet-filter-month"
+          name="month"
+          type="number"
+          min={1}
+          max={12}
+          className={cn(FIELD_INPUT, "w-24")}
+          defaultValue={props.filters.month ?? ""}
+          placeholder="1-12"
+        />
       </div>
-      <Button type="submit" variant="secondary" size="sm">
+      <button type="submit" className={cn(BTN_SECONDARY, "h-9 px-4 text-[13px]")}>
         Filtroni
-      </Button>
+      </button>
     </form>
   );
 }
 
-function RowQuickActions(props: {
-  row: LargimetRowSerialized;
-  pending: boolean;
-  startTransition: (fn: () => void) => void;
-}) {
-  const { row, pending, startTransition } = props;
+function PayrollCell({ row }: { row: LargimetRowSerialized }) {
+  if (row.finalPayroll) {
+    const meta = PAYROLL_STATUS_META[row.finalPayroll.status] ?? {
+      label: row.finalPayroll.status,
+      tone: "neutral" as ChipTone,
+    };
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Link
+          href={`/pagat/${row.finalPayroll.id}`}
+          className="text-[12.5px] font-semibold tabular-nums text-brand-blue hover:underline"
+        >
+          {row.finalPayroll.month}/{row.finalPayroll.year}
+        </Link>
+        <StatusChip tone={meta.tone}>{meta.label}</StatusChip>
+      </div>
+    );
+  }
+  if (row.finalPayrollRequired) {
+    return <StatusChip tone="warning">Kërkohet</StatusChip>;
+  }
+  return <span className="text-[12px] text-[#94a3b8]">—</span>;
+}
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
+function useRowRunner(startTransition: (fn: () => void) => void) {
+  return function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) toast.error(res.error ?? "Gabim.");
       else toast.success("U krye.");
     });
+  };
+}
+
+/** Per-status next action (the register's inline CTA). */
+function RowNextAction(props: {
+  row: LargimetRowSerialized;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+}) {
+  const { row, pending, startTransition } = props;
+  const run = useRowRunner(startTransition);
+
+  if (row.status === "DRAFT") {
+    return (
+      <button
+        type="button"
+        className={BTN_DENSE_PRIMARY}
+        disabled={pending}
+        onClick={() => run(() => submitTerminationAction({ id: row.id }))}
+      >
+        Dërgo
+      </button>
+    );
   }
+  if (row.status === "PENDING_REVIEW") {
+    return (
+      <button
+        type="button"
+        className={BTN_DENSE_PRIMARY}
+        disabled={pending}
+        onClick={() => run(() => approveTerminationAction({ id: row.id }))}
+      >
+        Mirato
+      </button>
+    );
+  }
+  if (row.status === "APPROVED") {
+    return (
+      <button
+        type="button"
+        className={BTN_DENSE_PRIMARY}
+        disabled={pending}
+        onClick={() => run(() => completeTerminationAction({ id: row.id }))}
+      >
+        Përfundo
+      </button>
+    );
+  }
+  return (
+    <Link href={`/largimet/${row.id}`} className={BTN_DENSE_SECONDARY}>
+      Shiko
+    </Link>
+  );
+}
+
+/** The rest of the quick actions, folded into a per-row menu. */
+function RowActionsMenu(props: {
+  row: LargimetRowSerialized;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+}) {
+  const { row, pending, startTransition } = props;
+  const run = useRowRunner(startTransition);
+  const closed = row.status === "COMPLETED" || row.status === "CANCELLED";
 
   return (
-    <div className="flex flex-wrap justify-end gap-1">
-      <Button asChild size="sm" variant="ghost">
-        <Link href={`/largimet/${row.id}`}>Shiko</Link>
-      </Button>
-      {row.status === "DRAFT" ? (
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending}
-          onClick={() => run(() => submitTerminationAction({ id: row.id }))}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-[#94a3b8] transition-colors hover:bg-[#eef2f7] hover:text-[#475569] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+          aria-label="Veprime"
         >
-          Dërgo
-        </Button>
-      ) : null}
-      {row.status === "PENDING_REVIEW" ? (
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending}
-          onClick={() => run(() => approveTerminationAction({ id: row.id }))}
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem asChild>
+          <Link href={`/largimet/${row.id}`}>Shiko detajet</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={pending || closed}
+          onClick={() => run(() => generateTerminationDocumentActionServer({ id: row.id }))}
         >
-          Mirato
-        </Button>
-      ) : null}
-      <Button
-        size="sm"
-        variant="outlinePrimary"
-        disabled={pending || row.status === "COMPLETED" || row.status === "CANCELLED"}
-        onClick={() => run(() => generateTerminationDocumentActionServer({ id: row.id }))}
-      >
-        Dokumenti
-      </Button>
-      <Button
-        size="sm"
-        variant="outlinePrimary"
-        disabled={pending || row.status === "COMPLETED" || row.status === "CANCELLED"}
-        onClick={() => run(() => prepareFinalPayrollTerminationAction({ id: row.id }))}
-      >
-        Payroll
-      </Button>
-      {row.status === "APPROVED" ? (
-        <Button size="sm" disabled={pending} onClick={() => run(() => completeTerminationAction({ id: row.id }))}>
-          Përfundo
-        </Button>
-      ) : null}
-      {row.status !== "COMPLETED" && row.status !== "CANCELLED" ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={pending}
-          onClick={() => run(() => cancelTerminationAction({ id: row.id }))}
+          Gjenero dokumentin
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={pending || closed}
+          onClick={() => run(() => prepareFinalPayrollTerminationAction({ id: row.id }))}
         >
-          Anulo
-        </Button>
-      ) : null}
-    </div>
+          Përgatit payroll
+        </DropdownMenuItem>
+        {!closed ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              disabled={pending}
+              onClick={() => run(() => cancelTerminationAction({ id: row.id }))}
+            >
+              Anulo largimin
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -390,10 +763,10 @@ function CreateTerminationDialogContent(props: {
         <DialogDescription>Përzgjidh punonjësin dhe llojin e procesit.</DialogDescription>
       </DialogHeader>
       <div className="grid gap-3 py-2">
-        <div className="space-y-2">
-          <Label>Punonjësi</Label>
+        <div className="space-y-1.5">
+          <label className={FIELD_LABEL}>Punonjësi</label>
           <select
-            className="h-10 w-full rounded-md border px-2 text-sm"
+            className={cn(FIELD_SELECT, "h-10 w-full")}
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
             disabled={props.pending}
@@ -406,10 +779,10 @@ function CreateTerminationDialogContent(props: {
             ))}
           </select>
         </div>
-        <div className="space-y-2">
-          <Label>Lloji</Label>
+        <div className="space-y-1.5">
+          <label className={FIELD_LABEL}>Lloji</label>
           <select
-            className="h-10 w-full rounded-md border px-2 text-sm"
+            className={cn(FIELD_SELECT, "h-10 w-full")}
             value={type}
             onChange={(e) => setType(e.target.value as TerminationType)}
             disabled={props.pending}
@@ -422,36 +795,49 @@ function CreateTerminationDialogContent(props: {
           </select>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-2">
-            <Label>Data largimit</Label>
-            <Input type="date" value={terminationDate} onChange={(e) => setTerminationDate(e.target.value)} disabled={props.pending} />
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL}>Data largimit</label>
+            <input
+              type="date"
+              className={cn(FIELD_INPUT, "w-full")}
+              value={terminationDate}
+              onChange={(e) => setTerminationDate(e.target.value)}
+              disabled={props.pending}
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Dita e fundit e punës</Label>
-            <Input type="date" value={lastWorkingDay} onChange={(e) => setLastWorkingDay(e.target.value)} disabled={props.pending} />
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL}>Dita e fundit e punës</label>
+            <input
+              type="date"
+              className={cn(FIELD_INPUT, "w-full")}
+              value={lastWorkingDay}
+              onChange={(e) => setLastWorkingDay(e.target.value)}
+              disabled={props.pending}
+            />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Arsyeja</Label>
+        <div className="space-y-1.5">
+          <label className={FIELD_LABEL}>Arsyeja</label>
           <textarea
-            className="min-h-[72px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+            className="min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             disabled={props.pending}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Detaje</Label>
+        <div className="space-y-1.5">
+          <label className={FIELD_LABEL}>Detaje</label>
           <textarea
-            className="min-h-[72px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+            className="min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
             disabled={props.pending}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-[13px] text-[#334155]">
           <input
             type="checkbox"
+            className="h-4 w-4 accent-[#2563EB]"
             checked={finalPayrollRequired}
             onChange={(e) => setFinalPayrollRequired(e.target.checked)}
             disabled={props.pending}
@@ -460,9 +846,9 @@ function CreateTerminationDialogContent(props: {
         </label>
       </div>
       <DialogFooter>
-        <Button type="button" onClick={submit} disabled={props.pending || !employeeId}>
+        <button type="button" className={BTN_PRIMARY} onClick={submit} disabled={props.pending || !employeeId}>
           Ruaj
-        </Button>
+        </button>
       </DialogFooter>
     </DialogContent>
   );

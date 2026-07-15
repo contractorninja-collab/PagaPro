@@ -1243,7 +1243,9 @@ model PayrollSettings {
   /// Normë javore për përshkrimin e overtime (transparency / politikë — default 40h)
   overtimeWeeklyThresholdHours Decimal @default(40) @db.Decimal(6, 2)
 
-  /// Paga e sëmurë si përqindje e normës (1 = 100 %)
+  /// Paga e sëmurë si përqindje e normës (1 = 100 %). Neni 60 i Ligjit të Punës kërkon
+  /// 100% — vlerat nën 1 ngrihen automatikisht në dysheme statutore nga motori
+  /// (statutorySickLeavePayPercent); mbi 1 lejohet (punëdhënës më bujar).
   sickLeavePayPercent Decimal @default(1) @db.Decimal(8, 6)
 
   /// Oret maksimum javore të overtime për sinjal paralajmërimi (default 8 sipas kontekstit ligjor)

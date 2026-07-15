@@ -70,21 +70,24 @@ export function DashboardKpiCard(props: {
     <Link
       href={props.href}
       className={cn(
-        "group surface-card-padded flex h-full min-h-[120px] flex-col justify-between transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        props.emphasis && "border-blue-200/80 bg-gradient-to-br from-blue-50/50 via-white to-white hover:from-blue-50/70",
+        "group flex h-full flex-col rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        props.emphasis && "border-[#bfdbfe]",
         props.className,
       )}
     >
-      <div>
-        <p className={cn("card-label", props.emphasis && "text-blue-800/70")}>{props.label}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{props.hint}</p>
-      </div>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <p className={cn("card-value", needsAttention && "text-amber-700")}>{props.value}</p>
-        <span className="shrink-0 text-xs font-semibold text-[#64748b] transition-colors group-hover:text-[#0f172a]">
-          {props.cta}
-        </span>
-      </div>
+      <p className="text-[11.5px] font-semibold leading-snug text-[#64748b]">{props.label}</p>
+      <p className="mt-0.5 truncate text-[10.5px] text-[#94a3b8]">{props.hint}</p>
+      <p
+        className={cn(
+          "mt-2 text-[26px] font-extrabold leading-none tracking-[-0.02em] tabular-nums",
+          needsAttention ? "text-[#b45309]" : "text-[#0f172a]",
+        )}
+      >
+        {props.value}
+      </p>
+      <p className="mt-2 truncate text-[11px] font-semibold text-[#94a3b8] transition-colors group-hover:text-brand-blue">
+        {props.cta}
+      </p>
     </Link>
   );
 }
@@ -95,7 +98,6 @@ export function DashboardKpiCards({ summary }: { summary: DashboardSummaryCards 
       {LABELS.map(({ key, label, hint, href, cta }) => (
         <DashboardKpiCard
           key={key}
-          className="card-sm"
           label={label}
           hint={hint}
           href={href}
@@ -117,9 +119,10 @@ export function DashboardKpiCardsSkeleton() {
   return (
     <>
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="card-sm surface-card-padded min-h-[120px]">
-          <Skeleton className="mb-4 h-3 w-28" />
-          <Skeleton className="h-8 w-12" />
+        <div key={i} className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5">
+          <Skeleton className="mb-3 h-3 w-24" />
+          <Skeleton className="h-7 w-12" />
+          <Skeleton className="mt-3 h-3 w-20" />
         </div>
       ))}
     </>

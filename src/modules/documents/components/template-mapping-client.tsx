@@ -1,15 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { TemplateDetectionMode } from "@prisma/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { cn } from "@/lib/utils";
 import { saveTemplateMappingAction } from "@/modules/documents/actions/documents-actions";
+import {
+  docBtnPrimary,
+  docCard,
+  docInput,
+  docSelect,
+} from "@/modules/documents/components/doc-ui";
 import type {
   BlankFieldMapping,
   DetectedBlankField,
@@ -18,14 +21,13 @@ import type {
 } from "@/modules/documents/types/template-mapping";
 import { parseMappingJson } from "@/modules/documents/validators/document-template-validator";
 
-const selectClass =
-  "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
 export interface RegistryOption {
   placeholderKey: string;
   label: string;
   category: string;
 }
+
+const fieldLabelClass = "text-[12px] font-semibold text-[#64748b]";
 
 export function TemplateMappingClient(props: {
   templateId: string;
@@ -93,39 +95,39 @@ export function TemplateMappingClient(props: {
   }, [props.registry]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Mapimi i fushave</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {props.templateName} — v{props.versionNumber} ({props.detectionMode ?? "—"})
-          </p>
-        </div>
-        <Button variant="secondary" asChild>
-          <Link href={`/dokumentet/templates/${props.templateId}`}>Kthehu te shablloni</Link>
-        </Button>
-      </div>
-
+    <>
+      <AppSubBar
+        dense
+        backHref={`/dokumentet/templates/${props.templateId}`}
+        backLabel="Shablloni"
+        title="Mapimi i fushave"
+        description={`${props.templateName} — v${props.versionNumber} (${props.detectionMode ?? "—"})`}
+      />
+      <div className="space-y-5">
       {blankFields.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Fushat bosh ({blankFields.length})</CardTitle>
-            <CardDescription>
+        <section className={docCard}>
+          <div className="border-b border-[#eef2f7] px-4 py-3">
+            <h2 className="text-[13.5px] font-bold text-[#0f172a]">
+              Fushat bosh ({blankFields.length})
+            </h2>
+            <p className="mt-0.5 text-[12px] text-[#94a3b8]">
               Çdo vijë (_) mapohet me një çelës të dhënash nga regjistri — pa hamendësime automatike.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
+          </div>
+          <div className="space-y-4 p-4">
             {props.detectedBlanks.map((detected, i) => (
-              <div key={detected.index} className="rounded-lg border border-border p-4 space-y-3">
+              <div key={detected.index} className="space-y-3 rounded-[10px] border border-[#eef2f7] p-4">
                 <div>
-                  <p className="font-medium">Fusha {detected.index}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{detected.paragraphPreview}</p>
+                  <p className="text-[13px] font-bold text-[#0f172a]">Fusha {detected.index}</p>
+                  <p className="mt-1 rounded-md bg-[#f8fafc] px-2.5 py-1.5 text-[12px] italic text-[#64748b]">
+                    {detected.paragraphPreview}
+                  </p>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label>Çelësi i të dhënave</Label>
+                  <div className="grid gap-1.5">
+                    <label className={fieldLabelClass}>Çelësi i të dhënave</label>
                     <select
-                      className={selectClass}
+                      className={cn(docSelect, "w-full")}
                       value={blankFields[i]?.placeholderKey ?? ""}
                       onChange={(e) => {
                         const key = e.target.value;
@@ -148,9 +150,10 @@ export function TemplateMappingClient(props: {
                       ))}
                     </select>
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Etiketa (opsionale)</Label>
-                    <Input
+                  <div className="grid gap-1.5">
+                    <label className={fieldLabelClass}>Etiketa (opsionale)</label>
+                    <input
+                      className={docInput}
                       value={blankFields[i]?.label ?? ""}
                       onChange={(e) =>
                         setBlankFields((prev) =>
@@ -161,9 +164,10 @@ export function TemplateMappingClient(props: {
                       }
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Vlerë rezervë</Label>
-                    <Input
+                  <div className="grid gap-1.5">
+                    <label className={fieldLabelClass}>Vlerë rezervë</label>
+                    <input
+                      className={docInput}
                       value={blankFields[i]?.fallback ?? ""}
                       onChange={(e) =>
                         setBlankFields((prev) =>
@@ -174,9 +178,10 @@ export function TemplateMappingClient(props: {
                       }
                     />
                   </div>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex items-center gap-2 self-end pb-2 text-[13px] font-medium text-[#334155]">
                     <input
                       type="checkbox"
+                      className="h-4 w-4 accent-[#2563EB]"
                       checked={blankFields[i]?.required !== false}
                       onChange={(e) =>
                         setBlankFields((prev) =>
@@ -191,22 +196,30 @@ export function TemplateMappingClient(props: {
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ) : null}
 
       {placeholders.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Placeholder {"{{tags}}"} ({placeholders.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <section className={docCard}>
+          <div className="border-b border-[#eef2f7] px-4 py-3">
+            <h2 className="text-[13.5px] font-bold text-[#0f172a]">
+              Placeholder {"{{tags}}"} ({placeholders.length})
+            </h2>
+          </div>
+          <div className="space-y-2.5 p-4">
             {placeholders.map((ph, i) => (
-              <div key={ph.key} className="flex flex-wrap items-center gap-3 rounded border p-3">
-                <code className="text-sm">{`{{${ph.key}}}`}</code>
-                <label className="flex items-center gap-2 text-sm">
+              <div
+                key={ph.key}
+                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[#eef2f7] px-3 py-2.5 transition-colors hover:bg-[#f8fafc]"
+              >
+                <code className="rounded-md bg-[#eff6ff] px-2 py-0.5 font-mono text-[12px] font-semibold text-brand-blue">
+                  {`{{${ph.key}}}`}
+                </code>
+                <label className="ml-auto flex items-center gap-2 text-[13px] font-medium text-[#334155]">
                   <input
                     type="checkbox"
+                    className="h-4 w-4 accent-[#2563EB]"
                     checked={ph.required !== false}
                     onChange={(e) =>
                       setPlaceholders((prev) =>
@@ -220,15 +233,16 @@ export function TemplateMappingClient(props: {
                 </label>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ) : null}
 
       <div className="flex gap-2">
-        <Button type="button" disabled={pending} onClick={save}>
+        <button type="button" className={docBtnPrimary} disabled={pending} onClick={save}>
           {pending ? "Duke ruajtur…" : "Ruaj mapimin"}
-        </Button>
+        </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

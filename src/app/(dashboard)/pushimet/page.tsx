@@ -11,6 +11,7 @@ import {
   listLeaveTemplatesPicklist,
   listPendingLeaveRequests,
 } from "@/modules/leaves/services/leave-query-service";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { PushimetFiltersForm } from "@/modules/leaves/components/pushimet-filters-form";
 import { PushimetDashboardClient } from "@/modules/leaves/components/pushimet-dashboard-client";
 import type {
@@ -132,14 +133,20 @@ function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
 
 function DashboardFallback() {
   return (
-    <div className="animate-pulse space-y-6 rounded-xl border border-border bg-card p-6">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="h-24 rounded-lg bg-muted" />
-        <div className="h-24 rounded-lg bg-muted" />
-        <div className="h-24 rounded-lg bg-muted" />
+    <div className="animate-pulse space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
       </div>
-      <div className="h-40 rounded-lg bg-muted" />
-      <div className="h-64 rounded-lg bg-muted" />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-6">
+          <div className="h-40 rounded-xl border border-[#e2e8f0] bg-white" />
+          <div className="h-64 rounded-xl border border-[#e2e8f0] bg-white" />
+        </div>
+        <div className="h-72 rounded-xl border border-[#e2e8f0] bg-white" />
+      </div>
     </div>
   );
 }
@@ -248,15 +255,13 @@ export default async function PushimetPage({
   });
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimet</h1>
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Rrjedhë operative për kërkesat, miratimet, balancat dhe lidhjen me payroll dhe dokumentet. Të dhënat janë të izoluara
-          sipas kompanisë aktive.
-        </p>
-      </header>
-
+    <>
+      <AppSubBar
+        eyebrow="Menaxhimi i pushimeve"
+        title="Pushimet"
+        description="Rrjedhë operative për kërkesat, miratimet, balancat dhe lidhjen me payroll dhe dokumentet, të izoluara sipas kompanisë aktive."
+      />
+      <div className="space-y-6">
       <PushimetFiltersForm
         employees={employees}
         departments={departments}
@@ -283,6 +288,7 @@ export default async function PushimetPage({
           templates={templates}
         />
       </Suspense>
-    </div>
+      </div>
+    </>
   );
 }

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { DocumentCategory } from "@prisma/client";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { Button } from "@/components/ui/button";
 import { DocumentsDashboardClient } from "@/modules/documents/components/documents-dashboard-client";
 import { DocumentsListFilters } from "@/modules/documents/components/documents-list-filters";
 import {
@@ -109,23 +112,40 @@ export default async function DokumentetPage({
   const authorOptions = authors.filter((a): a is NonNullable<typeof a> & { id: string } => Boolean(a?.id));
 
   return (
-    <div className="space-y-8">
-      <DocumentsListFilters
-        defaults={{
-          q,
-          employeeId,
-          documentCategory: catRaw,
-          month,
-          archived: archivedRaw || "all",
-          authorId,
-        }}
-        employees={employees}
-        authors={authorOptions}
+    <>
+      <AppSubBar
+        eyebrow="Menaxhimi i dokumenteve"
+        title="Dokumentet"
+        description="Qendër e strukturuar për printimin e kontratave, pushimeve, largimeve dhe vërejtjeve me shabllone DOCX."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/dokumentet/templates">Konfigurimi i shablloneve</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dokumentet/generate">Gjenero dokumente</Link>
+            </Button>
+          </>
+        }
       />
       <DocumentsDashboardClient
         artifacts={artifactRows}
         templateSummary={templateSummary}
+        filtersSlot={
+          <DocumentsListFilters
+            defaults={{
+              q,
+              employeeId,
+              documentCategory: catRaw,
+              month,
+              archived: archivedRaw || "all",
+              authorId,
+            }}
+            employees={employees}
+            authors={authorOptions}
+          />
+        }
       />
-    </div>
+    </>
   );
 }
