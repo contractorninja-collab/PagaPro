@@ -10,6 +10,7 @@ import { annualSplitLeaveCompliant } from "@/modules/leaves/engine/split-leave-a
 import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
 import { syncLeaveBalancesForEmployeeYear } from "@/modules/leaves/services/leave-balance-service";
 import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
+import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 
 const OVERLAP_STATUSES = ["PENDING", "APPROVED"] as const;
 
@@ -250,6 +251,7 @@ export async function validateLeaveRequestForWorkflow(params: {
   startDate: Date;
   endDate: Date;
   excludeLeaveId?: string;
+  metricsRuleVersion?: string;
 }): Promise<LeaveValidationResult> {
   const parts: LeaveValidationResult[] = [];
 
@@ -267,7 +269,12 @@ export async function validateLeaveRequestForWorkflow(params: {
 
   parts.push(await payrollLockedOverlapBlock(params));
 
-  const metrics = await computeLeaveMetrics(params.companyId, params.startDate, params.endDate);
+  const metrics = await computeLeaveMetrics(
+    params.companyId,
+    params.startDate,
+    params.endDate,
+    params.metricsRuleVersion ?? LEAVE_ENGINE_RULE_VERSION,
+  );
   const yearUtc = params.startDate.getUTCFullYear();
 
   parts.push(

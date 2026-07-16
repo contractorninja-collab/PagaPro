@@ -1,6 +1,7 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { recalculatePayrollEntriesForEmployees } from "@/modules/payroll/services/payroll-period-service";
+import { approximateLeaveHoursForPayrollMonth } from "@/modules/payroll/services/payroll-leave-integration-service";
+import { updatePayrollEntryAmounts } from "@/modules/payroll/services/payroll-period-service";
+import { resolvePayrollMonthWorkingTime } from "@/modules/payroll/services/payroll-working-time-service";
 
 /** Muajt (viti, muaji) të mbuluar nga një interval datash UTC — përfshirës në të dy skajet. */
 export function payrollMonthsCoveredByRange(startDate: Date, endDate: Date): Array<{ year: number; month: number }> {
@@ -18,27 +19,6 @@ export function payrollMonthsCoveredByRange(startDate: Date, endDate: Date): Arr
     }
   }
   return months;
-}
-
-/**
- * A ka rreshti redaktime manuale të orëve? Rreshtat e sinkronizuar/gjeneruar respektojnë
- * identitetin actualReg == max(0, expected − paid − sick); një devijim do të thotë që
- * dikush ka redaktuar orët me dorë — sinkronizimi nuk i mbishkruan ato.
- * (Rreshtat e vjetër me orë pa pagesë të mbjella para rregullimit të zbritjes së dyfishtë
- * gjithashtu devijojnë — anashkalohen me paralajmërim, gjë që i nxjerr në pah për rishikim.)
- */
-export function hasManualHourEdits(entry: {
-  expectedRegularHours: Prisma.Decimal | null;
-  actualRegularHours: Prisma.Decimal;
-  paidLeaveHours: Prisma.Decimal;
-  sickLeaveHours: Prisma.Decimal;
-}): boolean {
-  if (entry.expectedRegularHours == null) return false;
-  const derived = Math.max(
-    0,
-    Number(entry.expectedRegularHours) - Number(entry.paidLeaveHours) - Number(entry.sickLeaveHours),
-  );
-  return Math.abs(Number(entry.actualRegularHours) - derived) > 0.005;
 }
 
 export interface LeavePayrollSyncResult {
@@ -62,13 +42,12 @@ function monthBoundsUtc(year: number, month: number): { start: Date; end: Date }
  * manualisht (orë shtesë / vikend / festë / natë, bonus, zbritje, avans).
  *
  * Rregulla sigurie:
- * - Payroll-et jo-DRAFT nuk preken kurrë; ata NË SHQYRTIM raportohen si të anashkaluar
- *   (paralajmërim në timeline) sepse orët e tyre mbeten të vjetruara derisa të kthehen në draft.
- * - Rreshtat me override manual bruto/neto, arsye override-i, shënime, ose me orë të
- *   redaktuara manualisht anashkalohen me paralajmërim — nuk mbishkruhen kurrë në heshtje.
- * - Rreshtat e muajit të pjesshëm (largim) rimbajnë kufirin e ditës së fundit të punës,
- *   të kërkuar vetëm brenda muajit të payroll-it.
- * - Garda optimiste `updatedAt` rikontrollohet brenda transaksionit të ripëllogaritjes —
+ * - Payroll-et jo-DRAFT nuk preken kurrë; raportohen si të anashkaluar me paralajmërim
+ *   sepse orët e tyre mbeten të vjetruara derisa të kthehen në draft.
+ * - Orët e rregullta/pushimit mbishkruhen nga burimi i miratuar PUSHIMET; të gjitha
+ *   inputet e tjera manuale dhe ID-ja e rreshtit ruhen nga përditësimi in-place.
+ * - Rreshtat e muajit të pjesshëm ruajnë orët e pritura ekzistuese të kufizuara.
+ * - Garda optimiste `updatedAt` aplikohet atomikisht gjatë përditësimit —
  *   një edit i njëkohshëm në spreadsheet e ndal sinkronizimin në vend që të humbasë.
  * - Dështimet nuk hedhin — kthehen si "skipped" që veprimi i pushimit të mos bllokohet.
  */
@@ -87,7 +66,6 @@ export async function syncDraftPayrollsForLeaveChange(params: {
   const payrolls = await prisma.payroll.findMany({
     where: {
       companyId: params.companyId,
-      status: { in: ["DRAFT", "REVIEWED"] },
       OR: months.map((m) => ({ year: m.year, month: m.month })),
     },
     select: { id: true, year: true, month: true, status: true },
@@ -97,7 +75,7 @@ export async function syncDraftPayrollsForLeaveChange(params: {
   for (const p of payrolls) {
     try {
       if (p.status !== "DRAFT") {
-        // NË SHQYRTIM: nuk preket, por HR duhet ta dijë që orët e tij tani janë të vjetruara.
+        // Vetëm DRAFT ndryshohet; çdo gjendje tjetër merr paralajmërim të dukshëm.
         const hasEntry = await prisma.payrollEntry.findUnique({
           where: { payrollId_employeeId: { payrollId: p.id, employeeId: params.employeeId } },
           select: { id: true },
@@ -108,7 +86,7 @@ export async function syncDraftPayrollsForLeaveChange(params: {
             year: p.year,
             month: p.month,
             reason:
-              "Payroll-i është në shqyrtim — orët e pushimit nuk u përditësuan. Kthejeni në draft për t'i rifreskuar.",
+              `Payroll-i është ${p.status} — orët e pushimit nuk u përditësuan. Kthejeni në DRAFT për t'i rifreskuar.`,
           });
         }
         continue;
@@ -116,94 +94,75 @@ export async function syncDraftPayrollsForLeaveChange(params: {
 
       const entry = await prisma.payrollEntry.findUnique({
         where: { payrollId_employeeId: { payrollId: p.id, employeeId: params.employeeId } },
+        include: { employee: { select: { weeklyHours: true } } },
       });
       if (!entry) {
         // Punonjësi nuk është pjesë e këtij payroll-i — asgjë për të sinkronizuar.
         continue;
       }
 
-      if (
-        entry.manualGrossOverride != null ||
-        entry.manualNetOverride != null ||
-        entry.manualGrossReason != null ||
-        entry.manualNetReason != null ||
-        entry.notes != null
-      ) {
-        result.skipped.push({
-          payrollId: p.id,
-          year: p.year,
-          month: p.month,
-          reason:
-            "Rreshti ka override manual bruto/neto ose shënime — përditësoni orët e pushimit manualisht në spreadsheet.",
-        });
-        continue;
-      }
-
-      if (hasManualHourEdits(entry)) {
-        result.skipped.push({
-          payrollId: p.id,
-          year: p.year,
-          month: p.month,
-          reason:
-            "Orët e rreshtit janë redaktuar manualisht — përditësoni orët e pushimit manualisht në spreadsheet.",
-        });
-        continue;
-      }
-
-      // Rreshti i muajit të pjesshëm (pagë përfunduese): rimbaj kufirin e largimit,
-      // të kërkuar vetëm brenda muajit të këtij payroll-i (punonjësit e ripunësuar mund
-      // të kenë largime të tjera në muaj të tjerë).
-      const breakdown = entry.calculationBreakdown as { terminationPartialMonth?: unknown } | null;
-      let lastWorkingDayCap: Date | undefined;
-      if (breakdown?.terminationPartialMonth === true) {
-        const { start, end } = monthBoundsUtc(p.year, p.month);
-        const term = await prisma.termination.findFirst({
+      const { start, end } = monthBoundsUtc(p.year, p.month);
+      const [wt, leaveReqs] = await Promise.all([
+        resolvePayrollMonthWorkingTime(params.companyId, p.year, p.month),
+        prisma.leaveRequest.findMany({
           where: {
             companyId: params.companyId,
             employeeId: params.employeeId,
-            status: { not: "CANCELLED" },
-            lastWorkingDay: { gte: start, lte: end },
+            status: "APPROVED",
+            affectsPayroll: true,
+            AND: [{ startDate: { lte: end } }, { endDate: { gte: start } }],
           },
-          orderBy: { lastWorkingDay: "desc" },
-          select: { lastWorkingDay: true },
+          select: {
+            id: true,
+            type: true,
+            startDate: true,
+            endDate: true,
+            isPaid: true,
+            affectsPayroll: true,
+            subtype: true,
+            interruptedByLeaveRequestId: true,
+            metricsRuleVersion: true,
+          },
+        }),
+      ]);
+      if (!wt) {
+        result.skipped.push({
+          payrollId: p.id,
+          year: p.year,
+          month: p.month,
+          reason: "Nuk mund të ngarkohet kalendari i punës për sinkronizimin e pushimit.",
         });
-        if (!term) {
-          result.skipped.push({
-            payrollId: p.id,
-            year: p.year,
-            month: p.month,
-            reason: "Rresht i muajit të pjesshëm pa largim aktiv në këtë muaj — rifreskoni manualisht.",
-          });
-          continue;
-        }
-        lastWorkingDayCap = term.lastWorkingDay;
+        continue;
       }
 
-      const recalc = await recalculatePayrollEntriesForEmployees({
+      // V1 uses the employee schedule; V2 requests override this inside the helper with fixed 8h.
+      const rawDailyH = Math.min(Number(entry.employee.weeklyHours) / 5, Number(wt.hoursPerWorkingDay));
+      const dailyH = Number.isFinite(rawDailyH) && rawDailyH > 0 ? rawDailyH : Number(wt.hoursPerWorkingDay);
+      const leaveHrs = await approximateLeaveHoursForPayrollMonth({
         companyId: params.companyId,
-        payrollId: p.id,
-        employeeIds: [params.employeeId],
-        lastWorkingDayByEmployeeId: lastWorkingDayCap
-          ? { [params.employeeId]: lastWorkingDayCap }
-          : undefined,
-        entryStatus: entry.status,
-        actorUserId: params.actorUserId,
-        updatePayrollAggregateMeta: false,
-        guardEntryUpdatedAtByEmployeeId: { [params.employeeId]: entry.updatedAt },
-        lineOverridesByEmployeeId: {
-          [params.employeeId]: {
-            // Ruaj vetëm fushat e futura nga përdoruesi — orët e pushimit dhe orët e
-            // rregullta ri-derivohen nga pushimet e miratuara.
-            overtimeHours: entry.overtimeHours.toString(),
-            weekendHours: entry.weekendHours.toString(),
-            holidayHours: entry.holidayHours.toString(),
-            nightHours: entry.nightHours.toString(),
-            bonuses: entry.bonuses.toString(),
-            otherDeductions: entry.otherDeductions.toString(),
-            salaryAdvanceDeduction: entry.salaryAdvanceDeduction.toString(),
-          },
-        },
+        requests: leaveReqs,
+        monthStart: start,
+        monthEnd: end,
+        dailyHours: dailyH,
       });
+      const expected =
+        entry.expectedRegularHours != null
+          ? Number(entry.expectedRegularHours)
+          : Number(entry.actualRegularHours) + Number(entry.paidLeaveHours) + Number(entry.sickLeaveHours);
+      const actualRegular = Math.max(0, expected - leaveHrs.paidLeaveHours - leaveHrs.sickLeaveHours);
+
+      const recalc = await updatePayrollEntryAmounts(
+        params.companyId,
+        entry.id,
+        {
+          actualRegularHours: actualRegular.toFixed(2),
+          paidLeaveHours: leaveHrs.paidLeaveHours.toFixed(2),
+          sickLeaveHours: leaveHrs.sickLeaveHours.toFixed(2),
+          unpaidLeaveHours: leaveHrs.unpaidLeaveHours.toFixed(2),
+        },
+        params.actorUserId,
+        { expectedUpdatedAt: entry.updatedAt },
+      );
 
       if (recalc.ok) {
         result.synced.push({ payrollId: p.id, year: p.year, month: p.month });

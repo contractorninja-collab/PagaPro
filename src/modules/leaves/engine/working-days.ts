@@ -33,6 +33,7 @@ export function computeWorkingDaysInRange(
   endDate: Date,
   holidayIsoSet: ReadonlySet<string>,
   hoursPerWorkingDay: number,
+  options: { excludeWeekdayHolidays?: boolean } = {},
 ): WorkingDaysEngineResult {
   const s = utcDateOnly(startDate);
   const e = utcDateOnly(endDate);
@@ -41,6 +42,7 @@ export function computeWorkingDaysInRange(
   }
 
   const safeHours = Number.isFinite(hoursPerWorkingDay) && hoursPerWorkingDay > 0 ? hoursPerWorkingDay : 8;
+  const excludeWeekdayHolidays = options.excludeWeekdayHolidays ?? true;
 
   let workingDays = 0;
   const weekdayHolidayDatesInRange: string[] = [];
@@ -49,8 +51,9 @@ export function computeWorkingDaysInRange(
     const dow = cur.getUTCDay();
     const iso = isoDateUtc(cur.getUTCFullYear(), cur.getUTCMonth() + 1, cur.getUTCDate());
     if (dow >= 1 && dow <= 5) {
-      if (holidayIsoSet.has(iso)) weekdayHolidayDatesInRange.push(iso);
-      else workingDays++;
+      const isHoliday = holidayIsoSet.has(iso);
+      if (isHoliday) weekdayHolidayDatesInRange.push(iso);
+      if (!isHoliday || !excludeWeekdayHolidays) workingDays++;
     }
     cur.setUTCDate(cur.getUTCDate() + 1);
   }

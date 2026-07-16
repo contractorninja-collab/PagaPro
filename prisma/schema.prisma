@@ -1821,11 +1821,14 @@ model LeaveRequest {
   /// Calendar-inclusive duration (all days in range).
   totalDays Decimal? @db.Decimal(8, 2)
 
-  /// Mon–Fri working days excluding configured holidays (operational basis).
+  /// Mon–Fri leave days under metricsRuleVersion (v1 excludes holidays; v2 includes them).
   workingDays Decimal? @db.Decimal(8, 2)
 
-  /// Expected leave hours (workingDays × company daily norm unless overridden).
+  /// Expected leave hours under metricsRuleVersion (v2 = workingDays × fixed 8h).
   totalHours Decimal? @db.Decimal(10, 2)
+
+  /// Frozen calculation behavior: existing rows are v1; newly created requests use v2.
+  metricsRuleVersion String @default("kosovo-leave-engine.v2") @db.VarChar(64)
 
   isPaid         Boolean @default(true)
   affectsPayroll Boolean @default(true)

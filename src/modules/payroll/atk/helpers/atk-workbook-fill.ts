@@ -180,11 +180,6 @@ export async function fillAtkOfficialTemplate(rows: Record<AtkColumnKey, string>
     dataStart + Math.max(rows.length + 80, 250),
   );
 
-  if (rows.length === 0) {
-    const wbBuf = await workbook.xlsx.writeBuffer();
-    return Buffer.from(wbBuf);
-  }
-
   for (let i = 0; i < rows.length; i++) {
     const targetRowNum = dataStart + i;
     const targetRow = sheet.getRow(targetRowNum);

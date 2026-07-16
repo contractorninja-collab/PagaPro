@@ -133,7 +133,12 @@ export async function createDraftLeaveRequest(params: {
   createdByUserId?: string | null;
 }): Promise<{ id: string }> {
   const flags = defaultPaidAndPayrollFlags(params.type, params.subtype ?? "NONE");
-  const metrics = await computeLeaveMetrics(params.companyId, params.startDate, params.endDate);
+  const metrics = await computeLeaveMetrics(
+    params.companyId,
+    params.startDate,
+    params.endDate,
+    LEAVE_ENGINE_RULE_VERSION,
+  );
 
   const row = await prisma.leaveRequest.create({
     data: {
@@ -147,6 +152,7 @@ export async function createDraftLeaveRequest(params: {
       totalDays: metrics.calendarDays,
       workingDays: metrics.workingDays,
       totalHours: metrics.totalHours,
+      metricsRuleVersion: LEAVE_ENGINE_RULE_VERSION,
       isPaid: flags.isPaid,
       affectsPayroll: false,
       reason: params.reason?.trim() || null,
@@ -187,6 +193,7 @@ export async function submitLeaveRequest(params: { companyId: string; leaveId: s
     startDate: lr.startDate,
     endDate: lr.endDate,
     excludeLeaveId: lr.id,
+    metricsRuleVersion: lr.metricsRuleVersion,
   });
   if (validation.blocks.length > 0) {
     await appendLeaveTimeline({
@@ -220,7 +227,12 @@ export async function submitLeaveRequest(params: { companyId: string; leaveId: s
     });
     if (overlap) throw new Error("Ekziston një kërkesë e mbivendosur në pritje ose të miratuar.");
 
-    const metrics = await computeLeaveMetrics(params.companyId, lr.startDate, lr.endDate);
+    const metrics = await computeLeaveMetrics(
+      params.companyId,
+      lr.startDate,
+      lr.endDate,
+      lr.metricsRuleVersion,
+    );
 
     await tx.leaveRequest.update({
       where: { id: lr.id },
@@ -285,6 +297,7 @@ export async function approveLeaveRequest(params: {
     startDate: lr.startDate,
     endDate: lr.endDate,
     excludeLeaveId: lr.id,
+    metricsRuleVersion: lr.metricsRuleVersion,
   });
   if (validation.blocks.length > 0) {
     throw new Error(validation.blocks[0]?.message ?? "Miratimi u bllokua nga validimi.");

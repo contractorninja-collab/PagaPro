@@ -22,7 +22,6 @@
     "db:fix-permissions": "powershell -ExecutionPolicy Bypass -File scripts/fix-db-permissions.ps1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "atk:template:placeholder": "node scripts/write-atk-placeholder-template.cjs",
     "contracts:validate-templates": "node scripts/validate-contract-templates.cjs",
     "contracts:seed": "node -e \"require('dotenv').config({override:true});const {PrismaPg}=require('@prisma/adapter-pg');const {PrismaClient}=require('@prisma/client');const {seedContractTemplates}=require('./scripts/seed-contract-templates.cjs');const p=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});seedContractTemplates(p).finally(()=>p.$disconnect());\"",
     "leave:seed": "node -e \"require('dotenv').config({override:true});const {PrismaPg}=require('@prisma/adapter-pg');const {PrismaClient}=require('@prisma/client');const {seedLeaveTemplates}=require('./scripts/seed-leave-templates.cjs');const p=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});seedLeaveTemplates(p).finally(()=>p.$disconnect());\"",

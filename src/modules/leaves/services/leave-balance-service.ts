@@ -70,6 +70,7 @@ async function sumApprovedWorkingDaysForTypeInYear(
       startDate: true,
       endDate: true,
       subtype: true,
+      metricsRuleVersion: true,
     },
   });
 
@@ -80,7 +81,7 @@ async function sumApprovedWorkingDaysForTypeInYear(
     }
     const clip = clipRangeToYear(r.startDate, r.endDate, yearStart, yearEnd);
     if (!clip) continue;
-    const part = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const part = await computeLeaveMetrics(companyId, clip.rs, clip.re, r.metricsRuleVersion);
     total = total.add(new Prisma.Decimal(part.workingDays));
   }
 
@@ -105,7 +106,7 @@ async function sumNetAnnualUsedDays(
         affectsPayroll: true,
         AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
       },
-      select: { startDate: true, endDate: true, workingDays: true },
+      select: { startDate: true, endDate: true, workingDays: true, metricsRuleVersion: true },
     }),
     prisma.leaveRequest.findMany({
       where: {
@@ -129,7 +130,12 @@ async function sumNetAnnualUsedDays(
     const clip = clipRangeToYear(annual.startDate, annual.endDate, yearStart, yearEnd);
     if (!clip) continue;
 
-    const grossMetrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const grossMetrics = await computeLeaveMetrics(
+      companyId,
+      clip.rs,
+      clip.re,
+      annual.metricsRuleVersion,
+    );
     let overlapDays = 0;
 
     for (const medical of medicalReqs) {
@@ -140,7 +146,12 @@ async function sumNetAnnualUsedDays(
         Math.min(clip.re.getTime(), medical.endDate.getTime(), yearEnd.getTime()),
       );
       if (overlapStart > overlapEnd) continue;
-      const overlapMetrics = await computeLeaveMetrics(companyId, overlapStart, overlapEnd);
+      const overlapMetrics = await computeLeaveMetrics(
+        companyId,
+        overlapStart,
+        overlapEnd,
+        annual.metricsRuleVersion,
+      );
       overlapDays += overlapMetrics.workingDays;
       hasMedicalOverlap = true;
     }
@@ -165,7 +176,7 @@ async function sumPendingAnnualDays(companyId: string, employeeId: string, year:
       status: "PENDING",
       AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
     },
-    select: { workingDays: true, startDate: true, endDate: true },
+    select: { workingDays: true, startDate: true, endDate: true, metricsRuleVersion: true },
   });
 
   let total = 0;
@@ -176,7 +187,7 @@ async function sumPendingAnnualDays(companyId: string, employeeId: string, year:
     }
     const clip = clipRangeToYear(row.startDate, row.endDate, yearStart, yearEnd);
     if (!clip) continue;
-    const metrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const metrics = await computeLeaveMetrics(companyId, clip.rs, clip.re, row.metricsRuleVersion);
     total += metrics.workingDays;
   }
   return total;

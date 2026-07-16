@@ -545,6 +545,7 @@ async function createPayrollEntriesForEmployeesTx(
         affectsPayroll: true,
         subtype: true,
         interruptedByLeaveRequestId: true,
+        metricsRuleVersion: true,
       },
     });
 
@@ -1149,6 +1150,7 @@ export async function updatePayrollEntryAmounts(
   entryId: string,
   patch: PayrollEntrySpreadsheetPatch,
   actorUserId?: string | null,
+  options?: { expectedUpdatedAt?: Date },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const entry = await prisma.payrollEntry.findFirst({
     where: { id: entryId, payroll: { companyId } },
@@ -1156,6 +1158,15 @@ export async function updatePayrollEntryAmounts(
   });
 
   if (!entry) return { ok: false, error: "Rreshti nuk u gjet." };
+  if (
+    options?.expectedUpdatedAt &&
+    entry.updatedAt.getTime() !== options.expectedUpdatedAt.getTime()
+  ) {
+    return {
+      ok: false,
+      error: "Rreshti u ndryshua nga një veprim tjetër gjatë sinkronizimit — provoni sërish.",
+    };
+  }
   const notEditable = payrollNotEditableMessage(entry.payroll.status);
   if (notEditable) return { ok: false, error: notEditable };
 
@@ -1267,9 +1278,7 @@ export async function updatePayrollEntryAmounts(
     return { ok: false, error: "Rezultati i llogaritjes nuk mund të ruhet (serializim JSON)." };
   }
 
-  await prisma.payrollEntry.update({
-    where: { id: entryId },
-    data: {
+  const updateData: Prisma.PayrollEntryUpdateManyMutationInput = {
       expectedWorkingDays: wd,
       expectedRegularHours: new Prisma.Decimal(expHours),
       actualRegularHours: new Prisma.Decimal(lineInput.actualRegularHours),
@@ -1306,8 +1315,25 @@ export async function updatePayrollEntryAmounts(
       manualGrossReason: grossReason ?? null,
       manualNetReason: netReason ?? null,
       notes: patch.notes !== undefined ? patch.notes : entry.notes,
-    },
-  });
+  };
+
+  if (options?.expectedUpdatedAt) {
+    const guarded = await prisma.payrollEntry.updateMany({
+      where: { id: entryId, updatedAt: options.expectedUpdatedAt },
+      data: updateData,
+    });
+    if (guarded.count !== 1) {
+      return {
+        ok: false,
+        error: "Rreshti u ndryshua nga një veprim tjetër gjatë sinkronizimit — provoni sërish.",
+      };
+    }
+  } else {
+    await prisma.payrollEntry.update({
+      where: { id: entryId },
+      data: updateData,
+    });
+  }
 
   await appendPayrollAuditLog({
     companyId,

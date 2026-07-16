@@ -381,7 +381,8 @@ export function PayrollSpreadsheet(props: {
           {props.entries.length} rreshta · kontraktorët përjashtohen automatikisht · fushat me kufi të verdhë kanë vlera
           jo-zero ose të ndryshuara · redaktimi aktiv vetëm në DRAFT · Pushim Orë = vjetor/paguar + mjekësor (M) + pa
           pagesë (PP), ditë pune × orë ditore nga pushimet e miratuara — redaktimi ndryshon vetëm pjesën e paguar ·
-          rreshtat me orë të redaktuara manualisht nuk sinkronizohen automatikisht me pushimet e reja.
+          kërkesat e reja llogariten 8 orë për çdo ditë Hënë–Premte, duke përfshirë festat · miratimi në PUSHIMET
+          rifreskon automatikisht orët e rregullta/pushimit në payroll-et DRAFT dhe ruan inputet e tjera manuale.
         </p>
       </div>
 

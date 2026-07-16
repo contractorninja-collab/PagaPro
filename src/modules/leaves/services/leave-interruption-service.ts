@@ -77,7 +77,7 @@ export async function linkApprovedSickInterruptingAnnualLeave(params: {
       interruptedByLeaveRequestId: sick.id,
       supersedesWorkingDaysSnapshot: {
         linkedAt: new Date().toISOString(),
-        ruleVersion: LEAVE_ENGINE_RULE_VERSION,
+        ruleVersion: annual.metricsRuleVersion,
         priorWorkingDays: annual.workingDays?.toString() ?? null,
         priorTotalHours: annual.totalHours?.toString() ?? null,
         sickLeaveId: sick.id,
@@ -158,6 +158,8 @@ export async function linkApprovedSickInterruptingAnnualLeave(params: {
         summary: "U lidh ndërprerja e pushimit vjetor me pushimin mjekësor (Art 34.2).",
         payload: {
           ruleVersion: LEAVE_ENGINE_RULE_VERSION,
+          annualMetricsRuleVersion: annual.metricsRuleVersion,
+          sickMetricsRuleVersion: sick.metricsRuleVersion,
           sickLeaveId: sick.id,
           kosovoRefs: ["Art 34.2"],
         },
