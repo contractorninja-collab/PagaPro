@@ -309,20 +309,23 @@ export async function buildMergedPlaceholderContext(
         },
         employee.id,
       );
-      const termSlice = buildTerminationPlaceholderMap(
-        {
-          terminationDate: term.terminationDate,
-          lastWorkingDay: term.lastWorkingDay,
-          noticeDate: term.noticeDate,
-          type: term.type,
-          status: term.status,
-          noticeDays: term.noticeDays,
-          severanceAmount: term.severanceAmount,
-          reason: term.reason,
-          details: term.details,
-        },
-        locale,
-      );
+      const termSlice = {
+        ...buildTerminationPlaceholderMap(
+          {
+            terminationDate: term.terminationDate,
+            lastWorkingDay: term.lastWorkingDay,
+            noticeDate: term.noticeDate,
+            type: term.type,
+            status: term.status,
+            noticeDays: term.noticeDays,
+            severanceAmount: term.severanceAmount,
+            reason: term.reason,
+            details: term.details,
+          },
+          locale,
+        ),
+        employment_start_date: formatTemplateDate(employee.hireDate, locale),
+      };
       return {
         merged: mergeDocumentMetadata(empCore.merged, termSlice),
         resolvedEmployeeId: employee.id,

@@ -25,6 +25,12 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     labelSq: "Emri i punonjësit",
   },
   {
+    key: "employee_first_name",
+    requiredByDefault: true,
+    sources: ["employee"],
+    labelSq: "Emri",
+  },
+  {
     key: "employee_personal_number",
     requiredByDefault: true,
     sources: ["employee"],
@@ -339,6 +345,13 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
     },
   ],
   TERMINATION: [
+    {
+      key: "employment_start_date",
+      requiredByDefault: true,
+      sources: ["employee"],
+      applicableCategories: ["TERMINATION"],
+      labelSq: "Data e fillimit të punës",
+    },
     {
       key: "termination_date",
       requiredByDefault: true,

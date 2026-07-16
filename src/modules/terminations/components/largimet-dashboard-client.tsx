@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { payrollMonthNameSq } from "@/modules/payroll/helpers/month-label";
 import {
   createTerminationAction,
   approveTerminationAction,
@@ -34,6 +35,10 @@ import {
   submitTerminationAction,
 } from "@/modules/terminations/actions/termination-actions";
 import { TERMINATION_STATUS_LABELS, TERMINATION_TYPE_LABELS } from "@/modules/terminations/types";
+import {
+  eligibleTerminationMonths,
+  eligibleTerminationYears,
+} from "@/modules/terminations/helpers/eligible-termination-periods";
 
 export interface LargimetRowSerialized {
   id: string;
@@ -487,6 +492,55 @@ function LargimetFiltersClient(props: {
   };
   employees: EmployeePickerOption[];
 }) {
+  const currentYear = new Date().getUTCFullYear();
+  const [employeeId, setEmployeeId] = useState(props.filters.employeeId ?? "");
+  const [year, setYear] = useState(props.filters.year != null ? String(props.filters.year) : "");
+  const [month, setMonth] = useState(props.filters.month != null ? String(props.filters.month) : "");
+
+  const employeeForId = (id: string) => props.employees.find((employee) => employee.id === id);
+  const yearsForEmployee = (id: string): number[] => {
+    if (id) {
+      const employee = employeeForId(id);
+      return employee ? eligibleTerminationYears(new Date(employee.hireDate), currentYear) : [];
+    }
+    return [...new Set(
+      props.employees.flatMap((employee) =>
+        eligibleTerminationYears(new Date(employee.hireDate), currentYear),
+      ),
+    )].sort((a, b) => b - a);
+  };
+  const monthsForPeriod = (id: string, selectedYear: string): number[] => {
+    const numericYear = Number(selectedYear);
+    if (!Number.isInteger(numericYear)) return [];
+    if (id) {
+      const employee = employeeForId(id);
+      return employee ? eligibleTerminationMonths(new Date(employee.hireDate), numericYear) : [];
+    }
+    return [...new Set(
+      props.employees.flatMap((employee) =>
+        eligibleTerminationMonths(new Date(employee.hireDate), numericYear),
+      ),
+    )].sort((a, b) => a - b);
+  };
+
+  const eligibleYears = yearsForEmployee(employeeId);
+  const eligibleMonths = monthsForPeriod(employeeId, year);
+
+  function changeEmployee(nextEmployeeId: string) {
+    const nextYears = yearsForEmployee(nextEmployeeId);
+    const nextYear = nextYears.includes(Number(year)) ? year : String(nextYears[0] ?? "");
+    const nextMonths = monthsForPeriod(nextEmployeeId, nextYear);
+    setEmployeeId(nextEmployeeId);
+    setYear(nextYear);
+    if (month && !nextMonths.includes(Number(month))) setMonth("");
+  }
+
+  function changeYear(nextYear: string) {
+    const nextMonths = monthsForPeriod(employeeId, nextYear);
+    setYear(nextYear);
+    if (month && !nextMonths.includes(Number(month))) setMonth("");
+  }
+
   return (
     <form
       className={cn(CARD, "flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end")}
@@ -531,7 +585,8 @@ function LargimetFiltersClient(props: {
         <select
           id="largimet-filter-employee"
           name="employeeId"
-          defaultValue={props.filters.employeeId ?? ""}
+          value={employeeId}
+          onChange={(event) => changeEmployee(event.target.value)}
           className={cn(FIELD_SELECT, "max-w-[220px]")}
         >
           <option value="">Të gjithë</option>
@@ -546,29 +601,40 @@ function LargimetFiltersClient(props: {
         <label className={FIELD_LABEL} htmlFor="largimet-filter-year">
           Viti
         </label>
-        <input
+        <select
           id="largimet-filter-year"
           name="year"
-          type="number"
-          className={cn(FIELD_INPUT, "w-28")}
-          defaultValue={props.filters.year ?? ""}
-          placeholder="2026"
-        />
+          value={year}
+          onChange={(event) => changeYear(event.target.value)}
+          className={cn(FIELD_SELECT, "w-32")}
+        >
+          <option value="">Të gjitha vitet</option>
+          {eligibleYears.map((eligibleYear) => (
+            <option key={eligibleYear} value={String(eligibleYear)}>
+              {eligibleYear}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="grid gap-1.5">
         <label className={FIELD_LABEL} htmlFor="largimet-filter-month">
           Muaji
         </label>
-        <input
+        <select
           id="largimet-filter-month"
           name="month"
-          type="number"
-          min={1}
-          max={12}
-          className={cn(FIELD_INPUT, "w-24")}
-          defaultValue={props.filters.month ?? ""}
-          placeholder="1-12"
-        />
+          value={month}
+          onChange={(event) => setMonth(event.target.value)}
+          disabled={!year}
+          className={cn(FIELD_SELECT, "w-36 disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]")}
+        >
+          <option value="">{year ? "Të gjithë muajt" : "Zgjidhni vitin"}</option>
+          {eligibleMonths.map((eligibleMonth) => (
+            <option key={eligibleMonth} value={String(eligibleMonth)}>
+              {payrollMonthNameSq(eligibleMonth)}
+            </option>
+          ))}
+        </select>
       </div>
       <button type="submit" className={cn(BTN_SECONDARY, "h-9 px-4 text-[13px]")}>
         Filtroni

@@ -22,6 +22,7 @@ import type {
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
+import { eligibleLeaveYears } from "@/modules/leaves/helpers/eligible-leave-years";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -220,6 +221,7 @@ export default async function PushimetPage({
   const employees: PushimetEmployeeOptionDto[] = employeesRaw.map((e) => ({
     id: e.id,
     label: `${e.firstName} ${e.lastName}`.trim(),
+    eligibleYears: eligibleLeaveYears(e.hireDate, e.terminationDate, defaultYear),
   }));
 
   const departments: PushimetDepartmentOptionDto[] = departmentsRaw.map((d) => ({

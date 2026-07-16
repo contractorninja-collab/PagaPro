@@ -28,15 +28,20 @@ export default async function LargimetPage({
   const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
-  const yearRaw = Number(first(sp, "year"));
-  const monthRaw = Number(first(sp, "month"));
+  const yearParam = first(sp, "year");
+  const monthParam = first(sp, "month");
+  const yearRaw = Number(yearParam);
+  const monthRaw = Number(monthParam);
 
   const filters = {
     status: first(sp, "status") || undefined,
     type: first(sp, "type") || undefined,
     employeeId: first(sp, "employeeId") || undefined,
-    year: Number.isFinite(yearRaw) ? yearRaw : undefined,
-    month: Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : undefined,
+    year: yearParam && Number.isFinite(yearRaw) ? yearRaw : undefined,
+    month:
+      monthParam && Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12
+        ? monthRaw
+        : undefined,
   };
 
   let rows;

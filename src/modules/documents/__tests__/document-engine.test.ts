@@ -94,6 +94,12 @@ describe("composePlaceholderRegistry", () => {
     expect(reg.payroll_month_name).toBeDefined();
   });
 
+  it("includes the employee start date for termination documents", () => {
+    const reg = composePlaceholderRegistry(["TERMINATION"]);
+    expect(reg.employment_start_date).toBeDefined();
+    expect(reg.employment_start_date?.requiredByDefault).toBe(true);
+  });
+
   it("includes generic OTHER metadata keys", () => {
     const reg = composePlaceholderRegistry(["OTHER"]);
     expect(reg.document_title).toBeDefined();

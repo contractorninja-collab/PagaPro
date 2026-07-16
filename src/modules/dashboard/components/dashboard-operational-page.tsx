@@ -4,9 +4,8 @@ import type { DepartmentOptionDto } from "@/modules/employees/types";
 import type { DashboardOperationalPayload } from "../types/dashboard-types";
 import { daysBetweenUtc } from "../helpers/dashboard-time";
 import { DashboardActionCenter, type AtkDeadlineItem } from "../widgets/dashboard-action-center";
-import { DashboardActivityTimeline } from "../widgets/dashboard-activity-timeline";
+import { ActivityLogCard } from "../widgets/activity-log-card";
 import { DashboardBrutoTrendCard } from "../widgets/dashboard-trend-card";
-import { DashboardDocumentsSection } from "../widgets/dashboard-documents-section";
 import { DashboardEmployeeDistribution } from "../widgets/dashboard-employee-distribution";
 import { DashboardFiltersBar } from "../widgets/dashboard-filters-bar";
 import { DashboardPayrollPanel } from "../widgets/dashboard-payroll-panel";
@@ -84,8 +83,8 @@ export function DashboardOperationalPage(props: {
       />
 
       <div className="pb-24 md:pb-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <div className="min-w-0 space-y-[22px]">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="min-w-0 space-y-[22px]" data-dashboard-column="main">
             <DashboardActionCenter
               alerts={data.alerts}
               leavePending={data.leavePending}
@@ -96,23 +95,17 @@ export function DashboardOperationalPage(props: {
               expiringContractsTotal={data.summary.contractsExpiringWithin30Days}
             />
             <DashboardBrutoTrendCard payroll={data.payroll} />
-          </div>
-
-          <div className="min-w-0 space-y-[18px]">
-            <DashboardPayrollPanel payroll={data.payroll} />
-            <div className="grid grid-cols-2 gap-3">
-              <DashboardKpiCards summary={data.summary} />
-            </div>
             <DashboardEmployeeDistribution distribution={data.distribution} />
+            <ActivityLogCard entries={data.timeline} />
           </div>
-        </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <DashboardDocumentsSection
-            byCategory={data.documentsThisMonthByCategory}
-            recent={data.recentDocuments}
-          />
-          <DashboardActivityTimeline entries={data.timeline} />
+          <div className="min-w-0 space-y-[18px]" data-dashboard-column="sidebar">
+            <DashboardPayrollPanel
+              payroll={data.payroll}
+              activeEmployeeCount={data.summary.activeEmployees}
+            />
+            <DashboardKpiCards summary={data.summary} />
+          </div>
         </div>
       </div>
     </>

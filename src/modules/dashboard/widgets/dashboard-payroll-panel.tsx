@@ -25,11 +25,18 @@ const STATUS_PROGRESS: Record<PayrollPeriodStatus, number> = {
   ARCHIVED: 100,
 };
 
-export function DashboardPayrollPanel({ payroll }: { payroll: DashboardPayrollSlice }) {
+export function DashboardPayrollPanel({
+  payroll,
+  activeEmployeeCount,
+}: {
+  payroll: DashboardPayrollSlice;
+  activeEmployeeCount: number;
+}) {
   const label = payrollMonthLabel(payroll.year, payroll.month);
   const hasPayroll = payroll.payrollId != null && payroll.status != null;
   const pill = payroll.status ? DARK_PILL[payroll.status] : null;
   const progress = payroll.status ? STATUS_PROGRESS[payroll.status] : 0;
+  const employeesOutsideCycle = Math.max(0, activeEmployeeCount - payroll.employeeCount);
 
   return (
     <section
@@ -76,6 +83,11 @@ export function DashboardPayrollPanel({ payroll }: { payroll: DashboardPayrollSl
         <p className="mt-1.5 text-[12.5px] text-[#8b95a7]">
           Bruto totale · {payroll.employeeCount} punonjës
         </p>
+        {hasPayroll && employeesOutsideCycle > 0 ? (
+          <p className="mt-1 text-[11.5px] text-[#cbd5e1]">
+            {employeesOutsideCycle} pa u përfshirë në këtë cikël pagese
+          </p>
+        ) : null}
 
         <dl className="my-5 flex flex-wrap gap-x-[22px] gap-y-3">
           <div>

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { LeaveRequestStatus, LeaveType } from "@prisma/client";
 import { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
@@ -37,6 +40,30 @@ export function PushimetFiltersForm(props: {
   defaults: PushimetFilterDefaults;
 }) {
   const { employees, departments, defaults } = props;
+  const [employeeId, setEmployeeId] = useState(defaults.employeeId);
+
+  const yearsForEmployee = (id: string): number[] => {
+    if (id) return employees.find((employee) => employee.id === id)?.eligibleYears ?? [];
+    return [...new Set(employees.flatMap((employee) => employee.eligibleYears))].sort(
+      (a, b) => b - a,
+    );
+  };
+
+  const initialYears = yearsForEmployee(defaults.employeeId);
+  const [year, setYear] = useState(() =>
+    initialYears.includes(Number(defaults.year))
+      ? defaults.year
+      : String(initialYears[0] ?? defaults.year),
+  );
+  const eligibleYears = yearsForEmployee(employeeId);
+
+  function changeEmployee(nextEmployeeId: string) {
+    const nextYears = yearsForEmployee(nextEmployeeId);
+    setEmployeeId(nextEmployeeId);
+    if (!nextYears.includes(Number(year))) {
+      setYear(nextYears[0] != null ? String(nextYears[0]) : "");
+    }
+  }
 
   return (
     <form
@@ -48,7 +75,13 @@ export function PushimetFiltersForm(props: {
         <label htmlFor="pf-emp" className={MICRO_LABEL}>
           Punonjësi
         </label>
-        <select id="pf-emp" name="employeeId" defaultValue={defaults.employeeId} className={FIELD_CONTROL}>
+        <select
+          id="pf-emp"
+          name="employeeId"
+          value={employeeId}
+          onChange={(event) => changeEmployee(event.target.value)}
+          className={FIELD_CONTROL}
+        >
           <option value="">Të gjithë</option>
           {employees.map((e) => (
             <option key={e.id} value={e.id}>
@@ -100,15 +133,21 @@ export function PushimetFiltersForm(props: {
         <label htmlFor="pf-year" className={MICRO_LABEL}>
           Viti
         </label>
-        <input
+        <select
           id="pf-year"
           name="year"
-          type="number"
-          min={2000}
-          max={2100}
-          defaultValue={defaults.year}
+          value={year}
+          onChange={(event) => setYear(event.target.value)}
+          disabled={eligibleYears.length === 0}
           className={`${FIELD_CONTROL} tabular-nums`}
-        />
+        >
+          {eligibleYears.length === 0 ? <option value="">Pa vite të pranueshme</option> : null}
+          {eligibleYears.map((eligibleYear) => (
+            <option key={eligibleYear} value={String(eligibleYear)}>
+              {eligibleYear}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex min-w-[110px] flex-col gap-1.5">
         <label htmlFor="pf-month" className={MICRO_LABEL}>

@@ -313,6 +313,10 @@ async function main() {
 
   const { seedContractTemplates } = require("../scripts/seed-contract-templates.cjs");
   await seedContractTemplates(prisma);
+  const { seedLeaveTemplates } = require("../scripts/seed-leave-templates.cjs");
+  await seedLeaveTemplates(prisma);
+  const { seedTerminationTemplates } = require("../scripts/seed-termination-templates.cjs");
+  await seedTerminationTemplates(prisma);
 }
 
 main()

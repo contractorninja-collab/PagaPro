@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
+import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import type {
   JobTitleOptionDto,
 } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
+import { EmployeeImportDialog } from "@/modules/employees/components/employee-import-dialog";
 import { EmployeesTable } from "@/modules/employees/components/employees-table";
 
 function StatCard({ label, value }: { label: string; value: number }) {
@@ -40,6 +42,7 @@ export function EmployeesPageClient(props: {
   /** True kur ka filtra aktivë — statistikat reflektojnë nën-bashkësinë e filtruar. */
   filtersActive?: boolean;
   filters?: ReactNode;
+  canImportEmployees?: boolean;
 }) {
   const {
     employees,
@@ -49,6 +52,7 @@ export function EmployeesPageClient(props: {
     documentsMissingToggleHref = "/punonjesit?documentsMissing=1",
     filtersActive = false,
     filters,
+    canImportEmployees = false,
   } = props;
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -56,6 +60,7 @@ export function EmployeesPageClient(props: {
   const [editId, setEditId] = useState<string | undefined>();
   const [detail, setDetail] = useState<EmployeeDetailDto | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const editFetchGeneration = useRef(0);
 
   const stats = useMemo(() => {
@@ -141,6 +146,12 @@ export function EmployeesPageClient(props: {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {loadingDetail ? <Skeleton className="h-9 w-36" /> : null}
+            {canImportEmployees ? (
+              <Button type="button" variant="outlinePrimary" onClick={() => setImportOpen(true)} disabled={loadingDetail}>
+                <Upload className="h-4 w-4" aria-hidden />
+                Importo CSV
+              </Button>
+            ) : null}
             <Button type="button" onClick={openCreate} disabled={loadingDetail}>
               Shto punonjës
             </Button>
@@ -192,6 +203,11 @@ export function EmployeesPageClient(props: {
         departments={departments}
         jobTitles={jobTitles}
         onSuccess={() => router.refresh()}
+      />
+      <EmployeeImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => router.refresh()}
       />
     </>
   );

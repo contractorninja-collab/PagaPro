@@ -33,7 +33,7 @@ export default function PaneliLoading() {
 
       {/* Body — 1fr / 400px grid */}
       <div className="pb-24 md:pb-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-[22px]">
             <div>
               <div className="mb-4 flex items-baseline justify-between">
@@ -57,37 +57,40 @@ export default function PaneliLoading() {
                 ))}
               </div>
             </div>
+            <div className="rounded-lg border border-[#e2e8f0] bg-white p-5">
+              <Skeleton className="mb-2 h-4 w-40" />
+              <Skeleton className="mb-5 h-3 w-64 max-w-full" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[150px_1fr_24px] items-center gap-3">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-2 w-full" />
+                    <Skeleton className="h-3 w-5" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
+              <div className="border-b border-[#f1f5f9] px-5 py-4">
+                <Skeleton className="mb-2 h-4 w-36" />
+                <Skeleton className="mb-3 h-3 w-64 max-w-full" />
+                <Skeleton className="h-8 w-64 max-w-full rounded-md" />
+              </div>
+              <div className="divide-y divide-[#f1f5f9]">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="px-5 py-3">
+                    <Skeleton className="mb-2 h-3.5 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="min-w-0 space-y-[18px]">
             <DashboardPayrollPanelSkeleton />
-            <div className="grid grid-cols-2 gap-3">
-              <DashboardKpiCardsSkeleton />
-            </div>
-            <div className="rounded-[14px] border border-[#e2e8f0] bg-white p-5">
-              <Skeleton className="mb-3 h-4 w-36" />
-              <Skeleton className="mb-4 h-[9px] w-full rounded-md" />
-              <div className="space-y-2.5">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-3 w-full" />
-                ))}
-              </div>
-            </div>
+            <DashboardKpiCardsSkeleton />
           </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-[#e2e8f0] bg-white p-5">
-              <Skeleton className="mb-2 h-4 w-32" />
-              <Skeleton className="mb-4 h-3 w-56" />
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, j) => (
-                  <Skeleton key={j} className="h-4 w-full" />
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </>

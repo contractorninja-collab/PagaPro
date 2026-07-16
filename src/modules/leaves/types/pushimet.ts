@@ -48,6 +48,10 @@ export type PushimetBalanceRowDto = {
   entitlementBreakdown: { base: number; tenure: number; special: number } | null;
 };
 
-export type PushimetEmployeeOptionDto = { id: string; label: string };
+export type PushimetEmployeeOptionDto = {
+  id: string;
+  label: string;
+  eligibleYears: number[];
+};
 export type PushimetDepartmentOptionDto = { id: string; name: string };
 export type PushimetTemplateOptionDto = { id: string; name: string };
