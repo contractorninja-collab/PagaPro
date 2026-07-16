@@ -33,3 +33,4 @@ scripts/dev-create-test-login.cjs
 
 # Local binary uploads (company signatures / stamps)
 .local-storage/
+.vercel
