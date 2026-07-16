@@ -10,7 +10,7 @@ import {
   destroySession,
   getCurrentUser,
 } from "@/modules/auth/services/session";
-import { ACTIVE_COMPANY_COOKIE } from "@/server/company-scope";
+import { ACTIVE_COMPANY_COOKIE, resolveRequestCompanyIdFromHost } from "@/server/company-scope";
 
 export type AuthActionResult =
   | { ok: true; redirectTo: string }
@@ -64,12 +64,17 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
       data: { lastLoginAt: new Date(), ...(user.status === "INVITED" ? { status: "ACTIVE" } : {}) },
     });
 
+    const requestedCompanyId = await resolveRequestCompanyIdFromHost();
+    if (requestedCompanyId && !user.isPlatformAdmin && !user.memberships.some((m) => m.companyId === requestedCompanyId)) {
+      return { ok: false, error: "Llogaria juaj nuk ka qasje në këtë klient." };
+    }
+
     await createSession(user.id);
 
     const jar = await cookies();
-    const firstCompanyId = user.memberships[0]?.companyId;
-    if (firstCompanyId) {
-      jar.set(ACTIVE_COMPANY_COOKIE, firstCompanyId, {
+    const activeCompanyId = requestedCompanyId ?? user.memberships[0]?.companyId;
+    if (activeCompanyId) {
+      jar.set(ACTIVE_COMPANY_COOKIE, activeCompanyId, {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
@@ -78,7 +83,7 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
     }
 
     if (user.mustChangePassword) return { ok: true, redirectTo: "/ndrysho-fjalekalimin" };
-    if (user.isPlatformAdmin) return { ok: true, redirectTo: "/admin" };
+    if (user.isPlatformAdmin && !requestedCompanyId) return { ok: true, redirectTo: "/admin" };
     return { ok: true, redirectTo: "/paneli" };
   } catch (err) {
     console.error("[loginAction] unexpected:", err);

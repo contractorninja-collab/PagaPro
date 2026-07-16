@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, Plus, Search } from "lucide-react";
+import { Building2, ExternalLink, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
     const q = query.trim().toLowerCase();
     if (!q) return companies;
     return companies.filter((c) =>
-      [c.legalName, c.tradeName, c.fiscalNumber, c.businessRegistrationNumber, c.email]
+      [c.legalName, c.tradeName, c.slug, c.customDomain, c.tenantUrl, c.fiscalNumber, c.businessRegistrationNumber, c.email]
         .filter(Boolean)
         .some((v) => v!.toLowerCase().includes(q)),
     );
@@ -152,6 +152,20 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
                       {c.legalName}
                     </Link>
                     {c.tradeName ? <p className="text-xs text-muted-foreground">{c.tradeName}</p> : null}
+                    {c.tenantUrl ? (
+                      <a
+                        href={c.tenantUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {c.tenantUrl.replace(/^https:\/\//, "")}
+                        <ExternalLink className="h-3 w-3" aria-hidden />
+                      </a>
+                    ) : c.slug ? (
+                      <p className="mt-1 text-xs text-muted-foreground">Slug: {c.slug}</p>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{c.fiscalNumber ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.businessRegistrationNumber ?? "—"}</TableCell>

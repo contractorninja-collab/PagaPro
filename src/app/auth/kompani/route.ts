@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { destroySession, getCurrentUser } from "@/modules/auth/services/session";
-import { ACTIVE_COMPANY_COOKIE } from "@/server/company-scope";
+import { ACTIVE_COMPANY_COOKIE, resolveRequestCompanyIdFromHost } from "@/server/company-scope";
 
 /**
  * Re-resolves the active company for the logged-in user:
@@ -12,6 +12,24 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.redirect(new URL("/hyrje", request.url));
+  }
+
+  const hostCompanyId = await resolveRequestCompanyIdFromHost();
+  if (hostCompanyId) {
+    const membership = await prisma.userCompanyMembership.findUnique({
+      where: { userId_companyId: { userId: user.id, companyId: hostCompanyId } },
+      select: { isActive: true, company: { select: { status: true } } },
+    });
+    if (user.isPlatformAdmin || (membership?.isActive && membership.company.status === "ACTIVE")) {
+      const res = NextResponse.redirect(new URL("/paneli", request.url));
+      res.cookies.set(ACTIVE_COMPANY_COOKIE, hostCompanyId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      });
+      return res;
+    }
   }
 
   const membership = await prisma.userCompanyMembership.findFirst({

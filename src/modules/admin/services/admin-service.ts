@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { companySlugFromName } from "@/lib/company-url";
 import { generateTempPassword, hashPassword } from "@/modules/auth/services/password";
 import { destroyAllSessionsForUser } from "@/modules/auth/services/session";
 import type { CompanyUpsertInput, CreateCompanyUserInput } from "@/modules/admin/validation/admin-schemas";
+import { tenantUrlForCompany } from "@/server/tenant-domain";
 
 // ---------------------------------------------------------------------------
 // Companies
@@ -11,6 +13,9 @@ export interface AdminCompanyListItem {
   id: string;
   legalName: string;
   tradeName: string | null;
+  slug: string | null;
+  customDomain: string | null;
+  tenantUrl: string | null;
   fiscalNumber: string | null;
   businessRegistrationNumber: string | null;
   email: string | null;
@@ -26,6 +31,8 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
       id: true,
       legalName: true,
       tradeName: true,
+      slug: true,
+      customDomain: true,
       fiscalNumber: true,
       businessRegistrationNumber: true,
       email: true,
@@ -39,6 +46,9 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
     id: r.id,
     legalName: r.legalName,
     tradeName: r.tradeName,
+    slug: r.slug,
+    customDomain: r.customDomain,
+    tenantUrl: tenantUrlForCompany({ slug: r.slug, customDomain: r.customDomain }),
     fiscalNumber: r.fiscalNumber,
     businessRegistrationNumber: r.businessRegistrationNumber,
     email: r.email,
@@ -64,6 +74,9 @@ export interface AdminCompanyDetail {
   id: string;
   legalName: string;
   tradeName: string | null;
+  slug: string | null;
+  customDomain: string | null;
+  tenantUrl: string | null;
   fiscalNumber: string | null;
   businessRegistrationNumber: string | null;
   email: string | null;
@@ -84,6 +97,8 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       id: true,
       legalName: true,
       tradeName: true,
+      slug: true,
+      customDomain: true,
       fiscalNumber: true,
       businessRegistrationNumber: true,
       email: true,
@@ -115,6 +130,9 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
     id: row.id,
     legalName: row.legalName,
     tradeName: row.tradeName,
+    slug: row.slug,
+    customDomain: row.customDomain,
+    tenantUrl: tenantUrlForCompany({ slug: row.slug, customDomain: row.customDomain }),
     fiscalNumber: row.fiscalNumber,
     businessRegistrationNumber: row.businessRegistrationNumber,
     email: row.email,
@@ -141,18 +159,39 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
 
 export type UpdateCompanyResult =
   | { ok: true }
-  | { ok: false; code: "NOT_FOUND" | "DUPLICATE_NUI" | "DUPLICATE_NRB" | "DB_ERROR"; message?: string };
+  | {
+      ok: false;
+      code: "NOT_FOUND" | "DUPLICATE_NUI" | "DUPLICATE_NRB" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
+      message?: string;
+    };
+
+async function generateUniqueCompanySlug(baseName: string, excludeCompanyId: string): Promise<string> {
+  const base = companySlugFromName(baseName);
+  for (let i = 0; i < 100; i += 1) {
+    const suffix = i === 0 ? "" : `-${i + 1}`;
+    const candidate = `${base.slice(0, 80 - suffix.length)}${suffix}`;
+    const exists = await prisma.company.findFirst({
+      where: { slug: candidate, id: { not: excludeCompanyId } },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+  }
+  return `${base.slice(0, 67)}-${Date.now().toString(36)}`;
+}
 
 export async function updateCompanyForAdmin(
   companyId: string,
   input: CompanyUpsertInput,
 ): Promise<UpdateCompanyResult> {
   try {
+    const slug = input.slug ?? (await generateUniqueCompanySlug(input.tradeName ?? input.legalName, companyId));
     await prisma.company.update({
       where: { id: companyId },
       data: {
         legalName: input.legalName,
         tradeName: input.tradeName ?? null,
+        slug,
+        customDomain: input.customDomain ?? null,
         fiscalNumber: input.fiscalNumber ?? null,
         businessRegistrationNumber: input.businessRegistrationNumber ?? null,
         email: input.email ?? null,
@@ -172,6 +211,8 @@ export async function updateCompanyForAdmin(
       const target = Array.isArray(meta?.target) ? meta.target.join(",") : String(meta?.target ?? "");
       if (target.includes("fiscalNumber")) return { ok: false, code: "DUPLICATE_NUI" };
       if (target.includes("businessRegistrationNumber")) return { ok: false, code: "DUPLICATE_NRB" };
+      if (target.includes("slug")) return { ok: false, code: "DUPLICATE_SLUG" };
+      if (target.includes("customDomain")) return { ok: false, code: "DUPLICATE_DOMAIN" };
     }
     return { ok: false, code: "DB_ERROR", message: err instanceof Error ? err.message : String(err) };
   }

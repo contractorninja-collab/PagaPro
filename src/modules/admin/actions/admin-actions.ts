@@ -67,6 +67,20 @@ export async function createCompanyAction(raw: unknown): Promise<AdminActionResu
           fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
         };
       }
+      if (res.code === "DUPLICATE_SLUG") {
+        return {
+          ok: false,
+          error: "Ky slug ekziston tashmë.",
+          fieldErrors: { slug: ["Zgjidhni një slug tjetër për domain-in e klientit."] },
+        };
+      }
+      if (res.code === "DUPLICATE_DOMAIN") {
+        return {
+          ok: false,
+          error: "Ky domain ekziston tashmë.",
+          fieldErrors: { customDomain: ["Domain duhet të jetë unik."] },
+        };
+      }
       return { ok: false, error: "Krijimi i biznesit dështoi." };
     }
 
@@ -106,6 +120,20 @@ export async function updateCompanyAction(raw: unknown): Promise<AdminActionResu
           ok: false,
           error: "Ky NRB ekziston tashmë.",
           fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
+        };
+      }
+      if (res.code === "DUPLICATE_SLUG") {
+        return {
+          ok: false,
+          error: "Ky slug ekziston tashmë.",
+          fieldErrors: { slug: ["Zgjidhni një slug tjetër për domain-in e klientit."] },
+        };
+      }
+      if (res.code === "DUPLICATE_DOMAIN") {
+        return {
+          ok: false,
+          error: "Ky domain ekziston tashmë.",
+          fieldErrors: { customDomain: ["Domain duhet të jetë unik."] },
         };
       }
       return { ok: false, error: "Ruajtja dështoi." };

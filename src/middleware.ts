@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdminHost, tenantSlugFromHost } from "@/server/tenant-domain";
 
 const SESSION_COOKIE = "pp_session";
 
@@ -10,12 +11,31 @@ const SESSION_COOKIE = "pp_session";
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = hasSession ? (isAdminHost(host) ? "/admin" : "/paneli") : "/hyrje";
+    return NextResponse.redirect(url);
+  }
 
   if (pathname === "/hyrje") {
     return NextResponse.next();
   }
 
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  if (isAdminHost(host) && hasSession && !pathname.startsWith("/admin") && pathname !== "/ndrysho-fjalekalimin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin";
+    return NextResponse.redirect(url);
+  }
+
+  if (tenantSlugFromHost(host) && hasSession && pathname.startsWith("/admin")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/paneli";
+    return NextResponse.redirect(url);
+  }
+
   if (!hasSession) {
     const loginUrl = new URL("/hyrje", request.url);
     return NextResponse.redirect(loginUrl);

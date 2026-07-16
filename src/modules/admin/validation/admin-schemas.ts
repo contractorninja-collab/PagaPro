@@ -1,10 +1,30 @@
 import { z } from "zod";
+import { isValidCompanyDomain, normalizeCompanyDomain, normalizeCompanySlug } from "@/lib/company-url";
 
 const emptyToNull = (v: unknown) => {
   if (typeof v !== "string") return v ?? null;
   const t = v.trim();
   return t === "" ? null : t;
 };
+
+const slugInputSchema = z.preprocess(
+  emptyToNull,
+  z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (typeof v === "string" ? normalizeCompanySlug(v) : null))
+    .refine((v) => v === null || v.length >= 2, "Slug duhet të ketë të paktën 2 karaktere.")
+    .refine((v) => v === null || /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/.test(v), "Slug nuk është valid."),
+);
+
+const customDomainInputSchema = z.preprocess(
+  emptyToNull,
+  z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (typeof v === "string" ? normalizeCompanyDomain(v) : null))
+    .refine((v) => v === null || isValidCompanyDomain(v), "Domain nuk është valid."),
+);
 
 /** Company (business customer) create/update payload — Albanian field labels in UI. */
 export const companyUpsertSchema = z.object({
@@ -14,6 +34,8 @@ export const companyUpsertSchema = z.object({
     .min(2, "Emri i biznesit duhet të ketë të paktën 2 karaktere.")
     .max(255, "Emri i biznesit është shumë i gjatë."),
   tradeName: z.preprocess(emptyToNull, z.string().max(255).nullable().optional()),
+  slug: slugInputSchema,
+  customDomain: customDomainInputSchema,
   /// NUI — numri unik identifikues (fiscal number)
   fiscalNumber: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
   /// NRB — numri i regjistrimit të biznesit

@@ -372,6 +372,8 @@ model Company {
   id        String @id @default(cuid())
   legalName String
   tradeName String?
+  slug      String? @unique @db.VarChar(80)
+  customDomain String? @unique @db.VarChar(255)
 
   /// Kosovo Business Registration Number (or successor identifier)
   businessRegistrationNumber String? @unique

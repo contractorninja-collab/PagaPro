@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 export interface CompanyFormValues {
   legalName: string;
   tradeName: string;
+  slug: string;
+  customDomain: string;
   fiscalNumber: string;
   businessRegistrationNumber: string;
   email: string;
@@ -21,6 +23,8 @@ export interface CompanyFormValues {
 export const EMPTY_COMPANY_FORM: CompanyFormValues = {
   legalName: "",
   tradeName: "",
+  slug: "",
+  customDomain: "",
   fiscalNumber: "",
   businessRegistrationNumber: "",
   email: "",
@@ -82,6 +86,24 @@ export function CompanyForm({
         <Label htmlFor="tradeName">Emri tregtar</Label>
         <Input id="tradeName" value={values.tradeName} onChange={set("tradeName")} />
         <FieldError errors={fieldErrors.tradeName} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="slug">Slug i klientit</Label>
+          <Input id="slug" value={values.slug} onChange={set("slug")} placeholder="klienti" />
+          <FieldError errors={fieldErrors.slug} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="customDomain">Domain personal</Label>
+          <Input
+            id="customDomain"
+            value={values.customDomain}
+            onChange={set("customDomain")}
+            placeholder="hr.klienti.com"
+          />
+          <FieldError errors={fieldErrors.customDomain} />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
