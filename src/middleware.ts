@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  ADMIN_BASE_PATH,
+  isAdminPublicPathname,
+} from "@/lib/admin-path";
 import { isAdminHost, tenantSlugFromHost } from "@/server/tenant-domain";
 
 const SESSION_COOKIE = "pp_session";
@@ -13,10 +17,18 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const tenantSlug = tenantSlugFromHost(host);
+
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return new NextResponse("Not Found", {
+      status: 404,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 
   if (pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = hasSession ? (isAdminHost(host) ? "/admin" : "/paneli") : "/hyrje";
+    url.pathname = hasSession ? (isAdminHost(host) ? ADMIN_BASE_PATH : "/paneli") : "/hyrje";
     return NextResponse.redirect(url);
   }
 
@@ -24,15 +36,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isAdminHost(host) && hasSession && !pathname.startsWith("/admin") && pathname !== "/ndrysho-fjalekalimin") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    return NextResponse.redirect(url);
+  if (isAdminPublicPathname(pathname)) {
+    if (tenantSlug) {
+      return new NextResponse("Not Found", {
+        status: 404,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+    if (!hasSession) {
+      return NextResponse.redirect(new URL("/hyrje", request.url));
+    }
+
+    const internalUrl = request.nextUrl.clone();
+    internalUrl.pathname = `/admin${pathname.slice(ADMIN_BASE_PATH.length)}`;
+    return NextResponse.rewrite(internalUrl);
   }
 
-  if (tenantSlugFromHost(host) && hasSession && pathname.startsWith("/admin")) {
+  if (isAdminHost(host) && hasSession && pathname !== "/ndrysho-fjalekalimin") {
     const url = request.nextUrl.clone();
-    url.pathname = "/paneli";
+    url.pathname = ADMIN_BASE_PATH;
     return NextResponse.redirect(url);
   }
 

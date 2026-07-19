@@ -77,6 +77,7 @@ async function main() {
   console.log(
     `Baselined ${migrations.length} migrations in isolated schema ${databaseSchema}.`,
   );
+  runPrisma(["db", "seed"]);
 }
 
 main()

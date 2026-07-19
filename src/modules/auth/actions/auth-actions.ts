@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { z } from "zod";
+import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
 import {
@@ -83,7 +84,7 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
     }
 
     if (user.mustChangePassword) return { ok: true, redirectTo: "/ndrysho-fjalekalimin" };
-    if (user.isPlatformAdmin && !requestedCompanyId) return { ok: true, redirectTo: "/admin" };
+    if (user.isPlatformAdmin && !requestedCompanyId) return { ok: true, redirectTo: ADMIN_BASE_PATH };
     return { ok: true, redirectTo: "/paneli" };
   } catch (err) {
     console.error("[loginAction] unexpected:", err);
@@ -145,7 +146,7 @@ export async function changePasswordAction(raw: unknown): Promise<AuthActionResu
     await destroyAllSessionsForUser(user.id);
     await createSession(user.id);
 
-    return { ok: true, redirectTo: user.isPlatformAdmin ? "/admin" : "/paneli" };
+    return { ok: true, redirectTo: user.isPlatformAdmin ? ADMIN_BASE_PATH : "/paneli" };
   } catch (err) {
     console.error("[changePasswordAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi i fjalëkalimit dështoi papritur." };

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Building2, type LucideIcon } from "lucide-react";
 import { PagaProLogo } from "@/components/branding/logo";
 import { sidebarItemClass } from "@/components/layout/sidebar-styles";
+import { adminPath } from "@/lib/admin-path";
 
 interface AdminNavItem {
   href: string;
@@ -12,7 +13,7 @@ interface AdminNavItem {
   icon: LucideIcon;
 }
 
-const ADMIN_NAV: AdminNavItem[] = [{ href: "/admin/bizneset", label: "Bizneset", icon: Building2 }];
+const ADMIN_NAV: AdminNavItem[] = [{ href: adminPath("bizneset"), label: "Bizneset", icon: Building2 }];
 
 export function AdminSidebar() {
   const pathname = usePathname();

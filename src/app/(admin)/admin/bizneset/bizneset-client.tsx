@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/patterns/empty-state";
 import { PageHeader } from "@/components/patterns/page-header";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { adminPath } from "@/lib/admin-path";
 import { createCompanyAction } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyListItem } from "@/modules/admin/services/admin-service";
 
@@ -55,7 +56,7 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
       if (res.ok && res.data) {
         toast.success("Biznesi u krijua me sukses.");
         setCreateOpen(false);
-        router.push(`/admin/bizneset/${res.data.id}`);
+        router.push(adminPath(`bizneset/${res.data.id}`));
       } else if (!res.ok) {
         setError(res.error);
         setFieldErrors(res.fieldErrors ?? {});
@@ -142,10 +143,10 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
             {filtered.map((c) => {
               const status = STATUS_LABELS[c.status];
               return (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => router.push(`/admin/bizneset/${c.id}`)}>
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => router.push(adminPath(`bizneset/${c.id}`))}>
                   <TableCell>
                     <Link
-                      href={`/admin/bizneset/${c.id}`}
+                      href={adminPath(`bizneset/${c.id}`)}
                       className="font-medium text-foreground hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >

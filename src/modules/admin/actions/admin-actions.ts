@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { adminPath } from "@/lib/admin-path";
 import { z } from "zod";
 import { getCurrentUser } from "@/modules/auth/services/session";
 import { provisionCompany } from "@/modules/admin/services/company-provisioning";
@@ -31,8 +32,8 @@ async function requireAdmin(): Promise<boolean> {
 
 function revalidateBizneset(companyId?: string) {
   try {
-    revalidatePath("/admin/bizneset");
-    if (companyId) revalidatePath(`/admin/bizneset/${companyId}`);
+    revalidatePath(adminPath("bizneset"));
+    if (companyId) revalidatePath(adminPath(`bizneset/${companyId}`));
   } catch (err) {
     console.error("[admin-actions] revalidatePath failed:", err);
   }

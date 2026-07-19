@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { PagaProLogo, PagaProMark } from "@/components/branding/logo";
 import { getCurrentUser } from "@/modules/auth/services/session";
 import { LoginForm } from "./login-form";
@@ -12,7 +13,7 @@ export default async function HyrjePage() {
   const user = await getCurrentUser();
   if (user) {
     if (user.mustChangePassword) redirect("/ndrysho-fjalekalimin");
-    redirect(user.isPlatformAdmin ? "/admin" : "/paneli");
+    redirect(user.isPlatformAdmin ? ADMIN_BASE_PATH : "/paneli");
   }
 
   return (

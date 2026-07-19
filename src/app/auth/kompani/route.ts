@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { prisma } from "@/lib/prisma";
 import { destroySession, getCurrentUser } from "@/modules/auth/services/session";
 import { ACTIVE_COMPANY_COOKIE, resolveRequestCompanyIdFromHost } from "@/server/company-scope";
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
 
   if (!membership) {
     if (user.isPlatformAdmin) {
-      return NextResponse.redirect(new URL("/admin", request.url));
+      return NextResponse.redirect(new URL(ADMIN_BASE_PATH, request.url));
     }
     // No accessible company left — end the session to avoid a login redirect loop.
     await destroySession();

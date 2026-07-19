@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { adminPath } from "@/lib/admin-path";
 
 export default function AdminIndexPage() {
-  redirect("/admin/bizneset");
+  redirect(adminPath("bizneset"));
 }

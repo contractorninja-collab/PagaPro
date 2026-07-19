@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { NextResponse } from "next/server";
 import type { CompanyMembershipRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -99,7 +100,7 @@ export async function requireCompanyContextPage(): Promise<CompanyContext> {
       redirect("/ndrysho-fjalekalimin");
     case "NO_ACTIVE_COMPANY": {
       const user = await getCurrentUser();
-      redirect(user?.isPlatformAdmin ? "/admin" : "/auth/kompani");
+      redirect(user?.isPlatformAdmin ? ADMIN_BASE_PATH : "/auth/kompani");
     }
     case "FORBIDDEN":
       redirect("/auth/kompani");

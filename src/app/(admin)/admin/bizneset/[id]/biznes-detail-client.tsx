@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { adminPath } from "@/lib/admin-path";
 import {
   createCompanyUserAction,
   resetUserPasswordAction,
@@ -217,7 +218,7 @@ export function BiznesDetailClient({ company }: { company: AdminCompanyDetail })
       <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <Link
-            href="/admin/bizneset"
+            href={adminPath("bizneset")}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />

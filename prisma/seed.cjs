@@ -74,7 +74,7 @@ async function maybeSeedKosovoOfficialFixedForCurrentYearIfEmpty(companyId) {
 }
 
 function upsertDevCompanyIdInEnv(companyId) {
-  if (process.env.VERCEL || process.env.NODE_ENV === "production") return;
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") return false;
 
   const envPath = path.join(__dirname, "..", ".env");
   let raw = "";
@@ -99,6 +99,7 @@ function upsertDevCompanyIdInEnv(companyId) {
   }
 
   fs.writeFileSync(envPath, `${out.join("\n").replace(/\s+$/, "")}\n`);
+  return true;
 }
 
 /** Canonical placeholder catalog for Dokumentet (aligned with `engine/placeholders/registry.ts`). */
@@ -285,7 +286,9 @@ async function maybeSeedPlatformAdmin() {
     console.log(`Password: ${password}`);
     console.log("Save this password now — it is shown only once and must be changed on first login.");
   }
-  console.log("Login at /hyrje, console at /admin.\n");
+  const adminPath =
+    process.env.NEXT_PUBLIC_PAGAPRO_ADMIN_PATH || "/admin-console";
+  console.log(`Login at /hyrje, console at ${adminPath}.\n`);
 }
 
 async function main() {
@@ -329,8 +332,10 @@ async function main() {
     console.log("Created default PayrollParameterSet for dev.");
   }
 
-  upsertDevCompanyIdInEnv(company.id);
+  if (upsertDevCompanyIdInEnv(company.id)) {
   console.log(`\nUpdated .env → DEV_DEFAULT_COMPANY_ID=${company.id}`);
+
+  }
 
   const { seedContractTemplates } = require("../scripts/seed-contract-templates.cjs");
   await seedContractTemplates(prisma);
