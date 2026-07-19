@@ -3,7 +3,7 @@
  * Run: `npx prisma db seed` (or `npm run db:seed`)
  */
 /* eslint-disable @typescript-eslint/no-require-imports -- Prisma seed runs as plain Node */
-require("dotenv").config({ override: true });
+require("dotenv").config();
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomInt } = require("node:crypto");
@@ -11,14 +11,33 @@ const bcrypt = require("bcryptjs");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { PrismaClient } = require("@prisma/client");
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL;
+const databaseSchema =
+  process.env.PAGAPRO_DATABASE_SCHEMA?.trim() ||
+  (process.env.VERCEL ? "pagapro" : "public");
 if (!connectionString) {
-  console.error("DATABASE_URL is required for seeding.");
+  console.error(
+    "A PostgreSQL connection is required via DATABASE_URL or a Vercel Postgres environment variable.",
+  );
   process.exit(1);
 }
 
+const seedConnectionString = (() => {
+  if (!process.env.VERCEL) return connectionString;
+  const url = new URL(connectionString);
+  url.searchParams.set("uselibpqcompat", "true");
+  return url.toString();
+})();
+
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
+  adapter: new PrismaPg(
+    { connectionString: seedConnectionString },
+    { schema: databaseSchema },
+  ),
 });
 
 /** Keep in sync with `KOSOVO_OFFICIAL_FIXED_HOLIDAY_DEFINITIONS` in `src/modules/payroll/calendar/kosovo-public-holidays.ts`. */
@@ -55,6 +74,8 @@ async function maybeSeedKosovoOfficialFixedForCurrentYearIfEmpty(companyId) {
 }
 
 function upsertDevCompanyIdInEnv(companyId) {
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") return;
+
   const envPath = path.join(__dirname, "..", ".env");
   let raw = "";
   try {
