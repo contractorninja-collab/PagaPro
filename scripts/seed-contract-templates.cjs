@@ -16,21 +16,13 @@ function templateVersionSourceKey({ companyId, templateId, versionNumber }) {
   return `documents/templates/${companyId}/${templateId}/v${versionNumber}/source.docx`;
 }
 
-function storageRoot() {
-  return process.env.COMPANY_ASSET_STORAGE_ROOT
-    ? path.resolve(process.env.COMPANY_ASSET_STORAGE_ROOT)
-    : path.join(__dirname, "..", ".local-storage", "company-assets");
-}
-
-function putStorage(key, buffer) {
-  const full = path.join(storageRoot(), key);
-  fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, buffer);
-}
-
-function getStorage(key) {
-  return fs.readFileSync(path.join(storageRoot(), key));
-}
+// Storage lives in scripts/seed-storage.cjs so the seeder writes wherever the app reads.
+const {
+  describeStorage,
+  getStorage,
+  putStorage,
+  contentTypeForExtension,
+} = require("./seed-storage.cjs");
 
 function docxContainsStubMarker(docxBuffer) {
   const zip = new PizZip(docxBuffer);
@@ -132,14 +124,13 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
       select: { id: true, sourceStorageKey: true, mappingJson: true },
     });
     if (existingPublished) {
-      let publishedIsSameRealFile = false;
-      try {
-        const publishedBuf = getStorage(existingPublished.sourceStorageKey);
-        publishedIsSameRealFile =
-          Buffer.compare(publishedBuf, buf) === 0 && !docxContainsStubMarker(publishedBuf);
-      } catch {
-        publishedIsSameRealFile = false;
-      }
+      // null means genuinely absent; a real failure throws and aborts the run
+      // rather than being misread as "changed" and republishing v(n+1).
+      const publishedBuf = await getStorage(existingPublished.sourceStorageKey);
+      const publishedIsSameRealFile =
+        publishedBuf !== null &&
+        Buffer.compare(publishedBuf, buf) === 0 &&
+        !docxContainsStubMarker(publishedBuf);
       const publishedHasSameMapping = stableJson(existingPublished.mappingJson) === stableJson(mappingJson);
       if (publishedIsSameRealFile && publishedHasSameMapping) continue;
     }
@@ -155,7 +146,7 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
       templateId: template.id,
       versionNumber,
     });
-    putStorage(sourceStorageKey, buf);
+    await putStorage(sourceStorageKey, buf, contentTypeForExtension(sourceStorageKey));
 
     await prisma.documentTemplateVersion.updateMany({
       where: { templateId: template.id },
@@ -188,6 +179,7 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
 }
 
 async function seedContractTemplates(prisma) {
+  console.log(`[contracts:seed] storage: ${describeStorage()}`);
   const companies = await prisma.company.findMany({ select: { id: true } });
   if (companies.length === 0) return 0;
 

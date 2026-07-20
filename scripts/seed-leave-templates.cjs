@@ -24,21 +24,15 @@ function templateVersionSourceKey({ companyId, templateId, versionNumber }) {
   return `documents/templates/${companyId}/${templateId}/v${versionNumber}/source.docx`;
 }
 
-function storageRoot() {
-  return process.env.COMPANY_ASSET_STORAGE_ROOT
-    ? path.resolve(process.env.COMPANY_ASSET_STORAGE_ROOT)
-    : path.join(__dirname, "..", ".local-storage", "company-assets");
-}
-
-function storagePath(key) {
-  return path.join(storageRoot(), key);
-}
-
-function putStorage(key, buffer) {
-  const full = storagePath(key);
-  fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, buffer);
-}
+// Storage lives in scripts/seed-storage.cjs so the seeder writes wherever the
+// app reads. `storagePath` is deliberately gone: any missed conversion must be
+// a ReferenceError, not a silent read from local disk while the app reads S3.
+const {
+  describeStorage,
+  getStorage,
+  putStorage,
+  contentTypeForExtension,
+} = require("./seed-storage.cjs");
 
 function normalizeBundledLeaveTemplate(source) {
   const zip = new PizZip(source);
@@ -130,14 +124,11 @@ async function seedLeaveTemplatesForCompany(prisma, companyId) {
       select: { sourceStorageKey: true, mappingJson: true, detectionMode: true },
     });
     if (published) {
-      let sameSource = false;
-      try {
-        sameSource =
-          docxContentDigest(fs.readFileSync(storagePath(published.sourceStorageKey))) ===
-          docxContentDigest(source);
-      } catch {
-        sameSource = false;
-      }
+      // null means genuinely absent; a real failure throws and aborts the run.
+      const existingBuf = await getStorage(published.sourceStorageKey);
+      const sameSource =
+        existingBuf !== null &&
+        docxContentDigest(existingBuf) === docxContentDigest(source);
       if (
         sameSource &&
         published.detectionMode === "PLACEHOLDER" &&
@@ -157,7 +148,7 @@ async function seedLeaveTemplatesForCompany(prisma, companyId) {
       templateId: template.id,
       versionNumber,
     });
-    putStorage(sourceStorageKey, source);
+    await putStorage(sourceStorageKey, source, contentTypeForExtension(sourceStorageKey));
 
     await prisma.$transaction([
       prisma.documentTemplateVersion.updateMany({
@@ -191,6 +182,7 @@ async function seedLeaveTemplatesForCompany(prisma, companyId) {
 }
 
 async function seedLeaveTemplates(prisma) {
+  console.log(`[leave:seed] storage: ${describeStorage()}`);
   const companies = await prisma.company.findMany({ select: { id: true } });
   let total = 0;
   for (const company of companies) {

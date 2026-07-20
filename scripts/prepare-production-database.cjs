@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { Client } = require("pg");
+const { evaluateSchemaChange } = require("./lib/deploy-guard.cjs");
 
 const databaseSchema =
   process.env.PAGAPRO_DATABASE_SCHEMA?.trim() ||
@@ -57,6 +58,17 @@ async function main() {
 
   if (history.rows[0]?.exists) {
     console.log(`Prisma migration history already exists in schema ${databaseSchema}.`);
+    return;
+  }
+
+  // Bootstrapping runs `db push` and `db seed`. If this ever reaches the
+  // production schema from a non-production deployment it would rewrite live
+  // data, so it is gated by the same invariant as migrations.
+  const verdict = evaluateSchemaChange();
+  if (!verdict.allowed) {
+    console.warn(verdict.reason);
+    console.warn("Refusing to bootstrap a schema that already holds production data.");
+    process.exitCode = 1;
     return;
   }
 

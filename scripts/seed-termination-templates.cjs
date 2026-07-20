@@ -9,6 +9,12 @@ const {
   loadTerminationManifest,
   terminationDir,
 } = require("./termination-manifest.cjs");
+const {
+  describeStorage,
+  getStorage,
+  putStorage,
+  contentTypeForExtension,
+} = require("./seed-storage.cjs");
 
 const XML_PART = /^word\/(document\d*|header\d*|footer\d*)\.xml$/i;
 const REQUIRED_PLACEHOLDERS = new Set([
@@ -25,21 +31,9 @@ function templateVersionSourceKey({ companyId, templateId, versionNumber }) {
   return `documents/templates/${companyId}/${templateId}/v${versionNumber}/source.docx`;
 }
 
-function storageRoot() {
-  return process.env.COMPANY_ASSET_STORAGE_ROOT
-    ? path.resolve(process.env.COMPANY_ASSET_STORAGE_ROOT)
-    : path.join(__dirname, "..", ".local-storage", "company-assets");
-}
-
-function storagePath(key) {
-  return path.join(storageRoot(), key);
-}
-
-function putStorage(key, buffer) {
-  const full = storagePath(key);
-  fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, buffer);
-}
+// Storage lives in scripts/seed-storage.cjs so the seeder writes wherever the
+// app reads. `storagePath` is deliberately gone: any missed conversion must be
+// a ReferenceError, not a silent write to local disk while the app reads S3.
 
 function normalizeBundledTerminationTemplate(source) {
   const zip = new PizZip(source);
@@ -142,14 +136,13 @@ async function seedTerminationTemplatesForCompany(prisma, companyId) {
       select: { sourceStorageKey: true, mappingJson: true, detectionMode: true },
     });
     if (published) {
-      let sameSource = false;
-      try {
-        sameSource =
-          docxContentDigest(fs.readFileSync(storagePath(published.sourceStorageKey))) ===
-          docxContentDigest(source);
-      } catch {
-        sameSource = false;
-      }
+      // getStorage returns null ONLY for genuine absence and throws otherwise,
+      // so a transient failure aborts loudly instead of being misread as
+      // "template changed" and republishing v(n+1) against an empty bucket.
+      const existingBuf = await getStorage(published.sourceStorageKey);
+      const sameSource =
+        existingBuf !== null &&
+        docxContentDigest(existingBuf) === docxContentDigest(source);
       if (
         sameSource &&
         published.detectionMode === "PLACEHOLDER" &&
@@ -169,7 +162,7 @@ async function seedTerminationTemplatesForCompany(prisma, companyId) {
       templateId: template.id,
       versionNumber,
     });
-    putStorage(sourceStorageKey, source);
+    await putStorage(sourceStorageKey, source, contentTypeForExtension(sourceStorageKey));
 
     await prisma.$transaction([
       prisma.documentTemplateVersion.updateMany({
@@ -203,6 +196,7 @@ async function seedTerminationTemplatesForCompany(prisma, companyId) {
 }
 
 async function seedTerminationTemplates(prisma) {
+  console.log(`[termination:seed] storage: ${describeStorage()}`);
   const companies = await prisma.company.findMany({ select: { id: true } });
   let total = 0;
   for (const company of companies) {

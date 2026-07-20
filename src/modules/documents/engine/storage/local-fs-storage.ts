@@ -1,19 +1,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { DocumentStorage, DocumentStoragePutOptions } from "./types";
+import { assertSafeStorageKey, StorageNotFoundError } from "./key-safety";
 
-function assertSafeKey(key: string): void {
-  if (!key || key.includes("..") || path.isAbsolute(key)) {
-    throw new Error(`Unsafe storage key: ${key}`);
-  }
+function isEnoent(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as NodeJS.ErrnoException).code === "ENOENT"
+  );
 }
 
-/** Filesystem-backed storage — swap for S3 in production. */
+/** Filesystem-backed storage — the local-dev fallback for SupabaseDocumentStorage. */
 export class LocalFsDocumentStorage implements DocumentStorage {
   constructor(private readonly rootDir: string) {}
 
   private resolve(key: string): string {
-    assertSafeKey(key);
+    // Shared with the Supabase adapter — one guard, no bypass, throws StorageKeyError.
+    assertSafeStorageKey(key);
     return path.join(this.rootDir, key);
   }
 
@@ -21,11 +25,21 @@ export class LocalFsDocumentStorage implements DocumentStorage {
     const target = this.resolve(key);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, body);
+    // The filesystem has nowhere to persist a content type; every download route
+    // sets its own header, so this stays a no-op and local behaviour is unchanged.
     void options.contentType;
   }
 
   async get(key: string): Promise<Buffer> {
-    return fs.readFile(this.resolve(key));
+    try {
+      return await fs.readFile(this.resolve(key));
+    } catch (err) {
+      // Match the object-store contract so callers branch on one error type.
+      // Without this a missing file surfaces as a raw ENOENT 500 locally while
+      // the same request 404s in production.
+      if (isEnoent(err)) throw new StorageNotFoundError();
+      throw err;
+    }
   }
 
   async exists(key: string): Promise<boolean> {
