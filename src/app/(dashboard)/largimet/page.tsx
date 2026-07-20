@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
-import {
-  LargimetDashboardClient,
-  type ChecklistProgressMap,
-} from "@/modules/terminations/components/largimet-dashboard-client";
+import { LargimetDashboardClient } from "@/modules/terminations/components/largimet-dashboard-client";
 import {
   listEmployeesForTerminationPicker,
   listTerminationsForCompany,
@@ -46,23 +42,9 @@ export default async function LargimetPage({
 
   let rows;
   let employees;
-  const checklistProgress: ChecklistProgressMap = {};
   try {
     rows = await listTerminationsForCompany(companyId, filters);
     employees = await listEmployeesForTerminationPicker(companyId);
-
-    // Presentation-only aggregation for the register's per-row checklist progress (x/6).
-    if (rows.length > 0) {
-      const checklistRows = await prisma.terminationChecklist.findMany({
-        where: { companyId, terminationId: { in: rows.map((r) => r.id) } },
-        select: { terminationId: true, isCompleted: true },
-      });
-      for (const item of checklistRows) {
-        const entry = (checklistProgress[item.terminationId] ??= { done: 0, total: 0 });
-        entry.total += 1;
-        if (item.isCompleted) entry.done += 1;
-      }
-    }
   } catch (err) {
     console.error("[pagapro] LargimetPage load failed", err);
     return (
@@ -80,7 +62,6 @@ export default async function LargimetPage({
       rows={serializedRows as never}
       employees={serializedEmployees as never}
       filters={filters}
-      checklistProgress={checklistProgress}
     />
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
-import { Banknote, Check, Clock, FileText, MoreHorizontal, UserMinus } from "lucide-react";
+import { Banknote, Check, Clock, Download, FileText, MoreHorizontal, UserMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { payrollMonthNameSq } from "@/modules/payroll/helpers/month-label";
+import { logDocumentDownloadAction } from "@/modules/documents/actions/documents-actions";
 import {
   createTerminationAction,
   approveTerminationAction,
@@ -60,6 +62,7 @@ export interface LargimetRowSerialized {
   generatedDocument: {
     id: string;
     displayFilename: string;
+    generatedDocxStorageKey: string | null;
   } | null;
 }
 
@@ -71,8 +74,6 @@ export interface EmployeePickerOption {
   jobTitle: string | null;
   hireDate: string;
 }
-
-export type ChecklistProgressMap = Record<string, { done: number; total: number }>;
 
 function fmtDate(iso: string) {
   try {
@@ -177,24 +178,6 @@ function InitialsAvatar({
   );
 }
 
-function ChecklistProgress({ done, total }: { done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const complete = total > 0 && done >= total;
-  return (
-    <div className="min-w-[96px] max-w-[130px]">
-      <p className="text-[11px] font-bold tabular-nums text-[#64748b]">
-        {done}/{total}
-      </p>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f7]">
-        <div
-          className={cn("h-full rounded-full transition-all", complete ? "bg-[#16a34a]" : "bg-brand-blue")}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 /* ── Register page ────────────────────────────────────────────────────── */
 
 export function LargimetDashboardClient(props: {
@@ -207,7 +190,6 @@ export function LargimetDashboardClient(props: {
     year?: number;
     month?: number;
   };
-  checklistProgress?: ChecklistProgressMap;
 }) {
   const [pending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
@@ -296,7 +278,7 @@ export function LargimetDashboardClient(props: {
             {/* Register table (md+) */}
             <div className={cn(CARD, "hidden overflow-hidden md:block")}>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] border-collapse text-[13px]">
+                <table className="w-full min-w-[960px] border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
                       <th className="px-4 py-2.5 font-bold">Punonjësi</th>
@@ -305,14 +287,12 @@ export function LargimetDashboardClient(props: {
                       <th className="px-4 py-2.5 font-bold">Statusi</th>
                       <th className="px-4 py-2.5 font-bold">Payroll final</th>
                       <th className="px-4 py-2.5 font-bold">Dokumenti</th>
-                      <th className="px-4 py-2.5 font-bold">Checklist</th>
                       <th className="px-4 py-2.5 text-right font-bold">Veprime</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => {
                       const closed = r.status === "COMPLETED" || r.status === "CANCELLED";
-                      const progress = props.checklistProgress?.[r.id] ?? { done: 0, total: 6 };
                       return (
                         <tr
                           key={r.id}
@@ -367,9 +347,6 @@ export function LargimetDashboardClient(props: {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <ChecklistProgress done={progress.done} total={progress.total} />
-                          </td>
-                          <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1.5">
                               <RowNextAction row={r} pending={pending} startTransition={startTransition} />
                               <RowActionsMenu row={r} pending={pending} startTransition={startTransition} />
@@ -387,7 +364,6 @@ export function LargimetDashboardClient(props: {
             <div className="grid gap-3 md:hidden">
               {rows.map((r) => {
                 const closed = r.status === "COMPLETED" || r.status === "CANCELLED";
-                const progress = props.checklistProgress?.[r.id] ?? { done: 0, total: 6 };
                 return (
                   <div key={r.id} className={cn(CARD, "p-4", closed && "opacity-60")}>
                     <div className="flex items-start justify-between gap-2">
@@ -445,9 +421,6 @@ export function LargimetDashboardClient(props: {
                         </dd>
                       </div>
                     </dl>
-                    <div className="mt-3">
-                      <ChecklistProgress done={progress.done} total={progress.total} />
-                    </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[#f1f5f9] pt-3">
                       <Link href={`/largimet/${r.id}`} className={BTN_DENSE_SECONDARY}>
                         Hap
@@ -668,13 +641,97 @@ function PayrollCell({ row }: { row: LargimetRowSerialized }) {
 }
 
 function useRowRunner(startTransition: (fn: () => void) => void) {
+  const router = useRouter();
   return function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) toast.error(res.error ?? "Gabim.");
-      else toast.success("U krye.");
+      else {
+        toast.success("U krye.");
+        router.refresh();
+      }
     });
   };
+}
+
+/**
+ * Streams an artifact's DOCX to the browser.
+ *
+ * Deliberately not the `window.open` idiom used on the document detail page: here the
+ * call can follow a full server-side render, which puts the popup outside the user-gesture
+ * window and gets it blocked. Fetching the blob also turns a missing file into a toast
+ * instead of a raw JSON error page.
+ */
+async function downloadArtifactDocx(artifactId: string, filename: string): Promise<void> {
+  const res = await fetch(`/api/dokumentet/artifacts/${artifactId}/docx?inline=0`);
+  if (!res.ok) {
+    toast.error("Skedari i dokumentit nuk u gjet.");
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  void logDocumentDownloadAction({ artifactId });
+}
+
+function docxFilenameFor(row: LargimetRowSerialized): string {
+  const stored = row.generatedDocument?.displayFilename?.replace(/\.[^.]+$/, "");
+  if (stored) return `${stored}.docx`;
+  return `Largim-${row.employee.lastName}-${row.employee.firstName}.docx`.replace(/\s+/g, "-");
+}
+
+/**
+ * Generates the termination document if it doesn't exist yet, then downloads it.
+ * Uses its own transition so one row's spinner doesn't disable every other row.
+ */
+function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean }) {
+  const { row } = props;
+  const router = useRouter();
+  const [busy, startDownload] = useTransition();
+
+  function onClick() {
+    startDownload(async () => {
+      const filename = docxFilenameFor(row);
+
+      if (row.generatedDocument?.generatedDocxStorageKey) {
+        await downloadArtifactDocx(row.generatedDocument.id, filename);
+        return;
+      }
+
+      const res = await generateTerminationDocumentActionServer({ id: row.id });
+      if (!res.ok) {
+        // The "no template seeded" message is long but actionable — show it in full.
+        toast.error(res.error, { duration: 8000 });
+        return;
+      }
+      const artifactId = res.data?.artifactId;
+      if (!artifactId) {
+        toast.error("Dokumenti u gjenerua, por nuk u kthye ID e tij.");
+        return;
+      }
+      toast.success("Dokumenti u gjenerua.");
+      await downloadArtifactDocx(artifactId, filename);
+      router.refresh();
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(BTN_DENSE_PRIMARY, "inline-flex items-center gap-1.5")}
+      disabled={busy || props.pending}
+      onClick={onClick}
+    >
+      <Download className="h-3.5 w-3.5" aria-hidden />
+      {busy ? "Duke gjeneruar…" : "Shkarko"}
+    </button>
+  );
 }
 
 /** Per-status next action (the register's inline CTA). */
@@ -722,11 +779,16 @@ function RowNextAction(props: {
       </button>
     );
   }
-  return (
-    <Link href={`/largimet/${row.id}`} className={BTN_DENSE_SECONDARY}>
-      Shiko
-    </Link>
-  );
+  // A cancelled termination has no legitimate document — generateTerminationArtifact
+  // rejects it outright — so it keeps a plain link to the detail page.
+  if (row.status === "CANCELLED") {
+    return (
+      <Link href={`/largimet/${row.id}`} className={BTN_DENSE_SECONDARY}>
+        Shiko
+      </Link>
+    );
+  }
+  return <RowDownloadButton row={row} pending={pending} />;
 }
 
 /** The rest of the quick actions, folded into a per-row menu. */
@@ -756,10 +818,10 @@ function RowActionsMenu(props: {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          disabled={pending || closed}
-          onClick={() => run(() => generateTerminationDocumentActionServer({ id: row.id }))}
+          disabled={pending || row.status === "CANCELLED"}
+          onClick={() => run(() => generateTerminationDocumentActionServer({ id: row.id }, true))}
         >
-          Gjenero dokumentin
+          {row.generatedDocument ? "Rigjenero dokumentin" : "Gjenero dokumentin"}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={pending || closed}

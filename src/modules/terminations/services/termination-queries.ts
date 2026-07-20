@@ -72,7 +72,6 @@ export async function getTerminationDetailBundle(companyId: string, terminationI
     where: { id: terminationId, companyId },
     include: {
       employee: { include: { department: { select: { id: true, name: true } } } },
-      checklists: { orderBy: { itemKey: "asc" } },
       finalPayroll: true,
       generatedDocument: true,
       approvedBy: { select: { id: true, displayName: true, email: true } },

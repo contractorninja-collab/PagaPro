@@ -84,9 +84,3 @@ export const terminationUpdateSchema = z
 export const terminationIdSchema = z.object({
   id: z.string().min(1),
 });
-
-export const checklistToggleSchema = z.object({
-  terminationId: z.string().min(1),
-  itemKey: z.string().min(1),
-  isCompleted: z.boolean(),
-});

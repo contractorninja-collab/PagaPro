@@ -31,7 +31,6 @@ export default async function LargimetDetailPage({ params }: Props) {
 
   const plain = JSON.parse(JSON.stringify(bundle)) as {
     termination: unknown;
-    checklists: unknown;
     artifacts: unknown;
     payrollEntry: unknown;
     timeline: unknown;
@@ -42,7 +41,6 @@ export default async function LargimetDetailPage({ params }: Props) {
   return (
     <LargimetDetailClient
       termination={plain.termination as never}
-      checklists={plain.checklists as never}
       artifacts={plain.artifacts as never}
       payrollEntry={plain.payrollEntry as never}
       timeline={plain.timeline as never}

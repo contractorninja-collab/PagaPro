@@ -12,13 +12,11 @@ import {
   generateTerminationDocumentAction,
   completeTerminationWorkflow,
   cancelTerminationWorkflow,
-  toggleTerminationChecklist,
 } from "@/modules/terminations/services/termination-workflow-service";
 import {
   terminationCreateSchema,
   terminationUpdateSchema,
   terminationIdSchema,
-  checklistToggleSchema,
 } from "@/modules/terminations/validators/termination-schemas";
 
 export type TerminationActionResult<T = undefined> =
@@ -46,7 +44,7 @@ export async function createTerminationAction(raw: unknown): Promise<Termination
   const res = await createTerminationWorkflow(companyId, parsed.data, user.id);
   if (!res.ok) return res;
   rev();
-  return res;
+  return { ok: true, data: { id: res.id } };
 }
 
 export async function updateTerminationAction(raw: unknown): Promise<TerminationActionResult> {
@@ -130,6 +128,8 @@ export async function prepareFinalPayrollTerminationAction(raw: unknown): Promis
 
 export async function generateTerminationDocumentActionServer(
   raw: unknown,
+  /** Force a fresh artifact even when one already exists ("Rigjenero dokumentin"). */
+  force = false,
 ): Promise<TerminationActionResult<{ artifactId: string }>> {
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
@@ -138,7 +138,7 @@ export async function generateTerminationDocumentActionServer(
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await generateTerminationDocumentAction(companyId, parsed.data.id, user.id);
+  const res = await generateTerminationDocumentAction(companyId, parsed.data.id, user.id, force);
   if (!res.ok) return res;
   rev();
   try {
@@ -147,7 +147,7 @@ export async function generateTerminationDocumentActionServer(
   } catch {
     /* ignore */
   }
-  return res;
+  return { ok: true, data: { artifactId: res.artifactId } };
 }
 
 export async function completeTerminationAction(raw: unknown): Promise<TerminationActionResult> {
@@ -192,33 +192,6 @@ export async function cancelTerminationAction(raw: unknown): Promise<Termination
   rev();
   try {
     revalidatePath(`/largimet/${parsed.data.id}`);
-  } catch {
-    /* ignore */
-  }
-  return res;
-}
-
-export async function toggleTerminationChecklistAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
-  const { companyId, user } = result.context;
-
-  const parsed = checklistToggleSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
-  }
-
-  const res = await toggleTerminationChecklist(
-    companyId,
-    parsed.data.terminationId,
-    parsed.data.itemKey,
-    parsed.data.isCompleted,
-    user.id,
-  );
-  if (!res.ok) return res;
-  rev();
-  try {
-    revalidatePath(`/largimet/${parsed.data.terminationId}`);
   } catch {
     /* ignore */
   }

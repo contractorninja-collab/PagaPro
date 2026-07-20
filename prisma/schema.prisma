@@ -431,7 +431,6 @@ model Company {
   leavePolicyParameterSets    LeavePolicyParameterSet[]
   leaveAccrualLedgerEntries   LeaveAccrualLedger[]
   payrollAtkExports           PayrollATKExport[]
-  terminationChecklists       TerminationChecklist[]
   generatedReports            GeneratedReport[]
   reportExportLogs            ReportExportLog[]
 
@@ -590,7 +589,6 @@ model User {
   leaveRequestsCreated       LeaveRequest[]             @relation("LeaveCreatedBy")
   terminationsApproved       Termination[]              @relation("TerminationApprovedBy")
   terminationsCreated        Termination[]              @relation("TerminationCreatedBy")
-  terminationChecklistsDone  TerminationChecklist[]     @relation("TerminationChecklistCompletedBy")
   generatedReports           GeneratedReport[]          @relation("GeneratedReportAuthor")
   reportExportLogsPerformed  ReportExportLog[]         @relation("ReportExportLogActor")
 
@@ -1931,7 +1929,6 @@ model Termination {
   updatedAt DateTime @updatedAt
 
   employmentPeriods EmploymentPeriod[]
-  checklists        TerminationChecklist[]
 
   @@index([companyId])
   @@index([employeeId])
@@ -1939,34 +1936,6 @@ model Termination {
   @@index([companyId, type])
   @@index([companyId, terminationDate])
   @@map("terminations")
-}
-
-model TerminationChecklist {
-  id String @id @default(cuid())
-
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  terminationId String
-  termination   Termination @relation(fields: [terminationId], references: [id], onDelete: Cascade)
-
-  itemKey String
-
-  label String
-
-  isCompleted Boolean @default(false)
-
-  completedById String?
-  completedBy   User?     @relation("TerminationChecklistCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  completedAt   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([terminationId])
-  @@unique([terminationId, itemKey])
-  @@map("termination_checklists")
 }
 
 // -----------------------------------------------------------------------------

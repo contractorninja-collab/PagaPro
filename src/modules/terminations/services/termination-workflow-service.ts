@@ -9,7 +9,6 @@ import {
   TIMELINE_TYPES,
 } from "@/modules/employees/services/employee-audit";
 import { prepareTerminationFinalPayroll } from "@/modules/terminations/payroll/prepare-final-payroll";
-import { defaultTerminationChecklistRows, CHECKLIST_KEYS } from "@/modules/terminations/checklists/default-checklist";
 import { generateTerminationArtifact } from "@/modules/terminations/documents/generate-termination-document";
 import {
   appendTerminationAuditLog,
@@ -72,37 +71,22 @@ export async function createTerminationWorkflow(
         ? new Prisma.Decimal(input.severanceAmount!.replace(",", "."))
         : undefined;
 
-    const row = await prisma.$transaction(async (tx) => {
-      const t = await tx.termination.create({
-        data: {
-          companyId,
-          employeeId: input.employeeId,
-          type: input.type,
-          status: "DRAFT",
-          terminationDate: input.terminationDate,
-          noticeDate: input.noticeDate ?? undefined,
-          lastWorkingDay: input.lastWorkingDay,
-          noticeDays: input.noticeDays ?? undefined,
-          severanceAmount: severance,
-          reason: input.reason?.trim() || undefined,
-          details: input.details?.trim() || undefined,
-          finalPayrollRequired: input.finalPayrollRequired ?? true,
-          createdById: actorUserId ?? undefined,
-        },
-      });
-
-      for (const item of defaultTerminationChecklistRows()) {
-        await tx.terminationChecklist.create({
-          data: {
-            companyId,
-            terminationId: t.id,
-            itemKey: item.itemKey,
-            label: item.label,
-          },
-        });
-      }
-
-      return t;
+    const row = await prisma.termination.create({
+      data: {
+        companyId,
+        employeeId: input.employeeId,
+        type: input.type,
+        status: "DRAFT",
+        terminationDate: input.terminationDate,
+        noticeDate: input.noticeDate ?? undefined,
+        lastWorkingDay: input.lastWorkingDay,
+        noticeDays: input.noticeDays ?? undefined,
+        severanceAmount: severance,
+        reason: input.reason?.trim() || undefined,
+        details: input.details?.trim() || undefined,
+        finalPayrollRequired: input.finalPayrollRequired ?? true,
+        createdById: actorUserId ?? undefined,
+      },
     });
 
     await appendTerminationEmployeeTimeline({
@@ -312,15 +296,6 @@ export async function approveTerminationWorkflow(
         data: { finalPayrollId: prep.payrollId },
       });
 
-      await prisma.terminationChecklist.updateMany({
-        where: { terminationId: row.id, itemKey: CHECKLIST_KEYS.FINAL_PAYROLL },
-        data: {
-          isCompleted: true,
-          completedAt: new Date(),
-          completedById: actorUserId ?? undefined,
-        },
-      });
-
       await appendTerminationEmployeeTimeline({
         companyId,
         employeeId: row.employeeId,
@@ -380,15 +355,6 @@ export async function prepareTerminationFinalPayrollAction(
       data: { finalPayrollId: prep.payrollId },
     });
 
-    await prisma.terminationChecklist.updateMany({
-      where: { terminationId: row.id, itemKey: CHECKLIST_KEYS.FINAL_PAYROLL },
-      data: {
-        isCompleted: true,
-        completedAt: new Date(),
-        completedById: actorUserId ?? undefined,
-      },
-    });
-
     await appendTerminationEmployeeTimeline({
       companyId,
       employeeId: row.employeeId,
@@ -427,8 +393,9 @@ export async function generateTerminationDocumentAction(
   companyId: string,
   terminationId: string,
   actorUserId: string | null,
+  force = false,
 ): Promise<{ ok: true; artifactId: string } | { ok: false; error: string }> {
-  return generateTerminationArtifact({ companyId, terminationId, actorUserId });
+  return generateTerminationArtifact({ companyId, terminationId, actorUserId, force });
 }
 
 export async function completeTerminationWorkflow(
@@ -475,15 +442,6 @@ export async function completeTerminationWorkflow(
         data: {
           status: "COMPLETED",
           completedAt: new Date(),
-        },
-      });
-
-      await tx.terminationChecklist.updateMany({
-        where: { terminationId: row.id, itemKey: CHECKLIST_KEYS.EMPLOYEE_MARKED_LEFT },
-        data: {
-          isCompleted: true,
-          completedAt: new Date(),
-          completedById: actorUserId ?? undefined,
         },
       });
     });
@@ -626,42 +584,3 @@ export async function cancelTerminationWorkflow(
   }
 }
 
-export async function toggleTerminationChecklist(
-  companyId: string,
-  terminationId: string,
-  itemKey: string,
-  isCompleted: boolean,
-  actorUserId: string | null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    const row = await loadTerminationOrThrow(companyId, terminationId);
-    if (row.status === "COMPLETED") throw new Error("Lista e kontrollit është vetëm leximi.");
-
-    const item = await prisma.terminationChecklist.findFirst({
-      where: { terminationId: row.id, itemKey, companyId },
-    });
-    if (!item) throw new Error("Artikulli i listës nuk u gjet.");
-
-    await prisma.terminationChecklist.update({
-      where: { id: item.id },
-      data: {
-        isCompleted,
-        completedAt: isCompleted ? new Date() : null,
-        completedById: isCompleted ? actorUserId ?? undefined : null,
-      },
-    });
-
-    await appendTerminationAuditLog({
-      companyId,
-      terminationId: row.id,
-      action: "TERMINATION_CHECKLIST_TOGGLE",
-      actorUserId,
-      diff: jsonSafe({ itemKey, isCompleted }),
-    });
-
-    return { ok: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
-  }
-}

@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { buildMergedPlaceholderContext } from "@/modules/documents/services/build-placeholder-context";
 import { finalizeDocumentGeneration } from "@/modules/documents/services/document-generation-service";
-import { CHECKLIST_KEYS } from "@/modules/terminations/checklists/default-checklist";
 import {
   appendTerminationAuditLog,
   appendTerminationDomainActivity,
@@ -15,6 +14,8 @@ export async function generateTerminationArtifact(params: {
   companyId: string;
   terminationId: string;
   actorUserId?: string | null;
+  /** Regenerate even when a document already exists (the "Rigjenero" escape hatch). */
+  force?: boolean;
 }): Promise<{ ok: true; artifactId: string } | { ok: false; error: string }> {
   const term = await prisma.termination.findFirst({
     where: { id: params.terminationId, companyId: params.companyId },
@@ -23,6 +24,10 @@ export async function generateTerminationArtifact(params: {
   if (!term) return { ok: false, error: "Largimi nuk u gjet." };
   if (term.status === "CANCELLED") {
     return { ok: false, error: "Largimi është anuluar." };
+  }
+  // Idempotent by default so a double-click on "Shkarko" can't orphan a first artifact.
+  if (!params.force && term.generatedDocumentId) {
+    return { ok: true, artifactId: term.generatedDocumentId };
   }
 
   const template = await prisma.documentTemplate.findFirst({
@@ -72,7 +77,11 @@ export async function generateTerminationArtifact(params: {
       employeeFirstName: term.employee.firstName,
       employeeLastName: term.employee.lastName,
       documentDate: new Date(),
-      attemptPdf: true,
+      // DOCX only. finalizeDocumentGeneration throws for ARCHIVED_FINAL when no DOCX→PDF
+      // converter is reachable, and the serverless runtime has no LibreOffice/Word/Gotenberg.
+      // The PDF route backfills lazily via ensureArtifactPdf once DOCX_TO_PDF_URL is set,
+      // so leaving this false costs nothing. Do not flip back to true.
+      attemptPdf: false,
     });
 
     await prisma.$transaction(async (tx) => {
@@ -81,27 +90,9 @@ export async function generateTerminationArtifact(params: {
         data: { generatedDocumentId: result.artifactId },
       });
 
-      await tx.terminationChecklist.updateMany({
-        where: { terminationId: term.id, itemKey: CHECKLIST_KEYS.DOC_GENERATED },
-        data: {
-          isCompleted: true,
-          completedAt: new Date(),
-          completedById: params.actorUserId ?? undefined,
-        },
-      });
-
       await tx.documentGenerationArtifact.updateMany({
         where: { id: result.artifactId, companyId: params.companyId },
         data: { isArchived: true, archivedAt: new Date() },
-      });
-
-      await tx.terminationChecklist.updateMany({
-        where: { terminationId: term.id, itemKey: CHECKLIST_KEYS.DOCS_ARCHIVED },
-        data: {
-          isCompleted: true,
-          completedAt: new Date(),
-          completedById: params.actorUserId ?? undefined,
-        },
       });
     });
 

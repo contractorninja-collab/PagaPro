@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
-import { AlertTriangle, Banknote, CalendarDays, Check, FileText } from "lucide-react";
+import { Banknote, CalendarDays, Check, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import {
@@ -24,7 +24,6 @@ import {
   generateTerminationDocumentActionServer,
   prepareFinalPayrollTerminationAction,
   submitTerminationAction,
-  toggleTerminationChecklistAction,
   updateTerminationAction,
 } from "@/modules/terminations/actions/termination-actions";
 import { TERMINATION_STATUS_LABELS, TERMINATION_TYPE_LABELS } from "@/modules/terminations/types";
@@ -67,13 +66,6 @@ export interface LargimetDetailProps {
     finalPayroll: { id: string; year: number; month: number; status: string } | null;
     generatedDocument: { id: string; displayFilename: string } | null;
   };
-  checklists: Array<{
-    id: string;
-    itemKey: string;
-    label: string;
-    isCompleted: boolean;
-    completedAt: string | null;
-  }>;
   artifacts: Array<{
     id: string;
     title: string;
@@ -111,8 +103,6 @@ function fmtDateTime(iso: string) {
 
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
-const HERO_CARD =
-  "rounded-[14px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
 const CARD_TITLE = "text-[14px] font-bold tracking-[-0.01em] text-[#0f172a]";
 
 const BTN_PRIMARY =
@@ -260,7 +250,6 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
   const [pending, startTransition] = useTransition();
   const t = props.termination;
   const readOnly = t.status === "COMPLETED" || t.status === "CANCELLED";
-  const stepsRemaining = props.checklists.filter((c) => !c.isCompleted).length;
 
   function run(labelOk: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
@@ -337,73 +326,6 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Left — main column */}
           <div className="min-w-0 space-y-5">
-            {/* Hero: 6-item offboarding checklist */}
-            <div className={cn(HERO_CARD, "p-5")}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[15px] font-bold tracking-[-0.01em] text-[#0f172a]">Lista e largimit</h2>
-                  <p className="mt-0.5 text-[12.5px] text-[#64748b]">Hapat operativë para përfundimit të largimit.</p>
-                </div>
-                <Chip tone={stepsRemaining === 0 ? "success" : "info"}>
-                  {props.checklists.length - stepsRemaining}/{props.checklists.length} hapa
-                </Chip>
-              </div>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f7]">
-                <div
-                  className={cn("h-full rounded-full transition-all", stepsRemaining === 0 ? "bg-[#16a34a]" : "bg-brand-blue")}
-                  style={{
-                    width: `${
-                      props.checklists.length > 0
-                        ? Math.round(((props.checklists.length - stepsRemaining) / props.checklists.length) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-              <ul className="mt-2">
-                {props.checklists.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-start justify-between gap-3 border-b border-[#f1f5f9] py-3 last:border-0 last:pb-0"
-                  >
-                    <label className="flex flex-1 cursor-pointer items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-[18px] w-[18px] shrink-0 rounded accent-[#2563EB]"
-                        checked={c.isCompleted}
-                        disabled={pending || readOnly}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          startTransition(async () => {
-                            const res = await toggleTerminationChecklistAction({
-                              terminationId: t.id,
-                              itemKey: c.itemKey,
-                              isCompleted: checked,
-                            });
-                            if (!res.ok) toast.error(res.error);
-                            else {
-                              toast.success("Lista u përditësua.");
-                              router.refresh();
-                            }
-                          });
-                        }}
-                      />
-                      <span
-                        className={cn(
-                          "text-[13.5px] font-medium",
-                          c.isCompleted ? "text-[#94a3b8] line-through" : "text-[#111827]",
-                        )}
-                      >
-                        {c.label}
-                      </span>
-                    </label>
-                    {c.completedAt ? (
-                      <span className="shrink-0 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(c.completedAt)}</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
 
             {/* Final payroll + severance */}
             <div className={cn(CARD, "p-5")}>
@@ -650,19 +572,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
       <div className="sticky bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] z-30 -mx-4 mt-6 border-t border-[#e2e8f0] bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:bottom-0 md:-mx-10 md:px-10">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="mr-auto flex items-center gap-2">
-            {readOnly ? (
-              <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>{TERMINATION_STATUS_LABELS[t.status] ?? t.status}</Chip>
-            ) : stepsRemaining > 0 ? (
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#b45309]">
-                <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-                {stepsRemaining} {stepsRemaining === 1 ? "hap mbetet" : "hapa mbeten"}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#15803d]">
-                <Check className="h-3.5 w-3.5" aria-hidden />
-                Të gjithë hapat u kryen
-              </span>
-            )}
+            <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>{TERMINATION_STATUS_LABELS[t.status] ?? t.status}</Chip>
           </div>
           <button
             type="button"
