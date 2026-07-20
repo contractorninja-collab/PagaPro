@@ -135,6 +135,10 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
         where: { isPrimary: true },
         take: 1,
       },
+      salaryChanges: {
+        orderBy: { effectiveFrom: "desc" },
+        take: 50,
+      },
     },
   });
   if (!e) return null;
@@ -186,6 +190,16 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     documentsMissing: e.documentsMissing,
     terminationDate: e.terminationDate ? toIso(e.terminationDate) : null,
     terminationReason: e.terminationReason,
+    salaryHistory: e.salaryChanges.map((s) => ({
+      id: s.id,
+      effectiveFromIso: toIso(s.effectiveFrom),
+      previousBaseSalary: s.previousBaseSalary ? moneyToString(s.previousBaseSalary) : null,
+      newBaseSalary: moneyToString(s.newBaseSalary),
+      compensationBasis: s.compensationBasis,
+      targetNetMonthly: s.targetNetMonthly ? moneyToString(s.targetNetMonthly) : null,
+      reason: s.reason,
+      createdAtIso: toIso(s.createdAt),
+    })),
   };
 }
 
@@ -382,6 +396,20 @@ export async function createEmployee(
         },
       });
 
+      await tx.employeeSalaryChange.create({
+        data: {
+          companyId,
+          employeeId: row.id,
+          effectiveFrom: input.hireDate,
+          previousBaseSalary: null,
+          newBaseSalary: row.baseSalaryMonthly,
+          compensationBasis: row.compensationBasis,
+          targetNetMonthly: row.targetNetMonthly,
+          reason: "Rekord fillestar (punësim)",
+          changedById: actorUserId ?? undefined,
+        },
+      });
+
       await syncEmergencyContact(tx, row.id, input);
       await syncPrimaryBankAccount(tx, row.id, input.bankAccountIban, input.bankName);
 
@@ -421,7 +449,14 @@ export async function updateEmployee(
 > {
   const existing = await prisma.employee.findFirst({
     where: { id: employeeId, companyId },
-    select: { id: true, status: true, jobTitleId: true },
+    select: {
+      id: true,
+      status: true,
+      jobTitleId: true,
+      baseSalaryMonthly: true,
+      compensationBasis: true,
+      targetNetMonthly: true,
+    },
   });
   if (!existing) return { ok: false, code: "NOT_FOUND" };
   if (existing.status === "TERMINATED") return { ok: false, code: "TERMINATED_LOCKED" };
@@ -479,6 +514,22 @@ export async function updateEmployee(
           documentsMissing: input.documentsMissing,
         },
       });
+
+      const newBase = new Prisma.Decimal(String(input.baseSalaryMonthly));
+      if (!existing.baseSalaryMonthly.equals(newBase)) {
+        await tx.employeeSalaryChange.create({
+          data: {
+            companyId,
+            employeeId,
+            effectiveFrom: new Date(),
+            previousBaseSalary: existing.baseSalaryMonthly,
+            newBaseSalary: newBase,
+            compensationBasis: existing.compensationBasis,
+            targetNetMonthly: existing.targetNetMonthly,
+            changedById: actorUserId ?? undefined,
+          },
+        });
+      }
 
       await syncEmergencyContact(tx, employeeId, input);
       await syncPrimaryBankAccount(tx, employeeId, input.bankAccountIban, input.bankName);
@@ -619,21 +670,43 @@ export async function terminateEmployee(
   terminationDate: Date,
   terminationReason: string,
   actorUserId: string | null,
-): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "DB_ERROR"; message?: string }> {
+): Promise<
+  { ok: true } | { ok: false; code: "NOT_FOUND" | "ALREADY_TERMINATED" | "DB_ERROR"; message?: string }
+> {
   const existing = await prisma.employee.findFirst({
     where: { id: employeeId, companyId },
-    select: { id: true },
+    select: { id: true, status: true },
   });
   if (!existing) return { ok: false, code: "NOT_FOUND" };
+  // Guard against double-termination (the full Largimet workflow guards similarly) —
+  // avoids a duplicate COMPLETED Termination row + a spurious period close.
+  if (existing.status === "TERMINATED") return { ok: false, code: "ALREADY_TERMINATED" };
 
   try {
     await prisma.$transaction(async (tx) => {
+      // Quick termination still creates a COMPLETED Termination record so every
+      // TERMINATED employee has a matching record + closed employment period,
+      // identical in shape to the full Largimet workflow's end state.
+      const termination = await tx.termination.create({
+        data: {
+          companyId,
+          employeeId,
+          type: "MANUAL",
+          status: "COMPLETED",
+          terminationDate,
+          lastWorkingDay: terminationDate,
+          finalPayrollRequired: false,
+          reason: terminationReason,
+          createdById: actorUserId ?? undefined,
+          completedAt: new Date(),
+        },
+      });
       await applyEmployeeTerminationOutcome({
         tx,
         employeeId,
         terminationDate,
         terminationReason,
-        employmentTerminationRecordId: null,
+        employmentTerminationRecordId: termination.id,
       });
     });
   } catch (e) {
@@ -677,6 +750,76 @@ export async function terminateEmployee(
     });
   } catch (err) {
     console.error("[employees] terminate audit failed:", err);
+  }
+
+  return { ok: true };
+}
+
+export async function rehireEmployee(
+  companyId: string,
+  employeeId: string,
+  rehireDate: Date,
+  actorUserId: string | null,
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "NOT_TERMINATED" | "DB_ERROR"; message?: string }> {
+  const existing = await prisma.employee.findFirst({
+    where: { id: employeeId, companyId },
+    select: { id: true, status: true },
+  });
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+  if (existing.status !== "TERMINATED") return { ok: false, code: "NOT_TERMINATED" };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: { status: "ACTIVE", terminationDate: null, terminationReason: null },
+      });
+      await tx.employmentPeriod.create({
+        data: { companyId, employeeId, startedAt: rehireDate, reason: "REHIRE" },
+      });
+    });
+  } catch (e) {
+    console.error(e);
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, code: "DB_ERROR", message };
+  }
+
+  const isoDay = rehireDate.toISOString().slice(0, 10);
+  try {
+    await appendEmployeeEmploymentHistory({
+      companyId,
+      employeeId,
+      kind: EmployeeHistoryEventKind.STATUS_CHANGED,
+      title: "Punonjësi u rikthye në punë",
+      description: `Rikthim në punë (${isoDay}).`,
+      status: "ACTIVE",
+      metadata: asJson({ rehireDate: rehireDate.toISOString(), reason: "REHIRE" }),
+    });
+    await appendEmployeeTimeline({
+      companyId,
+      employeeId,
+      eventType: TIMELINE_TYPES.STATUS_CHANGED,
+      title: "Punonjësi u rikthye në punë",
+      body: `Rikthim në punë (${isoDay})`,
+      actorUserId,
+    });
+    await appendDomainEmployeeActivity({
+      companyId,
+      employeeId,
+      verb: DomainActivityVerb.UPDATED,
+      summary: "Punonjësi u rikthye në punë",
+      actorUserId,
+      payload: asJson({ rehireDate: rehireDate.toISOString() }),
+    });
+    await appendEmployeeAuditLog({
+      companyId,
+      employeeId,
+      action: "EMPLOYEE_REHIRE",
+      actorUserId,
+      diff: asJson({ status: "ACTIVE", rehireDate: rehireDate.toISOString() }),
+    });
+  } catch (err) {
+    console.error("[employees] rehire audit failed:", err);
   }
 
   return { ok: true };

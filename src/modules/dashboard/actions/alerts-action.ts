@@ -1,12 +1,13 @@
 "use server";
 
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { getCompanyContext } from "@/server/company-context";
 import { loadDashboardOperationalData } from "@/modules/dashboard/services/dashboard-data-service";
 import type { OperationalAlert } from "@/modules/dashboard/types/dashboard-types";
 
 export async function fetchAlertsAction(): Promise<OperationalAlert[]> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return [];
+  const result = await getCompanyContext();
+  if (!result.ok) return [];
+  const { companyId } = result.context;
   try {
     const now = new Date();
     const data = await loadDashboardOperationalData(companyId, {

@@ -1,72 +1,16 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import PizZip from "pizzip";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { resolveActiveCompanyId } from "@/server/company-scope";
-import { generationArtifactPdfKey } from "@/modules/documents/engine";
-import { convertDocxBufferToPdf } from "@/modules/documents/services/docx-to-pdf-service";
-
-async function ensurePdfBuffer(
-  artifact: {
-    id: string;
-    companyId: string;
-    subjectKind: string;
-    subjectId: string;
-    generatedPdfStorageKey: string | null;
-    generatedDocxStorageKey: string | null;
-    displayFilename: string;
-  },
-  storage: ReturnType<typeof getCompanyAssetStorage>,
-): Promise<{ buffer: Buffer; filename: string } | null> {
-  if (artifact.generatedPdfStorageKey) {
-    try {
-      const buf = await storage.get(artifact.generatedPdfStorageKey);
-      const filename = artifact.displayFilename.endsWith(".pdf")
-        ? artifact.displayFilename
-        : `${artifact.displayFilename.replace(/\.[^.]+$/, "")}.pdf`;
-      return { buffer: buf, filename };
-    } catch {
-      return null;
-    }
-  }
-
-  if (!artifact.generatedDocxStorageKey) return null;
-
-  try {
-    const docx = await storage.get(artifact.generatedDocxStorageKey);
-    const conv = await convertDocxBufferToPdf(docx);
-    if (!conv.ok) return null;
-
-    const pdfStorageKey = generationArtifactPdfKey({
-      companyId: artifact.companyId,
-      subjectKind: artifact.subjectKind,
-      subjectId: artifact.subjectId,
-      artifactId: artifact.id,
-    });
-    await storage.put(pdfStorageKey, conv.pdf, { contentType: "application/pdf" });
-    await prisma.documentGenerationArtifact.update({
-      where: { id: artifact.id },
-      data: {
-        generatedPdfStorageKey: pdfStorageKey,
-        pdfSha256: createHash("sha256").update(conv.pdf).digest("hex"),
-      },
-    });
-
-    const filename = artifact.displayFilename.endsWith(".pdf")
-      ? artifact.displayFilename
-      : `${artifact.displayFilename.replace(/\.[^.]+$/, "")}.pdf`;
-    return { buffer: conv.pdf, filename };
-  } catch {
-    return null;
-  }
-}
+import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { ensureArtifactPdf } from "@/modules/documents/services/artifact-pdf-service";
 
 export async function POST(request: Request) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return companyContextHttpError(result.reason);
   }
+  const companyId = result.context.companyId;
 
   let artifactIds: string[] = [];
   const contentType = request.headers.get("content-type") ?? "";
@@ -105,8 +49,8 @@ export async function POST(request: Request) {
   let added = 0;
 
   for (const artifact of artifacts) {
-    const pdf = await ensurePdfBuffer(artifact, storage);
-    if (!pdf) continue;
+    const pdf = await ensureArtifactPdf(artifact, storage);
+    if (!pdf.ok) continue;
     const safeName = pdf.filename.replace(/[/\\?%*:|"<>]/g, "_");
     zip.file(safeName, pdf.buffer);
     added += 1;

@@ -1,0 +1,29 @@
+{
+  "templates": [
+    {
+      "filename": "vendim-nderprerje-vullnetare.docx",
+      "name": "Vendim për largim vullnetar",
+      "terminationWorkflowKey": "LARGIM_VULLNETAR"
+    },
+    {
+      "filename": "vendim-nderprerje-pa-paralajmerim.docx",
+      "name": "Vendim për ndërprerje pa paralajmërim",
+      "terminationWorkflowKey": "PA_PARALAJMERIM"
+    },
+    {
+      "filename": "marreveshje-nderprerje.docx",
+      "name": "Marrëveshje për ndërprerje",
+      "terminationWorkflowKey": "MARREVESHJE_E_DYANSHME"
+    },
+    {
+      "filename": "vendim-nderprerje-nga-punedhenesi.docx",
+      "name": "Vendim për ndërprerje nga punëdhënësi",
+      "terminationWorkflowKey": "NGA_PUNEDHENESI"
+    },
+    {
+      "filename": "vendim-nderprerje-manual.docx",
+      "name": "Vendim manual për ndërprerje",
+      "terminationWorkflowKey": "MANUAL"
+    }
+  ]
+}

@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Banknote, CalendarDays, Check, FileText } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +17,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   approveTerminationAction,
   cancelTerminationAction,
@@ -28,6 +28,12 @@ import {
   updateTerminationAction,
 } from "@/modules/terminations/actions/termination-actions";
 import { TERMINATION_STATUS_LABELS, TERMINATION_TYPE_LABELS } from "@/modules/terminations/types";
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  formatEur,
+  formatSqDate,
+} from "@/modules/employees/components/employees-labels";
+import { formatArtifactKind } from "@/modules/documents/components/document-labels";
 
 export interface LargimetDetailProps {
   termination: {
@@ -93,7 +99,7 @@ export interface LargimetDetailProps {
   }>;
 }
 
-function fmt(iso: string) {
+function fmtDateTime(iso: string) {
   try {
     return new Date(iso).toLocaleString("sq-AL", { timeZone: "UTC" });
   } catch {
@@ -101,11 +107,160 @@ function fmt(iso: string) {
   }
 }
 
+/* ── 1b design primitives (module-local) ─────────────────────────────── */
+
+const CARD =
+  "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+const HERO_CARD =
+  "rounded-[14px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+const CARD_TITLE = "text-[14px] font-bold tracking-[-0.01em] text-[#0f172a]";
+
+const BTN_PRIMARY =
+  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-blue px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_SECONDARY =
+  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#e2e8f0] bg-white px-[18px] text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_DESTRUCTIVE =
+  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#fee2e2] bg-white px-[18px] text-[13px] font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dc2626]/30 disabled:pointer-events-none disabled:opacity-50";
+
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const FIELD_SELECT =
+  "h-10 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+const FIELD_INPUT =
+  "h-10 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+const FIELD_TEXTAREA =
+  "min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+
+type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
+
+const CHIP_TONES: Record<ChipTone, { chip: string; dot: string }> = {
+  info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
+  success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
+  warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
+  destructive: { chip: "bg-[#fef2f2] text-[#dc2626]", dot: "bg-[#dc2626]" },
+  neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
+  locked: { chip: "bg-brand-navy text-white", dot: "bg-white" },
+};
+
+function Chip({ tone, children, className }: { tone: ChipTone; children: ReactNode; className?: string }) {
+  const t = CHIP_TONES[tone];
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12px] font-semibold",
+        t.chip,
+        className,
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", t.dot)} aria-hidden />
+      {children}
+    </span>
+  );
+}
+
+const STATUS_TONE: Record<string, ChipTone> = {
+  DRAFT: "neutral",
+  PENDING_REVIEW: "warning",
+  APPROVED: "info",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
+};
+
+// Mirrors the Albanian labels/tones of PayrollStatusBadge (payroll module).
+const PAYROLL_STATUS_META: Record<string, { label: string; tone: ChipTone }> = {
+  DRAFT: { label: "Draft", tone: "warning" },
+  REVIEWED: { label: "Në shqyrtim", tone: "info" },
+  APPROVED: { label: "I miratuar", tone: "success" },
+  LOCKED: { label: "I kyçur", tone: "locked" },
+  ARCHIVED: { label: "I arkivuar", tone: "neutral" },
+};
+
+const EMPLOYEE_STATUS_TONE: Record<string, ChipTone> = {
+  ACTIVE: "success",
+  INACTIVE: "neutral",
+  ON_LEAVE: "info",
+  SUSPENDED: "warning",
+  TERMINATED: "destructive",
+};
+
+/* ── Stage pipeline ───────────────────────────────────────────────────── */
+
+const PIPELINE_STAGES: Array<{ key: TerminationStatus; label: string }> = [
+  { key: "DRAFT", label: "Krijuar" },
+  { key: "PENDING_REVIEW", label: "Në shqyrtim" },
+  { key: "APPROVED", label: "I miratuar" },
+  { key: "COMPLETED", label: "I përfunduar" },
+];
+
+const PIPELINE_INDEX: Record<string, number> = {
+  DRAFT: 0,
+  PENDING_REVIEW: 1,
+  APPROVED: 2,
+  COMPLETED: 3,
+};
+
+function StagePipeline({ status }: { status: TerminationStatus }) {
+  const cancelled = status === "CANCELLED";
+  const current = cancelled ? -1 : (PIPELINE_INDEX[status] ?? 0);
+  const completed = status === "COMPLETED";
+
+  return (
+    <div className={cn(CARD, "px-5 py-4")}>
+      <div className="overflow-x-auto">
+        <div className="flex min-w-[560px] items-center gap-2">
+          {PIPELINE_STAGES.map((stage, i) => {
+            const done = !cancelled && (completed || i < current);
+            const active = !cancelled && !completed && i === current;
+            return (
+              <div key={stage.key} className={cn("flex items-center gap-2", i < PIPELINE_STAGES.length - 1 && "flex-1")}>
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
+                      done && "bg-brand-blue text-white",
+                      active && "border-2 border-brand-blue bg-[#eff6ff] text-brand-blue",
+                      !done && !active && "border border-[#e2e8f0] bg-white text-[#94a3b8]",
+                    )}
+                    aria-hidden
+                  >
+                    {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                  </span>
+                  <span
+                    className={cn(
+                      "whitespace-nowrap text-[12.5px] font-semibold",
+                      done || active ? "text-[#0f172a]" : "text-[#94a3b8]",
+                    )}
+                  >
+                    {stage.label}
+                  </span>
+                </div>
+                {i < PIPELINE_STAGES.length - 1 ? (
+                  <span
+                    className={cn("h-[2px] min-w-[24px] flex-1 rounded-full", done ? "bg-brand-blue" : "bg-[#e2e8f0]")}
+                    aria-hidden
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+          {cancelled ? (
+            <Chip tone="destructive" className="ml-2 shrink-0">
+              {TERMINATION_STATUS_LABELS.CANCELLED}
+            </Chip>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Cockpit ──────────────────────────────────────────────────────────── */
+
 export function LargimetDetailClient(props: LargimetDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const t = props.termination;
   const readOnly = t.status === "COMPLETED" || t.status === "CANCELLED";
+  const stepsRemaining = props.checklists.filter((c) => !c.isCompleted).length;
 
   function run(labelOk: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
@@ -118,246 +273,448 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
     });
   }
 
-  return (
-    <div className="space-y-8 pb-28 md:pb-8">
-      <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <Link href="/largimet" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            ← Largimet
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-            {t.employee.firstName} {t.employee.lastName}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {TERMINATION_TYPE_LABELS[t.type]} · {fmt(t.terminationDate)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>{TERMINATION_STATUS_LABELS[t.status] ?? t.status}</Badge>
-          {!readOnly ? (
-            <EditTerminationDialog termination={t} pending={pending} startTransition={startTransition} onSaved={() => router.refresh()} />
-          ) : null}
-        </div>
-      </div>
+  const initials = `${t.employee.firstName?.[0] ?? ""}${t.employee.lastName?.[0] ?? ""}`.toUpperCase();
+  const employeeStatusLabel =
+    EMPLOYMENT_STATUS_LABELS[t.employee.status as keyof typeof EMPLOYMENT_STATUS_LABELS] ?? t.employee.status;
 
-      <section className="grid gap-4 rounded-lg border bg-card p-4 md:grid-cols-2">
-        <div>
-          <h2 className="text-sm font-semibold">Punonjësi</h2>
-          <p className="mt-1 text-sm">
-            <Link href={`/punonjesit/${t.employee.id}`} className="underline-offset-4 hover:underline">
+  return (
+    <>
+      <AppSubBar
+        dense
+        backHref="/largimet"
+        backLabel="Largimet"
+        title={`${t.employee.firstName} ${t.employee.lastName}`}
+        description={`${TERMINATION_TYPE_LABELS[t.type]} · ${formatSqDate(t.terminationDate)}`}
+        status={
+          <SubBarStatus tone={STATUS_TONE[t.status] ?? "neutral"}>
+            {TERMINATION_STATUS_LABELS[t.status] ?? t.status}
+          </SubBarStatus>
+        }
+        actions={
+          !readOnly ? (
+            <EditTerminationDialog termination={t} pending={pending} startTransition={startTransition} onSaved={() => router.refresh()} />
+          ) : undefined
+        }
+      />
+
+      <div className="space-y-5">
+        {/* Stage pipeline */}
+        <StagePipeline status={t.status} />
+
+        {/* Identity header */}
+        <div className={cn(CARD, "p-5")}>
+          <div className="flex flex-wrap items-center gap-4">
+            <span
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-navy text-[18px] font-bold text-white"
+              aria-hidden
+            >
+              {initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <Link
+                  href={`/punonjesit/${t.employee.id}`}
+                  className="text-[18px] font-bold tracking-[-0.02em] text-[#0f172a] transition-colors hover:text-brand-blue"
+                >
+                  {t.employee.firstName} {t.employee.lastName}
+                </Link>
+                <Chip tone={EMPLOYEE_STATUS_TONE[t.employee.status] ?? "neutral"}>{employeeStatusLabel}</Chip>
+                <Chip tone="neutral">{TERMINATION_TYPE_LABELS[t.type]}</Chip>
+              </div>
+              <p className="mt-1 text-[13px] text-[#64748b]">
+                {t.employee.jobTitle ?? "—"} · {t.employee.department?.name ?? "—"} ·{" "}
+                <span className="tabular-nums">Punësuar {formatSqDate(t.employee.hireDate)}</span> ·{" "}
+                <span className="tabular-nums">{t.employee.personalId}</span>
+              </p>
+            </div>
+            <Link href={`/punonjesit/${t.employee.id}`} className={BTN_SECONDARY}>
               Profili
             </Link>
-          </p>
-          <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
-            <div>Nr.personal: {t.employee.personalId}</div>
-            <div>Pozita: {t.employee.jobTitle ?? "—"}</div>
-            <div>Departamenti: {t.employee.department?.name ?? "—"}</div>
-            <div>Statusi aktual: {t.employee.status}</div>
-          </dl>
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold">Datat</h2>
-          <dl className="mt-2 space-y-1 text-xs">
-            <div>Data largimit: {fmt(t.terminationDate)}</div>
-            <div>Dita e fundit e punës: {fmt(t.lastWorkingDay)}</div>
-            <div>Njoftimi: {t.noticeDate ? fmt(t.noticeDate) : "—"}</div>
-          </dl>
-        </div>
-        <div className="md:col-span-2">
-          <h2 className="text-sm font-semibold">Arsyeja / detajet</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{t.reason ?? "—"}</p>
-          {t.details ? (
-            <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{t.details}</p>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Dokumentet</h2>
-        {props.artifacts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Nuk ka dokumente të gjeneruara.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {props.artifacts.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>{a.displayFilename}</span>
-                <Button asChild size="sm" variant="outlinePrimary">
-                  <Link href={`/dokumentet/${a.id}`}>Hap</Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Final payroll</h2>
-        {t.finalPayroll ? (
-          <div className="text-sm">
-            <Link href={`/pagat/${t.finalPayroll.id}`} className="underline-offset-4 hover:underline">
-              Pagë {t.finalPayroll.month}/{t.finalPayroll.year} ({t.finalPayroll.status})
-            </Link>
-            {props.payrollEntry ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Rreshti: {props.payrollEntry.status} · Neto {props.payrollEntry.netPay} € · Bruto {props.payrollEntry.grossSalary} €
-              </p>
-            ) : null}
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Nuk është lidhur ende.</p>
-        )}
-      </section>
-
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Lista e kontrollit</h2>
-        <ul className="space-y-2">
-          {props.checklists.map((c) => (
-            <li key={c.id} className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 accent-primary"
-                checked={c.isCompleted}
-                disabled={pending || readOnly}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  startTransition(async () => {
-                    const res = await toggleTerminationChecklistAction({
-                      terminationId: t.id,
-                      itemKey: c.itemKey,
-                      isCompleted: checked,
-                    });
-                    if (!res.ok) toast.error(res.error);
-                    else {
-                      toast.success("Lista u përditësua.");
-                      router.refresh();
-                    }
-                  });
-                }}
-              />
-              <span className={c.isCompleted ? "text-muted-foreground line-through" : ""}>{c.label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h2 className="text-sm font-semibold">Timeline (punonjësi)</h2>
-        <ul className="space-y-2 text-xs">
-          {props.timeline.map((ev) => (
-            <li key={ev.id} className="border-b border-dashed pb-2">
-              <div className="font-medium">{ev.title}</div>
-              <div className="text-muted-foreground">{fmt(ev.occurredAt)}</div>
-              {ev.body ? <div className="mt-1 whitespace-pre-wrap">{ev.body}</div> : null}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-semibold">Aktiviteti</h2>
-          <ul className="mt-2 space-y-2 text-xs">
-            {props.activities.map((a) => (
-              <li key={a.id}>
-                <div className="font-medium">{a.summary}</div>
-                <div className="text-muted-foreground">
-                  {a.verb} · {fmt(a.occurredAt)} · {a.actor?.displayName ?? a.actor?.email ?? "—"}
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-semibold">Audit log</h2>
-          <ul className="mt-2 space-y-2 text-xs">
-            {props.audits.map((a) => (
-              <li key={a.id}>
-                <div className="font-medium">{a.action}</div>
-                <div className="text-muted-foreground">
-                  {a.createdAt ? fmt(a.createdAt) : "—"} · {a.actor?.displayName ?? "—"}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex flex-wrap gap-2 border-t bg-background/95 p-3 backdrop-blur md:hidden">
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending || readOnly || t.status !== "DRAFT"}
-          onClick={() => run("U dërgua.", () => submitTerminationAction({ id: t.id }))}
-        >
-          Dërgo
-        </Button>
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending || readOnly || t.status !== "PENDING_REVIEW"}
-          onClick={() => run("U miratua.", () => approveTerminationAction({ id: t.id }))}
-        >
-          Mirato
-        </Button>
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending || readOnly}
-          onClick={() => run("U gjenerua.", () => generateTerminationDocumentActionServer({ id: t.id }))}
-        >
-          Dok.
-        </Button>
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending || readOnly}
-          onClick={() => run("U përgatit.", () => prepareFinalPayrollTerminationAction({ id: t.id }))}
-        >
-          Payroll
-        </Button>
-        <Button
-          size="sm"
-          disabled={pending || t.status !== "APPROVED"}
-          onClick={() => run("U përfundua.", () => completeTerminationAction({ id: t.id }))}
-        >
-          Përfundo
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={pending || readOnly}
-          onClick={() => run("U anulua.", () => cancelTerminationAction({ id: t.id }))}
-        >
-          Anulo
-        </Button>
+        {/* Two-column body */}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          {/* Left — main column */}
+          <div className="min-w-0 space-y-5">
+            {/* Hero: 6-item offboarding checklist */}
+            <div className={cn(HERO_CARD, "p-5")}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-bold tracking-[-0.01em] text-[#0f172a]">Lista e largimit</h2>
+                  <p className="mt-0.5 text-[12.5px] text-[#64748b]">Hapat operativë para përfundimit të largimit.</p>
+                </div>
+                <Chip tone={stepsRemaining === 0 ? "success" : "info"}>
+                  {props.checklists.length - stepsRemaining}/{props.checklists.length} hapa
+                </Chip>
+              </div>
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f7]">
+                <div
+                  className={cn("h-full rounded-full transition-all", stepsRemaining === 0 ? "bg-[#16a34a]" : "bg-brand-blue")}
+                  style={{
+                    width: `${
+                      props.checklists.length > 0
+                        ? Math.round(((props.checklists.length - stepsRemaining) / props.checklists.length) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+              <ul className="mt-2">
+                {props.checklists.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex items-start justify-between gap-3 border-b border-[#f1f5f9] py-3 last:border-0 last:pb-0"
+                  >
+                    <label className="flex flex-1 cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-[18px] w-[18px] shrink-0 rounded accent-[#2563EB]"
+                        checked={c.isCompleted}
+                        disabled={pending || readOnly}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          startTransition(async () => {
+                            const res = await toggleTerminationChecklistAction({
+                              terminationId: t.id,
+                              itemKey: c.itemKey,
+                              isCompleted: checked,
+                            });
+                            if (!res.ok) toast.error(res.error);
+                            else {
+                              toast.success("Lista u përditësua.");
+                              router.refresh();
+                            }
+                          });
+                        }}
+                      />
+                      <span
+                        className={cn(
+                          "text-[13.5px] font-medium",
+                          c.isCompleted ? "text-[#94a3b8] line-through" : "text-[#111827]",
+                        )}
+                      >
+                        {c.label}
+                      </span>
+                    </label>
+                    {c.completedAt ? (
+                      <span className="shrink-0 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(c.completedAt)}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Final payroll + severance */}
+            <div className={cn(CARD, "p-5")}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className={CARD_TITLE}>Final payroll & severanca</h2>
+                <Chip tone={t.finalPayrollRequired ? "info" : "neutral"}>
+                  {t.finalPayrollRequired ? "I detyrueshëm" : "Jo i detyrueshëm"}
+                </Chip>
+              </div>
+              {t.finalPayroll ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-[#eff6ff] text-brand-blue">
+                    <Banknote className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/pagat/${t.finalPayroll.id}`}
+                      className="text-[13.5px] font-semibold tabular-nums text-brand-blue hover:underline"
+                    >
+                      Pagë {t.finalPayroll.month}/{t.finalPayroll.year}
+                    </Link>
+                    {props.payrollEntry ? (
+                      <p className="mt-0.5 text-[12.5px] text-[#64748b]">
+                        Rreshti: {props.payrollEntry.status} · Bruto{" "}
+                        <span className="font-semibold tabular-nums text-[#111827]">
+                          {formatEur(props.payrollEntry.grossSalary)}
+                        </span>{" "}
+                        · Neto{" "}
+                        <span className="font-semibold tabular-nums text-[#111827]">
+                          {formatEur(props.payrollEntry.netPay)}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <Chip
+                    tone={(PAYROLL_STATUS_META[t.finalPayroll.status]?.tone ?? "neutral") as ChipTone}
+                  >
+                    {PAYROLL_STATUS_META[t.finalPayroll.status]?.label ?? t.finalPayroll.status}
+                  </Chip>
+                </div>
+              ) : (
+                <p className="mt-3 text-[13px] text-[#64748b]">Nuk është lidhur ende.</p>
+              )}
+              <div className="mt-4 flex items-center justify-between border-t border-[#f1f5f9] pt-3 text-[13px]">
+                <span className="text-[#64748b]">Severanca</span>
+                <span className="font-semibold tabular-nums text-[#111827]">
+                  {t.severanceAmount != null ? formatEur(t.severanceAmount) : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Generated documents */}
+            <div className={cn(CARD, "p-5")}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className={CARD_TITLE}>Dokumentet e gjeneruara</h2>
+                <Chip tone="neutral">{props.artifacts.length}</Chip>
+              </div>
+              {props.artifacts.length === 0 ? (
+                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka dokumente të gjeneruara.</p>
+              ) : (
+                <ul className="mt-2">
+                  {props.artifacts.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-wrap items-center gap-3 border-b border-[#f1f5f9] py-3 last:border-0 last:pb-0"
+                    >
+                      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-[#f1f5f9] text-[#475569]">
+                        <FileText className="h-4 w-4" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold text-[#111827]">{a.displayFilename}</p>
+                        <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(a.createdAt)}</p>
+                      </div>
+                      <Chip tone={a.kind === "PREVIEW" ? "warning" : "success"} className="uppercase tracking-[0.03em]">
+                        {formatArtifactKind(a.kind)}
+                      </Chip>
+                      {a.isArchived ? <Chip tone="neutral">I arkivuar</Chip> : null}
+                      <Link href={`/dokumentet/${a.id}`} className={cn(BTN_SECONDARY, "h-8 px-3 text-[12.5px]")}>
+                        Hap
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Dates & legal reason */}
+            <div className={cn(CARD, "p-5")}>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-[#eff6ff] text-brand-blue">
+                  <CalendarDays className="h-4 w-4" aria-hidden />
+                </span>
+                <h2 className={CARD_TITLE}>Datat & arsyeja ligjore</h2>
+              </div>
+              <dl className="mt-4 grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
+                  <dt className="text-[#64748b]">Data e largimit</dt>
+                  <dd className="font-semibold tabular-nums text-[#111827]">{formatSqDate(t.terminationDate)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
+                  <dt className="text-[#64748b]">Dita e fundit e punës</dt>
+                  <dd className="font-semibold tabular-nums text-[#111827]">{formatSqDate(t.lastWorkingDay)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
+                  <dt className="text-[#64748b]">Njoftimi</dt>
+                  <dd className="font-semibold tabular-nums text-[#111827]">
+                    {t.noticeDate ? formatSqDate(t.noticeDate) : "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
+                  <dt className="text-[#64748b]">Ditë njoftimi</dt>
+                  <dd className="font-semibold tabular-nums text-[#111827]">{t.noticeDays ?? "—"}</dd>
+                </div>
+              </dl>
+              <div className="mt-4">
+                <p className={FIELD_LABEL}>Arsyeja</p>
+                <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">{t.reason ?? "—"}</p>
+                {t.details ? (
+                  <>
+                    <p className={cn(FIELD_LABEL, "mt-4")}>Detaje</p>
+                    <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">{t.details}</p>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Right — summary rail */}
+          <div className="min-w-0 space-y-5">
+            <div className={cn(CARD, "p-5")}>
+              <h2 className={CARD_TITLE}>Përmbledhje</h2>
+              <dl className="mt-3 space-y-2.5 text-[13px]">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-[#64748b]">Statusi</dt>
+                  <dd>
+                    <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>
+                      {TERMINATION_STATUS_LABELS[t.status] ?? t.status}
+                    </Chip>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Lloji</dt>
+                  <dd className="font-medium text-[#111827]">{TERMINATION_TYPE_LABELS[t.type]}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Krijuar nga</dt>
+                  <dd className="truncate font-medium text-[#111827]">
+                    {t.createdBy?.displayName ?? t.createdBy?.email ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Miratuar nga</dt>
+                  <dd className="truncate font-medium text-[#111827]">
+                    {t.approvedBy?.displayName ?? t.approvedBy?.email ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Miratuar më</dt>
+                  <dd className="font-medium tabular-nums text-[#111827]">
+                    {t.approvedAt ? fmtDateTime(t.approvedAt) : "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Përfunduar më</dt>
+                  <dd className="font-medium tabular-nums text-[#111827]">
+                    {t.completedAt ? fmtDateTime(t.completedAt) : "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
+                  <dt className="text-[#64748b]">Final payroll</dt>
+                  <dd className="font-medium text-[#111827]">{t.finalPayrollRequired ? "Po" : "Jo"}</dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Activity timeline */}
+            <div className={cn(CARD, "p-5")}>
+              <h2 className={CARD_TITLE}>Aktiviteti</h2>
+              {props.activities.length === 0 ? (
+                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka aktivitet të regjistruar.</p>
+              ) : (
+                <ul className="mt-3">
+                  {props.activities.map((a, i) => (
+                    <li key={a.id} className="relative flex gap-3 pb-4 last:pb-0">
+                      {i < props.activities.length - 1 ? (
+                        <span className="absolute left-[5px] top-4 h-full w-px bg-[#eef2f7]" aria-hidden />
+                      ) : null}
+                      <span className="relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white bg-brand-blue shadow-[0_0_0_1px_#dbeafe]" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium leading-snug text-[#111827]">{a.summary}</p>
+                        <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+                          <span className="tabular-nums">{fmtDateTime(a.occurredAt)}</span> ·{" "}
+                          {a.actor?.displayName ?? a.actor?.email ?? "—"}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className={cn(CARD, "p-5")}>
+              <h2 className={CARD_TITLE}>Timeline (punonjësi)</h2>
+              {props.timeline.length === 0 ? (
+                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka ngjarje.</p>
+              ) : (
+                <ul className="mt-2">
+                  {props.timeline.map((ev) => (
+                    <li key={ev.id} className="border-b border-[#f1f5f9] py-2.5 last:border-0 last:pb-0">
+                      <p className="text-[13px] font-medium text-[#111827]">{ev.title}</p>
+                      <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(ev.occurredAt)}</p>
+                      {ev.body ? (
+                        <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-[#64748b]">{ev.body}</p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className={cn(CARD, "p-5")}>
+              <h2 className={CARD_TITLE}>Audit log</h2>
+              {props.audits.length === 0 ? (
+                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka regjistrime.</p>
+              ) : (
+                <ul className="mt-2">
+                  {props.audits.map((a) => (
+                    <li key={a.id} className="border-b border-[#f1f5f9] py-2.5 last:border-0 last:pb-0">
+                      <p className="text-[12.5px] font-semibold text-[#111827]">{a.action}</p>
+                      <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+                        <span className="tabular-nums">{a.createdAt ? fmtDateTime(a.createdAt) : "—"}</span> ·{" "}
+                        {a.actor?.displayName ?? "—"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="hidden flex-wrap gap-2 md:flex">
-        <Button size="sm" variant="outlinePrimary" disabled={pending || readOnly || t.status !== "DRAFT"} onClick={() => run("U dërgua.", () => submitTerminationAction({ id: t.id }))}>
-          Dërgo në shqyrtim
-        </Button>
-        <Button
-          size="sm"
-          variant="outlinePrimary"
-          disabled={pending || readOnly || t.status !== "PENDING_REVIEW"}
-          onClick={() => run("U miratua.", () => approveTerminationAction({ id: t.id }))}
-        >
-          Mirato
-        </Button>
-        <Button size="sm" variant="outlinePrimary" disabled={pending || readOnly} onClick={() => run("U gjenerua.", () => generateTerminationDocumentActionServer({ id: t.id }))}>
-          Gjenero dokumentin
-        </Button>
-        <Button size="sm" variant="outlinePrimary" disabled={pending || readOnly} onClick={() => run("U përgatit.", () => prepareFinalPayrollTerminationAction({ id: t.id }))}>
-          Përgatit payroll
-        </Button>
-        <Button size="sm" disabled={pending || t.status !== "APPROVED"} onClick={() => run("U përfundua.", () => completeTerminationAction({ id: t.id }))}>
-          Përfundo largimin
-        </Button>
-        <Button size="sm" variant="destructive" disabled={pending || readOnly} onClick={() => run("U anulua.", () => cancelTerminationAction({ id: t.id }))}>
-          Anulo
-        </Button>
+      {/* Sticky action bar */}
+      <div className="sticky bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] z-30 -mx-4 mt-6 border-t border-[#e2e8f0] bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:bottom-0 md:-mx-10 md:px-10">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="mr-auto flex items-center gap-2">
+            {readOnly ? (
+              <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>{TERMINATION_STATUS_LABELS[t.status] ?? t.status}</Chip>
+            ) : stepsRemaining > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#b45309]">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                {stepsRemaining} {stepsRemaining === 1 ? "hap mbetet" : "hapa mbeten"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#15803d]">
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                Të gjithë hapat u kryen
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className={BTN_SECONDARY}
+            disabled={pending || readOnly || t.status !== "DRAFT"}
+            onClick={() => run("U dërgua.", () => submitTerminationAction({ id: t.id }))}
+          >
+            Dërgo në shqyrtim
+          </button>
+          <button
+            type="button"
+            className={BTN_SECONDARY}
+            disabled={pending || readOnly || t.status !== "PENDING_REVIEW"}
+            onClick={() => run("U miratua.", () => approveTerminationAction({ id: t.id }))}
+          >
+            Mirato
+          </button>
+          <button
+            type="button"
+            className={BTN_SECONDARY}
+            disabled={pending || readOnly}
+            onClick={() => run("U gjenerua.", () => generateTerminationDocumentActionServer({ id: t.id }))}
+          >
+            Gjenero dokument
+          </button>
+          <button
+            type="button"
+            className={BTN_SECONDARY}
+            disabled={pending || readOnly}
+            onClick={() => run("U përgatit.", () => prepareFinalPayrollTerminationAction({ id: t.id }))}
+          >
+            Përgatit payroll
+          </button>
+          <button
+            type="button"
+            className={BTN_DESTRUCTIVE}
+            disabled={pending || readOnly}
+            onClick={() => run("U anulua.", () => cancelTerminationAction({ id: t.id }))}
+          >
+            Anulo
+          </button>
+          <button
+            type="button"
+            className={BTN_PRIMARY}
+            disabled={pending || t.status !== "APPROVED"}
+            onClick={() => run("U përfundua.", () => completeTerminationAction({ id: t.id }))}
+          >
+            Përfundo largimin
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -399,18 +756,18 @@ function EditTerminationDialog(props: {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">
+        <button type="button" className={BTN_SECONDARY}>
           Edito
-        </Button>
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edito largimin</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-2">
-          <div className="space-y-2">
-            <Label>Lloji</Label>
-            <select className="h-10 w-full rounded-md border px-2 text-sm" value={type} onChange={(e) => setType(e.target.value as TerminationType)}>
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL}>Lloji</label>
+            <select className={FIELD_SELECT} value={type} onChange={(e) => setType(e.target.value as TerminationType)}>
               {(Object.keys(TERMINATION_TYPE_LABELS) as TerminationType[]).map((k) => (
                 <option key={k} value={k}>
                   {TERMINATION_TYPE_LABELS[k]}
@@ -419,32 +776,47 @@ function EditTerminationDialog(props: {
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label>Data largimit</Label>
-              <Input type="date" value={terminationDate} onChange={(e) => setTerminationDate(e.target.value)} />
+            <div className="space-y-1.5">
+              <label className={FIELD_LABEL}>Data largimit</label>
+              <input
+                type="date"
+                className={FIELD_INPUT}
+                value={terminationDate}
+                onChange={(e) => setTerminationDate(e.target.value)}
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Dita e fundit</Label>
-              <Input type="date" value={lastWorkingDay} onChange={(e) => setLastWorkingDay(e.target.value)} />
+            <div className="space-y-1.5">
+              <label className={FIELD_LABEL}>Dita e fundit</label>
+              <input
+                type="date"
+                className={FIELD_INPUT}
+                value={lastWorkingDay}
+                onChange={(e) => setLastWorkingDay(e.target.value)}
+              />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Arsyeja</Label>
-            <textarea className="min-h-[72px] w-full rounded-md border px-3 py-2 text-sm" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL}>Arsyeja</label>
+            <textarea className={FIELD_TEXTAREA} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
-          <div className="space-y-2">
-            <Label>Detaje</Label>
-            <textarea className="min-h-[72px] w-full rounded-md border px-3 py-2 text-sm" value={details} onChange={(e) => setDetails(e.target.value)} />
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL}>Detaje</label>
+            <textarea className={FIELD_TEXTAREA} value={details} onChange={(e) => setDetails(e.target.value)} />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={finalPayrollRequired} onChange={(e) => setFinalPayrollRequired(e.target.checked)} />
+          <label className="flex items-center gap-2 text-[13px] text-[#334155]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[#2563EB]"
+              checked={finalPayrollRequired}
+              onChange={(e) => setFinalPayrollRequired(e.target.checked)}
+            />
             Final payroll i detyrueshëm
           </label>
         </div>
         <DialogFooter>
-          <Button type="button" onClick={save} disabled={pending}>
+          <button type="button" className={BTN_PRIMARY} onClick={save} disabled={pending}>
             Ruaj
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

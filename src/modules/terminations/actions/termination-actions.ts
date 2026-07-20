@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { getCompanyContext, companyContextErrorMessage } from "@/server/company-context";
 import {
   createTerminationWorkflow,
   updateTerminationWorkflow,
@@ -33,35 +33,33 @@ function rev(): void {
   }
 }
 
-async function companyOrFail(): Promise<string | null> {
-  return resolveActiveCompanyId();
-}
-
 export async function createTerminationAction(raw: unknown): Promise<TerminationActionResult<{ id: string }>> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
 
-  const res = await createTerminationWorkflow(companyId, parsed.data, null);
+  const res = await createTerminationWorkflow(companyId, parsed.data, user.id);
   if (!res.ok) return res;
   rev();
   return res;
 }
 
 export async function updateTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationUpdateSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
 
-  const res = await updateTerminationWorkflow(companyId, parsed.data, null);
+  const res = await updateTerminationWorkflow(companyId, parsed.data, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -73,13 +71,14 @@ export async function updateTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function submitTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await submitTerminationForReview(companyId, parsed.data.id, null);
+  const res = await submitTerminationForReview(companyId, parsed.data.id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -91,13 +90,14 @@ export async function submitTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function approveTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await approveTerminationWorkflow(companyId, parsed.data.id, null);
+  const res = await approveTerminationWorkflow(companyId, parsed.data.id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -109,13 +109,14 @@ export async function approveTerminationAction(raw: unknown): Promise<Terminatio
 }
 
 export async function prepareFinalPayrollTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await prepareTerminationFinalPayrollAction(companyId, parsed.data.id, null);
+  const res = await prepareTerminationFinalPayrollAction(companyId, parsed.data.id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -130,13 +131,14 @@ export async function prepareFinalPayrollTerminationAction(raw: unknown): Promis
 export async function generateTerminationDocumentActionServer(
   raw: unknown,
 ): Promise<TerminationActionResult<{ artifactId: string }>> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await generateTerminationDocumentAction(companyId, parsed.data.id, null);
+  const res = await generateTerminationDocumentAction(companyId, parsed.data.id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -149,8 +151,9 @@ export async function generateTerminationDocumentActionServer(
 }
 
 export async function completeTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
@@ -162,7 +165,7 @@ export async function completeTerminationAction(raw: unknown): Promise<Terminati
     select: { employeeId: true },
   });
 
-  const res = await completeTerminationWorkflow(companyId, id, null);
+  const res = await completeTerminationWorkflow(companyId, id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -177,13 +180,14 @@ export async function completeTerminationAction(raw: unknown): Promise<Terminati
 }
 
 export async function cancelTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
-  const res = await cancelTerminationWorkflow(companyId, parsed.data.id, null);
+  const res = await cancelTerminationWorkflow(companyId, parsed.data.id, user.id);
   if (!res.ok) return res;
   rev();
   try {
@@ -195,8 +199,9 @@ export async function cancelTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function toggleTerminationChecklistAction(raw: unknown): Promise<TerminationActionResult> {
-  const companyId = await companyOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const parsed = checklistToggleSchema.safeParse(raw);
   if (!parsed.success) {
@@ -208,7 +213,7 @@ export async function toggleTerminationChecklistAction(raw: unknown): Promise<Te
     parsed.data.terminationId,
     parsed.data.itemKey,
     parsed.data.isCompleted,
-    null,
+    user.id,
   );
   if (!res.ok) return res;
   rev();

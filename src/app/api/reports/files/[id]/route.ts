@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { resolveActiveCompanyId, assertCompanyScopedStorageKey } from "@/server/company-scope";
+import { assertCompanyScopedStorageKey } from "@/server/company-scope";
+import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
 import { appendReportExportLog } from "@/modules/reports/services/report-log-service";
 
 function dispositionFilename(reportTitle: string, format: string): string {
@@ -24,10 +25,11 @@ function mimeFor(format: string): string {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return companyContextHttpError(result.reason);
   }
+  const companyId = result.context.companyId;
 
   const { id } = await context.params;
 
@@ -39,6 +41,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if (doc.isArchived) {
+    return NextResponse.json(
+      { error: "Ky raport është arkivuar ose zëvendësuar; skedari nuk është më i disponueshëm." },
+      { status: 410 },
+    );
+  }
+
   try {
     assertCompanyScopedStorageKey(companyId, doc.storageKey);
     const buf = await getCompanyAssetStorage().get(doc.storageKey);
@@ -47,7 +56,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       companyId,
       generatedReportId: doc.id,
       action: "DOWNLOADED",
-      performedByUserId: null,
+      performedByUserId: result.context.user.id,
       metadataJson: { format: doc.fileFormat },
     });
 

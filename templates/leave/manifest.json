@@ -1,0 +1,32 @@
+{
+  "templates": [
+    {
+      "filename": "vendim-pushim-vjetor.docx",
+      "name": "Vendim për pushim vjetor"
+    },
+    {
+      "filename": "vertetim-pushim-vjetor.docx",
+      "name": "Vërtetim për pushim vjetor"
+    },
+    {
+      "filename": "vertetim-pushim-mjekesor.docx",
+      "name": "Vërtetim për pushim mjekësor"
+    },
+    {
+      "filename": "vertetim-pushim-lehonie.docx",
+      "name": "Vërtetim për pushim lehonie"
+    },
+    {
+      "filename": "vertetim-pushim-personal.docx",
+      "name": "Vërtetim për pushim personal"
+    },
+    {
+      "filename": "vertetim-pushim-pa-pagese.docx",
+      "name": "Vërtetim për pushim pa pagesë"
+    },
+    {
+      "filename": "vertetim-pushim-tjeter.docx",
+      "name": "Vërtetim për pushim tjetër"
+    }
+  ]
+}

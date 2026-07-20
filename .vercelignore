@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.vercel
+.local-storage
+.next
+node_modules
+*.log

@@ -7,7 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 import {
   templateVersionSourceKey,
 } from "@/modules/documents/engine";
@@ -56,10 +56,6 @@ function safeRevalidatePath(path: string): void {
   } catch (err) {
     console.error("[pagapro] documents-actions: revalidatePath failed:", path, err);
   }
-}
-
-async function requireCompanyId(): Promise<string | null> {
-  return resolveActiveCompanyId();
 }
 
 function assertTemplateMatchesSubject(
@@ -137,14 +133,11 @@ export async function uploadDocumentTemplateVersionAction(
     needsMapping: boolean;
   }>
 > {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -291,14 +284,11 @@ export async function uploadDocumentTemplateVersionAction(
 export async function publishDocumentTemplateVersionAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = publishTemplateVersionSchema.safeParse(raw);
   if (!parsed.success) {
@@ -352,14 +342,11 @@ export async function publishDocumentTemplateVersionAction(
 export async function saveTemplateMappingAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = saveTemplateMappingSchema.safeParse(raw);
   if (!parsed.success) {
@@ -427,10 +414,11 @@ export async function previewPlaceholderValuesAction(
 ): Promise<
   DocumentModuleActionResult<{ values: Record<string, string>; errors: { key: string; message: string }[] }>
 > {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return { ok: false, error: "Nuk ka kompani aktive." };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = previewPlaceholderValuesSchema.safeParse(raw);
   if (!parsed.success) {
@@ -468,14 +456,11 @@ export async function previewPlaceholderValuesAction(
 export async function setDocumentTemplateActiveAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = setTemplateActiveSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
@@ -493,14 +478,11 @@ export async function setDocumentTemplateActiveAction(
 export async function updateDocumentTemplateTerminationKeyAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = updateTemplateTerminationKeySchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
@@ -706,14 +688,11 @@ async function runGeneration(params: {
 export async function previewDocumentGenerationAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = generateDocumentPayloadSchema.safeParse(raw);
   if (!parsed.success) {
@@ -724,21 +703,18 @@ export async function previewDocumentGenerationAction(
     companyId,
     parsed: parsed.data,
     kind: "PREVIEW",
-    actorUserId: null,
+    actorUserId: user.id,
   });
 }
 
 export async function generateFinalDocumentAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = generateDocumentPayloadSchema.safeParse(raw);
   if (!parsed.success) {
@@ -749,7 +725,7 @@ export async function generateFinalDocumentAction(
     companyId,
     parsed: parsed.data,
     kind: "ARCHIVED_FINAL",
-    actorUserId: null,
+    actorUserId: user.id,
   });
 }
 
@@ -813,10 +789,11 @@ export async function generateHrDocumentsBatchAction(
     artifactId?: string;
   }>
 > {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return { ok: false, error: "Nuk ka kompani aktive." };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = generateHrDocumentsBatchSchema.safeParse(raw);
   if (!parsed.success) {
@@ -867,7 +844,7 @@ export async function generateHrDocumentsBatchAction(
       companyId,
       parsed: payload.data,
       kind: "ARCHIVED_FINAL",
-      actorUserId: null,
+      actorUserId: user.id,
     });
     if (res.ok) {
       generated += 1;
@@ -898,14 +875,11 @@ export async function generateBulkDocumentsAction(
 ): Promise<
   DocumentModuleActionResult<{ generated: number; failed: BulkGenerationFailure[]; artifactIds: string[] }>
 > {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = bulkGenerateDocumentsSchema.safeParse(raw);
   if (!parsed.success) {
@@ -966,7 +940,7 @@ export async function generateBulkDocumentsAction(
       companyId,
       parsed: payload.data,
       kind: "ARCHIVED_FINAL",
-      actorUserId: null,
+      actorUserId: user.id,
     });
     if (res.ok) {
       generated += 1;
@@ -993,14 +967,11 @@ export async function generateContractDocumentsAction(
     artifactId?: string;
   }>
 > {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId } = auth.context;
 
   const parsed = generateContractDocumentsSchema.safeParse(raw);
   if (!parsed.success) {
@@ -1058,14 +1029,11 @@ const regeneratePayloadSchema = z.object({
 export async function regenerateDocumentAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = regeneratePayloadSchema.safeParse(raw);
   if (!parsed.success) {
@@ -1097,19 +1065,16 @@ export async function regenerateDocumentAction(
     companyId,
     parsed: generateDocumentPayloadSchema.parse(payload),
     kind: "ARCHIVED_FINAL",
-    actorUserId: null,
+    actorUserId: user.id,
   });
 }
 
 export async function archiveArtifactAction(raw: unknown): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = archiveArtifactSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
@@ -1134,7 +1099,7 @@ export async function archiveArtifactAction(raw: unknown): Promise<DocumentModul
     generatedDocumentId: row.id,
     eventType: DOCUMENT_MODULE_TIMELINE.DOCUMENT_ARCHIVED,
     metadata: { archived: parsed.data.archived },
-    createdByUserId: null,
+    createdByUserId: user.id,
   });
 
   await appendDocumentDomainActivity({
@@ -1152,14 +1117,11 @@ export async function archiveArtifactAction(raw: unknown): Promise<DocumentModul
 }
 
 export async function logDocumentDownloadAction(raw: unknown): Promise<DocumentModuleActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const auth = await getCompanyContext();
+  if (!auth.ok) {
+    return { ok: false, error: companyContextErrorMessage(auth.reason) };
   }
+  const { companyId, user } = auth.context;
 
   const parsed = logDownloadSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
@@ -1175,7 +1137,7 @@ export async function logDocumentDownloadAction(raw: unknown): Promise<DocumentM
     employeeId: row.employeeId,
     generatedDocumentId: row.id,
     eventType: DOCUMENT_MODULE_TIMELINE.DOCUMENT_DOWNLOADED,
-    createdByUserId: null,
+    createdByUserId: user.id,
   });
 
   await appendDocumentDomainActivity({

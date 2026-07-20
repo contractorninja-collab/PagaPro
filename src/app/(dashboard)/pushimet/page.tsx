@@ -11,6 +11,7 @@ import {
   listLeaveTemplatesPicklist,
   listPendingLeaveRequests,
 } from "@/modules/leaves/services/leave-query-service";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { PushimetFiltersForm } from "@/modules/leaves/components/pushimet-filters-form";
 import { PushimetDashboardClient } from "@/modules/leaves/components/pushimet-dashboard-client";
 import type {
@@ -21,7 +22,8 @@ import type {
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { eligibleLeaveYears } from "@/modules/leaves/helpers/eligible-leave-years";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Pushimet",
@@ -100,6 +102,24 @@ function serializeLeaveRow(
   };
 }
 
+function readAnnualBreakdown(
+  bd: unknown,
+): { projected: number | null; base: number; tenure: number; special: number } | null {
+  if (!bd || typeof bd !== "object") return null;
+  const ent = (bd as { entitlement?: unknown }).entitlement;
+  if (!ent || typeof ent !== "object") return null;
+  const e = ent as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    projected: num(e.remainingYearlyDays),
+    base: num(e.baseAnnualDays) ?? 0,
+    tenure: num(e.experienceExtraDays) ?? 0,
+    special: num(e.protectedCategoryExtraDays) ?? 0,
+  };
+}
+
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
 function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
   return {
     id: row.id,
@@ -114,14 +134,20 @@ function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
 
 function DashboardFallback() {
   return (
-    <div className="animate-pulse space-y-6 rounded-xl border border-border bg-card p-6">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="h-24 rounded-lg bg-muted" />
-        <div className="h-24 rounded-lg bg-muted" />
-        <div className="h-24 rounded-lg bg-muted" />
+    <div className="animate-pulse space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
+        <div className="h-[72px] rounded-xl border border-[#e2e8f0] bg-white" />
       </div>
-      <div className="h-40 rounded-lg bg-muted" />
-      <div className="h-64 rounded-lg bg-muted" />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-6">
+          <div className="h-40 rounded-xl border border-[#e2e8f0] bg-white" />
+          <div className="h-64 rounded-xl border border-[#e2e8f0] bg-white" />
+        </div>
+        <div className="h-72 rounded-xl border border-[#e2e8f0] bg-white" />
+      </div>
     </div>
   );
 }
@@ -131,21 +157,7 @@ export default async function PushimetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimet</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code>, variablën{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>, ose në development
-          përdorni <code className="rounded bg-muted px-1.5 py-0.5 text-xs">POST /api/dev/active-company</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const now = new Date();
@@ -209,6 +221,7 @@ export default async function PushimetPage({
   const employees: PushimetEmployeeOptionDto[] = employeesRaw.map((e) => ({
     id: e.id,
     label: `${e.firstName} ${e.lastName}`.trim(),
+    eligibleYears: eligibleLeaveYears(e.hireDate, e.terminationDate, defaultYear),
   }));
 
   const departments: PushimetDepartmentOptionDto[] = departmentsRaw.map((d) => ({
@@ -221,31 +234,36 @@ export default async function PushimetPage({
     name: t.name,
   }));
 
-  const balances: PushimetBalanceRowDto[] = balancesRaw.map((b) => ({
-    id: b.id,
-    employeeId: b.employeeId,
-    employeeName: `${b.employee.firstName} ${b.employee.lastName}`.trim(),
-    departmentName: b.employee.department?.name ?? null,
-    leaveType: b.leaveType,
-    year: b.year,
-    yearlyQuota: b.yearlyQuota.toString(),
-    accruedDays: b.accruedYtd.toString(),
-    carryOverDays: b.carryOverDays.toString(),
-    usedDays: b.usedDays.toString(),
-    pendingDays: b.pendingDays.toString(),
-    remainingDays: b.remainingDays.toString(),
-  }));
+  const balances: PushimetBalanceRowDto[] = balancesRaw.map((b) => {
+    const isAnnual = b.leaveType === "PUSHIM_VJETOR";
+    const bd = isAnnual ? readAnnualBreakdown(b.breakdown) : null;
+    return {
+      id: b.id,
+      employeeId: b.employeeId,
+      employeeName: `${b.employee.firstName} ${b.employee.lastName}`.trim(),
+      departmentName: b.employee.department?.name ?? null,
+      leaveType: b.leaveType,
+      year: b.year,
+      yearlyQuota: b.yearlyQuota.toString(),
+      accruedDays: b.accruedYtd.toString(),
+      carryOverDays: b.carryOverDays.toString(),
+      usedDays: b.usedDays.toString(),
+      pendingDays: b.pendingDays.toString(),
+      remainingDays: b.remainingDays.toString(),
+      projectedYearEndDays: bd?.projected != null ? String(round2(bd.projected)) : null,
+      carryExpiresIso: b.carryExpiresAt ? b.carryExpiresAt.toISOString() : null,
+      entitlementBreakdown: bd ? { base: bd.base, tenure: bd.tenure, special: bd.special } : null,
+    };
+  });
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pushimet</h1>
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Rrjedhë operative për kërkesat, miratimet, balancat dhe lidhjen me payroll dhe dokumentet. Të dhënat janë të izoluara
-          sipas kompanisë aktive.
-        </p>
-      </header>
-
+    <>
+      <AppSubBar
+        eyebrow="Menaxhimi i pushimeve"
+        title="Pushimet"
+        description="Rrjedhë operative për kërkesat, miratimet, balancat dhe lidhjen me payroll dhe dokumentet, të izoluara sipas kompanisë aktive."
+      />
+      <div className="space-y-6">
       <PushimetFiltersForm
         employees={employees}
         departments={departments}
@@ -272,6 +290,7 @@ export default async function PushimetPage({
           templates={templates}
         />
       </Suspense>
-    </div>
+      </div>
+    </>
   );
 }

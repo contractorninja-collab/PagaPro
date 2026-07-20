@@ -16,7 +16,7 @@ import {
 } from "@/modules/leaves/components/pushimet-detail-client";
 import type { PushimetLeaveRowDto, PushimetTemplateOptionDto } from "@/modules/leaves/types/pushimet";
 import type { LeaveRequestStatus, LeaveSubtype, LeaveType } from "@prisma/client";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await props.params;
@@ -73,15 +73,7 @@ function serializeLeaveRowDto(lr: {
 
 export default async function PushimetDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive.</p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   let detail;
   try {

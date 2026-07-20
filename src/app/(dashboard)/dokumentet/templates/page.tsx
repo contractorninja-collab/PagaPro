@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { TemplatesLibraryClient } from "@/modules/documents/components/templates-library-client";
 import { listDocumentTemplatesWithVersions } from "@/modules/documents/services/document-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Shabllonet — Dokumentet",
@@ -15,16 +14,7 @@ function placeholderCountFromJson(value: unknown): number {
 }
 
 export default async function DokumentetTemplatesPage() {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold text-foreground">Shabllonet</h1>
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive për këtë sesion.</p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   let templates;
   try {
@@ -57,15 +47,5 @@ export default async function DokumentetTemplatesPage() {
     })),
   }));
 
-  return (
-    <div className="space-y-6">
-      <Link
-        href="/dokumentet"
-        className="inline-flex text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-      >
-        ← Kthehu te dokumentet
-      </Link>
-      <TemplatesLibraryClient templates={rows} />
-    </div>
-  );
+  return <TemplatesLibraryClient templates={rows} />;
 }

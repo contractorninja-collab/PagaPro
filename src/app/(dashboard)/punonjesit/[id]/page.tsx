@@ -11,7 +11,7 @@ import {
   listPayrollGeneratedDocsForEmployee,
 } from "@/modules/documents/services/document-queries";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -26,9 +26,9 @@ function first(v: string | string[] | undefined): string {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params;
-    const companyId = await resolveActiveCompanyId();
-    if (!companyId) return { title: "Punonjësi" };
-    const e = await getEmployeeById(companyId, id);
+    const result = await getCompanyContext();
+    if (!result.ok) return { title: "Punonjësi" };
+    const e = await getEmployeeById(result.context.companyId, id);
     if (!e) return { title: "Punonjësi" };
     return { title: `${e.firstName} ${e.lastName}` };
   } catch {
@@ -40,15 +40,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   const { id } = await params;
   const sp = await searchParams;
   const openEditDocuments = first(sp.edit) === "documents";
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive për këtë sesion.</p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   let employee;
   let departments;

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { DocumentCategory } from "@prisma/client";
+import { Upload } from "lucide-react";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,8 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import {
   publishDocumentTemplateVersionAction,
   setDocumentTemplateActiveAction,
@@ -26,6 +28,15 @@ import {
   updateDocumentTemplateTerminationKeyAction,
 } from "@/modules/documents/actions/documents-actions";
 import { DOCUMENT_CATEGORY_LABELS } from "@/modules/documents/components/document-labels";
+import {
+  DocChip,
+  docBtnPrimary,
+  docBtnSecondaryDense,
+  docCard,
+  docSelect,
+  docTableCell,
+  docTableHead,
+} from "@/modules/documents/components/doc-ui";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -82,38 +93,40 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Shabllonet DOCX</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Ngarkoni versione të rij, inspektoni placeholderët dhe publikoni një version për gjenerim.
-          </p>
-        </div>
-        <UploadTemplateDialog onUploaded={() => refresh()} pending={pending} startTransition={startTransition} />
-      </div>
-
-      <div className="space-y-10">
+    <>
+      <AppSubBar
+        dense
+        backHref="/dokumentet"
+        backLabel="Dokumentet"
+        title="Shabllonet DOCX"
+        description="Ngarkoni versione të rij, inspektoni placeholderët dhe publikoni një version për gjenerim."
+        actions={
+          <UploadTemplateDialog onUploaded={() => refresh()} pending={pending} startTransition={startTransition} />
+        }
+      />
+      <div className="space-y-5">
         {props.templates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nuk ka shabllon ende — ngarkoni një DOCX.</p>
+          <div className={cn(docCard, "p-8 text-center text-[13px] text-[#64748b]")}>
+            Nuk ka shabllon ende — ngarkoni një DOCX.
+          </div>
         ) : (
           props.templates.map((t) => (
-            <div key={t.id} className="rounded-lg border border-border bg-card">
-              <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
-                <div>
+            <div key={t.id} className={cn(docCard, "overflow-hidden")}>
+              <div className="flex flex-col gap-3 border-b border-[#eef2f7] p-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <Link
                     href={`/dokumentet/templates/${t.id}`}
-                    className="font-semibold text-foreground hover:underline"
+                    className="text-[14px] font-bold text-[#0f172a] hover:text-brand-blue"
                   >
                     {t.name}
                   </Link>
-                  <p className="text-xs text-muted-foreground">
-                    {DOCUMENT_CATEGORY_LABELS[t.documentCategory]} ·{" "}
+                  <DocChip tone="info">{DOCUMENT_CATEGORY_LABELS[t.documentCategory]}</DocChip>
+                  <DocChip tone={t.isActive ? "success" : "neutral"}>
                     {t.isActive ? "Aktiv" : "Jo aktiv"}
-                  </p>
+                  </DocChip>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">Aktiv</span>
+                  <span className="text-[12px] font-medium text-[#64748b]">Aktiv</span>
                   <Switch
                     checked={t.isActive}
                     disabled={pending}
@@ -124,77 +137,86 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
               {t.documentCategory === "TERMINATION" ? (
                 <TerminationWorkflowKeyRow templateId={t.id} initialKey={t.terminationWorkflowKey} />
               ) : null}
-              <div className="overflow-x-auto p-2">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ver.</TableHead>
-                      <TableHead>Skedari</TableHead>
-                      <TableHead>Placeholderë</TableHead>
-                      <TableHead>Fusha bosh</TableHead>
-                      <TableHead>Mapping</TableHead>
-                      <TableHead>Ngarkuar</TableHead>
-                      <TableHead className="text-right">Veprime</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                      <th className={docTableHead}>Ver.</th>
+                      <th className={docTableHead}>Skedari</th>
+                      <th className={cn(docTableHead, "text-right")}>Placeholderë</th>
+                      <th className={cn(docTableHead, "text-right")}>Fusha bosh</th>
+                      <th className={docTableHead}>Mapping</th>
+                      <th className={docTableHead}>Ngarkuar</th>
+                      <th className={cn(docTableHead, "text-right")}>Veprime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {t.versions.map((v) => (
-                      <TableRow key={v.id}>
-                        <TableCell className="font-mono text-sm">{v.versionNumber}</TableCell>
-                        <TableCell className="max-w-[200px] truncate text-sm">
+                      <tr
+                        key={v.id}
+                        className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                      >
+                        <td className={cn(docTableCell, "text-[13px] font-semibold tabular-nums text-[#0f172a]")}>
+                          v{v.versionNumber}
+                        </td>
+                        <td className={cn(docTableCell, "max-w-[220px] truncate text-[13px] text-[#334155]")}>
                           {v.originalFilename ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">{v.placeholderCount}</TableCell>
-                        <TableCell className="text-sm">{v.blankCount}</TableCell>
-                        <TableCell className="text-xs">
+                        </td>
+                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-[#334155]")}>
+                          {v.placeholderCount}
+                        </td>
+                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-[#334155]")}>
+                          {v.blankCount}
+                        </td>
+                        <td className={docTableCell}>
                           {v.isMapped ? (
-                            <span className="font-medium text-emerald-700">Gati</span>
+                            <DocChip tone="success">Gati</DocChip>
                           ) : v.blankCount > 0 || v.detectionMode === "MIXED" ? (
-                            <span className="text-amber-700">Duhet mapping</span>
+                            <DocChip tone="warning">Duhet mapping</DocChip>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-[12px] text-[#94a3b8]">—</span>
                           )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        </td>
+                        <td className={cn(docTableCell, "whitespace-nowrap text-[12.5px] tabular-nums text-[#64748b]")}>
                           {new Date(v.uploadedAt).toLocaleString("sq-AL", {
                             dateStyle: "short",
                             timeStyle: "short",
                           })}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className={cn(docTableCell, "text-right")}>
                           <div className="flex flex-wrap items-center justify-end gap-2">
                             {!v.isMapped && v.blankCount > 0 ? (
-                              <Button type="button" size="sm" variant="secondary" asChild>
-                                <Link href={`/dokumentet/templates/${t.id}/mapping?versionId=${v.id}`}>
-                                  Mapo fushat
-                                </Link>
-                              </Button>
+                              <Link
+                                href={`/dokumentet/templates/${t.id}/mapping?versionId=${v.id}`}
+                                className={docBtnSecondaryDense}
+                              >
+                                Mapo fushat
+                              </Link>
                             ) : null}
                             {v.isPublished ? (
-                              <span className="text-xs font-medium text-emerald-700">Publikuar</span>
+                              <DocChip tone="success">Publikuar</DocChip>
                             ) : (
-                              <Button
+                              <button
                                 type="button"
-                                size="sm"
-                                variant="secondary"
+                                className={docBtnSecondaryDense}
                                 disabled={pending}
                                 onClick={() => publish(t.id, v.id)}
                               >
                                 Publiko
-                              </Button>
+                              </button>
                             )}
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </div>
           ))
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -206,7 +228,10 @@ function UploadTemplateDialog(props: {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="button">Ngarko DOCX</Button>
+        <button type="button" className={docBtnPrimary}>
+          <Upload className="h-4 w-4" aria-hidden />
+          Ngarko DOCX
+        </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -303,11 +328,13 @@ function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: stri
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border px-4 py-3 md:flex-row md:items-end md:gap-4">
+    <div className="flex flex-col gap-2 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3 md:flex-row md:items-end md:gap-4">
       <div className="flex-1 space-y-1">
-        <Label className="text-xs text-muted-foreground">Çelësi Largimet (workflow)</Label>
+        <Label className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">
+          Çelësi Largimet (workflow)
+        </Label>
         <select
-          className={selectClass}
+          className={cn(docSelect, "w-full")}
           value={value}
           disabled={pending}
           onChange={(e) => setValue(e.target.value)}
@@ -320,9 +347,9 @@ function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: stri
           <option value="MANUAL">MANUAL</option>
         </select>
       </div>
-      <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={save}>
+      <button type="button" className={docBtnSecondaryDense} disabled={pending} onClick={save}>
         Ruaj çelësin
-      </Button>
+      </button>
     </div>
   );
 }

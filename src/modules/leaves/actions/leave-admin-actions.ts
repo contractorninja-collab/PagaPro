@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runMonthlyLeaveAccrualForCompany } from "@/modules/leaves/services/leave-accrual-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 const monthlyAccrualBodySchema = z.object({
   periodYear: z.number().int().min(1970).max(2100),
@@ -18,8 +18,9 @@ export type LeaveAdminActionResult<T = undefined> =
 export async function postMonthlyLeaveAccrualAction(
   raw: unknown,
 ): Promise<LeaveAdminActionResult<{ created: number; skipped: number }>> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId } = ctx.context;
 
   const parsed = monthlyAccrualBodySchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Viti ose muaji nuk janë të vlefshëm." };

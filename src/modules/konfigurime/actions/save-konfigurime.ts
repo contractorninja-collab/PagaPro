@@ -8,7 +8,7 @@ import {
   konfigurimePayloadSchema,
 } from "@/modules/konfigurime/validation/konfigurime-schemas";
 import { persistKonfigurimeSave } from "@/modules/konfigurime/services/konfigurime-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -43,14 +43,11 @@ export type SaveKonfigurimeResult =
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
 export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKonfigurimeResult> {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id, variablën DEV_DEFAULT_COMPANY_ID, ose përdorni POST /api/dev/active-company (vetëm në development).",
-    };
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
   }
+  const { companyId } = result.context;
 
   const companyExists = await prisma.company.findUnique({ where: { id: companyId }, select: { id: true } });
   if (!companyExists) {

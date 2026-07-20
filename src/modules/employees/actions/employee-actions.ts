@@ -6,6 +6,7 @@ import {
   createEmployee,
   deleteEmployeeHard,
   getEmployeeById,
+  rehireEmployee,
   terminateEmployee,
   updateEmployee,
 } from "@/modules/employees/services/employee-service";
@@ -13,28 +14,22 @@ import type { EmployeeDetailDto } from "@/modules/employees/types";
 import {
   employeeUpsertSchema,
   formatEmployeeFieldErrors,
+  rehireEmployeeSchema,
   terminateEmployeeSchema,
 } from "@/modules/employees/validations/employee-schemas";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 export type EmployeeActionResult<T = undefined> =
   | { ok: true; data?: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
-async function requireCompanyId(): Promise<string | null> {
-  return resolveActiveCompanyId();
-}
-
 export async function createEmployeeAction(raw: unknown): Promise<EmployeeActionResult<{ id: string }>> {
   try {
-    const companyId = await requireCompanyId();
-    if (!companyId) {
-      return {
-        ok: false,
-        error:
-          "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-      };
+    const result = await getCompanyContext();
+    if (!result.ok) {
+      return { ok: false, error: companyContextErrorMessage(result.reason) };
     }
+    const { user, companyId } = result.context;
 
     const parsed = employeeUpsertSchema.safeParse(raw);
     if (!parsed.success) {
@@ -45,7 +40,7 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
       };
     }
 
-    const res = await createEmployee(companyId, parsed.data, null);
+    const res = await createEmployee(companyId, parsed.data, user.id);
     if (!res.ok) {
       if (res.code === "DUPLICATE_PERSONAL_ID") {
         return {
@@ -97,14 +92,11 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
 
 export async function updateEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
   try {
-    const companyId = await requireCompanyId();
-    if (!companyId) {
-      return {
-        ok: false,
-        error:
-          "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-      };
+    const result = await getCompanyContext();
+    if (!result.ok) {
+      return { ok: false, error: companyContextErrorMessage(result.reason) };
     }
+    const { user, companyId } = result.context;
 
     const body = raw as { employeeId?: string; payload?: unknown };
     const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
@@ -121,7 +113,7 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
       };
     }
 
-    const res = await updateEmployee(companyId, employeeId, parsed.data, null);
+    const res = await updateEmployee(companyId, employeeId, parsed.data, user.id);
     if (!res.ok) {
       if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
       if (res.code === "TERMINATED_LOCKED") {
@@ -177,16 +169,13 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
 }
 
 export async function archiveEmployeeAction(employeeId: string): Promise<EmployeeActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
   }
+  const { user, companyId } = result.context;
 
-  const res = await archiveEmployee(companyId, employeeId, null);
+  const res = await archiveEmployee(companyId, employeeId, user.id);
   if (!res.ok) {
     if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
     if (res.code === "TERMINATED") return { ok: false, error: "Punonjësi është tashmë i larguar." };
@@ -199,14 +188,11 @@ export async function archiveEmployeeAction(employeeId: string): Promise<Employe
 }
 
 export async function terminateEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
-    return {
-      ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
-    };
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
   }
+  const { user, companyId } = result.context;
 
   const parsed = terminateEmployeeSchema.safeParse(raw);
   if (!parsed.success) {
@@ -218,9 +204,10 @@ export async function terminateEmployeeAction(raw: unknown): Promise<EmployeeAct
   }
 
   const { employeeId, terminationDate, terminationReason } = parsed.data;
-  const res = await terminateEmployee(companyId, employeeId, terminationDate, terminationReason, null);
+  const res = await terminateEmployee(companyId, employeeId, terminationDate, terminationReason, user.id);
   if (!res.ok) {
     if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
+    if (res.code === "ALREADY_TERMINATED") return { ok: false, error: "Punonjësi është tashmë i larguar." };
     return { ok: false, error: "Largimi nuk u regjistrua." };
   }
 
@@ -229,17 +216,44 @@ export async function terminateEmployeeAction(raw: unknown): Promise<EmployeeAct
   return { ok: true };
 }
 
-export async function deleteEmployeeAction(employeeId: string): Promise<EmployeeActionResult> {
-  const companyId = await requireCompanyId();
-  if (!companyId) {
+export async function rehireEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
+  }
+  const { user, companyId } = result.context;
+
+  const parsed = rehireEmployeeSchema.safeParse(raw);
+  if (!parsed.success) {
     return {
       ok: false,
-      error:
-        "Nuk ka kompani aktive. Vendosni cookie-in pp_active_company_id ose DEV_DEFAULT_COMPANY_ID për zhvillim.",
+      error: "Ju lutem plotësoni datën e rikthimit.",
+      fieldErrors: formatEmployeeFieldErrors(parsed.error),
     };
   }
 
-  const res = await deleteEmployeeHard(companyId, employeeId, null);
+  const res = await rehireEmployee(companyId, parsed.data.employeeId, parsed.data.rehireDate, user.id);
+  if (!res.ok) {
+    if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
+    if (res.code === "NOT_TERMINATED") {
+      return { ok: false, error: "Vetëm punonjësit e larguar mund të rikthehen në punë." };
+    }
+    return { ok: false, error: "Rikthimi në punë dështoi." };
+  }
+
+  revalidatePath("/punonjesit");
+  revalidatePath(`/punonjesit/${parsed.data.employeeId}`);
+  return { ok: true };
+}
+
+export async function deleteEmployeeAction(employeeId: string): Promise<EmployeeActionResult> {
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
+  }
+  const { user, companyId } = result.context;
+
+  const res = await deleteEmployeeHard(companyId, employeeId, user.id);
   if (!res.ok) {
     if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
     if (res.code === "NOT_ELIGIBLE") {
@@ -257,9 +271,9 @@ export async function deleteEmployeeAction(employeeId: string): Promise<Employee
 
 export async function getEmployeeDetailAction(employeeId: string): Promise<EmployeeDetailDto | null> {
   try {
-    const companyId = await requireCompanyId();
-    if (!companyId) return null;
-    return await getEmployeeById(companyId, employeeId);
+    const result = await getCompanyContext();
+    if (!result.ok) return null;
+    return await getEmployeeById(result.context.companyId, employeeId);
   } catch (err) {
     console.error("[getEmployeeDetailAction] failed:", err);
     return null;

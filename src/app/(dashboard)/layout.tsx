@@ -1,33 +1,14 @@
-import { redirect } from "next/navigation";
-import { AppShell } from "@/components/layout/app-shell";
+import { AppTopNav } from "@/components/layout/app-top-nav";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/modules/auth/services/session";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/hyrje");
-  if (user.mustChangePassword) redirect("/ndrysho-fjalekalimin");
-
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    redirect(user.isPlatformAdmin ? "/admin" : "/auth/kompani");
-  }
-
-  if (!user.isPlatformAdmin) {
-    const membership = await prisma.userCompanyMembership.findUnique({
-      where: { userId_companyId: { userId: user.id, companyId } },
-      select: { isActive: true },
-    });
-    if (!membership?.isActive) {
-      // Cookie points to a company this user can't access — re-resolve via route handler.
-      redirect("/auth/kompani");
-    }
-  }
+  const { user, companyId } = await requireCompanyContextPage();
 
   let activeCompanyLabel: string | null = null;
   try {
@@ -57,13 +38,17 @@ export default async function DashboardLayout({
   }
 
   return (
-    <AppShell
-      activeCompanyLabel={activeCompanyLabel}
-      userLabel={user.displayName}
-      userEmail={user.email}
-      alertCount={alertCount}
-    >
-      {children}
-    </AppShell>
+    <div className="flex min-h-screen flex-col bg-brand-canvas">
+      <AppTopNav
+        activeCompanyLabel={activeCompanyLabel}
+        userLabel={user.displayName}
+        userEmail={user.email}
+        alertCount={alertCount}
+      />
+      <main className="flex-1 bg-brand-canvas px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-10 md:pt-6 md:pb-9">
+        {children}
+      </main>
+      <MobileNav />
+    </div>
   );
 }

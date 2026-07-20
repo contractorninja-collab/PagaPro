@@ -1,6 +1,4 @@
 import type {
-  CalculateContractorLineInput,
-  CalculateContractorLineOutput,
   CalculateEmployeeLineInput,
   CalculateEmployeeLineOutput,
   CalculationBreakdownPayload,
@@ -12,16 +10,14 @@ import { D } from "./money/decimal";
 import { roundMoneyEUR, ROUNDING_POLICY_VERSION } from "./money/rounding";
 import { computeGrossFromHours } from "./gross/from-hours";
 import { computePensionContributions } from "./statutory/pension";
-import { computeEmployeePit } from "./statutory/pit-policy";
+import { computeEmployeePit, computeEmployeePitExempt } from "./statutory/pit-policy";
 import { validateHourBreakdown } from "./validation/hours";
 import { validateLegislationSnapshot } from "./validation/parameters";
 import { validateMinimumCompensation } from "./validation/minimum-wage";
-import { calculateContractorLine } from "./contractor/contractor-line";
 
 function mergeIssues(...groups: PayrollCalculationIssue[][]): PayrollCalculationIssue[] {
   return groups.flat();
 }
-
 export function calculateEmployeeLine(
   input: CalculateEmployeeLineInput,
   snapshot: LegislationSnapshot,
@@ -126,17 +122,29 @@ export function calculateEmployeeLine(
     return { ok: false, issues: minIssues };
   }
 
-  const pension = computePensionContributions({
-    grossSalary: grossDecimal,
-    snapshot,
-  });
+  const applyTrust = input.applyTrust ?? true;
+  const applyTax = input.applyTax ?? true;
 
-  const pitResult = computeEmployeePit({
-    employerPrimacy: input.employerPrimacy,
-    grossSalary: grossDecimal,
-    pensionEmployee: pension.pensionEmployee,
-    snapshot,
-  });
+  const pension = applyTrust
+    ? computePensionContributions({
+        grossSalary: grossDecimal,
+        snapshot,
+      })
+    : { pensionEmployee: D("0"), pensionEmployer: D("0") };
+
+  const pitResult = applyTax
+    ? computeEmployeePit({
+        employerPrimacy: input.employerPrimacy,
+        grossSalary: grossDecimal,
+        pensionEmployee: pension.pensionEmployee,
+        snapshot,
+      })
+    : computeEmployeePitExempt({
+        employerPrimacy: input.employerPrimacy,
+        grossSalary: grossDecimal,
+        pensionEmployee: pension.pensionEmployee,
+        snapshot,
+      });
 
   const netPay = roundMoneyEUR(
     grossDecimal.minus(pension.pensionEmployee).minus(pitResult.pitWithheld).minus(otherDeductions),
@@ -179,55 +187,3 @@ export function calculateEmployeeLine(
   };
 }
 
-export function calculateContractorLineSafe(
-  input: CalculateContractorLineInput,
-  snapshot: LegislationSnapshot,
-): PayrollCalculationResult<CalculateContractorLineOutput> {
-  const otherDeductions = roundMoneyEUR(D(input.otherDeductions ?? "0"));
-  const bonusAmount = roundMoneyEUR(D(input.bonusAmount ?? "0"));
-  const issues = mergeIssues(
-    validateHourBreakdown(input.hours),
-    validateLegislationSnapshot(snapshot),
-  );
-
-  const hourlyRate = D(input.rates.hourlyRate);
-  if (!hourlyRate.isFinite() || hourlyRate.lte(0)) {
-    issues.push({
-      code: "NEGATIVE_OR_ZERO_HOURLY_RATE",
-      message: "rates.hourlyRate must be a finite number > 0",
-    });
-  }
-
-  if (otherDeductions.isNegative()) {
-    issues.push({
-      code: "INVALID_OTHER_DEDUCTIONS",
-      message: "otherDeductions cannot be negative",
-    });
-  }
-
-  if (bonusAmount.isNegative()) {
-    issues.push({
-      code: "INVALID_BONUS_AMOUNT",
-      message: "bonusAmount cannot be negative",
-    });
-  }
-
-  if (issues.length > 0) {
-    return { ok: false, issues };
-  }
-
-  try {
-    return { ok: true, value: calculateContractorLine(input, snapshot) };
-  } catch (error) {
-    return {
-      ok: false,
-      issues: [
-        {
-          code: "INVALID_OTHER_DEDUCTIONS",
-          message:
-            error instanceof Error ? error.message : "Contractor payroll calculation failed",
-        },
-      ],
-    };
-  }
-}

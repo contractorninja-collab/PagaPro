@@ -1,16 +1,16 @@
 import path from "node:path";
 
 /**
- * Official ATK template — place `Mostra Pagave ATK.xlsx` in `public/atk_template/`.
- * Filename may vary; update here if HR uses a different file name.
+ * Official ATK template supplied by the product owner and stored as
+ * `public/atk_template/Mostra Pagave ATK.xlsx`.
  *
  * ## Template inventory (for auditors / QA)
  *
  * - **Loader:** binary XLSX from disk (`ExcelJS`); sheet index {@link ATK_TEMPLATE_SHEET_INDEX}.
  * - **Header row:** detected automatically by scanning the first {@link ATK_HEADER_SCAN_MAX_ROW} rows and
  *   scoring Albanian header fragments (see `atk-workbook-fill.ts` `MATCHERS` / `headerMatchesKey`).
- * - **Data rows:** first row immediately under the detected header; styles cloned from that template row for
- *   additional employees.
+ * - **Data rows:** official sample rows are replaced from the first row immediately under the detected header;
+ *   styles are cloned from that template row for additional employees.
  * - **Columns populated** (matched by header text, not fixed column letters):
  *   | Concept | Header cues (normalized, substring match unless noted) |
  *   |---------|--------------------------------------------------------|

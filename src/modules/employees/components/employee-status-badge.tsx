@@ -31,8 +31,3 @@ export function EmployeeStatusBadge({
 export function EmployeeTypeBadge({ employmentType }: { employmentType: EmploymentType }) {
   return <Badge variant="muted">{EMPLOYMENT_TYPE_LABELS[employmentType]}</Badge>;
 }
-
-/** Dokumentacion i paplotë / mungon */
-export function MissingDocsBadge(props: { label?: string }) {
-  return <Badge variant="warning">{props.label ?? "Dokumentacion i paplotë"}</Badge>;
-}

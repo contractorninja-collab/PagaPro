@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy, KeyRound, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Check, Copy, ExternalLink, KeyRound, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { adminPath } from "@/lib/admin-path";
 import {
   createCompanyUserAction,
   resetUserPasswordAction,
@@ -121,6 +122,8 @@ export function BiznesDetailClient({ company }: { company: AdminCompanyDetail })
   const initialFormValues: CompanyFormValues = {
     legalName: company.legalName,
     tradeName: company.tradeName ?? "",
+    slug: company.slug ?? "",
+    customDomain: company.customDomain ?? "",
     fiscalNumber: company.fiscalNumber ?? "",
     businessRegistrationNumber: company.businessRegistrationNumber ?? "",
     email: company.email ?? "",
@@ -215,7 +218,7 @@ export function BiznesDetailClient({ company }: { company: AdminCompanyDetail })
       <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <Link
-            href="/admin/bizneset"
+            href={adminPath("bizneset")}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -228,6 +231,19 @@ export function BiznesDetailClient({ company }: { company: AdminCompanyDetail })
           <p className="text-sm text-muted-foreground">
             NUI: {company.fiscalNumber ?? "—"} · NRB: {company.businessRegistrationNumber ?? "—"}
           </p>
+          {company.tenantUrl ? (
+            <a
+              href={company.tenantUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              {company.tenantUrl.replace(/^https:\/\//, "")}
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          ) : company.slug ? (
+            <p className="text-sm text-muted-foreground">Slug: {company.slug}</p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button

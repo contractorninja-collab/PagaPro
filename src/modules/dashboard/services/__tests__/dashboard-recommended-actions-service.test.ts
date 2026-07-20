@@ -19,6 +19,7 @@ const basePayload: Omit<DashboardOperationalPayload, "alerts" | "recommendedActi
     status: "REVIEWED",
     employeeCount: 3,
     totals: { grossSalary: "3150", netPay: "2780.25", employerTotalCost: "3307.50" },
+    grossHistory: [],
     reviewedAtIso: null,
     approvedAtIso: null,
     lockedAtIso: null,
@@ -27,8 +28,6 @@ const basePayload: Omit<DashboardOperationalPayload, "alerts" | "recommendedActi
   leavePending: [],
   leaveToday: { approved: 0, rejected: 0 },
   timeline: [],
-  documentsThisMonthByCategory: [],
-  recentDocuments: [],
   distribution: { byStatus: {}, byEmploymentType: {}, byDepartment: [] },
 };
 

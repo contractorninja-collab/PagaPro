@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { CalendarDays, CheckCircle2, Clock, FileText, Plus, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,17 +14,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
+import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
+import {
+  BTN_DESTRUCTIVE_DENSE,
+  BTN_PRIMARY,
+  BTN_PRIMARY_DENSE,
+  InitialsAvatar,
+  LEAVE_CARD,
+  LEAVE_TYPE_TONES,
+  LeaveTypePill,
+  MICRO_LABEL,
+  TonePill,
+  type SemanticTone,
+} from "@/modules/leaves/components/leave-ui";
+import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import type { LeaveSubtype } from "@prisma/client";
 import {
   approveLeaveRequestAction,
@@ -53,6 +58,49 @@ function shiftMonth(year: number, month: number, delta: number): { year: number;
   const d = new Date(Date.UTC(year, month - 1 + delta, 1));
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
 }
+
+function utcDayStartMs(iso: string): number {
+  const d = new Date(iso);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+const STAT_TONES: Record<SemanticTone, string> = {
+  info: "bg-[#eff6ff] text-brand-blue",
+  success: "bg-[#ecfdf5] text-[#15803d]",
+  warning: "bg-[#fffbeb] text-[#b45309]",
+  destructive: "bg-[#fef2f2] text-[#dc2626]",
+  neutral: "bg-[#f1f5f9] text-[#64748b]",
+};
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  tone: SemanticTone;
+}) {
+  return (
+    <div className={`flex items-center gap-3.5 p-4 ${LEAVE_CARD}`}>
+      <span
+        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] ${STAT_TONES[tone]}`}
+      >
+        <Icon className="h-[18px] w-[18px]" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <p className={`truncate ${MICRO_LABEL}`}>{label}</p>
+        <p className="mt-0.5 text-[24px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+type ConflictFlag = { key: string; label: string; tone: SemanticTone };
 
 export function PushimetDashboardClient(props: {
   stats: { pending: number; approvedThisUtcMonth: number; draft: number };
@@ -100,6 +148,59 @@ export function PushimetDashboardClient(props: {
     p.set("month", String(month));
     return `/pushimet?${p.toString()}`;
   }, [props.calendarMonth, props.calendarYear, searchParams]);
+
+  /** Approved chips overlapping today (UTC), deduplicated by employee — "Sot në pushim". */
+  const todayOff = useMemo(() => {
+    const now = new Date();
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const seen = new Set<string>();
+    const list: PushimetCalendarChipDto[] = [];
+    for (const c of props.chips) {
+      if (c.status !== "APPROVED") continue;
+      if (today < utcDayStartMs(c.startDateIso) || today > utcDayStartMs(c.endDateIso)) continue;
+      if (seen.has(c.employeeId)) continue;
+      seen.add(c.employeeId);
+      list.push(c);
+    }
+    return list;
+  }, [props.chips]);
+
+  const balanceIndex = useMemo(() => {
+    const m = new Map<string, PushimetBalanceRowDto>();
+    for (const b of props.balances) m.set(`${b.employeeId}:${b.leaveType}`, b);
+    return m;
+  }, [props.balances]);
+
+  function conflictFlags(row: PushimetLeaveRowDto): ConflictFlag[] {
+    const flags: ConflictFlag[] = [];
+    if (row.affectsPayroll) flags.push({ key: "payroll", label: "Ndikon në pagë", tone: "info" });
+    const bal = balanceIndex.get(`${row.employeeId}:${row.type}`);
+    if (bal) {
+      const remaining = Number(bal.remainingDays);
+      const requested = Number(row.workingDays ?? row.totalDays ?? "0");
+      if (Number.isFinite(remaining)) {
+        if (remaining < 0) {
+          flags.push({
+            key: "negative",
+            label: `Balancë negative (${bal.remainingDays})`,
+            tone: "destructive",
+          });
+        } else if (Number.isFinite(requested) && requested > remaining) {
+          flags.push({
+            key: "low",
+            label: `Balancë e ulët (${bal.remainingDays} ditë)`,
+            tone: "warning",
+          });
+        }
+      }
+    }
+    return flags;
+  }
+
+  const otherTypeBalances = useMemo(
+    () => props.balances.filter((b) => b.leaveType !== "PUSHIM_VJETOR"),
+    [props.balances],
+  );
 
   function refresh() {
     startTransition(() => router.refresh());
@@ -188,195 +289,264 @@ export function PushimetDashboardClient(props: {
   }
 
   return (
-    <div className={`space-y-8 ${pendingUi ? "opacity-80 transition-opacity" : ""}`}>
+    <div className={`space-y-6 ${pendingUi ? "opacity-80 transition-opacity" : ""}`}>
       {pendingUi ? (
         <div className="flex justify-end">
           <Skeleton className="h-4 w-24" />
         </div>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <Card className="border-border/80 p-4 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground">Në pritje</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{props.stats.pending}</p>
-        </Card>
-        <Card className="border-border/80 p-4 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground">Miratuar (muaji UTC)</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            {props.stats.approvedThisUtcMonth}
-          </p>
-        </Card>
-        <Card className="border-border/80 p-4 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground">Draft</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{props.stats.draft}</p>
-        </Card>
+      {/* 5a — 4-stat strip */}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Në pritje" value={props.stats.pending} icon={Clock} tone="warning" />
+        <StatCard
+          label="Miratuar këtë muaj"
+          value={props.stats.approvedThisUtcMonth}
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatCard label="Sot në pushim" value={todayOff.length} icon={CalendarDays} tone="info" />
+        <StatCard label="Draft" value={props.stats.draft} icon={FileText} tone="neutral" />
       </section>
 
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Miratimet në pritje</h2>
-            <p className="text-xs text-muted-foreground">Operacion HR — reflektohet menjëherë në payroll pas miratimit.</p>
-          </div>
-          <Button type="button" className="hidden md:inline-flex" onClick={() => setNewOpen(true)}>
-            Kërkesë e re
-          </Button>
-        </div>
-        {props.pendingRows.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-            Nuk ka kërkesa në pritje.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-            <Table className="table-dense">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Punonjësi</TableHead>
-                  <TableHead>Lloji</TableHead>
-                  <TableHead>Periudha</TableHead>
-                  <TableHead className="text-right">Veprime të shpejta</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.pendingRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.employeeName}</TableCell>
-                    <TableCell>{LEAVE_TYPE_LABELS_SQ[row.type]}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {row.startDateIso.slice(0, 10)} → {row.endDateIso.slice(0, 10)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button type="button" size="sm" onClick={() => void runApprove(row.id)}>
-                          Mirato
-                        </Button>
-                        <Button type="button" size="sm" variant="secondary" onClick={() => setRejectId(row.id)}>
-                          Refuzo
-                        </Button>
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link href={`/pushimet/${row.id}`}>Hape</Link>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Gjendje ditësh (balanca)</h2>
-            <p className="text-xs text-muted-foreground">
-              Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe pushimi
-              mjekësor i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.{" "}
-              <span className="font-medium text-amber-800 dark:text-amber-200">
-                Vlerat negative alarmojnë HR para miratimit.
-              </span>
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <Table className="table-dense min-w-[960px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Punonjësi</TableHead>
-                <TableHead>Departamenti</TableHead>
-                <TableHead>Lloji</TableHead>
-                <TableHead>Viti</TableHead>
-                <TableHead>Kuota vjetore</TableHead>
-                <TableHead>Akumuluar</TableHead>
-                <TableHead>Bartur</TableHead>
-                <TableHead>Përdorur</TableHead>
-                <TableHead>Në pritje</TableHead>
-                <TableHead>Mbetur</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {props.balances.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
-                    Nuk ka të dhëna balancë për vitin e filtrit — do të popullohet kur miratohen pushimet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                props.balances.map((b) => {
-                  const neg = parseFloat(b.remainingDays) < 0;
+      <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+        {/* Left column — approvals queue, operative list, calendar */}
+        <div className="min-w-0 space-y-6">
+          <div className={`overflow-hidden ${LEAVE_CARD}`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-4">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+                  Miratimet në pritje
+                  {props.pendingRows.length > 0 ? (
+                    <TonePill tone="warning" size="sm">
+                      {props.pendingRows.length}
+                    </TonePill>
+                  ) : null}
+                </h2>
+                <p className="mt-0.5 text-[12px] text-[#64748b]">
+                  Operacion HR — reflektohet menjëherë në payroll pas miratimit.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={`hidden md:inline-flex ${BTN_PRIMARY}`}
+                onClick={() => setNewOpen(true)}
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+                Kërkesë e re
+              </button>
+            </div>
+            {props.pendingRows.length === 0 ? (
+              <p className="px-5 py-8 text-center text-[13px] text-[#64748b]">
+                Nuk ka kërkesa në pritje.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#f1f5f9]">
+                {props.pendingRows.map((row) => {
+                  const flags = conflictFlags(row);
                   return (
-                    <TableRow key={b.id}>
-                      <TableCell className="font-medium">{b.employeeName}</TableCell>
-                      <TableCell className="text-muted-foreground">{b.departmentName ?? "—"}</TableCell>
-                      <TableCell>{LEAVE_TYPE_LABELS_SQ[b.leaveType]}</TableCell>
-                      <TableCell className="tabular-nums">{b.year}</TableCell>
-                      <TableCell className="tabular-nums">{b.yearlyQuota}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.accruedDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.carryOverDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">{b.usedDays}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {b.leaveType === "PUSHIM_VJETOR" ? b.pendingDays : "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {neg ? (
-                          <Badge variant="destructive">{b.remainingDays}</Badge>
-                        ) : (
-                          <span>{b.remainingDays}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                    <li
+                      key={row.id}
+                      className="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center"
+                    >
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <InitialsAvatar name={row.employeeName} />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/pushimet/${row.id}`}
+                              className="truncate text-[13.5px] font-semibold text-[#0f172a] transition-colors hover:text-brand-blue"
+                            >
+                              {row.employeeName}
+                            </Link>
+                            <LeaveTypePill type={row.type} label={LEAVE_TYPE_LABELS_SQ[row.type]} />
+                          </div>
+                          <p className="mt-0.5 text-[12px] tabular-nums text-[#64748b]">
+                            {formatSqDate(row.startDateIso)} → {formatSqDate(row.endDateIso)}
+                            {row.workingDays ?? row.totalDays
+                              ? ` · ${row.workingDays ?? row.totalDays} ditë`
+                              : ""}
+                            {row.departmentName ? ` · ${row.departmentName}` : ""}
+                          </p>
+                          {flags.length > 0 ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {flags.map((f) => (
+                                <TonePill key={f.key} tone={f.tone} size="sm">
+                                  {f.label}
+                                </TonePill>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                        <button
+                          type="button"
+                          className={BTN_PRIMARY_DENSE}
+                          onClick={() => void runApprove(row.id)}
+                        >
+                          Mirato
+                        </button>
+                        <button
+                          type="button"
+                          className={BTN_DESTRUCTIVE_DENSE}
+                          onClick={() => setRejectId(row.id)}
+                        >
+                          Refuzo
+                        </button>
+                        <Link
+                          href={`/pushimet/${row.id}`}
+                          className="text-[12.5px] font-semibold text-[#64748b] transition-colors hover:text-brand-blue"
+                        >
+                          Hape
+                        </Link>
+                      </div>
+                    </li>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </section>
+                })}
+              </ul>
+            )}
+          </div>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_minmax(280px,360px)]">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-foreground">Lista operative</h2>
-            <p className="text-xs text-muted-foreground">Filtrimi aplikon për tabelë dhe kalendar.</p>
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+                Lista operative
+              </h2>
+              <p className="text-[12px] text-[#94a3b8]">Filtrimi aplikon për tabelë dhe kalendar.</p>
+            </div>
+            <LeaveRequestsTable
+              rows={props.rows}
+              onApprove={(id) => void runApprove(id)}
+              onReject={(id) => setRejectId(id)}
+              onCancel={(id) => void runCancel(id)}
+              onGenerate={(id) => openGenerate(id)}
+            />
+            <LeaveRequestsMobileList
+              rows={props.rows}
+              onApprove={(id) => void runApprove(id)}
+              onReject={(id) => setRejectId(id)}
+              onCancel={(id) => void runCancel(id)}
+              onGenerate={(id) => openGenerate(id)}
+            />
           </div>
-          <LeaveRequestsTable
-            rows={props.rows}
-            onApprove={(id) => void runApprove(id)}
-            onReject={(id) => setRejectId(id)}
-            onCancel={(id) => void runCancel(id)}
-            onGenerate={(id) => openGenerate(id)}
-          />
-          <LeaveRequestsMobileList
-            rows={props.rows}
-            onApprove={(id) => void runApprove(id)}
-            onReject={(id) => setRejectId(id)}
-            onCancel={(id) => void runCancel(id)}
-            onGenerate={(id) => openGenerate(id)}
-          />
-        </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href={prevHref} prefetch={false}>
-                ← Muaji paraprak
-              </Link>
-            </Button>
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href={nextHref} prefetch={false}>
-                Muaji tjetër →
-              </Link>
-            </Button>
-          </div>
+
+          {/* 5b — month calendar */}
           <LeaveOperationalCalendar
             year={props.calendarYear}
             month={props.calendarMonth}
             chips={props.chips.filter((c) => c.status === "APPROVED" || c.status === "PENDING")}
+            prevHref={prevHref}
+            nextHref={nextHref}
           />
+        </div>
+
+        {/* Right rail — balances, other quotas, who's off today */}
+        <div className="min-w-0 space-y-6">
+          <AnnualLeaveBalancePanel balances={props.balances} year={props.calendarYear} />
+
+          {otherTypeBalances.length > 0 ? (
+            <div className={`overflow-hidden ${LEAVE_CARD}`}>
+              <div className="border-b border-[#eef2f7] px-4 py-3.5">
+                <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+                  Lloje të tjera (kuotë vjetore)
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[300px] border-collapse text-[12.5px] text-[#111827]">
+                  <thead>
+                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                      <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                        Punonjësi
+                      </th>
+                      <th className="px-2 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                        Kuota
+                      </th>
+                      <th className="px-2 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                        Përdorur
+                      </th>
+                      <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                        Mbetur
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {otherTypeBalances.map((b) => {
+                      const neg = parseFloat(b.remainingDays) < 0;
+                      const tone = LEAVE_TYPE_TONES[b.leaveType];
+                      return (
+                        <tr
+                          key={b.id}
+                          className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                        >
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold text-[#0f172a]">{b.employeeName}</p>
+                            <p className="flex items-center gap-1.5 text-[11px] text-[#64748b]">
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
+                              {LEAVE_TYPE_LABELS_SQ[b.leaveType]}
+                            </p>
+                          </td>
+                          <td className="px-2 py-2.5 text-right tabular-nums text-[#64748b]">
+                            {b.yearlyQuota}
+                          </td>
+                          <td className="px-2 py-2.5 text-right tabular-nums text-[#64748b]">
+                            {b.usedDays}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {neg ? (
+                              <span className="font-bold text-[#dc2626]">{b.remainingDays}</span>
+                            ) : (
+                              <span className="font-semibold text-[#0f172a]">{b.remainingDays}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          <div className={`overflow-hidden ${LEAVE_CARD}`}>
+            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
+              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">Sot në pushim</h2>
+              {todayOff.length > 0 ? (
+                <TonePill tone="info" size="sm">
+                  {todayOff.length}
+                </TonePill>
+              ) : null}
+            </div>
+            {todayOff.length === 0 ? (
+              <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">
+                Askush nuk është në pushim sot.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#f1f5f9]">
+                {todayOff.map((c) => {
+                  const tone = LEAVE_TYPE_TONES[c.type];
+                  return (
+                    <li key={c.id}>
+                      <Link
+                        href={`/pushimet/${c.id}`}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                      >
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-semibold text-[#0f172a]">
+                            {c.employeeName}
+                          </span>
+                          <span className="block truncate text-[11.5px] text-[#64748b]">
+                            {LEAVE_TYPE_LABELS_SQ[c.type]} · deri më {formatSqDate(c.endDateIso)}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </section>
 

@@ -106,7 +106,13 @@ export async function leaveDashboardStats(companyId: string) {
 export async function listActiveEmployeesPicklist(companyId: string) {
   return prisma.employee.findMany({
     where: { companyId, status: { not: "TERMINATED" } },
-    select: { id: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      hireDate: true,
+      terminationDate: true,
+    },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     take: 500,
   });

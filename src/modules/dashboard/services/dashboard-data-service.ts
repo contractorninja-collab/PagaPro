@@ -1,7 +1,5 @@
 import type {
   ContractKind,
-  DocumentCategory,
-  DocumentGenerationArtifactKind,
   EmploymentStatus,
   EmploymentType,
   Prisma,
@@ -13,14 +11,17 @@ import type {
   DashboardOperationalPayload,
   DashboardPayrollSlice,
   DashboardSummaryCards,
-  DocumentCategoryCount,
   EmployeeDistributionSlice,
   LeavePendingRow,
-  RecentDocumentRow,
   TimelineEntryDto,
 } from "../types/dashboard-types";
 import { daysBetweenUtc, endOfUtcDay, startOfUtcDay, utcMonthWindow } from "../helpers/dashboard-time";
 import { buildOperationalAlerts } from "./dashboard-alerts-service";
+import {
+  canonicalActivityOperation,
+  collapseDashboardActivity,
+  type DashboardActivityCandidate,
+} from "./dashboard-activity-service";
 import { buildRecommendedActions } from "./dashboard-recommended-actions-service";
 
 function decStr(v: null | undefined | { toString(): string }): string {
@@ -40,6 +41,42 @@ function urgencyBucket(days: number): ContractExpiryRow["urgency"] {
   if (days <= 7) return "7";
   if (days <= 14) return "14";
   return "30";
+}
+
+const ENTITY_LABELS: Record<string, string> = {
+  Employee: "Punonjës",
+  Payroll: "Payroll",
+  LeaveRequest: "Pushim",
+  Termination: "Largim",
+  DocumentGenerationArtifact: "Dokument",
+  DocumentTemplateVersion: "Model dokumenti",
+};
+
+function entityLabel(entityType: string): string {
+  return ENTITY_LABELS[entityType] ?? entityType.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+function auditActionLabel(action: string): string {
+  const operation = canonicalActivityOperation(action);
+  const labels: Record<string, string> = {
+    CREATE: "U krijua",
+    UPDATE: "U përditësua",
+    DELETE: "U fshi",
+    APPROV: "U miratua",
+    REJECT: "U refuzua",
+    LOCK: "U kyç",
+    UNLOCK: "U çkyç",
+    ARCHIV: "U arkivua",
+    TERMINAT: "U përfundua",
+    GENERAT: "U gjenerua",
+    REGENERAT: "U rigjenerua",
+    DOWNLOAD: "U shkarkua",
+    CANCEL: "U anulua",
+    REVOK: "U revokua",
+    SUBMIT: "U dërgua",
+    VOID: "U anulua",
+  };
+  return labels[operation] ?? action.replaceAll("_", " ").toLocaleLowerCase("sq-AL");
 }
 
 export async function loadDashboardOperationalData(
@@ -91,14 +128,14 @@ export async function loadDashboardOperationalData(
     empTimeline,
     audits,
     docTimeline,
-    docCategoryGroups,
-    recentArtifacts,
     statusGroups,
     employmentTypeGroups,
     deptGroups,
     departments,
     documentsMissingRows,
     correctionsOpen,
+    payrollHistoryPeriods,
+    payrollHistoryGrossGroups,
   ] = await Promise.all([
     prisma.employee.count({ where: { ...empBase, status: "ACTIVE" } }),
     prisma.contract.count({
@@ -237,31 +274,6 @@ export async function loadDashboardOperationalData(
         employee: { select: { firstName: true, lastName: true } },
       },
     }),
-    prisma.documentGenerationArtifact.groupBy({
-      by: ["documentCategory"],
-      where: {
-        companyId,
-        createdAt: { gte: monthStart, lte: monthEnd },
-        kind: "ARCHIVED_FINAL",
-        generationStatus: "SUCCEEDED",
-      },
-      _count: { _all: true },
-    }),
-    prisma.documentGenerationArtifact.findMany({
-      where: { companyId, generationStatus: "SUCCEEDED" },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        title: true,
-        documentCategory: true,
-        kind: true,
-        createdAt: true,
-        employeeId: true,
-        employee: { select: { firstName: true, lastName: true } },
-        templateVersion: { select: { template: { select: { name: true } } } },
-      },
-    }),
     prisma.employee.groupBy({
       by: ["status"],
       where: distributionWhere,
@@ -297,7 +309,124 @@ export async function loadDashboardOperationalData(
         payroll: { status: { notIn: ["LOCKED", "ARCHIVED"] } },
       },
     }),
+    prisma.payroll.findMany({
+      where: {
+        companyId,
+        OR: [
+          { year: { lt: filters.year } },
+          { year: filters.year, month: { lte: filters.month } },
+        ],
+      },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      take: 6,
+      select: { id: true, year: true, month: true },
+    }),
+    prisma.payrollEntry.groupBy({
+      by: ["payrollId"],
+      where: {
+        payroll: {
+          companyId,
+          OR: [
+            { year: { lt: filters.year } },
+            { year: filters.year, month: { lte: filters.month } },
+          ],
+        },
+        ...payrollEntryEmpFilter,
+      },
+      _sum: { grossSalary: true },
+    }),
   ]);
+
+  const activityRefs = [
+    ...domainActs.map((entry) => ({ entityType: entry.entityType, entityId: entry.entityId })),
+    ...audits.map((entry) => ({ entityType: entry.entityType, entityId: entry.entityId })),
+    ...empTimeline
+      .filter((entry) => entry.subjectKind && entry.subjectId)
+      .map((entry) => ({ entityType: entry.subjectKind!, entityId: entry.subjectId! })),
+  ];
+  const idsFor = (entityType: string) => [
+    ...new Set(
+      activityRefs
+        .filter((reference) => reference.entityType === entityType)
+        .map((reference) => reference.entityId),
+    ),
+  ];
+
+  const [
+    activityEmployees,
+    activityPayrolls,
+    activityLeaves,
+    activityTerminations,
+    activityDocuments,
+    activityTemplateVersions,
+  ] = await Promise.all([
+      prisma.employee.findMany({
+        where: { companyId, id: { in: idsFor("Employee") } },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+      prisma.payroll.findMany({
+        where: { companyId, id: { in: idsFor("Payroll") } },
+        select: { id: true, year: true, month: true },
+      }),
+      prisma.leaveRequest.findMany({
+        where: { companyId, id: { in: idsFor("LeaveRequest") } },
+        select: {
+          id: true,
+          employee: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      prisma.termination.findMany({
+        where: { companyId, id: { in: idsFor("Termination") } },
+        select: {
+          id: true,
+          employee: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      prisma.documentGenerationArtifact.findMany({
+        where: { companyId, id: { in: idsFor("DocumentGenerationArtifact") } },
+        select: { id: true, title: true },
+      }),
+      prisma.documentTemplateVersion.findMany({
+        where: {
+          id: { in: idsFor("DocumentTemplateVersion") },
+          template: { companyId },
+        },
+        select: { id: true, template: { select: { name: true } } },
+      }),
+  ]);
+
+  const activitySubjectByKey = new Map<string, string>();
+  const setSubject = (entityType: string, entityId: string, label: string) =>
+    activitySubjectByKey.set(`${entityType}:${entityId}`, label);
+  for (const employee of activityEmployees) {
+    setSubject("Employee", employee.id, `${employee.firstName} ${employee.lastName}`.trim());
+  }
+  for (const period of activityPayrolls) {
+    setSubject("Payroll", period.id, `Payroll ${period.month}/${period.year}`);
+  }
+  for (const leave of activityLeaves) {
+    setSubject(
+      "LeaveRequest",
+      leave.id,
+      `Pushimi i ${leave.employee.firstName} ${leave.employee.lastName}`.trim(),
+    );
+  }
+  for (const termination of activityTerminations) {
+    setSubject(
+      "Termination",
+      termination.id,
+      `Largimi i ${termination.employee.firstName} ${termination.employee.lastName}`.trim(),
+    );
+  }
+  for (const document of activityDocuments) {
+    setSubject("DocumentGenerationArtifact", document.id, document.title);
+  }
+  for (const version of activityTemplateVersions) {
+    setSubject("DocumentTemplateVersion", version.id, `Modeli ${version.template.name}`);
+  }
+
+  const activitySubject = (entityType: string, entityId: string) =>
+    activitySubjectByKey.get(`${entityType}:${entityId}`) ?? entityLabel(entityType);
 
   const settingsRow = await prisma.payrollSettings.findUnique({
     where: { companyId },
@@ -344,6 +473,19 @@ export async function loadDashboardOperationalData(
       netPay: decStr(payrollEntryAgg._sum.netPay),
       employerTotalCost: decStr(payrollEntryAgg._sum.employerTotalCost),
     },
+    grossHistory: payrollHistoryPeriods
+      .map((period) => {
+        const totals = payrollHistoryGrossGroups.find((group) => group.payrollId === period.id);
+        return totals
+          ? {
+              year: period.year,
+              month: period.month,
+              grossSalary: decStr(totals._sum.grossSalary),
+            }
+          : null;
+      })
+      .filter((period): period is NonNullable<typeof period> => period != null)
+      .reverse(),
     reviewedAtIso: payrollRow?.reviewedAt?.toISOString() ?? null,
     approvedAtIso: payrollRow?.approvedAt?.toISOString() ?? null,
     lockedAtIso: payrollRow?.lockedAt?.toISOString() ?? null,
@@ -374,72 +516,75 @@ export async function loadDashboardOperationalData(
     endDateIso: r.endDate.toISOString(),
   }));
 
-  const timeline: TimelineEntryDto[] = [];
+  const activityCandidates: DashboardActivityCandidate[] = [];
 
   for (const a of domainActs) {
-    timeline.push({
+    activityCandidates.push({
       id: `da-${a.id}`,
       source: "domain",
       occurredAtIso: a.occurredAt.toISOString(),
       title: a.summary,
-      subtitle: `${a.entityType} · ${a.verb}`,
+      subtitle: activitySubject(a.entityType, a.entityId),
       actorLabel: actorName(a.actor),
+      entityType: a.entityType,
+      entityId: a.entityId,
+      operation: a.verb,
+      sourcePriority: 2,
     });
   }
 
   for (const e of empTimeline) {
-    timeline.push({
+    const employeeName = `${e.employee.firstName} ${e.employee.lastName}`.trim();
+    const entityType = e.subjectKind ?? "Employee";
+    const entityId = e.subjectId ?? e.employeeId;
+    activityCandidates.push({
       id: `et-${e.id}`,
       source: "employee_timeline",
       occurredAtIso: e.occurredAt.toISOString(),
       title: e.title,
-      subtitle: e.body ?? `${e.employee.firstName} ${e.employee.lastName}`,
+      subtitle: e.body ? `${employeeName} · ${e.body}` : employeeName,
       actorLabel: actorName(e.actor),
+      entityType,
+      entityId,
+      operation: e.eventType,
+      sourcePriority: 3,
     });
   }
 
   for (const u of audits) {
-    timeline.push({
+    const subject = activitySubject(u.entityType, u.entityId);
+    activityCandidates.push({
       id: `al-${u.id}`,
       source: "audit",
       occurredAtIso: u.createdAt.toISOString(),
-      title: `${u.action}: ${u.entityType}`,
-      subtitle: u.entityId,
+      title: `${entityLabel(u.entityType)}: ${auditActionLabel(u.action)}`,
+      subtitle: subject,
       actorLabel: actorName(u.actor),
+      entityType: u.entityType,
+      entityId: u.entityId,
+      operation: u.action,
+      sourcePriority: 1,
     });
   }
 
   for (const d of docTimeline) {
     const emp =
       d.employee != null ? `${d.employee.firstName} ${d.employee.lastName}` : undefined;
-    timeline.push({
+    activityCandidates.push({
       id: `dt-${d.id}`,
       source: "document_timeline",
       occurredAtIso: d.createdAt.toISOString(),
       title: d.generatedDocument.title,
-      subtitle: `${d.eventType}${emp ? ` · ${emp}` : ""}`,
+      subtitle: emp ?? "Dokument",
       actorLabel: actorName(d.createdBy),
+      entityType: "DocumentGenerationArtifact",
+      entityId: d.generatedDocumentId,
+      operation: d.eventType,
+      sourcePriority: 3,
     });
   }
 
-  timeline.sort((x, y) => Date.parse(y.occurredAtIso) - Date.parse(x.occurredAtIso));
-
-  const documentsThisMonthByCategory: DocumentCategoryCount[] = docCategoryGroups.map((g) => ({
-    category: g.documentCategory as DocumentCategory,
-    count: g._count._all,
-  }));
-
-  const recentDocuments: RecentDocumentRow[] = recentArtifacts.map((a) => ({
-    id: a.id,
-    title: a.title,
-    category: a.documentCategory,
-    kind: a.kind as DocumentGenerationArtifactKind,
-    createdAtIso: a.createdAt.toISOString(),
-    employeeId: a.employeeId,
-    employeeName:
-      a.employee != null ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : null,
-    templateName: a.templateVersion.template.name,
-  }));
+  const timeline: TimelineEntryDto[] = collapseDashboardActivity(activityCandidates).slice(0, 30);
 
   const byStatus: Partial<Record<EmploymentStatus, number>> = {};
   for (const g of statusGroups) {
@@ -470,9 +615,7 @@ export async function loadDashboardOperationalData(
     contractExpiries,
     leavePending,
     leaveToday: { approved: leaveApprovedToday, rejected: leaveRejectedToday },
-    timeline: timeline.slice(0, 42),
-    documentsThisMonthByCategory,
-    recentDocuments,
+    timeline,
     distribution,
   };
 

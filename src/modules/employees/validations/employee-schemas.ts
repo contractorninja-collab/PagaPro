@@ -108,6 +108,15 @@ export const terminateEmployeeSchema = z.object({
   terminationReason: z.string().trim().min(1, "Arsyeja e largimit është e detyrueshme"),
 });
 
+export const rehireEmployeeSchema = z.object({
+  employeeId: z.string().cuid(),
+  rehireDate: z.preprocess((v) => {
+    if (v instanceof Date) return v;
+    if (typeof v === "string" && v.trim()) return new Date(v);
+    return undefined;
+  }, z.date({ message: "Data e rikthimit është e detyrueshme" })),
+});
+
 export function formatEmployeeFieldErrors(error: z.ZodError): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const issue of error.issues) {

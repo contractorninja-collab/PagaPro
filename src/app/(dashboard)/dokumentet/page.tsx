@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { DocumentCategory } from "@prisma/client";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { Button } from "@/components/ui/button";
 import { DocumentsDashboardClient } from "@/modules/documents/components/documents-dashboard-client";
 import { DocumentsListFilters } from "@/modules/documents/components/documents-list-filters";
 import {
@@ -8,7 +11,7 @@ import {
   listDocumentTemplatesWithVersions,
   listEmployeesForDocumentFilters,
 } from "@/modules/documents/services/document-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Dokumentet",
@@ -34,21 +37,7 @@ export default async function DokumentetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dokumentet</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code>, variablën{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>, ose në development
-          përdorni <code className="rounded bg-muted px-1.5 py-0.5 text-xs">POST /api/dev/active-company</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const q = first(sp, "q");
@@ -123,23 +112,40 @@ export default async function DokumentetPage({
   const authorOptions = authors.filter((a): a is NonNullable<typeof a> & { id: string } => Boolean(a?.id));
 
   return (
-    <div className="space-y-8">
-      <DocumentsListFilters
-        defaults={{
-          q,
-          employeeId,
-          documentCategory: catRaw,
-          month,
-          archived: archivedRaw || "all",
-          authorId,
-        }}
-        employees={employees}
-        authors={authorOptions}
+    <>
+      <AppSubBar
+        eyebrow="Menaxhimi i dokumenteve"
+        title="Dokumentet"
+        description="Qendër e strukturuar për printimin e kontratave, pushimeve, largimeve dhe vërejtjeve me shabllone DOCX."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/dokumentet/templates">Konfigurimi i shablloneve</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dokumentet/generate">Gjenero dokumente</Link>
+            </Button>
+          </>
+        }
       />
       <DocumentsDashboardClient
         artifacts={artifactRows}
         templateSummary={templateSummary}
+        filtersSlot={
+          <DocumentsListFilters
+            defaults={{
+              q,
+              employeeId,
+              documentCategory: catRaw,
+              month,
+              archived: archivedRaw || "all",
+              authorId,
+            }}
+            employees={employees}
+            authors={authorOptions}
+          />
+        }
       />
-    </div>
+    </>
   );
 }

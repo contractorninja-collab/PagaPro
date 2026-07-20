@@ -11,3 +11,13 @@ export function getCompanyAssetStorage(): LocalFsDocumentStorage {
   }
   return singleton;
 }
+
+/** Best-effort blob removal for storage reclaim — never throws (GC must not break a request). */
+export async function safeDeleteAsset(key: string | null | undefined): Promise<void> {
+  if (!key) return;
+  try {
+    await getCompanyAssetStorage().delete(key);
+  } catch (err) {
+    console.error("[pagapro] asset delete failed for key", key, err);
+  }
+}

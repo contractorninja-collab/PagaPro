@@ -3,6 +3,12 @@ import {
   getHoursPerWorkingDayForCompany,
   getMergedHolidayIsoSetForUtcRange,
 } from "@/modules/leaves/services/leave-working-time-service";
+import {
+  LEAVE_ENGINE_RULE_VERSION,
+  LEAVE_ENGINE_RULE_VERSION_V2,
+  resolveLeaveEngineRuleVersion,
+  type LeaveEngineRuleVersion,
+} from "@/modules/leaves/constants/rule-versions";
 
 export interface LeaveMetricsComputed {
   calendarDays: number;
@@ -18,7 +24,10 @@ export async function computeLeaveMetrics(
   companyId: string,
   startDate: Date,
   endDate: Date,
+  requestedRuleVersion: string = LEAVE_ENGINE_RULE_VERSION,
 ): Promise<LeaveMetricsComputed> {
+  const ruleVersion: LeaveEngineRuleVersion = resolveLeaveEngineRuleVersion(requestedRuleVersion);
+  const fixedWeekdayRule = ruleVersion === LEAVE_ENGINE_RULE_VERSION_V2;
   const s = utcDateOnly(startDate);
   const e = utcDateOnly(endDate);
   if (e.getTime() < s.getTime()) {
@@ -31,7 +40,7 @@ export async function computeLeaveMetrics(
     };
   }
 
-  const hoursPerDay = await getHoursPerWorkingDayForCompany(companyId);
+  const hoursPerDay = fixedWeekdayRule ? 8 : await getHoursPerWorkingDayForCompany(companyId);
 
   const rangePadStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(), 0, 0, 0, 0));
   const rangePadEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate(), 23, 59, 59, 999));
@@ -43,6 +52,7 @@ export async function computeLeaveMetrics(
     endDate,
     holidays,
     hoursPerDay,
+    { excludeWeekdayHolidays: !fixedWeekdayRule },
   );
 
   const calendarDays = countCalendarDaysInclusiveUtc(startDate, endDate);
@@ -54,14 +64,4 @@ export async function computeLeaveMetrics(
     hoursPerDay: String(hoursPerDay),
     weekdayHolidayDatesInRange,
   };
-}
-
-/** Slice overlap metrics using the same holiday merge as leave requests (balance consumption, audits). */
-export async function computeLeaveMetricsForApprovedSlice(
-  companyId: string,
-  sliceStart: Date,
-  sliceEnd: Date,
-): Promise<Pick<LeaveMetricsComputed, "workingDays" | "totalHours">> {
-  const m = await computeLeaveMetrics(companyId, sliceStart, sliceEnd);
-  return { workingDays: m.workingDays, totalHours: m.totalHours };
 }

@@ -70,6 +70,7 @@ async function sumApprovedWorkingDaysForTypeInYear(
       startDate: true,
       endDate: true,
       subtype: true,
+      metricsRuleVersion: true,
     },
   });
 
@@ -80,7 +81,7 @@ async function sumApprovedWorkingDaysForTypeInYear(
     }
     const clip = clipRangeToYear(r.startDate, r.endDate, yearStart, yearEnd);
     if (!clip) continue;
-    const part = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const part = await computeLeaveMetrics(companyId, clip.rs, clip.re, r.metricsRuleVersion);
     total = total.add(new Prisma.Decimal(part.workingDays));
   }
 
@@ -105,7 +106,7 @@ async function sumNetAnnualUsedDays(
         affectsPayroll: true,
         AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
       },
-      select: { startDate: true, endDate: true, workingDays: true },
+      select: { startDate: true, endDate: true, workingDays: true, metricsRuleVersion: true },
     }),
     prisma.leaveRequest.findMany({
       where: {
@@ -129,7 +130,12 @@ async function sumNetAnnualUsedDays(
     const clip = clipRangeToYear(annual.startDate, annual.endDate, yearStart, yearEnd);
     if (!clip) continue;
 
-    const grossMetrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const grossMetrics = await computeLeaveMetrics(
+      companyId,
+      clip.rs,
+      clip.re,
+      annual.metricsRuleVersion,
+    );
     let overlapDays = 0;
 
     for (const medical of medicalReqs) {
@@ -140,7 +146,12 @@ async function sumNetAnnualUsedDays(
         Math.min(clip.re.getTime(), medical.endDate.getTime(), yearEnd.getTime()),
       );
       if (overlapStart > overlapEnd) continue;
-      const overlapMetrics = await computeLeaveMetrics(companyId, overlapStart, overlapEnd);
+      const overlapMetrics = await computeLeaveMetrics(
+        companyId,
+        overlapStart,
+        overlapEnd,
+        annual.metricsRuleVersion,
+      );
       overlapDays += overlapMetrics.workingDays;
       hasMedicalOverlap = true;
     }
@@ -165,7 +176,7 @@ async function sumPendingAnnualDays(companyId: string, employeeId: string, year:
       status: "PENDING",
       AND: [{ startDate: { lte: yearEnd } }, { endDate: { gte: yearStart } }],
     },
-    select: { workingDays: true, startDate: true, endDate: true },
+    select: { workingDays: true, startDate: true, endDate: true, metricsRuleVersion: true },
   });
 
   let total = 0;
@@ -176,7 +187,7 @@ async function sumPendingAnnualDays(companyId: string, employeeId: string, year:
     }
     const clip = clipRangeToYear(row.startDate, row.endDate, yearStart, yearEnd);
     if (!clip) continue;
-    const metrics = await computeLeaveMetrics(companyId, clip.rs, clip.re);
+    const metrics = await computeLeaveMetrics(companyId, clip.rs, clip.re, row.metricsRuleVersion);
     total += metrics.workingDays;
   }
   return total;
@@ -231,6 +242,30 @@ export async function syncLeaveBalancesForEmployeeYear(
   const uninterruptedMonths = uninterruptedCalendarMonthsUtc(serviceAnchor, clipEnd);
   const fullYears = fullYearsOfServiceUtc(serviceAnchor, clipEnd);
 
+  // Day-level service fractions of the calendar year — the deterministic basis for
+  // entitlement-scaled accrual ("to date" = available now, "to year-end" = projection).
+  const DAY_MS = 86400000;
+  const yearStartMs = Date.UTC(year, 0, 1);
+  const yearDays = Math.round((Date.UTC(year + 1, 0, 1) - yearStartMs) / DAY_MS);
+  const dayIdx = (ms: number): number => Math.floor((ms - yearStartMs) / DAY_MS);
+  const startIdx = Math.min(yearDays, Math.max(0, dayIdx(serviceAnchor.getTime())));
+  const termClipMs =
+    employee.terminationDate && employee.terminationDate.getTime() < yearEnd.getTime()
+      ? employee.terminationDate.getTime()
+      : yearEnd.getTime();
+  const servedDaysUntil = (endMs: number): number => {
+    const endIdx = Math.min(yearDays - 1, dayIdx(Math.min(endMs, yearEnd.getTime())));
+    return endIdx >= startIdx ? endIdx - startIdx + 1 : 0;
+  };
+  const servedFractionToDate = Math.max(
+    0,
+    Math.min(1, servedDaysUntil(Math.min(calculationDate.getTime(), termClipMs)) / yearDays),
+  );
+  const servedFractionToYearEnd = Math.max(
+    0,
+    Math.min(1, servedDaysUntil(termClipMs) / yearDays),
+  );
+
   const eligibleSpecial =
     employee.isSingleParent || employee.hasDisability || employee.hasChildUnderThree;
 
@@ -247,9 +282,17 @@ export async function syncLeaveBalancesForEmployeeYear(
           year: year - 1,
         },
       },
-      select: { remainingDays: true },
+      select: { remainingDays: true, carryOverDays: true },
     });
-    if (prev) prevAnnualRemaining = Math.max(0, prev.remainingDays.toNumber());
+    if (prev) {
+      // Carry only the prior year's OWN unused entitlement (remaining minus the carry
+      // it itself received) so annual balances cannot compound across years — the
+      // carried-in portion expires June 30 and must not roll forward again.
+      prevAnnualRemaining = Math.max(
+        0,
+        prev.remainingDays.toNumber() - prev.carryOverDays.toNumber(),
+      );
+    }
   }
 
   const carryExpiresAt =
@@ -296,6 +339,8 @@ export async function syncLeaveBalancesForEmployeeYear(
         uninterruptedMonths,
         fullYearsOfService: fullYears,
         monthsWorkedInYear: monthsWorked,
+        servedFractionToDate,
+        servedFractionToYearEnd,
         isHazardous: employee.isHazardousPosition,
         eligibleSpecialCategories: eligibleSpecial,
         calculationDate,

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return companyContextHttpError(result.reason);
   }
+  const { companyId } = result.context;
 
   const { id } = await context.params;
   const inline = new URL(request.url).searchParams.get("inline") === "1";

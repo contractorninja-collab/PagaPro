@@ -15,7 +15,7 @@ import {
   renameDepartmentSchema,
 } from "@/modules/departments/validation/department-schemas";
 import type { DepartmentOptionDto } from "@/modules/employees/types";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 
 const REVALIDATE_PATHS = ["/konfigurime", "/punonjesit", "/paneli", "/pushimet", "/raportet"] as const;
 
@@ -26,8 +26,10 @@ function revalidateDepartmentPaths(): void {
 }
 
 async function companyIdOrError(): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
-  const id = await resolveActiveCompanyId();
-  return id ? { ok: true, companyId: id } : { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  return result.ok
+    ? { ok: true, companyId: result.context.companyId }
+    : { ok: false, error: companyContextErrorMessage(result.reason) };
 }
 
 function mutationError(

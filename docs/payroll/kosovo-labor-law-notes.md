@@ -64,7 +64,8 @@ The **night window description** shown to HR (`nightWorkPeriodDescription`, defa
 
 
 
-- **`PayrollSettings.sickLeavePayPercent`** expresses paid sick/medical hours as a fraction of the regular hourly rate (`1` = 100%). Tune per policy; describe HR rules in Konfigurime **“Leje mjekësore”** notes.
+- **Neni 60, Ligji i Punës Nr. 03/L-212**: paid medical leave is compensated at **100% of salary**. The engine enforces this as a statutory **floor** — `statutorySickLeavePayPercent()` (`calculation/legislation/sick-pay.ts`) raises any `PayrollSettings.sickLeavePayPercent` below `1` back to `1` at every read site, so a misconfigured row can never underpay sick hours. Values above `1` (more generous employers) are honored.
+- **`PayrollSettings.sickLeavePayPercent`** therefore only matters at `>= 1`; it remains a technical multiplier for potential future tiering (e.g. beyond the statutory 20 paid working days/year, which the system does not yet track per-employee).
 
 
 
@@ -80,7 +81,7 @@ The **night window description** shown to HR (`nightWorkPeriodDescription`, defa
 
 
 
-- Deduction: **`hourly_rate × unpaid_leave_hours`**; those hours also reduce regenerated **`actual_regular_hours`**.
+- Deduction: **`hourly_rate × unpaid_leave_hours`** — applied **once**. Unpaid hours stay **inside** the regenerated `actual_regular_hours` (only paid + sick leave reduce them); the explicit deduction is the single mechanism that removes their pay. (Reducing regular hours *and* deducting was a double-penalty bug, fixed 2026-07.)
 
 
 

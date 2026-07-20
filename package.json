@@ -8,6 +8,7 @@
     "dev": "next dev",
     "dev:clean": "node -e \"try { require('fs').rmSync('.next', { recursive: true, force: true }); } catch (_) {}\" && next dev",
     "build": "next build",
+    "vercel-build": "node scripts/prepare-production-database.cjs && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "db:validate": "prisma validate",
@@ -22,9 +23,10 @@
     "db:fix-permissions": "powershell -ExecutionPolicy Bypass -File scripts/fix-db-permissions.ps1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "atk:template:placeholder": "node scripts/write-atk-placeholder-template.cjs",
     "contracts:validate-templates": "node scripts/validate-contract-templates.cjs",
     "contracts:seed": "node -e \"require('dotenv').config({override:true});const {PrismaPg}=require('@prisma/adapter-pg');const {PrismaClient}=require('@prisma/client');const {seedContractTemplates}=require('./scripts/seed-contract-templates.cjs');const p=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});seedContractTemplates(p).finally(()=>p.$disconnect());\"",
+    "leave:seed": "node -e \"require('dotenv').config({override:true});const {PrismaPg}=require('@prisma/adapter-pg');const {PrismaClient}=require('@prisma/client');const {seedLeaveTemplates}=require('./scripts/seed-leave-templates.cjs');const p=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});seedLeaveTemplates(p).finally(()=>p.$disconnect());\"",
+    "termination:seed": "node -e \"require('dotenv').config({override:true});const {PrismaPg}=require('@prisma/adapter-pg');const {PrismaClient}=require('@prisma/client');const {seedTerminationTemplates}=require('./scripts/seed-termination-templates.cjs');const p=new PrismaClient({adapter:new PrismaPg({connectionString:process.env.DATABASE_URL})});seedTerminationTemplates(p).finally(()=>p.$disconnect());\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,6 +43,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "decimal.js": "^10.6.0",
     "docxtemplater": "^3.53.0",
     "exceljs": "^4.4.0",

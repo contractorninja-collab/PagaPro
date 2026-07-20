@@ -1,7 +1,5 @@
 import type {
   ContractKind,
-  DocumentCategory,
-  DocumentGenerationArtifactKind,
   EmploymentStatus,
   EmploymentType,
   LeaveRequestStatus,
@@ -37,6 +35,11 @@ export interface DashboardPayrollSlice {
     netPay: string;
     employerTotalCost: string;
   };
+  grossHistory: Array<{
+    year: number;
+    month: number;
+    grossSalary: string;
+  }>;
   reviewedAtIso: string | null;
   approvedAtIso: string | null;
   lockedAtIso: string | null;
@@ -77,22 +80,6 @@ export interface TimelineEntryDto {
   actorLabel: string | null;
 }
 
-export interface DocumentCategoryCount {
-  category: DocumentCategory;
-  count: number;
-}
-
-export interface RecentDocumentRow {
-  id: string;
-  title: string;
-  category: DocumentCategory;
-  kind: DocumentGenerationArtifactKind;
-  createdAtIso: string;
-  employeeId: string | null;
-  employeeName: string | null;
-  templateName: string;
-}
-
 export interface EmployeeDistributionSlice {
   byStatus: Partial<Record<EmploymentStatus, number>>;
   byEmploymentType: Partial<Record<EmploymentType, number>>;
@@ -129,8 +116,6 @@ export interface DashboardOperationalPayload {
   leavePending: LeavePendingRow[];
   leaveToday: LeaveTodayCounts;
   timeline: TimelineEntryDto[];
-  documentsThisMonthByCategory: DocumentCategoryCount[];
-  recentDocuments: RecentDocumentRow[];
   distribution: EmployeeDistributionSlice;
   alerts: OperationalAlert[];
   recommendedActions: RecommendedAction[];

@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
   archiveEmployeeAction,
   deleteEmployeeAction,
@@ -33,6 +33,21 @@ import {
 } from "@/modules/employees/components/employees-labels";
 import { EmployeeStatusBadge, EmployeeTypeBadge } from "@/modules/employees/components/employee-status-badge";
 import { TerminateEmployeeDialog } from "@/modules/employees/components/terminate-employee-dialog";
+
+const TH =
+  "h-10 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+
+function EmployeeAvatar({ row }: { row: EmployeeListRowDto }) {
+  const initials = `${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase();
+  return (
+    <span
+      aria-hidden
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-[12px] font-semibold text-white"
+    >
+      {initials}
+    </span>
+  );
+}
 
 function RowActions(props: {
   row: EmployeeListRowDto;
@@ -183,101 +198,143 @@ export function EmployeesTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
-        <p className="text-sm font-medium text-foreground">Nuk ka punonjës për filtrat aktualë.</p>
-        <p className="mt-2 text-sm text-muted-foreground">Shtoni punonjës të rinj ose ndryshoni kriteret e kërkimit.</p>
+      <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-6 py-16 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+        <p className="text-sm font-semibold text-[#0f172a]">Nuk ka punonjës për filtrat aktualë.</p>
+        <p className="mt-2 text-[13px] text-[#64748b]">Shtoni punonjës të rinj ose ndryshoni kriteret e kërkimit.</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Emri dhe mbiemri</TableHead>
-              <TableHead>Pozita</TableHead>
-              <TableHead>Departamenti</TableHead>
-              <TableHead>Statusi</TableHead>
-              <TableHead>Lloji</TableHead>
-              <TableHead className="text-right">Paga bruto</TableHead>
-              <TableHead>Punësimi</TableHead>
-              <TableHead className="w-[72px] text-right">Veprime</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/punonjesit/${row.id}`} className="text-primary hover:underline">
-                    {row.firstName} {row.lastName}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">{row.personalId}</p>
-                </TableCell>
-                <TableCell>{row.jobTitle ?? "—"}</TableCell>
-                <TableCell>{row.departmentName ?? "—"}</TableCell>
-                <TableCell>
-                  <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
-                </TableCell>
-                <TableCell>
-                  <EmployeeTypeBadge employmentType={row.employmentType} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{formatEur(row.baseSalaryMonthly)}</TableCell>
-                <TableCell>{formatSqDate(row.hireDate)}</TableCell>
-                <TableCell className="text-right">
-                  <RowActions row={row} onEdit={onEdit} onRefresh={() => router.refresh()} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)] md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[880px] caption-bottom">
+            <thead>
+              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <th className={TH}>Punonjësi</th>
+                <th className={TH}>Pozita</th>
+                <th className={TH}>Departamenti</th>
+                <th className={TH}>Statusi</th>
+                <th className={TH}>Lloji</th>
+                <th className={cn(TH, "text-right")}>Paga bruto</th>
+                <th className={TH}>Punësimi</th>
+                <th className={cn(TH, "w-10 text-right")}>
+                  <span className="sr-only">Veprime</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  onClick={() => router.push(`/punonjesit/${row.id}`)}
+                  className="cursor-pointer border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <EmployeeAvatar row={row} />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/punonjesit/${row.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="block truncate text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                        >
+                          {row.firstName} {row.lastName}
+                        </Link>
+                        <p className="truncate text-xs tabular-nums text-[#94a3b8]">{row.personalId}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</td>
+                  <td className="px-4 py-3 text-[13px] text-[#64748b]">{row.departmentName ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <EmployeeTypeBadge employmentType={row.employmentType} />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-[#0f172a]">
+                    {formatEur(row.baseSalaryMonthly)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-[#64748b]">
+                    {formatSqDate(row.hireDate)}
+                  </td>
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <RowActions row={row} onEdit={onEdit} onRefresh={() => router.refresh()} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between border-t border-[#eef2f7] px-4 py-3">
+          <p className="text-[12.5px] text-[#64748b]">
+            Shfaqen <span className="font-semibold text-[#0f172a]">{rows.length}</span> punonjës
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 md:hidden">
         {rows.map((row) => (
-          <div key={row.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div
+            key={row.id}
+            className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+          >
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <Link href={`/punonjesit/${row.id}`} className="text-base font-semibold text-primary hover:underline">
-                  {row.firstName} {row.lastName}
-                </Link>
-                <p className="text-xs text-muted-foreground">{row.personalId}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <EmployeeAvatar row={row} />
+                <div className="min-w-0">
+                  <Link
+                    href={`/punonjesit/${row.id}`}
+                    className="block truncate text-[15px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                  >
+                    {row.firstName} {row.lastName}
+                  </Link>
+                  <p className="truncate text-xs tabular-nums text-[#94a3b8]">{row.personalId}</p>
+                </div>
               </div>
               <RowActions row={row} onEdit={onEdit} onRefresh={() => router.refresh()} />
             </div>
-            <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-[#f1f5f9] pt-3 text-sm">
               <div>
-                <dt className="text-muted-foreground">Pozita</dt>
-                <dd>{row.jobTitle ?? "—"}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Pozita</dt>
+                <dd className="text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Departamenti</dt>
-                <dd>{row.departmentName ?? "—"}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Departamenti</dt>
+                <dd className="text-[13px] text-[#334155]">{row.departmentName ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Statusi</dt>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Statusi</dt>
                 <dd className="mt-1">
                   <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Lloji</dt>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Lloji</dt>
                 <dd className="mt-1">
                   <EmployeeTypeBadge employmentType={row.employmentType} />
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Paga bruto</dt>
-                <dd className="tabular-nums font-medium">{formatEur(row.baseSalaryMonthly)}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto</dt>
+                <dd className="text-[13px] font-semibold tabular-nums text-[#0f172a]">
+                  {formatEur(row.baseSalaryMonthly)}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Data e punësimit</dt>
-                <dd>{formatSqDate(row.hireDate)}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">
+                  Data e punësimit
+                </dt>
+                <dd className="text-[13px] tabular-nums text-[#334155]">{formatSqDate(row.hireDate)}</dd>
               </div>
             </dl>
           </div>
         ))}
+        <p className="px-1 text-[12.5px] text-[#64748b]">
+          Shfaqen <span className="font-semibold text-[#0f172a]">{rows.length}</span> punonjës
+        </p>
       </div>
     </>
   );

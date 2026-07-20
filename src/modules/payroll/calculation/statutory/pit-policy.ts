@@ -53,3 +53,38 @@ export function computeEmployeePit(params: {
     pitBreakdown: primary.breakdown,
   };
 }
+
+/**
+ * PIT for an employee exempt from income-tax withholding (Employee.applyTax = false).
+ * Withholding is zero, but the taxable base is still computed for the breakdown.
+ */
+export function computeEmployeePitExempt(params: {
+  employerPrimacy: EmployerPrimacy;
+  grossSalary: Decimal;
+  pensionEmployee: Decimal;
+  snapshot: LegislationSnapshot;
+}): { pitWithheld: Decimal; taxableIncome: Decimal; pitBreakdown: PitBreakdown } {
+  const taxableIncome = computeTaxableIncome({
+    grossSalary: params.grossSalary,
+    pensionEmployee: params.pensionEmployee,
+    pitRules: params.snapshot.pitRules,
+  });
+
+  const pitBreakdown: PitBreakdown =
+    params.employerPrimacy === "SECONDARY"
+      ? {
+          atkRegime: "SECONDARY_FLAT_10",
+          pitBaseKind: params.snapshot.secondaryEmployerPitBase,
+          pitBaseAmount: "0.00",
+          flatRate: params.snapshot.secondaryEmployerFlatRate,
+          pitWithheld: "0.00",
+        }
+      : {
+          atkRegime: "PRIMARY_PROGRESSIVE",
+          taxableIncome: taxableIncome.toFixed(2),
+          pitWithheld: "0.00",
+          bracketSlices: [],
+        };
+
+  return { pitWithheld: D("0"), taxableIncome, pitBreakdown };
+}

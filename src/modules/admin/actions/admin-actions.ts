@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { adminPath } from "@/lib/admin-path";
 import { z } from "zod";
 import { getCurrentUser } from "@/modules/auth/services/session";
 import { provisionCompany } from "@/modules/admin/services/company-provisioning";
@@ -31,8 +32,8 @@ async function requireAdmin(): Promise<boolean> {
 
 function revalidateBizneset(companyId?: string) {
   try {
-    revalidatePath("/admin/bizneset");
-    if (companyId) revalidatePath(`/admin/bizneset/${companyId}`);
+    revalidatePath(adminPath("bizneset"));
+    if (companyId) revalidatePath(adminPath(`bizneset/${companyId}`));
   } catch (err) {
     console.error("[admin-actions] revalidatePath failed:", err);
   }
@@ -65,6 +66,20 @@ export async function createCompanyAction(raw: unknown): Promise<AdminActionResu
           ok: false,
           error: "Ky NRB ekziston tashmë.",
           fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
+        };
+      }
+      if (res.code === "DUPLICATE_SLUG") {
+        return {
+          ok: false,
+          error: "Ky slug ekziston tashmë.",
+          fieldErrors: { slug: ["Zgjidhni një slug tjetër për domain-in e klientit."] },
+        };
+      }
+      if (res.code === "DUPLICATE_DOMAIN") {
+        return {
+          ok: false,
+          error: "Ky domain ekziston tashmë.",
+          fieldErrors: { customDomain: ["Domain duhet të jetë unik."] },
         };
       }
       return { ok: false, error: "Krijimi i biznesit dështoi." };
@@ -106,6 +121,20 @@ export async function updateCompanyAction(raw: unknown): Promise<AdminActionResu
           ok: false,
           error: "Ky NRB ekziston tashmë.",
           fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
+        };
+      }
+      if (res.code === "DUPLICATE_SLUG") {
+        return {
+          ok: false,
+          error: "Ky slug ekziston tashmë.",
+          fieldErrors: { slug: ["Zgjidhni një slug tjetër për domain-in e klientit."] },
+        };
+      }
+      if (res.code === "DUPLICATE_DOMAIN") {
+        return {
+          ok: false,
+          error: "Ky domain ekziston tashmë.",
+          fieldErrors: { customDomain: ["Domain duhet të jetë unik."] },
         };
       }
       return { ok: false, error: "Ruajtja dështoi." };

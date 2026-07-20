@@ -690,10 +690,11 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 />
               </FormField>
-              <FormField label="IBAN" error={fieldErrors.bankAccountIban}>
+              <FormField label="Numri i llogarisë" error={fieldErrors.bankAccountIban}>
                 <Input
                   className={cn("font-mono text-xs", errClass("bankAccountIban"))}
                   value={values.bankAccountIban}
+                  placeholder="p.sh. 1234567890123456"
                   onChange={(e) => {
                     clearKey("bankAccountIban");
                     setValues((s) => ({ ...s, bankAccountIban: e.target.value }));

@@ -10,6 +10,7 @@ import { annualSplitLeaveCompliant } from "@/modules/leaves/engine/split-leave-a
 import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
 import { syncLeaveBalancesForEmployeeYear } from "@/modules/leaves/services/leave-balance-service";
 import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
+import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 
 const OVERLAP_STATUSES = ["PENDING", "APPROVED"] as const;
 
@@ -37,15 +38,20 @@ export async function findOverlappingLeaveRequest(
   return rows[0] ?? null;
 }
 
-async function payrollLockedOverlapBlock(params: {
+export async function payrollLockedOverlapBlock(params: {
   companyId: string;
   startDate: Date;
   endDate: Date;
+  /** Also treat ARCHIVED payrolls as finalized (used when revoking an approved leave). */
+  includeArchived?: boolean;
 }): Promise<LeaveValidationResult> {
   const start = params.startDate;
   const end = params.endDate;
   const cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
   const endM = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  const blockingStatuses = params.includeArchived
+    ? (["LOCKED", "APPROVED", "ARCHIVED"] as const)
+    : (["LOCKED", "APPROVED"] as const);
 
   while (cur.getTime() <= endM.getTime()) {
     const y = cur.getUTCFullYear();
@@ -55,7 +61,7 @@ async function payrollLockedOverlapBlock(params: {
         companyId: params.companyId,
         year: y,
         month: m,
-        status: { in: ["LOCKED", "APPROVED"] },
+        status: { in: [...blockingStatuses] },
       },
       select: { id: true },
     });
@@ -245,6 +251,7 @@ export async function validateLeaveRequestForWorkflow(params: {
   startDate: Date;
   endDate: Date;
   excludeLeaveId?: string;
+  metricsRuleVersion?: string;
 }): Promise<LeaveValidationResult> {
   const parts: LeaveValidationResult[] = [];
 
@@ -262,7 +269,12 @@ export async function validateLeaveRequestForWorkflow(params: {
 
   parts.push(await payrollLockedOverlapBlock(params));
 
-  const metrics = await computeLeaveMetrics(params.companyId, params.startDate, params.endDate);
+  const metrics = await computeLeaveMetrics(
+    params.companyId,
+    params.startDate,
+    params.endDate,
+    params.metricsRuleVersion ?? LEAVE_ENGINE_RULE_VERSION,
+  );
   const yearUtc = params.startDate.getUTCFullYear();
 
   parts.push(

@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { kosovo2026AtkDefaults } from "../legislation/defaults";
-import {
-  calculateContractorLineSafe,
-  calculateEmployeeLine,
-} from "../payroll-calculator";
-import { calculateContractorLine } from "../contractor/contractor-line";
+import { calculateEmployeeLine } from "../payroll-calculator";
 
 /** Snapshot with derived hourly minimum enforcement (450 € / 173.33 h). */
 const snapshotWithStandardHours = kosovo2026AtkDefaults({
   standardMonthlyHours: "173.33",
 });
-
 /** Snapshot without derived hourly rules — useful for gross override scenarios. */
 const snapshotPlain = kosovo2026AtkDefaults();
 
@@ -147,49 +142,69 @@ describe("calculateEmployeeLine — Kosovo 2026 defaults", () => {
   });
 });
 
-describe("calculateContractorLine", () => {
-  it("defaults to exempt withholding (gross = net)", () => {
-    const value = calculateContractorLine(
-      {
-        hours: { regularHours: "40" },
-        rates: { hourlyRate: "20" },
-      },
-      snapshotWithStandardHours,
-    );
+describe("calculateEmployeeLine — applyTrust / applyTax exemptions", () => {
+  const base = {
+    employmentType: "EMPLOYEE" as const,
+    employerPrimacy: "PRIMARY" as const,
+    grossSalaryOverride: "500.00",
+    hours: { regularHours: "0" },
+    rates: { hourlyRate: "10" },
+    enforceMinimumGross: false,
+  };
 
-    expect(value.grossSalary).toBe("800.00");
-    expect(value.pitWithheld).toBe("0.00");
-    expect(value.netPay).toBe("800.00");
-    expect(value.breakdown.atkRegime).toBe("CONTRACTOR_EXEMPT");
+  it("baseline (both applied) withholds pension and PIT", () => {
+    const r = calculateEmployeeLine({ ...base }, snapshotPlain);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.pensionEmployee).toBe("25.00");
+    expect(r.value.taxableIncome).toBe("475.00");
+    expect(r.value.pitWithheld).toBe("18.50");
+    expect(r.value.netPay).toBe("456.50");
   });
 
-  it("supports SECONDARY_FLAT_10 contractor withholding opt-in", () => {
-    const value = calculateContractorLine(
-      {
-        hours: { regularHours: "10" },
-        rates: { hourlyRate: "50" },
-        contractorWithholdingMode: "SECONDARY_FLAT_10",
-        applyTrustContributions: true,
-      },
-      snapshotPlain,
-    );
-
-    expect(value.grossSalary).toBe("500.00");
-    expect(value.pensionEmployee).toBe("25.00");
-    expect(value.taxableIncome).toBe("475.00");
-    expect(value.pitWithheld).toBe("47.50");
-    expect(value.netPay).toBe("427.50");
+  it("applyTrust=false zeroes employee & employer pension and taxes the full gross", () => {
+    const r = calculateEmployeeLine({ ...base, applyTrust: false }, snapshotPlain);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.pensionEmployee).toBe("0.00");
+    expect(r.value.pensionEmployer).toBe("0.00");
+    expect(r.value.taxableIncome).toBe("500.00");
+    expect(r.value.pitWithheld).toBe("21.00");
+    expect(r.value.netPay).toBe("479.00");
   });
 
-  it("surfaces validation failures via calculateContractorLineSafe", () => {
-    const result = calculateContractorLineSafe(
-      {
-        hours: { regularHours: "-1" },
-        rates: { hourlyRate: "10" },
-      },
+  it("applyTax=false zeroes PIT while pension still applies", () => {
+    const r = calculateEmployeeLine({ ...base, applyTax: false }, snapshotPlain);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.pensionEmployee).toBe("25.00");
+    expect(r.value.pitWithheld).toBe("0.00");
+    expect(r.value.netPay).toBe("475.00");
+    expect(r.value.breakdown.pit.pitWithheld).toBe("0.00");
+  });
+
+  it("both false → net equals gross (no statutory deductions)", () => {
+    const r = calculateEmployeeLine(
+      { ...base, applyTrust: false, applyTax: false },
       snapshotPlain,
     );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.pensionEmployee).toBe("0.00");
+    expect(r.value.pitWithheld).toBe("0.00");
+    expect(r.value.netPay).toBe("500.00");
+  });
 
-    expect(result.ok).toBe(false);
+  it("SECONDARY employer with applyTax=false zeroes flat withholding", () => {
+    const r = calculateEmployeeLine(
+      { ...base, employerPrimacy: "SECONDARY", applyTax: false },
+      snapshotPlain,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.pitWithheld).toBe("0.00");
+    expect(r.value.breakdown.atkRegime).toBe("SECONDARY_FLAT_10");
+    expect(r.value.netPay).toBe("475.00");
   });
 });
+

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DocumentDetailClient } from "@/modules/documents/components/document-detail-client";
 import { getDocumentArtifactDetail } from "@/modules/documents/services/document-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -25,9 +25,9 @@ function toDetectedKeys(value: unknown): string[] {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params;
-    const companyId = await resolveActiveCompanyId();
-    if (!companyId) return { title: "Dokumenti" };
-    const a = await getDocumentArtifactDetail(companyId, id);
+    const result = await getCompanyContext();
+    if (!result.ok) return { title: "Dokumenti" };
+    const a = await getDocumentArtifactDetail(result.context.companyId, id);
     if (!a) return { title: "Dokumenti" };
     return { title: a.title };
   } catch {
@@ -37,15 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DokumentDetailPage({ params }: Props) {
   const { id } = await params;
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm text-muted-foreground">Nuk ka kompani aktive për këtë sesion.</p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   let a;
   try {

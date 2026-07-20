@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/patterns/page-header";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
 import { HolidaySettingsPanel } from "@/components/konfigurime/holiday-settings-panel";
 import { LeaveMonthlyAccrualPanel } from "@/components/konfigurime/leave-monthly-accrual-panel";
@@ -273,24 +273,24 @@ export function KonfigurimeConfigurator({
 
   return (
     <>
+      <AppSubBar
+        eyebrow="Parametrat e kompanisë"
+        title="Konfigurimet"
+        description="Parametra të kompanisë, përfaqësuesi ligjor, pagat, festat publike, dokumentet, pushimet dhe njoftimet — të izoluara për kompaninë aktive."
+        actions={
+          <div className="flex flex-col items-end gap-2">
+            <Button type="submit" form="konfigurime-form" className="hidden md:inline-flex" disabled={pending}>
+              {pending ? "Duke ruajtur…" : "Ruaj ndryshimet"}
+            </Button>
+            {formError ? (
+              <p className="max-w-xs text-right text-xs font-medium text-destructive" role="alert">
+                {formError}
+              </p>
+            ) : null}
+          </div>
+        }
+      />
       <form id="konfigurime-form" className={cn("space-y-8 pb-28 md:pb-8", className)} onSubmit={(e) => void handleSubmit(e)}>
-        <PageHeader
-          title="Konfigurimet"
-          description="Parametra të kompanisë, përfaqësuesi ligjor, pagat, festat publike, dokumentet, pushimet dhe njoftimet — të izoluara për kompaninë aktive."
-          actions={
-            <div className="flex flex-col items-end gap-2">
-              <Button type="submit" className="hidden md:inline-flex" disabled={pending}>
-                {pending ? "Duke ruajtur…" : "Ruaj ndryshimet"}
-              </Button>
-              {formError ? (
-                <p className="max-w-xs text-right text-xs font-medium text-destructive" role="alert">
-                  {formError}
-                </p>
-              ) : null}
-            </div>
-          }
-        />
-
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as KonfigurimeTabId)} className="w-full">
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:h-10 sm:flex-nowrap">
             <TabsTrigger value="kompania">Kompania</TabsTrigger>

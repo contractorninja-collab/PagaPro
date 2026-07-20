@@ -8,6 +8,8 @@ export function solveEquivalentMonthlyGrossForTargetNet(params: {
   snapshot: LegislationSnapshot;
   employerPrimacy: EmployerPrimacy;
   enforceMinimumGross: boolean;
+  applyTrust?: boolean;
+  applyTax?: boolean;
 }): { gross: string } | null {
   const target = D(params.targetNet);
   if (!target.isFinite() || target.lte(0)) return null;
@@ -28,6 +30,8 @@ export function solveEquivalentMonthlyGrossForTargetNet(params: {
         bonusAmount: "0",
         otherDeductions: "0",
         enforceMinimumGross: params.enforceMinimumGross,
+        applyTrust: params.applyTrust,
+        applyTax: params.applyTax,
       },
       params.snapshot,
     );

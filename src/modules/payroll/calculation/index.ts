@@ -1,7 +1,5 @@
 export type {
   AtkRegime,
-  CalculateContractorLineInput,
-  CalculateContractorLineOutput,
   CalculateEmployeeLineInput,
   CalculateEmployeeLineOutput,
   EmployerPrimacy,
@@ -14,11 +12,7 @@ export type {
 
 export { kosovo2026AtkDefaults, KOSOVO_RULES_VERSION_2026_ATK } from "./legislation/defaults";
 
-export {
-  calculateEmployeeLine,
-  calculateContractorLineSafe,
-} from "./payroll-calculator";
-export { calculateContractorLine } from "./contractor/contractor-line";
+export { calculateEmployeeLine } from "./payroll-calculator";
 
 export { computeGrossFromHours } from "./gross/from-hours";
 export { ROUNDING_POLICY_VERSION } from "./money/rounding";

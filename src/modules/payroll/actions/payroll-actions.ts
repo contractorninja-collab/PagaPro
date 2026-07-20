@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { PayrollCorrectionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 import {
   approvePayroll,
   archivePayroll,
@@ -37,10 +37,6 @@ export type PayrollActionResult<T = undefined> =
   | { ok: true; data?: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
-async function companyIdOrFail(): Promise<string | null> {
-  return resolveActiveCompanyId();
-}
-
 /** Avoid surfacing 500s from rare cache/revalidate failures after successful mutations. */
 function safeRevalidatePath(path: string): void {
   try {
@@ -67,10 +63,11 @@ export async function payrollSelectionPreviewAction(
     employees: Awaited<ReturnType<typeof listEmployeesEligibleForPayrollSelection>>;
   }>
 > {
-  const companyId = await companyIdOrFail();
-  if (!companyId) {
-    return { ok: false, error: "Nuk ka kompani aktive për këtë sesion." };
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
   }
+  const { companyId } = result.context;
   const parsed = payrollSelectionPreviewSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -105,10 +102,11 @@ export async function payrollSelectionPreviewAction(
 }
 
 export async function createPayrollDraftAction(raw: unknown): Promise<PayrollActionResult<{ id: string }>> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) {
-    return { ok: false, error: "Nuk ka kompani aktive për këtë sesion." };
+  const result = await getCompanyContext();
+  if (!result.ok) {
+    return { ok: false, error: companyContextErrorMessage(result.reason) };
   }
+  const { companyId, user } = result.context;
   const parsed = payrollCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -121,7 +119,7 @@ export async function createPayrollDraftAction(raw: unknown): Promise<PayrollAct
     companyId,
     parsed.data.year,
     parsed.data.month,
-    null,
+    user.id,
     parsed.data.employeeIds,
   );
   if (!res.ok) {
@@ -140,9 +138,10 @@ export async function createPayrollDraftAction(raw: unknown): Promise<PayrollAct
 }
 
 export async function regeneratePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await regeneratePayrollEntriesAndCalculate(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await regeneratePayrollEntriesAndCalculate(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -150,9 +149,10 @@ export async function regeneratePayrollAction(payrollId: string): Promise<Payrol
 }
 
 export async function reviewPayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await reviewPayrollExplicit(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await reviewPayrollExplicit(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -160,9 +160,10 @@ export async function reviewPayrollAction(payrollId: string): Promise<PayrollAct
 }
 
 export async function returnPayrollReviewToDraftAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await returnPayrollReviewToDraft(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await returnPayrollReviewToDraft(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -170,9 +171,10 @@ export async function returnPayrollReviewToDraftAction(payrollId: string): Promi
 }
 
 export async function approvePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await approvePayroll(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await approvePayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -180,8 +182,9 @@ export async function approvePayrollAction(payrollId: string): Promise<PayrollAc
 }
 
 export async function validatePayrollAction(payrollId: string): Promise<PayrollActionResult<{ warnings: string[] }>> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId } = result.context;
   const res = await validatePayrollSpreadsheet(companyId, payrollId);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -189,9 +192,10 @@ export async function validatePayrollAction(payrollId: string): Promise<PayrollA
 }
 
 export async function lockPayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await lockPayrollWithSnapshot(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await lockPayrollWithSnapshot(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -199,9 +203,10 @@ export async function lockPayrollAction(payrollId: string): Promise<PayrollActio
 }
 
 export async function archivePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
-  const res = await archivePayroll(companyId, payrollId, null);
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await archivePayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -209,10 +214,11 @@ export async function archivePayrollAction(payrollId: string): Promise<PayrollAc
 }
 
 export async function generatePayrollAtkExportAction(payrollId: string): Promise<PayrollActionResult<{ exportId: string }>> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
-  const res = await generatePayrollAtkExport({ companyId, payrollId, actorUserId: null });
+  const res = await generatePayrollAtkExport({ companyId, payrollId, actorUserId: user.id });
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -220,8 +226,9 @@ export async function generatePayrollAtkExportAction(payrollId: string): Promise
 }
 
 export async function archivePayrollAtkExportAction(exportId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const row = await prisma.payrollATKExport.findFirst({
     where: { id: exportId, companyId },
@@ -229,7 +236,7 @@ export async function archivePayrollAtkExportAction(exportId: string): Promise<P
   });
   if (!row) return { ok: false, error: "Eksporti nuk u gjet." };
 
-  const res = await archivePayrollAtkExport({ companyId, exportId, actorUserId: null });
+  const res = await archivePayrollAtkExport({ companyId, exportId, actorUserId: user.id });
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${row.payrollId}`);
@@ -237,8 +244,9 @@ export async function archivePayrollAtkExportAction(exportId: string): Promise<P
 }
 
 export async function generatePayrollPdfsAction(payrollId: string): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
 
   const payroll = await prisma.payroll.findFirst({
     where: { id: payrollId, companyId },
@@ -252,7 +260,7 @@ export async function generatePayrollPdfsAction(payrollId: string): Promise<Payr
     };
   }
 
-  const res = await generatePayrollPdfArtifacts({ companyId, payrollId, actorUserId: null });
+  const res = await generatePayrollPdfArtifacts({ companyId, payrollId, actorUserId: user.id });
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
@@ -260,8 +268,9 @@ export async function generatePayrollPdfsAction(payrollId: string): Promise<Payr
 }
 
 export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
   const parsed = payrollEntryPatchSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -272,15 +281,16 @@ export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollAct
   }
   const { payrollId, entryId, ...patch } = parsed.data;
   void payrollId;
-  const res = await updatePayrollEntryAmounts(companyId, entryId, patch, null);
+  const res = await updatePayrollEntryAmounts(companyId, entryId, patch, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${parsed.data.payrollId}`);
   return { ok: true };
 }
 
 export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<PayrollActionResult> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
   const parsed = payrollBulkPatchSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -293,15 +303,16 @@ export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<Payro
     const { entryId, ...rest } = r;
     return { entryId, patch: rest };
   });
-  const res = await patchPayrollEntriesBulk(companyId, parsed.data.payrollId, rows, null);
+  const res = await patchPayrollEntriesBulk(companyId, parsed.data.payrollId, rows, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${parsed.data.payrollId}`);
   return { ok: true };
 }
 
 export async function createPayrollCorrectionAction(raw: unknown): Promise<PayrollActionResult<{ id: string }>> {
-  const companyId = await companyIdOrFail();
-  if (!companyId) return { ok: false, error: "Nuk ka kompani aktive." };
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
   const parsed = payrollCorrectionCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -317,7 +328,7 @@ export async function createPayrollCorrectionAction(raw: unknown): Promise<Payro
     kind: parsed.data.kind as PayrollCorrectionKind,
     amount: parsed.data.amount,
     reason: parsed.data.reason,
-    actorUserId: null,
+    actorUserId: user.id,
   });
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${parsed.data.payrollId}`);

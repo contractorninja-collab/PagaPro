@@ -40,8 +40,18 @@ export type PushimetBalanceRowDto = {
   usedDays: string;
   pendingDays: string;
   remainingDays: string;
+  /** Projected available balance by year-end (carry + accrual-to-year-end − used). Annual only. */
+  projectedYearEndDays: string | null;
+  /** ISO date when carried-in days expire (June 30), if any carry is active. */
+  carryExpiresIso: string | null;
+  /** Entitlement breakdown for annual leave: base + tenure + special/hazardous. */
+  entitlementBreakdown: { base: number; tenure: number; special: number } | null;
 };
 
-export type PushimetEmployeeOptionDto = { id: string; label: string };
+export type PushimetEmployeeOptionDto = {
+  id: string;
+  label: string;
+  eligibleYears: number[];
+};
 export type PushimetDepartmentOptionDto = { id: string; name: string };
 export type PushimetTemplateOptionDto = { id: string; name: string };

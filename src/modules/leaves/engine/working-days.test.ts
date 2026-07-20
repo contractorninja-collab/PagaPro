@@ -19,6 +19,17 @@ describe("working-days engine", () => {
     expect(r.weekdayHolidayDatesInRange).toContain("2025-01-08");
   });
 
+  it("can count weekday holidays while still listing them for audit", () => {
+    const start = new Date(Date.UTC(2025, 0, 6, 12, 0, 0, 0));
+    const end = new Date(Date.UTC(2025, 0, 10, 12, 0, 0, 0));
+    const r = computeWorkingDaysInRange(start, end, new Set(["2025-01-08"]), 8, {
+      excludeWeekdayHolidays: false,
+    });
+    expect(r.workingDays).toBe(5);
+    expect(r.totalHours).toBe("40.00");
+    expect(r.weekdayHolidayDatesInRange).toEqual(["2025-01-08"]);
+  });
+
   it("counts inclusive calendar days", () => {
     const s = new Date(Date.UTC(2025, 3, 1, 0, 0, 0, 0));
     const e = new Date(Date.UTC(2025, 3, 3, 0, 0, 0, 0));

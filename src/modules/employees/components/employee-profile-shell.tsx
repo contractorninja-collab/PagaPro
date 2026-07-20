@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { DocumentCategory } from "@prisma/client";
+import type { DocumentCategory, EmploymentStatus } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { getEmployeeDetailAction } from "@/modules/employees/actions/employee-actions";
-import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto } from "@/modules/employees/types";
+import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employees/actions/employee-actions";
+import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto, SalaryChangeDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import {
+  EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   formatEur,
   formatSqDate,
@@ -58,17 +59,102 @@ export interface EmployeeProfileDocumentsBundle {
   contracts: EmployeeContractSummary[];
 }
 
+/* ---------------------------------- 1b design primitives (local) ---------------------------------- */
+
+const TH =
+  "h-9 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const TD = "px-4 py-2.5 align-middle text-[13px] text-[#334155]";
+
+const TAB_TRIGGER =
+  "rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-[#64748b] transition-colors hover:text-[#0f172a] data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-[#0f172a] data-[state=active]:shadow-[0_1px_3px_rgba(15,23,42,0.08)]";
+
+/** Kartë e stilit "1b": bardhë, kufi #e2e8f0, radius 12px, hije e sheshtë. */
+function SectionCard({
+  title,
+  description,
+  action,
+  flush = false,
+  className,
+  children,
+}: {
+  title?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  /** Pa padding të brendshëm — për tabela që shtrihen deri në skaj. */
+  flush?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]",
+        className,
+      )}
+    >
+      {title || action ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-3.5">
+          <div className="min-w-0">
+            <h3 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[#0f172a]">{title}</h3>
+            {description ? <p className="mt-0.5 text-[12px] text-[#64748b]">{description}</p> : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
+      ) : null}
+      <div className={flush ? undefined : "px-5 py-4"}>{children}</div>
+    </section>
+  );
+}
+
 function EmptyTab({ title, body }: { title: string; body: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>{body}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">Nuk ka të dhëna për momentin.</p>
-      </CardContent>
-    </Card>
+    <SectionCard title={title} description={body}>
+      <p className="text-[13px] text-[#64748b]">Nuk ka të dhëna për momentin.</p>
+    </SectionCard>
+  );
+}
+
+function RehireControl({
+  employeeId,
+  onDone,
+}: {
+  employeeId: string;
+  onDone: () => void | Promise<void>;
+}) {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!date) {
+      toast.error("Zgjidhni datën e rikthimit.");
+      return;
+    }
+    setBusy(true);
+    const r = await rehireEmployeeAction({ employeeId, rehireDate: date });
+    setBusy(false);
+    if (!r.ok) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success("Punonjësi u rikthye në punë.");
+    await onDone();
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Data e rikthimit</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <Button type="button" disabled={busy} onClick={() => void submit()}>
+        Rikthe në punë
+      </Button>
+    </div>
   );
 }
 
@@ -82,95 +168,136 @@ function Row({
   className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className={cn("text-foreground", className)}>{value}</span>
+    <div className="flex flex-col gap-0.5 border-b border-[#f1f5f9] pb-2.5 last:border-0 last:pb-0">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">{label}</span>
+      <span className={cn("text-[13.5px] text-[#111827]", className)}>{value}</span>
     </div>
+  );
+}
+
+/* ------------------------------------------ Tab bodies ------------------------------------------ */
+
+function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
+  return (
+    <SectionCard
+      title="Historiku i pagave"
+      description="Ndryshimet e pagës bazë me datë efektive (rritje / rregullime)."
+      flush={rows.length > 0}
+    >
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-[#64748b]">Nuk ka ndryshime të regjistruara të pagës.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px]">
+            <thead>
+              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <th className={TH}>Data efektive</th>
+                <th className={cn(TH, "text-right")}>Nga</th>
+                <th className={cn(TH, "text-right")}>Në</th>
+                <th className={TH}>Arsyeja</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]">
+                  <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.effectiveFromIso)}</td>
+                  <td className={cn(TD, "text-right tabular-nums text-[#64748b]")}>
+                    {r.previousBaseSalary ? formatEur(r.previousBaseSalary) : "—"}
+                  </td>
+                  <td className={cn(TD, "text-right font-semibold tabular-nums text-[#0f172a]")}>
+                    {formatEur(r.newBaseSalary)}
+                  </td>
+                  <td className={cn(TD, "text-[#64748b]")}>{r.reason ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
 function SummaryTab({ e }: { e: EmployeeDetailDto }) {
   const ec = e.emergencyContact;
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Personale</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <Row label="Emri" value={`${e.firstName} ${e.lastName}`} />
-          <Row label="Numri personal" value={e.personalId} />
-          <Row label="Data e lindjes" value={formatSqDate(e.dateOfBirth)} />
-          <Row label="Gjinia" value={e.gender ? GENDER_LABELS[e.gender] : "—"} />
-          <Row label="Telefoni" value={e.phone ?? "—"} />
-          <Row label="Email" value={e.email ?? "—"} />
-          <Row label="Adresa" value={e.addressLine ?? "—"} />
-          <Row label="Qyteti" value={e.addressCity ?? "—"} />
-        </CardContent>
-      </Card>
+    <div className="grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+      {/* Left rail */}
+      <div className="grid gap-4">
+        <SectionCard title="Pagat & banka">
+          <div className="mb-4 rounded-[10px] bg-[#f8fafc] px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto mujore</p>
+            <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+              {formatEur(e.baseSalaryMonthly)}
+            </p>
+          </div>
+          <div className="grid gap-2.5">
+            <Row label="Orët javore" value={e.weeklyHours} className="tabular-nums" />
+            <Row label="Banka" value={e.bankName ?? "—"} />
+            <Row label="Numri i llogarisë" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
+            <Row label="Apliko Trustin" value={e.applyTrust ? "Po" : "Jo"} />
+            <Row label="Apliko tatimin" value={e.applyTax ? "Po" : "Jo"} />
+          </div>
+        </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Punësimi</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <Row
-            label="Statusi"
-            value={<EmployeeStatusBadge status={e.status} employmentType={e.employmentType} />}
-          />
-          <Row label="Lloji" value={<EmployeeTypeBadge employmentType={e.employmentType} />} />
-          <Row label="Lloji i punës" value={WORK_ARRANGEMENT_LABELS[e.workArrangement]} />
-          <Row label="Pozita" value={e.jobTitle ?? "—"} />
-          <Row
-            label="Përshkrimi i punës"
-            value={e.jobDescription ?? "—"}
-            className="whitespace-pre-wrap leading-relaxed"
-          />
-          <Row label="Departamenti" value={e.departmentName ?? "—"} />
-          <Row
-            label="Muaj pune praktike"
-            value={e.probationMonths && e.probationMonths > 0 ? `${e.probationMonths}` : "—"}
-          />
-          <Row label="Data e punësimit" value={formatSqDate(e.hireDate)} />
-          <Row label="Data e largimit" value={formatSqDate(e.terminationDate)} />
-          <Row label="Arsyeja e largimit" value={e.terminationReason ?? "—"} />
-        </CardContent>
-      </Card>
+        <SectionCard title="Kontakti emergjent">
+          <div className="grid gap-2.5">
+            <Row label="Emri" value={ec?.fullName ?? "—"} />
+            <Row label="Telefoni" value={ec?.phone ?? "—"} />
+            <Row label="Raporti" value={ec?.relationship ?? "—"} />
+          </div>
+        </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Pagat & banka</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <Row label="Paga bruto" value={formatEur(e.baseSalaryMonthly)} />
-          <Row label="Orët javore" value={e.weeklyHours} />
-          <Row label="Banka" value={e.bankName ?? "—"} />
-          <Row label="IBAN" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
-          <Row label="Apliko Trustin" value={e.applyTrust ? "Po" : "Jo"} />
-          <Row label="Apliko tatimin" value={e.applyTax ? "Po" : "Jo"} />
-        </CardContent>
-      </Card>
+        <SectionCard title="Shtesë">
+          <div className="grid gap-2.5">
+            <Row label="Shënime të brendshme" value={e.internalNotes ?? "—"} />
+            <Row label="Dokumente mungojnë" value={e.documentsMissing ? "Po" : "Jo"} />
+          </div>
+        </SectionCard>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Kontakti emergjent</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <Row label="Emri" value={ec?.fullName ?? "—"} />
-          <Row label="Telefoni" value={ec?.phone ?? "—"} />
-          <Row label="Raporti" value={ec?.relationship ?? "—"} />
-        </CardContent>
-      </Card>
+      {/* Right column */}
+      <div className="grid gap-4">
+        <SectionCard title="Personale">
+          <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-x-8">
+            <Row label="Emri" value={`${e.firstName} ${e.lastName}`} />
+            <Row label="Numri personal" value={e.personalId} className="tabular-nums" />
+            <Row label="Data e lindjes" value={formatSqDate(e.dateOfBirth)} className="tabular-nums" />
+            <Row label="Gjinia" value={e.gender ? GENDER_LABELS[e.gender] : "—"} />
+            <Row label="Telefoni" value={e.phone ?? "—"} className="tabular-nums" />
+            <Row label="Email" value={e.email ?? "—"} />
+            <Row label="Adresa" value={e.addressLine ?? "—"} />
+            <Row label="Qyteti" value={e.addressCity ?? "—"} />
+          </div>
+        </SectionCard>
 
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-base">Shtesë</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <Row label="Shënime të brendshme" value={e.internalNotes ?? "—"} />
-          <Row label="Dokumente mungojnë" value={e.documentsMissing ? "Po" : "Jo"} />
-        </CardContent>
-      </Card>
+        <SectionCard title="Punësimi">
+          <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-x-8">
+            <Row
+              label="Statusi"
+              value={<EmployeeStatusBadge status={e.status} employmentType={e.employmentType} />}
+            />
+            <Row label="Lloji" value={<EmployeeTypeBadge employmentType={e.employmentType} />} />
+            <Row label="Lloji i punës" value={WORK_ARRANGEMENT_LABELS[e.workArrangement]} />
+            <Row label="Pozita" value={e.jobTitle ?? "—"} />
+            <Row label="Departamenti" value={e.departmentName ?? "—"} />
+            <Row
+              label="Muaj pune praktike"
+              value={e.probationMonths && e.probationMonths > 0 ? `${e.probationMonths}` : "—"}
+            />
+            <Row label="Data e punësimit" value={formatSqDate(e.hireDate)} className="tabular-nums" />
+            <Row label="Data e largimit" value={formatSqDate(e.terminationDate)} className="tabular-nums" />
+            <Row label="Arsyeja e largimit" value={e.terminationReason ?? "—"} />
+            <Row
+              label="Përshkrimi i punës"
+              value={e.jobDescription ?? "—"}
+              className="whitespace-pre-wrap leading-relaxed"
+            />
+          </div>
+        </SectionCard>
+
+        <SalaryHistoryCard rows={e.salaryHistory} />
+      </div>
     </div>
   );
 }
@@ -178,45 +305,35 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
 function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
   if (rows.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Kontratat</CardTitle>
-          <CardDescription>Regjistrimi i kontratave në sistem.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Nuk ka kontrata të regjistruara.</p>
-        </CardContent>
-      </Card>
+      <SectionCard title="Kontratat" description="Regjistrimi i kontratave në sistem.">
+        <p className="text-[13px] text-[#64748b]">Nuk ka kontrata të regjistruara.</p>
+      </SectionCard>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Kontratat</CardTitle>
-        <CardDescription>Kronologjikisht sipas datës së efektshme.</CardDescription>
-      </CardHeader>
-      <CardContent className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Referenca</TableHead>
-              <TableHead>Statusi</TableHead>
-              <TableHead>Efektive nga</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+    <SectionCard title="Kontratat" description="Kronologjikisht sipas datës së efektshme." flush>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px]">
+          <thead>
+            <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+              <th className={TH}>Referenca</th>
+              <th className={TH}>Statusi</th>
+              <th className={TH}>Efektive nga</th>
+            </tr>
+          </thead>
+          <tbody>
             {rows.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-mono text-xs">{c.referenceCode ?? c.id.slice(0, 10)}</TableCell>
-                <TableCell className="text-sm">{c.status}</TableCell>
-                <TableCell className="text-sm">{formatSqDate(c.effectiveDateIso)}</TableCell>
-              </TableRow>
+              <tr key={c.id} className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]">
+                <td className={cn(TD, "font-mono text-xs")}>{c.referenceCode ?? c.id.slice(0, 10)}</td>
+                <td className={TD}>{c.status}</td>
+                <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(c.effectiveDateIso)}</td>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -248,26 +365,21 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
 
   if (merged.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-base">Dokumentet</CardTitle>
-              <CardDescription>Dokumentet e gjeneruara nga moduli Dokumentet dhe PDF nga payroll-i.</CardDescription>
-            </div>
-            {bundle.employeeId ? (
-              <Button size="sm" asChild>
-                <Link href={`/dokumentet/generate?category=CONTRACT&employeeId=${bundle.employeeId}`}>
-                  Gjenero dokument
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Nuk ka dokumente për këtë punonjës.</p>
-        </CardContent>
-      </Card>
+      <SectionCard
+        title="Dokumentet"
+        description="Dokumentet e gjeneruara nga moduli Dokumentet dhe PDF nga payroll-i."
+        action={
+          bundle.employeeId ? (
+            <Button size="sm" asChild>
+              <Link href={`/dokumentet/generate?category=CONTRACT&employeeId=${bundle.employeeId}`}>
+                Gjenero dokument
+              </Link>
+            </Button>
+          ) : null
+        }
+      >
+        <p className="text-[13px] text-[#64748b]">Nuk ka dokumente për këtë punonjës.</p>
+      </SectionCard>
     );
   }
 
@@ -283,37 +395,41 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
         </div>
       ) : null}
       {[...byCategory.entries()].map(([cat, docs]) => (
-        <Card key={cat}>
-          <CardHeader>
-            <CardTitle className="text-base">{DOCUMENT_CATEGORY_LABELS[cat]}</CardTitle>
-            <CardDescription>{docs.length} dokument(e)</CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Titulli</TableHead>
-                  <TableHead>Shablloni</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="text-right">Shkarko</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <SectionCard key={cat} title={DOCUMENT_CATEGORY_LABELS[cat]} description={`${docs.length} dokument(e)`} flush>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px]">
+              <thead>
+                <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                  <th className={TH}>Titulli</th>
+                  <th className={TH}>Shablloni</th>
+                  <th className={TH}>Data</th>
+                  <th className={cn(TH, "text-right")}>Shkarko</th>
+                </tr>
+              </thead>
+              <tbody>
                 {docs.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell>
-                      <Link href={`/dokumentet/${doc.id}`} className="font-medium hover:underline">
+                  <tr
+                    key={doc.id}
+                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className={TD}>
+                      <Link
+                        href={`/dokumentet/${doc.id}`}
+                        className="font-semibold text-[#0f172a] hover:text-brand-blue"
+                      >
                         {doc.title}
                       </Link>
                       {doc.isArchived ? (
-                        <span className="ml-2 text-[10px] uppercase text-muted-foreground">Arkiv</span>
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">
+                          Arkiv
+                        </span>
                       ) : null}
-                    </TableCell>
-                    <TableCell className="text-sm">
+                    </td>
+                    <td className={TD}>
                       {doc.templateName} v{doc.templateVersionNumber}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{doc.createdAtLabel}</TableCell>
-                    <TableCell className="text-right space-x-2">
+                    </td>
+                    <td className={cn(TD, "whitespace-nowrap tabular-nums text-[#64748b]")}>{doc.createdAtLabel}</td>
+                    <td className={cn(TD, "space-x-2 text-right")}>
                       <Button variant="secondary" size="sm" asChild>
                         <a href={`/api/dokumentet/artifacts/${doc.id}/docx`}>DOCX</a>
                       </Button>
@@ -322,31 +438,31 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                           <a href={`/api/dokumentet/artifacts/${doc.id}/pdf`}>PDF</a>
                         </Button>
                       ) : null}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
       ))}
 
-      <div className="md:hidden space-y-3">
+      <div className="space-y-3 md:hidden">
         {merged.map((item, idx) =>
           item.k === "artifact" ? (
             <Link
               key={`${item.a.id}-${idx}`}
               href={`/dokumentet/${item.a.id}`}
-              className="block rounded-lg border border-border bg-card p-4"
+              className="block rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
             >
-              <p className="font-medium">{item.a.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-[13.5px] font-semibold text-[#0f172a]">{item.a.title}</p>
+              <p className="mt-1 text-xs text-[#64748b]">
                 {DOCUMENT_CATEGORY_LABELS[item.a.documentCategory]} ·{" "}
                 {item.a.kind === "PREVIEW" ? "Parapamje" : "Final"}
                 {item.a.isArchived ? " · Arkiv" : ""}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{item.a.templateName}</p>
-              <p className="mt-2 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-xs text-[#64748b]">{item.a.templateName}</p>
+              <p className="mt-2 text-[11px] tabular-nums text-[#94a3b8]">
                 {new Date(item.a.createdAtIso).toLocaleString("sq-AL")}
               </p>
             </Link>
@@ -354,12 +470,12 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
             <a
               key={`${item.p.id}-${idx}`}
               href={`/api/payroll-documents/${item.p.id}`}
-              className="block rounded-lg border border-border bg-card p-4"
+              className="block rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
             >
-              <p className="font-medium">PDF pagë</p>
-              <p className="mt-1 text-xs text-muted-foreground">{item.p.periodLabel}</p>
-              <p className="mt-1 text-xs font-mono">{item.p.filename}</p>
-              <p className="mt-2 text-[11px] text-muted-foreground">
+              <p className="text-[13.5px] font-semibold text-[#0f172a]">PDF pagë</p>
+              <p className="mt-1 text-xs text-[#64748b]">{item.p.periodLabel}</p>
+              <p className="mt-1 font-mono text-xs text-[#334155]">{item.p.filename}</p>
+              <p className="mt-2 text-[11px] tabular-nums text-[#94a3b8]">
                 {new Date(item.p.generatedAtIso).toLocaleString("sq-AL")}
               </p>
             </a>
@@ -367,70 +483,85 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
         )}
       </div>
 
-      <Card className="hidden md:block">
-        <CardHeader>
-          <CardTitle className="text-base">Historia dokumenteve</CardTitle>
-          <CardDescription>Bashkim kronologjik: Dokumentet + fletëpagesat nga payroll-i.</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Burimi</TableHead>
-                <TableHead>Përshkrimi</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead className="text-right">Veprim</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      <SectionCard
+        className="hidden md:block"
+        title="Historia dokumenteve"
+        description="Bashkim kronologjik: Dokumentet + fletëpagesat nga payroll-i."
+        flush
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px]">
+            <thead>
+              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <th className={TH}>Burimi</th>
+                <th className={TH}>Përshkrimi</th>
+                <th className={TH}>Data</th>
+                <th className={cn(TH, "text-right")}>Veprim</th>
+              </tr>
+            </thead>
+            <tbody>
               {merged.map((item, idx) =>
                 item.k === "artifact" ? (
-                  <TableRow key={`${item.a.id}-${idx}`}>
-                    <TableCell className="text-sm">Dokumentet</TableCell>
-                    <TableCell>
+                  <tr
+                    key={`${item.a.id}-${idx}`}
+                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className={TD}>Dokumentet</td>
+                    <td className={TD}>
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">{item.a.title}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="font-semibold text-[#0f172a]">{item.a.title}</span>
+                        <span className="text-xs text-[#64748b]">
                           {DOCUMENT_CATEGORY_LABELS[item.a.documentCategory]} · {item.a.templateName}
                         </span>
                       </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    </td>
+                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-[#64748b]")}>
                       {new Date(item.a.createdAtIso).toLocaleString("sq-AL")}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </td>
+                    <td className={cn(TD, "text-right")}>
                       <Button variant="secondary" size="sm" asChild>
                         <Link href={`/dokumentet/${item.a.id}`}>Hap</Link>
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ) : (
-                  <TableRow key={`${item.p.id}-${idx}`}>
-                    <TableCell className="text-sm">Payroll PDF</TableCell>
-                    <TableCell>
+                  <tr
+                    key={`${item.p.id}-${idx}`}
+                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className={TD}>Payroll PDF</td>
+                    <td className={TD}>
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">{item.p.periodLabel}</span>
-                        <span className="text-xs font-mono text-muted-foreground">{item.p.filename}</span>
+                        <span className="font-semibold text-[#0f172a]">{item.p.periodLabel}</span>
+                        <span className="font-mono text-xs text-[#64748b]">{item.p.filename}</span>
                       </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    </td>
+                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-[#64748b]")}>
                       {new Date(item.p.generatedAtIso).toLocaleString("sq-AL")}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </td>
+                    <td className={cn(TD, "text-right")}>
                       <Button variant="secondary" size="sm" asChild>
                         <a href={`/api/payroll-documents/${item.p.id}`}>Shkarko</a>
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ),
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
     </div>
   );
 }
+
+const STATUS_TONE: Record<EmploymentStatus, "success" | "warning" | "destructive" | "neutral"> = {
+  ACTIVE: "success",
+  ON_LEAVE: "warning",
+  SUSPENDED: "warning",
+  TERMINATED: "destructive",
+  INACTIVE: "neutral",
+};
 
 export function EmployeeProfileShell(props: {
   employee: EmployeeDetailDto;
@@ -477,101 +608,130 @@ export function EmployeeProfileShell(props: {
   };
   bundle.employeeId ??= employee.id;
 
+  const statusTone = STATUS_TONE[employee.status] ?? "neutral";
+
+  const metaLine = [
+    employee.jobTitle,
+    employee.departmentName,
+    `Punësuar ${formatSqDate(employee.hireDate)}`,
+    `Nr. personal ${employee.personalId}`,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
+
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-3">
-          <Button variant="ghost" size="sm" className="-ml-2 h-8 px-2 text-muted-foreground" asChild>
-            <Link href="/punonjesit">
-              <ArrowLeft className="mr-1 h-4 w-4" aria-hidden />
-              Kthehu te lista
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {employee.firstName} {employee.lastName}
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <EmployeeStatusBadge status={employee.status} employmentType={employee.employmentType} />
-              <span className="text-sm text-muted-foreground">{EMPLOYMENT_TYPE_LABELS[employee.employmentType]}</span>
-            </div>
-          </div>
-        </div>
-        {canEdit ? (
-          <Button type="button" onClick={() => setSheetOpen(true)}>
-            Ndrysho profilin
-          </Button>
-        ) : (
-          <p className="text-sm text-muted-foreground">Profili është i mbyllur (i larguar).</p>
-        )}
-      </div>
-
-      {employee.documentsMissing ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 border-l-4 border-l-amber-500 bg-amber-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold text-foreground">Dokumentacion i paplotë</p>
-              <p className="text-xs text-muted-foreground">
-                Ky punonjës është shënuar me dokumentacion të paplotë. Përditësoni statusin ose ngarkoni dokumentet
-                e nevojshme.
-              </p>
-            </div>
-          </div>
-          {canEdit ? (
-            <Button type="button" variant="outlinePrimary" size="sm" className="shrink-0" onClick={() => setSheetOpen(true)}>
-              Rregullo dokumentacionin
+    <>
+      <AppSubBar
+        dense
+        backHref="/punonjesit"
+        backLabel="Punonjësit"
+        title={`${employee.firstName} ${employee.lastName}`}
+        status={
+          <>
+            <SubBarStatus tone={statusTone}>{EMPLOYMENT_STATUS_LABELS[employee.status]}</SubBarStatus>
+            <SubBarStatus tone="neutral">{EMPLOYMENT_TYPE_LABELS[employee.employmentType]}</SubBarStatus>
+          </>
+        }
+        description={canEdit ? metaLine : `${metaLine} — Profili është i mbyllur (i larguar).`}
+        actions={
+          canEdit ? (
+            <Button type="button" onClick={() => setSheetOpen(true)}>
+              Ndrysho profilin
             </Button>
-          ) : null}
-        </div>
-      ) : null}
+          ) : (
+            <RehireControl employeeId={employee.id} onDone={reload} />
+          )
+        }
+      />
 
-      <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger value="summary">Përmbledhje</TabsTrigger>
-          <TabsTrigger value="payroll">Pagat</TabsTrigger>
-          <TabsTrigger value="contracts">Kontratat</TabsTrigger>
-          <TabsTrigger value="documents">Dokumentet</TabsTrigger>
-          <TabsTrigger value="leave">Pushimet</TabsTrigger>
-          <TabsTrigger value="warnings">Vërejtjet</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-        </TabsList>
+      <div className="space-y-5 pb-24 md:pb-8">
+        {employee.documentsMissing ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3.5 shadow-[inset_3px_0_0_#d97706] sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" aria-hidden />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-semibold text-[#0f172a]">Dokumentacion i paplotë</p>
+                <p className="text-xs text-[#64748b]">
+                  Ky punonjës është shënuar me dokumentacion të paplotë. Përditësoni statusin ose ngarkoni dokumentet
+                  e nevojshme.
+                </p>
+              </div>
+            </div>
+            {canEdit ? (
+              <Button
+                type="button"
+                variant="outlinePrimary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setSheetOpen(true)}
+              >
+                Rregullo dokumentacionin
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
-        <TabsContent value="summary" className="mt-6">
-          <SummaryTab e={employee} />
-        </TabsContent>
-        <TabsContent value="payroll" className="mt-6">
-          <EmptyTab title="Pagat" body="Historiku i pagave do të lidhet me motorin e payroll-it." />
-        </TabsContent>
-        <TabsContent value="contracts" className="mt-6">
-          <ContractsTab rows={bundle.contracts} />
-        </TabsContent>
-        <TabsContent value="documents" className="mt-6">
-          <DocumentsCenterTab {...bundle} />
-        </TabsContent>
-        <TabsContent value="leave" className="mt-6">
-          <EmptyTab title="Pushimet" body="Kërkesat dhe bilanci i lejeve." />
-        </TabsContent>
-        <TabsContent value="warnings" className="mt-6">
-          <EmptyTab title="Vërejtjet" body="Disiplina dhe vërejtjet formale." />
-        </TabsContent>
-        <TabsContent value="timeline" className="mt-6">
-          <EmptyTab title="Timeline" body="Ngjarjet operative dhe auditimi." />
-        </TabsContent>
-      </Tabs>
+        <Tabs defaultValue="summary" className="w-full">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-[10px] border-[#e2e8f0] bg-[#eef2f7] p-1">
+            <TabsTrigger className={TAB_TRIGGER} value="summary">
+              Përmbledhje
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="payroll">
+              Pagat
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="contracts">
+              Kontratat
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="documents">
+              Dokumentet
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="leave">
+              Pushimet
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="warnings">
+              Vërejtjet
+            </TabsTrigger>
+            <TabsTrigger className={TAB_TRIGGER} value="timeline">
+              Timeline
+            </TabsTrigger>
+          </TabsList>
 
-      {canEdit ? (
-        <EmployeeFormSheet
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          mode="edit"
-          employeeId={employee.id}
-          initialDetail={employee}
-          departments={departments}
-          jobTitles={jobTitles}
-          onSuccess={() => void reload()}
-        />
-      ) : null}
-    </div>
+          <TabsContent value="summary" className="mt-5">
+            <SummaryTab e={employee} />
+          </TabsContent>
+          <TabsContent value="payroll" className="mt-5">
+            <SalaryHistoryCard rows={employee.salaryHistory} />
+          </TabsContent>
+          <TabsContent value="contracts" className="mt-5">
+            <ContractsTab rows={bundle.contracts} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-5">
+            <DocumentsCenterTab {...bundle} />
+          </TabsContent>
+          <TabsContent value="leave" className="mt-5">
+            <EmptyTab title="Pushimet" body="Kërkesat dhe bilanci i lejeve." />
+          </TabsContent>
+          <TabsContent value="warnings" className="mt-5">
+            <EmptyTab title="Vërejtjet" body="Disiplina dhe vërejtjet formale." />
+          </TabsContent>
+          <TabsContent value="timeline" className="mt-5">
+            <EmptyTab title="Timeline" body="Ngjarjet operative dhe auditimi." />
+          </TabsContent>
+        </Tabs>
+
+        {canEdit ? (
+          <EmployeeFormSheet
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            mode="edit"
+            employeeId={employee.id}
+            initialDetail={employee}
+            departments={departments}
+            jobTitles={jobTitles}
+            onSuccess={() => void reload()}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }

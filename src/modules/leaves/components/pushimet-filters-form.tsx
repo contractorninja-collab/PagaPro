@@ -1,5 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { LeaveRequestStatus, LeaveType } from "@prisma/client";
+import { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
+import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
+import {
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  FIELD_CONTROL,
+  LEAVE_CARD,
+  MICRO_LABEL,
+} from "@/modules/leaves/components/leave-ui";
 import type { PushimetDepartmentOptionDto, PushimetEmployeeOptionDto } from "@/modules/leaves/types/pushimet";
 
 const LEAVE_TYPES: LeaveType[] = [
@@ -12,15 +24,6 @@ const LEAVE_TYPES: LeaveType[] = [
 ];
 
 const STATUSES: LeaveRequestStatus[] = ["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELLED"];
-
-const TYPE_LABELS: Record<LeaveType, string> = {
-  PUSHIM_VJETOR: "Pushim vjetor",
-  PUSHIM_MJEKESOR: "Pushim mjekësor",
-  PUSHIM_PERSONAL: "Pushim personal",
-  PUSHIM_PA_PAGESE: "Pa pagesë",
-  PUSHIM_LEHONIE: "Pushim lehonie",
-  TJETER: "Tjetër",
-};
 
 export type PushimetFilterDefaults = {
   employeeId: string;
@@ -37,22 +40,47 @@ export function PushimetFiltersForm(props: {
   defaults: PushimetFilterDefaults;
 }) {
   const { employees, departments, defaults } = props;
+  const [employeeId, setEmployeeId] = useState(defaults.employeeId);
+
+  const yearsForEmployee = (id: string): number[] => {
+    if (id) return employees.find((employee) => employee.id === id)?.eligibleYears ?? [];
+    return [...new Set(employees.flatMap((employee) => employee.eligibleYears))].sort(
+      (a, b) => b - a,
+    );
+  };
+
+  const initialYears = yearsForEmployee(defaults.employeeId);
+  const [year, setYear] = useState(() =>
+    initialYears.includes(Number(defaults.year))
+      ? defaults.year
+      : String(initialYears[0] ?? defaults.year),
+  );
+  const eligibleYears = yearsForEmployee(employeeId);
+
+  function changeEmployee(nextEmployeeId: string) {
+    const nextYears = yearsForEmployee(nextEmployeeId);
+    setEmployeeId(nextEmployeeId);
+    if (!nextYears.includes(Number(year))) {
+      setYear(nextYears[0] != null ? String(nextYears[0]) : "");
+    }
+  }
 
   return (
     <form
       action="/pushimet"
       method="get"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm md:flex-row md:flex-wrap md:items-end"
+      className={`flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end ${LEAVE_CARD}`}
     >
-      <div className="flex min-w-[200px] flex-1 flex-col gap-1">
-        <label htmlFor="pf-emp" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+        <label htmlFor="pf-emp" className={MICRO_LABEL}>
           Punonjësi
         </label>
         <select
           id="pf-emp"
           name="employeeId"
-          defaultValue={defaults.employeeId}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          value={employeeId}
+          onChange={(event) => changeEmployee(event.target.value)}
+          className={FIELD_CONTROL}
         >
           <option value="">Të gjithë</option>
           {employees.map((e) => (
@@ -62,16 +90,11 @@ export function PushimetFiltersForm(props: {
           ))}
         </select>
       </div>
-      <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-        <label htmlFor="pf-dept" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[180px] flex-1 flex-col gap-1.5">
+        <label htmlFor="pf-dept" className={MICRO_LABEL}>
           Departamenti
         </label>
-        <select
-          id="pf-dept"
-          name="departmentId"
-          defaultValue={defaults.departmentId}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <select id="pf-dept" name="departmentId" defaultValue={defaults.departmentId} className={FIELD_CONTROL}>
           <option value="">Të gjithë</option>
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
@@ -80,66 +103,57 @@ export function PushimetFiltersForm(props: {
           ))}
         </select>
       </div>
-      <div className="flex min-w-[160px] flex-col gap-1">
-        <label htmlFor="pf-type" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[160px] flex-col gap-1.5">
+        <label htmlFor="pf-type" className={MICRO_LABEL}>
           Lloji i pushimit
         </label>
-        <select
-          id="pf-type"
-          name="type"
-          defaultValue={defaults.type}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <select id="pf-type" name="type" defaultValue={defaults.type} className={FIELD_CONTROL}>
           <option value="">Të gjitha</option>
           {LEAVE_TYPES.map((t) => (
             <option key={t} value={t}>
-              {TYPE_LABELS[t]}
+              {LEAVE_TYPE_LABELS_SQ[t]}
             </option>
           ))}
         </select>
       </div>
-      <div className="flex min-w-[140px] flex-col gap-1">
-        <label htmlFor="pf-status" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[140px] flex-col gap-1.5">
+        <label htmlFor="pf-status" className={MICRO_LABEL}>
           Statusi
         </label>
-        <select
-          id="pf-status"
-          name="status"
-          defaultValue={defaults.status}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <select id="pf-status" name="status" defaultValue={defaults.status} className={FIELD_CONTROL}>
           <option value="">Të gjitha</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {LEAVE_STATUS_LABELS_SQ[s]}
             </option>
           ))}
         </select>
       </div>
-      <div className="flex min-w-[100px] flex-col gap-1">
-        <label htmlFor="pf-year" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[100px] flex-col gap-1.5">
+        <label htmlFor="pf-year" className={MICRO_LABEL}>
           Viti
         </label>
-        <input
+        <select
           id="pf-year"
           name="year"
-          type="number"
-          min={2000}
-          max={2100}
-          defaultValue={defaults.year}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
+          value={year}
+          onChange={(event) => setYear(event.target.value)}
+          disabled={eligibleYears.length === 0}
+          className={`${FIELD_CONTROL} tabular-nums`}
+        >
+          {eligibleYears.length === 0 ? <option value="">Pa vite të pranueshme</option> : null}
+          {eligibleYears.map((eligibleYear) => (
+            <option key={eligibleYear} value={String(eligibleYear)}>
+              {eligibleYear}
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="flex min-w-[110px] flex-col gap-1">
-        <label htmlFor="pf-month" className="text-xs font-medium text-muted-foreground">
+      <div className="flex min-w-[110px] flex-col gap-1.5">
+        <label htmlFor="pf-month" className={MICRO_LABEL}>
           Muaji
         </label>
-        <select
-          id="pf-month"
-          name="month"
-          defaultValue={defaults.month}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <select id="pf-month" name="month" defaultValue={defaults.month} className={FIELD_CONTROL}>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
             <option key={m} value={String(m)}>
               {m}
@@ -147,17 +161,11 @@ export function PushimetFiltersForm(props: {
           ))}
         </select>
       </div>
-      <div className="flex gap-2 pb-0.5">
-        <button
-          type="submit"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-        >
+      <div className="flex gap-2">
+        <button type="submit" className={BTN_PRIMARY}>
           Filtro
         </button>
-        <Link
-          href="/pushimet"
-          className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted"
-        >
+        <Link href="/pushimet" className={BTN_SECONDARY}>
           Pastro
         </Link>
       </div>

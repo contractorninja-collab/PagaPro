@@ -450,7 +450,9 @@ export async function finalizeDocumentGeneration(
 
 
 
-  await params.prisma.documentGenerationArtifact.create({
+  try {
+
+    await params.prisma.documentGenerationArtifact.create({
 
     data: {
 
@@ -502,7 +504,19 @@ export async function finalizeDocumentGeneration(
 
     },
 
-  });
+    });
+
+  } catch (err) {
+
+    // Row insert failed after the blobs were written — reclaim the orphaned blobs.
+
+    await params.storage.delete(docxStorageKey).catch(() => {});
+
+    if (pdfStorageKey) await params.storage.delete(pdfStorageKey).catch(() => {});
+
+    throw err;
+
+  }
 
 
 

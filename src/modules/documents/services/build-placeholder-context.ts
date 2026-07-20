@@ -255,14 +255,31 @@ export async function buildMergedPlaceholderContext(
       if (!lr) throw new Error("Kërkesa e pushimit nuk u gjet.");
       const { employee } = lr;
       const empCore = coreFromEmployeeRow(employee, employee.id);
+      const balance = await prisma.leaveBalance.findUnique({
+        where: {
+          companyId_employeeId_leaveType_year: {
+            companyId: params.companyId,
+            employeeId: employee.id,
+            leaveType: lr.type,
+            year: lr.startDate.getUTCFullYear(),
+          },
+        },
+        select: { yearlyQuota: true, usedDays: true, remainingDays: true, carryOverDays: true },
+      });
       const leaveSlice = buildLeavePlaceholderMap(
         {
           startDate: lr.startDate,
           endDate: lr.endDate,
           type: lr.type,
+          subtype: lr.subtype,
           status: lr.status,
           reason: lr.reason,
+          workingDays: lr.workingDays,
+          totalDays: lr.totalDays,
+          decidedAt: lr.decidedAt,
+          isPaid: lr.isPaid,
         },
+        balance,
         locale,
       );
       return {
@@ -292,19 +309,23 @@ export async function buildMergedPlaceholderContext(
         },
         employee.id,
       );
-      const termSlice = buildTerminationPlaceholderMap(
-        {
-          terminationDate: term.terminationDate,
-          lastWorkingDay: term.lastWorkingDay,
-          type: term.type,
-          status: term.status,
-          noticeDays: term.noticeDays,
-          severanceAmount: term.severanceAmount,
-          reason: term.reason,
-          details: term.details,
-        },
-        locale,
-      );
+      const termSlice = {
+        ...buildTerminationPlaceholderMap(
+          {
+            terminationDate: term.terminationDate,
+            lastWorkingDay: term.lastWorkingDay,
+            noticeDate: term.noticeDate,
+            type: term.type,
+            status: term.status,
+            noticeDays: term.noticeDays,
+            severanceAmount: term.severanceAmount,
+            reason: term.reason,
+            details: term.details,
+          },
+          locale,
+        ),
+        employment_start_date: formatTemplateDate(employee.hireDate, locale),
+      };
       return {
         merged: mergeDocumentMetadata(empCore.merged, termSlice),
         resolvedEmployeeId: employee.id,

@@ -2,6 +2,10 @@ import type { LeaveRequest } from "@prisma/client";
 import { computeWorkingDaysInRange, utcDateOnly } from "@/modules/leaves/engine/working-days";
 import { getMergedHolidayIsoSetForUtcRange } from "@/modules/leaves/services/leave-working-time-service";
 import { classifyLeaveForPayrollHours } from "@/modules/leaves/payroll/leave-payroll-classifier";
+import {
+  LEAVE_ENGINE_RULE_VERSION_V2,
+  resolveLeaveEngineRuleVersion,
+} from "@/modules/leaves/constants/rule-versions";
 
 export type LeavePayrollSlice = Pick<
   LeaveRequest,
@@ -13,9 +17,10 @@ export type LeavePayrollSlice = Pick<
   | "affectsPayroll"
   | "subtype"
   | "interruptedByLeaveRequestId"
+  | "metricsRuleVersion"
 >;
 
-/** Holiday-aware leave hours for a payroll month window (same rules as leave request metrics). */
+/** Version-aware leave hours for a payroll month window (same rules as each request's metrics). */
 export async function approximateLeaveHoursForPayrollMonth(params: {
   companyId: string;
   requests: LeavePayrollSlice[];
@@ -38,6 +43,16 @@ export async function approximateLeaveHoursForPayrollMonth(params: {
 
   const safeDaily = Number.isFinite(dailyHours) && dailyHours > 0 ? dailyHours : 8;
 
+  const hoursInRange = (request: LeavePayrollSlice, start: Date, end: Date): number => {
+    const fixedWeekdayRule =
+      resolveLeaveEngineRuleVersion(request.metricsRuleVersion) === LEAVE_ENGINE_RULE_VERSION_V2;
+    const hoursPerDay = fixedWeekdayRule ? 8 : safeDaily;
+    const { workingDays } = computeWorkingDaysInRange(start, end, holidaySet, hoursPerDay, {
+      excludeWeekdayHolidays: !fixedWeekdayRule,
+    });
+    return workingDays * hoursPerDay;
+  };
+
   const byId = new Map(requests.map((r) => [r.id, r] as const));
 
   for (const r of requests) {
@@ -47,8 +62,7 @@ export async function approximateLeaveHoursForPayrollMonth(params: {
     const re = r.endDate < monthEnd ? r.endDate : monthEnd;
     if (rs > re) continue;
 
-    const { workingDays } = computeWorkingDaysInRange(rs, re, holidaySet, safeDaily);
-    const hrs = workingDays * safeDaily;
+    const hrs = hoursInRange(r, rs, re);
 
     const bucket = classifyLeaveForPayrollHours({
       type: r.type,
@@ -78,8 +92,8 @@ export async function approximateLeaveHoursForPayrollMonth(params: {
 
     if (os > oe) continue;
 
-    const { workingDays: overlapWd } = computeWorkingDaysInRange(os, oe, holidaySet, safeDaily);
-    const overlapHrs = overlapWd * safeDaily;
+    // Remove exactly the hours contributed by the annual request's own frozen rule.
+    const overlapHrs = hoursInRange(r, os, oe);
     paid = Math.max(0, paid - overlapHrs);
   }
 

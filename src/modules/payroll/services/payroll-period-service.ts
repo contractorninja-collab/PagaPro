@@ -18,6 +18,7 @@ import {
   type PayrollMonthCalendarSnapshot,
   type SpreadsheetLineComputationInput,
 } from "@/modules/payroll/calculation/payroll-spreadsheet-line";
+import { statutorySickLeavePayPercent } from "@/modules/payroll/calculation/legislation/sick-pay";
 import { generatePayrollPdfArtifacts } from "@/modules/payroll/services/payroll-pdf-service";
 import { countWeekdaysInclusiveUtc } from "@/modules/payroll/helpers/weekday-count";
 
@@ -298,7 +299,7 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
           weekendMultiplier: settings.weekendMultiplier.toString(),
           holidayMultiplier: settings.holidayMultiplier.toString(),
           nightWorkMultiplier: settings.nightWorkMultiplier.toString(),
-          sickLeavePayPercent: settings.sickLeavePayPercent.toString(),
+          sickLeavePayPercent: statutorySickLeavePayPercent(settings.sickLeavePayPercent.toString()),
           overtimeWeeklyCapHours: settings.overtimeWeeklyCapHours.toString(),
           standardWeeklyHours: settings.standardWeeklyHours.toString(),
           hoursPerWorkingDay: settings.hoursPerWorkingDay.toString(),
@@ -508,7 +509,6 @@ async function createPayrollEntriesForEmployeesTx(
   },
 ): Promise<{ aggPaidLeaveHrs: number; aggSickLeaveHrs: number; aggUnpaidLeaveHrs: number }> {
   const wd = params.wt.expectedWorkingDays;
-  const expHoursStr = params.wt.expectedRegularHours;
   const { start, end } = periodBoundsUtc(params.payrollYear, params.payrollMonth);
   const days = calendarDaysInMonth(params.payrollYear, params.payrollMonth);
 
@@ -545,13 +545,17 @@ async function createPayrollEntriesForEmployeesTx(
         affectsPayroll: true,
         subtype: true,
         interruptedByLeaveRequestId: true,
+        metricsRuleVersion: true,
       },
     });
 
-    const dailyH = Math.min(
+    // Orët ditore të PUNONJËSIT (part-time-aware); 0/e pavlefshme → norma e kompanisë.
+    const rawDailyH = Math.min(
       new Prisma.Decimal(emp.weeklyHours).div(new Prisma.Decimal(5)).toNumber(),
       Number(params.wt.hoursPerWorkingDay),
     );
+    const dailyH =
+      Number.isFinite(rawDailyH) && rawDailyH > 0 ? rawDailyH : Number(params.wt.hoursPerWorkingDay);
     const leaveHrs = await approximateLeaveHoursForPayrollMonth({
       companyId: params.companyId,
       requests: leaveReqs,
@@ -564,21 +568,30 @@ async function createPayrollEntriesForEmployeesTx(
     aggSickLeaveHrs += leaveHrs.sickLeaveHours;
     aggUnpaidLeaveHrs += leaveHrs.unpaidLeaveHours;
 
+    // Orët mujore të PUNONJËSIT: ditë pune × orët e tij ditore. Për një punonjës
+    // 20h/javë kjo është gjysma e muajit të kompanisë — orët e pritura, orët e
+    // pushimit dhe emëruesi i normës orare duhet të ndajnë të njëjtën shkallë,
+    // përndryshe zbritjet (mjekësore <100%, pa pagesë) nënvlerësohen.
+    const empFullMonthHours = wd * dailyH;
+
     let lineWd = wd;
-    let expHoursForLine = Number(expHoursStr);
+    let expHoursForLine = empFullMonthHours;
     const lwCap = params.lastWorkingDayByEmployeeId?.[emp.id];
     if (lwCap) {
       const effectiveEnd = lwCap.getTime() < end.getTime() ? lwCap : end;
       const effectiveStart = emp.hireDate.getTime() > start.getTime() ? emp.hireDate : start;
       const partialWd = countWeekdaysInclusiveUtc(effectiveStart, effectiveEnd);
       lineWd = Math.max(0, partialWd);
-      expHoursForLine = wd > 0 ? (lineWd / wd) * Number(expHoursStr) : 0;
+      expHoursForLine = lineWd * dailyH;
     }
 
     const paid = leaveHrs.paidLeaveHours;
     const sick = leaveHrs.sickLeaveHours;
     const unpaid = leaveHrs.unpaidLeaveHours;
-    const actualReg = Math.max(0, expHoursForLine - paid - sick - unpaid);
+    // Orët pa pagesë mbeten BRENDA orëve të rregullta — motori i zbret një herë si
+    // unpaidLeaveDeduction. (Zbritja e mëparshme edhe nga regularPay edhe si deduction
+    // e ndëshkonte punonjësin dyfish për çdo orë pa pagesë.)
+    const actualReg = Math.max(0, expHoursForLine - paid - sick);
 
     const lineInput: SpreadsheetLineComputationInput = {
       expectedWorkingDays: lineWd,
@@ -605,11 +618,20 @@ async function createPayrollEntriesForEmployeesTx(
         compensationBasis: emp.compensationBasis,
         targetNetMonthly: emp.targetNetMonthly?.toString() ?? null,
         exemptFromMinimumSalary: emp.exemptFromMinimumSalary,
+        applyTrust: emp.applyTrust,
+        applyTax: emp.applyTax,
       },
       lineInput,
       params.ctx.snapshot,
       params.sickPct,
-      calendarSnapshot,
+      {
+        // Kalendari i shkallëzuar për punonjësin: emëruesi i normës orare në motor
+        // është expectedRegularHours i muajit të PLOTË të punonjësit (88h për 20h/javë),
+        // jo i kompanisë me kohë të plotë.
+        ...calendarSnapshot,
+        expectedRegularHours: empFullMonthHours.toFixed(2),
+        hoursPerWorkingDay: String(dailyH),
+      },
     );
 
     if (!calc.ok) {
@@ -683,6 +705,12 @@ export async function recalculatePayrollEntriesForEmployees(params: {
   /** When false, skip updating payroll shell expected hours/days (used for partial runs). Default false. */
   updatePayrollAggregateMeta?: boolean;
   lineOverridesByEmployeeId?: Record<string, Partial<SpreadsheetLineComputationInput>>;
+  /**
+   * Optimistic guard: entry `updatedAt` per employee siç u lexua nga thirrësi. Rikontrollohet
+   * BRENDA transaksionit — nëse rreshti është ndryshuar ndërkohë (p.sh. një edit i njëkohshëm
+   * në spreadsheet), ripëllogaritja ndalet në vend që të mbishkruajë ndryshimin.
+   */
+  guardEntryUpdatedAtByEmployeeId?: Record<string, Date>;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const employeeIds = [...new Set(params.employeeIds)].filter(Boolean);
   if (employeeIds.length === 0) {
@@ -701,7 +729,7 @@ export async function recalculatePayrollEntriesForEmployees(params: {
   if (!ctx) return { ok: false, error: "Nuk mund të ngarkohen parametrat për këtë periudhë." };
 
   const settingsRow = await prisma.payrollSettings.findUnique({ where: { companyId: params.companyId } });
-  const sickPct = settingsRow?.sickLeavePayPercent.toString() ?? "1";
+  const sickPct = statutorySickLeavePayPercent(settingsRow?.sickLeavePayPercent.toString());
 
   const wt = await resolvePayrollMonthWorkingTime(params.companyId, payroll.year, payroll.month);
   if (!wt) return { ok: false, error: "Nuk mund të ngarkohet kalendari i punës nga PayrollSettings." };
@@ -736,6 +764,30 @@ export async function recalculatePayrollEntriesForEmployees(params: {
 
   try {
     await prisma.$transaction(async (tx) => {
+      // Rikontroll statusi BRENDA transaksionit — payroll-i mund të jetë kaluar në
+      // shqyrtim/miratim midis kontrollit të mësipërm dhe këtij transaksioni.
+      const fresh = await tx.payroll.findUnique({
+        where: { id: params.payrollId },
+        select: { status: true },
+      });
+      if (!fresh || fresh.status !== "DRAFT") {
+        throw new Error("Payroll nuk është më në DRAFT — ripëllogaritja u ndal.");
+      }
+
+      if (params.guardEntryUpdatedAtByEmployeeId) {
+        for (const [employeeId, expectedUpdatedAt] of Object.entries(params.guardEntryUpdatedAtByEmployeeId)) {
+          const cur = await tx.payrollEntry.findUnique({
+            where: { payrollId_employeeId: { payrollId: params.payrollId, employeeId } },
+            select: { updatedAt: true },
+          });
+          if (!cur || cur.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+            throw new Error(
+              "Rreshti u ndryshua nga një veprim tjetër gjatë sinkronizimit — provoni sërish.",
+            );
+          }
+        }
+      }
+
       await tx.payrollEntry.deleteMany({
         where: { payrollId: params.payrollId, employeeId: { in: employeeIds } },
       });
@@ -804,7 +856,7 @@ export async function regeneratePayrollEntriesAndCalculate(
   if (!ctx) return { ok: false, error: "Nuk mund të ngarkohen parametrat për këtë periudhë." };
 
   const settingsRow = await prisma.payrollSettings.findUnique({ where: { companyId } });
-  const sickPct = settingsRow?.sickLeavePayPercent.toString() ?? "1";
+  const sickPct = statutorySickLeavePayPercent(settingsRow?.sickLeavePayPercent.toString());
 
   const wt = await resolvePayrollMonthWorkingTime(companyId, payroll.year, payroll.month);
   if (!wt) return { ok: false, error: "Nuk mund të ngarkohet kalendari i punës nga PayrollSettings." };
@@ -1098,6 +1150,7 @@ export async function updatePayrollEntryAmounts(
   entryId: string,
   patch: PayrollEntrySpreadsheetPatch,
   actorUserId?: string | null,
+  options?: { expectedUpdatedAt?: Date },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const entry = await prisma.payrollEntry.findFirst({
     where: { id: entryId, payroll: { companyId } },
@@ -1105,6 +1158,15 @@ export async function updatePayrollEntryAmounts(
   });
 
   if (!entry) return { ok: false, error: "Rreshti nuk u gjet." };
+  if (
+    options?.expectedUpdatedAt &&
+    entry.updatedAt.getTime() !== options.expectedUpdatedAt.getTime()
+  ) {
+    return {
+      ok: false,
+      error: "Rreshti u ndryshua nga një veprim tjetër gjatë sinkronizimit — provoni sërish.",
+    };
+  }
   const notEditable = payrollNotEditableMessage(entry.payroll.status);
   if (notEditable) return { ok: false, error: notEditable };
 
@@ -1128,24 +1190,32 @@ export async function updatePayrollEntryAmounts(
   if (!ctx) return { ok: false, error: "Nuk mund të ngarkohen parametrat." };
 
   const settingsRow = await prisma.payrollSettings.findUnique({ where: { companyId } });
-  const sickPct = settingsRow?.sickLeavePayPercent.toString() ?? "1";
+  const sickPct = statutorySickLeavePayPercent(settingsRow?.sickLeavePayPercent.toString());
 
   const wt = await resolvePayrollMonthWorkingTime(companyId, entry.payroll.year, entry.payroll.month);
   if (!wt) return { ok: false, error: "Nuk mund të ngarkohet kalendari i punës nga PayrollSettings." };
 
-  const wd =
-    entry.payroll.expectedWorkingDays ??
-    entry.expectedWorkingDays ??
-    wt.expectedWorkingDays;
-  const expHours =
-    entry.payroll.expectedRegularHours?.toString() ??
-    entry.expectedRegularHours?.toString() ??
-    wt.expectedRegularHours;
+  // Rreshti mban orët/ditët e veta të pritura (pro-rata për muaj të pjesshëm — largim
+  // ose punësim mes muajit); kalendari mban muajin e PLOTË TË PUNONJËSIT (ditë pune ×
+  // orët e tij ditore, part-time-aware), i cili shërben si emërues i normës orare në
+  // motor — i njëjti shkallëzim si rruga e krijimit. Mos i përzie: preferimi i nivelit
+  // payroll këtu e rikthente një rresht të pjesshëm/part-time në muaj të plotë të
+  // kompanisë me çdo edit qelize.
+  const fullMonthWd = entry.payroll.expectedWorkingDays ?? wt.expectedWorkingDays;
+  const rawDailyH = Math.min(
+    new Prisma.Decimal(entry.employee.weeklyHours).div(new Prisma.Decimal(5)).toNumber(),
+    Number(wt.hoursPerWorkingDay),
+  );
+  const dailyH =
+    Number.isFinite(rawDailyH) && rawDailyH > 0 ? rawDailyH : Number(wt.hoursPerWorkingDay);
+  const fullMonthHours = (fullMonthWd * dailyH).toFixed(2);
+  const wd = entry.expectedWorkingDays ?? fullMonthWd;
+  const expHours = entry.expectedRegularHours?.toString() ?? fullMonthHours;
 
   const calendarSnapshot: PayrollMonthCalendarSnapshot = {
-    expectedWorkingDays: wd,
-    expectedRegularHours: expHours,
-    hoursPerWorkingDay: wt.hoursPerWorkingDay,
+    expectedWorkingDays: fullMonthWd,
+    expectedRegularHours: fullMonthHours,
+    hoursPerWorkingDay: String(dailyH),
     weekdayPublicHolidayDates: wt.weekdayPublicHolidayDates,
     overtimeWeeklyThresholdHours: wt.overtimeWeeklyThresholdHours,
     overtimeWarningWeeklyHours: wt.overtimeWarningWeeklyHours,
@@ -1182,6 +1252,8 @@ export async function updatePayrollEntryAmounts(
       compensationBasis: emp.compensationBasis,
       targetNetMonthly: emp.targetNetMonthly?.toString() ?? null,
       exemptFromMinimumSalary: emp.exemptFromMinimumSalary,
+      applyTrust: emp.applyTrust,
+      applyTax: emp.applyTax,
     },
     lineInput,
     ctx.snapshot,
@@ -1193,16 +1265,20 @@ export async function updatePayrollEntryAmounts(
 
   const v = calc.value;
 
+  // Ruaj shënuesin e muajit të pjesshëm — motori nuk e emeton, por sinkronizimi i
+  // pushimeve mbështetet tek ai për të rimbajtur kufirin e largimit.
+  const prevBreakdown = entry.calculationBreakdown as { terminationPartialMonth?: unknown } | null;
   let breakdownPlain: object;
   try {
-    breakdownPlain = payrollCalculationBreakdownAsJson(v.breakdown as Record<string, unknown>);
+    breakdownPlain = payrollCalculationBreakdownAsJson({
+      ...(v.breakdown as Record<string, unknown>),
+      ...(prevBreakdown?.terminationPartialMonth === true ? { terminationPartialMonth: true } : {}),
+    });
   } catch {
     return { ok: false, error: "Rezultati i llogaritjes nuk mund të ruhet (serializim JSON)." };
   }
 
-  await prisma.payrollEntry.update({
-    where: { id: entryId },
-    data: {
+  const updateData: Prisma.PayrollEntryUpdateManyMutationInput = {
       expectedWorkingDays: wd,
       expectedRegularHours: new Prisma.Decimal(expHours),
       actualRegularHours: new Prisma.Decimal(lineInput.actualRegularHours),
@@ -1239,8 +1315,25 @@ export async function updatePayrollEntryAmounts(
       manualGrossReason: grossReason ?? null,
       manualNetReason: netReason ?? null,
       notes: patch.notes !== undefined ? patch.notes : entry.notes,
-    },
-  });
+  };
+
+  if (options?.expectedUpdatedAt) {
+    const guarded = await prisma.payrollEntry.updateMany({
+      where: { id: entryId, updatedAt: options.expectedUpdatedAt },
+      data: updateData,
+    });
+    if (guarded.count !== 1) {
+      return {
+        ok: false,
+        error: "Rreshti u ndryshua nga një veprim tjetër gjatë sinkronizimit — provoni sërish.",
+      };
+    }
+  } else {
+    await prisma.payrollEntry.update({
+      where: { id: entryId },
+      data: updateData,
+    });
+  }
 
   await appendPayrollAuditLog({
     companyId,

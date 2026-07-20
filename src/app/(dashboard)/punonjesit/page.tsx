@@ -3,7 +3,8 @@ import { EmployeesFilters, type EmployeesFilterValues } from "@/modules/employee
 import { EmployeesPageClient } from "@/modules/employees/components/employees-page-client";
 import type { EmployeeFiltersDto } from "@/modules/employees/types";
 import { getEmployeesPageData } from "@/modules/employees/services/employee-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { canImportEmployees } from "@/modules/employees/services/employee-import-access";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Punonjësit",
@@ -22,21 +23,7 @@ export default async function PunonjesitPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Punonjësit</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code>, variablën{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>, ose në development
-          përdorni <code className="rounded bg-muted px-1.5 py-0.5 text-xs">POST /api/dev/active-company</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId, role, user } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const q = first(sp.q);
@@ -76,15 +63,27 @@ export default async function PunonjesitPage({
     documentsMissing,
   };
 
+  // URL that toggles the documentsMissing quick-filter while preserving the other applied filters.
+  const toggleParams = new URLSearchParams();
+  if (q) toggleParams.set("q", q);
+  if (filters.status) toggleParams.set("status", filters.status);
+  if (filters.employmentType) toggleParams.set("employmentType", filters.employmentType);
+  if (filters.departmentId) toggleParams.set("departmentId", filters.departmentId);
+  if (!documentsMissing) toggleParams.set("documentsMissing", "1");
+  const documentsMissingToggleHref = toggleParams.toString()
+    ? `/punonjesit?${toggleParams.toString()}`
+    : "/punonjesit";
+
   return (
-    <div className="space-y-8">
-      <EmployeesFilters departments={data.departments} defaults={defaults} />
-      <EmployeesPageClient
-        employees={data.employees}
-        departments={data.departments}
-        jobTitles={data.jobTitles}
-        documentsMissingFilter={documentsMissing}
-      />
-    </div>
+    <EmployeesPageClient
+      employees={data.employees}
+      departments={data.departments}
+      jobTitles={data.jobTitles}
+      documentsMissingFilter={documentsMissing}
+      documentsMissingToggleHref={documentsMissingToggleHref}
+      filtersActive={Boolean(q || filters.status || filters.employmentType || filters.departmentId || documentsMissing)}
+      filters={<EmployeesFilters departments={data.departments} defaults={defaults} />}
+      canImportEmployees={canImportEmployees({ role, isPlatformAdmin: user.isPlatformAdmin })}
+    />
   );
 }

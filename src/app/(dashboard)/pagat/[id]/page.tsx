@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PayrollDetailClient } from "@/modules/payroll/components/payroll-detail-client";
 import { getPayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
 
 export async function generateMetadata({
   params,
@@ -11,9 +11,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   try {
     const { id } = await params;
-    const companyId = await resolveActiveCompanyId();
-    if (!companyId) return { title: "Pagat" };
-    const data = await getPayrollDetailDto(companyId, id);
+    const result = await getCompanyContext();
+    if (!result.ok) return { title: "Pagat" };
+    const data = await getPayrollDetailDto(result.context.companyId, id);
     return {
       title: data ? `${data.payroll.monthLabel} · Pagat` : "Pagat",
     };
@@ -23,8 +23,7 @@ export async function generateMetadata({
 }
 
 export default async function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const companyId = await resolveActiveCompanyId();
-  if (!companyId) notFound();
+  const { companyId } = await requireCompanyContextPage();
 
   const { id } = await params;
   let data;

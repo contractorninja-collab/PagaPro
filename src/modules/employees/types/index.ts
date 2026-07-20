@@ -1,4 +1,5 @@
 import type {
+  CompensationBasis,
   EmployeeHistoryEventKind,
   EmploymentStatus,
   EmploymentType,
@@ -75,6 +76,18 @@ export interface EmployeeDetailDto {
   documentsMissing: boolean;
   terminationDate: string | null;
   terminationReason: string | null;
+  salaryHistory: SalaryChangeDto[];
+}
+
+export interface SalaryChangeDto {
+  id: string;
+  effectiveFromIso: string;
+  previousBaseSalary: string | null;
+  newBaseSalary: string;
+  compensationBasis: CompensationBasis;
+  targetNetMonthly: string | null;
+  reason: string | null;
+  createdAtIso: string;
 }
 
 export interface DepartmentOptionDto {

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PagaProLogoCompact, PagaProMark } from "@/components/branding/logo";
 import { logoutAction } from "@/modules/auth/actions/auth-actions";
+import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 
 function initialsOf(label: string | null | undefined): string {
   const trimmed = label?.trim();
@@ -34,7 +35,7 @@ export function AdminHeader({ userLabel, userEmail }: { userLabel?: string | nul
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 md:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <Link
-          href="/admin"
+          href={ADMIN_BASE_PATH}
           className="flex items-center gap-2 rounded-sm md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label="PagaPRO Admin — ballina"
         >

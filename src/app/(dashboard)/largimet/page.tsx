@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { LargimetDashboardClient } from "@/modules/terminations/components/largimet-dashboard-client";
+import { prisma } from "@/lib/prisma";
+import {
+  LargimetDashboardClient,
+  type ChecklistProgressMap,
+} from "@/modules/terminations/components/largimet-dashboard-client";
 import {
   listEmployeesForTerminationPicker,
   listTerminationsForCompany,
 } from "@/modules/terminations/services/termination-queries";
-import { resolveActiveCompanyId } from "@/server/company-scope";
+import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Largimet",
@@ -21,38 +25,44 @@ export default async function LargimetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const companyId = await resolveActiveCompanyId();
-
-  if (!companyId) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 py-12">
-        <h1 className="text-2xl font-semibold text-foreground">Largimet</h1>
-        <p className="text-sm text-muted-foreground">
-          Nuk ka kompani aktive për këtë sesion. Vendosni cookie-in{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pp_active_company_id</code> ose{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">DEV_DEFAULT_COMPANY_ID</code>.
-        </p>
-      </div>
-    );
-  }
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
-  const yearRaw = Number(first(sp, "year"));
-  const monthRaw = Number(first(sp, "month"));
+  const yearParam = first(sp, "year");
+  const monthParam = first(sp, "month");
+  const yearRaw = Number(yearParam);
+  const monthRaw = Number(monthParam);
 
   const filters = {
     status: first(sp, "status") || undefined,
     type: first(sp, "type") || undefined,
     employeeId: first(sp, "employeeId") || undefined,
-    year: Number.isFinite(yearRaw) ? yearRaw : undefined,
-    month: Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : undefined,
+    year: yearParam && Number.isFinite(yearRaw) ? yearRaw : undefined,
+    month:
+      monthParam && Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12
+        ? monthRaw
+        : undefined,
   };
 
   let rows;
   let employees;
+  const checklistProgress: ChecklistProgressMap = {};
   try {
     rows = await listTerminationsForCompany(companyId, filters);
     employees = await listEmployeesForTerminationPicker(companyId);
+
+    // Presentation-only aggregation for the register's per-row checklist progress (x/6).
+    if (rows.length > 0) {
+      const checklistRows = await prisma.terminationChecklist.findMany({
+        where: { companyId, terminationId: { in: rows.map((r) => r.id) } },
+        select: { terminationId: true, isCompleted: true },
+      });
+      for (const item of checklistRows) {
+        const entry = (checklistProgress[item.terminationId] ??= { done: 0, total: 0 });
+        entry.total += 1;
+        if (item.isCompleted) entry.done += 1;
+      }
+    }
   } catch (err) {
     console.error("[pagapro] LargimetPage load failed", err);
     return (
@@ -70,6 +80,7 @@ export default async function LargimetPage({
       rows={serializedRows as never}
       employees={serializedEmployees as never}
       filters={filters}
+      checklistProgress={checklistProgress}
     />
   );
 }

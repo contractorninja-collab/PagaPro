@@ -3,8 +3,9 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/patterns/page-header";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -142,36 +143,42 @@ export function PayrollsPageClient(props: { initialRows: PayrollListRow[]; initi
 
   return (
     <>
-      <PageHeader
+      <AppSubBar
+        eyebrow="Payroll"
         title="Pagat"
         description="Ekzekutim mujor — spreadsheet në detaj, vetëm DRAFT është i editueshëm; kontraktorët përjashtohen nga përzgjedhja."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-2">
-              <Label htmlFor="payroll-year" className="text-xs text-muted-foreground">
+              <Label htmlFor="payroll-year" className="sr-only">
                 Viti
               </Label>
               <select
                 id="payroll-year"
-                className="flex h-9 w-[110px] rounded-md border border-input bg-background px-2 text-sm shadow-sm"
+                className="flex h-10 w-[110px] cursor-pointer rounded-[10px] border border-[#e2e8f0] bg-white px-3.5 text-[13.5px] font-semibold text-[#334155] outline-none transition-colors hover:bg-[#f8fafc] focus-visible:border-brand-blue"
                 value={String(yearFilter)}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setYearFilter(Number(e.target.value))}
               >
                 {yearChoices.map((y) => (
                   <option key={y} value={y}>
-                    {y}
+                    Viti {y}
                   </option>
                 ))}
               </select>
             </div>
-            <Button type="button" onClick={() => setCreateOpen(true)}>
+            <Button
+              type="button"
+              className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
               Krijo payroll
             </Button>
           </div>
         }
       />
 
-      <div className="mt-8">
+      <div>
         <PayrollsTable
           rows={rows}
           onRegenerate={(id) => void toastPayrollAction(router, "Payroll u ripëllogarit.", regeneratePayrollAction(id))}

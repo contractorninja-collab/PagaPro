@@ -1,18 +1,15 @@
 import type { LeaveRequestStatus } from "@prisma/client";
-import { Badge } from "@/components/ui/badge";
 import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
+import { TonePill, type SemanticTone } from "@/modules/leaves/components/leave-ui";
 
-const VARIANT: Record<
-  LeaveRequestStatus,
-  "warning" | "success" | "destructive" | "muted" | "info"
-> = {
+const TONE: Record<LeaveRequestStatus, SemanticTone> = {
   DRAFT: "warning",
   PENDING: "warning",
   APPROVED: "success",
   REJECTED: "destructive",
-  CANCELLED: "muted",
+  CANCELLED: "neutral",
 };
 
 export function LeaveStatusBadge({ status }: { status: LeaveRequestStatus }) {
-  return <Badge variant={VARIANT[status]}>{LEAVE_STATUS_LABELS_SQ[status]}</Badge>;
+  return <TonePill tone={TONE[status]}>{LEAVE_STATUS_LABELS_SQ[status]}</TonePill>;
 }
