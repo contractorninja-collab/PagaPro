@@ -10,7 +10,12 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 /** Required by Prisma 7+ — uses node `pg` via the official adapter. */
 const connectionString =
-  (process.env.DATABASE_URL ?? "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder").trim();
+  (
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.POSTGRES_URL ??
+    "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder"
+  ).trim();
 const adapter = new PrismaPg({ connectionString });
 
 export const prisma =
