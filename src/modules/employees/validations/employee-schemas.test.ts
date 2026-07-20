@@ -44,6 +44,22 @@ describe("employeeUpsertSchema", () => {
     if (r.success) expect(r.data.departmentId).toBeNull();
   });
 
+  it("accepts an empty emergency contact", () => {
+    const r = employeeUpsertSchema.safeParse({
+      ...minimal,
+      emergencyContactName: "",
+      emergencyContactPhone: "",
+      emergencyContactRelationship: "",
+    });
+
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.emergencyContactName).toBeNull();
+      expect(r.data.emergencyContactPhone).toBeNull();
+      expect(r.data.emergencyContactRelationship).toBeNull();
+    }
+  });
+
   it("rejects missing jobTitleId (Pozita is required)", () => {
     const r = employeeUpsertSchema.safeParse({ ...minimal, jobTitleId: "" });
     expect(r.success).toBe(false);

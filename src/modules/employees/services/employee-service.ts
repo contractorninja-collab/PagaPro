@@ -195,12 +195,17 @@ async function syncEmergencyContact(
   input: Pick<EmployeeUpsertInput, "emergencyContactName" | "emergencyContactPhone" | "emergencyContactRelationship">,
 ): Promise<void> {
   await tx.employeeEmergencyContact.deleteMany({ where: { employeeId } });
+  const fullName = input.emergencyContactName?.trim() ?? "";
+  const phone = input.emergencyContactPhone?.trim() ?? "";
+  const relationship = input.emergencyContactRelationship?.trim() ?? "";
+  if (!fullName && !phone && !relationship) return;
+
   await tx.employeeEmergencyContact.create({
     data: {
       employeeId,
-      fullName: input.emergencyContactName,
-      phone: input.emergencyContactPhone,
-      relationship: input.emergencyContactRelationship,
+      fullName,
+      phone,
+      relationship,
       isPrimary: true,
     },
   });

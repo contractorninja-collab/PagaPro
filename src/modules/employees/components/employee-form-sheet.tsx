@@ -731,7 +731,7 @@ export function EmployeeFormSheet(props: {
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Kontakti emergjent</h3>
             <div className={fieldGrid}>
-              <FormField label="Emri" required error={fieldErrors.emergencyContactName}>
+              <FormField label="Emri" error={fieldErrors.emergencyContactName}>
                 <Input
                   className={errClass("emergencyContactName")}
                   value={values.emergencyContactName}
@@ -742,7 +742,7 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 />
               </FormField>
-              <FormField label="Telefoni" required error={fieldErrors.emergencyContactPhone}>
+              <FormField label="Telefoni" error={fieldErrors.emergencyContactPhone}>
                 <Input
                   className={errClass("emergencyContactPhone")}
                   value={values.emergencyContactPhone}
@@ -755,7 +755,6 @@ export function EmployeeFormSheet(props: {
               </FormField>
               <FormField
                 label="Raporti familjar"
-                required
                 error={fieldErrors.emergencyContactRelationship}
                 className="md:col-span-2"
               >

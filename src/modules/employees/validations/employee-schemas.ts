@@ -75,9 +75,9 @@ export const employeeUpsertSchema = z
     applyTrust: z.boolean(),
     applyTax: z.boolean(),
 
-    emergencyContactName: z.string().trim().min(1, "Emri i kontaktit emergjent është i detyrueshëm"),
-    emergencyContactPhone: z.string().trim().min(1, "Telefoni i kontaktit emergjent është i detyrueshëm"),
-    emergencyContactRelationship: z.string().trim().min(1, "Raporti familjar është i detyrueshëm"),
+    emergencyContactName: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
+    emergencyContactPhone: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
+    emergencyContactRelationship: z.preprocess(emptyToNull, z.string().trim().max(120).nullable().optional()),
 
     internalNotes: z.preprocess(emptyToNull, z.string().max(10000).nullable().optional()),
     documentsMissing: z.boolean(),
