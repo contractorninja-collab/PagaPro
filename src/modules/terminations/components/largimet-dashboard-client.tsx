@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
-import { Banknote, Check, Clock, Download, FileText, MoreHorizontal, UserMinus } from "lucide-react";
+import { Banknote, Check, ChevronDown, Clock, Download, FileText, MoreHorizontal, UserMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -35,7 +36,11 @@ import {
   prepareFinalPayrollTerminationAction,
   submitTerminationAction,
 } from "@/modules/terminations/actions/termination-actions";
-import { TERMINATION_STATUS_LABELS, TERMINATION_TYPE_LABELS } from "@/modules/terminations/types";
+import {
+  TERMINATION_STATUS_LABELS,
+  TERMINATION_TEMPLATE_OPTIONS,
+  TERMINATION_TYPE_LABELS,
+} from "@/modules/terminations/types";
 import {
   eligibleTerminationMonths,
   eligibleTerminationYears,
@@ -653,24 +658,27 @@ function useRowRunner(startTransition: (fn: () => void) => void) {
   };
 }
 
-function docxFilenameFor(row: LargimetRowSerialized): string {
-  return `Nderprerje-${row.employee.lastName}-${row.employee.firstName}.docx`.replace(/\s+/g, "-");
+function downloadFilename(row: LargimetRowSerialized, templateKey: TerminationType): string {
+  return `Nderprerje-${row.employee.lastName}-${row.employee.firstName}-${templateKey}.docx`.replace(
+    /\s+/g,
+    "-",
+  );
 }
 
 /**
- * Downloads the termination document, rendered in-request by
- * /api/largimet/[id]/document. That route persists nothing and falls back to the
- * repo's bundled template when no seeded blob exists, so it works with or without
- * an object store. Uses its own transition so one row's spinner doesn't disable
- * every other row.
+ * Picks which termination template to print, then downloads it. The document is
+ * rendered in-request by /api/largimet/[id]/document?template=<key>, which
+ * persists nothing and falls back to the repo's bundled template when no seeded
+ * blob exists — so it works with or without an object store. Its own transition
+ * keeps one row's spinner from disabling every other row.
  */
 function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean }) {
   const { row } = props;
   const [busy, startDownload] = useTransition();
 
-  function onClick() {
+  function download(templateKey: TerminationType) {
     startDownload(async () => {
-      const res = await fetch(`/api/largimet/${row.id}/document?inline=0`);
+      const res = await fetch(`/api/largimet/${row.id}/document?template=${templateKey}&inline=0`);
       if (!res.ok) {
         let message = "Dokumenti nuk u gjenerua.";
         try {
@@ -686,7 +694,7 @@ function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = docxFilenameFor(row);
+      a.download = downloadFilename(row, templateKey);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -695,15 +703,35 @@ function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean
   }
 
   return (
-    <button
-      type="button"
-      className={cn(BTN_DENSE_PRIMARY, "inline-flex items-center gap-1.5")}
-      disabled={busy || props.pending}
-      onClick={onClick}
-    >
-      <Download className="h-3.5 w-3.5" aria-hidden />
-      {busy ? "Duke shkarkuar…" : "Shkarko"}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(BTN_DENSE_PRIMARY, "inline-flex items-center gap-1.5")}
+          disabled={busy || props.pending}
+        >
+          <Download className="h-3.5 w-3.5" aria-hidden />
+          {busy ? "Duke shkarkuar…" : "Shkarko"}
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>Zgjidh shabllonin</DropdownMenuLabel>
+        {TERMINATION_TEMPLATE_OPTIONS.map((opt) => {
+          const suggested = opt.key === row.type;
+          return (
+            <DropdownMenuItem key={opt.key} onClick={() => download(opt.key)}>
+              <span className="flex-1 truncate">{opt.name}</span>
+              {suggested ? (
+                <span className="ml-2 shrink-0 text-[11px] font-semibold text-brand-blue">
+                  I sugjeruar
+                </span>
+              ) : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

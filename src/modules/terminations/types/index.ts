@@ -19,6 +19,19 @@ export const TERMINATION_TYPE_LABELS: Record<TerminationType, string> = {
   MANUAL: "Manual",
 };
 
+/**
+ * The termination decision documents that can be printed for any termination.
+ * Names match templates/termination/manifest.json. `key` is the
+ * `terminationWorkflowKey` used to resolve the template (storage or bundled).
+ */
+export const TERMINATION_TEMPLATE_OPTIONS: ReadonlyArray<{ key: TerminationType; name: string }> = [
+  { key: "LARGIM_VULLNETAR", name: "Vendim për largim vullnetar" },
+  { key: "PA_PARALAJMERIM", name: "Vendim për ndërprerje pa paralajmërim" },
+  { key: "MARREVESHJE_E_DYANSHME", name: "Marrëveshje për ndërprerje" },
+  { key: "NGA_PUNEDHENESI", name: "Vendim për ndërprerje nga punëdhënësi" },
+  { key: "MANUAL", name: "Vendim manual për ndërprerje" },
+];
+
 export const TERMINATION_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   PENDING_REVIEW: "Në shqyrtim",

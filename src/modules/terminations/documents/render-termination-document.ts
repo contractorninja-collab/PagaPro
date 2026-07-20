@@ -1,3 +1,4 @@
+import type { TerminationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { buildMergedPlaceholderContext } from "@/modules/documents/services/build-placeholder-context";
@@ -38,6 +39,8 @@ function asciiSlug(value: string): string {
 export async function renderTerminationDocument(
   companyId: string,
   terminationId: string,
+  /** Which template to print. Defaults to the one matching the termination's own type. */
+  templateType?: TerminationType,
 ): Promise<RenderTerminationResult> {
   const term = await prisma.termination.findFirst({
     where: { id: terminationId, companyId },
@@ -46,11 +49,13 @@ export async function renderTerminationDocument(
   if (!term) return { ok: false, error: "Largimi nuk u gjet." };
   if (term.status === "CANCELLED") return { ok: false, error: "Largimi është anuluar." };
 
+  const chosenType = templateType ?? term.type;
+
   const template = await prisma.documentTemplate.findFirst({
     where: {
       companyId,
       documentCategory: "TERMINATION",
-      terminationWorkflowKey: term.type,
+      terminationWorkflowKey: chosenType,
       isActive: true,
     },
     include: {
@@ -78,7 +83,7 @@ export async function renderTerminationDocument(
   }
 
   if (!templateDocxBuffer) {
-    const bundled = await resolveBundledTerminationTemplate(term.type);
+    const bundled = await resolveBundledTerminationTemplate(chosenType);
     if (!bundled) {
       return {
         ok: false,
@@ -120,9 +125,11 @@ export async function renderTerminationDocument(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
+  // Include the template key so downloading several templates for one employee
+  // produces distinct files rather than overwriting each other.
   const filename = `Nderprerje_${asciiSlug(term.employee.lastName)}_${asciiSlug(
     term.employee.firstName,
-  )}.docx`;
+  )}_${chosenType}.docx`;
 
   return { ok: true, buffer: renderedBuffer, filename, contentType: DOCX_CONTENT_TYPE };
 }

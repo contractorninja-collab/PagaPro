@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
+import type { TerminationType } from "@prisma/client";
 import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
 import { renderTerminationDocument } from "@/modules/terminations/documents/render-termination-document";
+import { TERMINATION_TEMPLATE_OPTIONS } from "@/modules/terminations/types";
 
 export const runtime = "nodejs";
+
+const VALID_TEMPLATE_KEYS = new Set<string>(TERMINATION_TEMPLATE_OPTIONS.map((o) => o.key));
+
+function parseTemplate(value: string | null): TerminationType | undefined {
+  if (value && VALID_TEMPLATE_KEYS.has(value)) return value as TerminationType;
+  return undefined;
+}
 
 /**
  * Streams a termination's decision document as a DOCX, rendered in-request.
@@ -21,9 +30,11 @@ export async function GET(
   const { companyId } = ctx.context;
 
   const { id } = await params;
-  const inline = new URL(request.url).searchParams.get("inline") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const inline = searchParams.get("inline") === "1";
+  const templateType = parseTemplate(searchParams.get("template"));
 
-  const result = await renderTerminationDocument(companyId, id);
+  const result = await renderTerminationDocument(companyId, id, templateType);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 404 });
   }
