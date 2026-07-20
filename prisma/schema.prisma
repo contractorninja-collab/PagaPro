@@ -94,6 +94,13 @@ enum CompensationBasis {
   TARGET_NET_MONTHLY
 }
 
+/// Kosovo Labour Law (Ligji Nr. 03/L-212, Neni 10) contract-duration categories.
+enum ContractTermType {
+  INDEFINITE
+  FIXED_TERM
+  SPECIFIC_TASK
+}
+
 enum PayrollCorrectionKind {
   NET_ADJUSTMENT
   GROSS_ADJUSTMENT
@@ -418,6 +425,7 @@ model Company {
   employmentPeriods      EmploymentPeriod[]
   employeeEmploymentHistories EmployeeEmploymentHistory[]
   employeeSalaryChanges  EmployeeSalaryChange[]
+  employeeContractAnnexes EmployeeContractAnnex[]
 
   configuration           CompanyConfiguration?
   authorizedRepresentatives AuthorizedRepresentative[]
@@ -583,6 +591,7 @@ model User {
   documentTimelineEventsCreated DocumentTimelineEvent[] @relation("DocumentTimelineCreatedBy")
   timelineActorEvents     EmployeeTimelineEvent[]       @relation("TimelineActor")
   salaryChangesMade       EmployeeSalaryChange[]        @relation("SalaryChangeBy")
+  contractAnnexesCreated  EmployeeContractAnnex[]       @relation("ContractAnnexBy")
   domainActivitiesAuthored DomainActivity[]              @relation("DomainActivityActor")
   notificationPreferences NotificationPreference[]
   targetedNotifications   NotificationOutbox[]          @relation("NotificationTarget")
@@ -734,6 +743,14 @@ model Employee {
   jobTitle           String?
   probationMonths    Int?
 
+  /// Contract term (Ligji Nr. 03/L-212, Neni 10-11). contractStartDate defaults to hireDate;
+  /// contractEndDate is null for indefinite contracts. Drives annex renewals + expiry.
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+  contractType      ContractTermType @default(INDEFINITE)
+  /// Vendi i punës (Neni 11.4); falls back to the company address when empty.
+  workplace         String?
+
   /// Orët kontraktuale javore (UI default 40)
   weeklyHours Decimal @default(40) @db.Decimal(6, 2)
 
@@ -790,6 +807,7 @@ model Employee {
   timelineEvents       EmployeeTimelineEvent[]
   employmentHistoryRecords EmployeeEmploymentHistory[]
   salaryChanges        EmployeeSalaryChange[]
+  contractAnnexes      EmployeeContractAnnex[]
   payrollGeneratedDocs PayrollGeneratedDocument[]
   payrollInclusions    PayrollIncludedEmployee[]
   payrollCorrections   PayrollCorrection[]
@@ -840,6 +858,52 @@ model EmployeeSalaryChange {
   @@index([companyId, employeeId, effectiveFrom(sort: Desc)])
   @@index([companyId])
   @@map("employee_salary_changes")
+}
+
+/// Issued contract amendment (Aneks Kontratë, Ligji Nr. 03/L-212 Neni 10-11, 17-19).
+/// Each row records what changed (changesJson) plus a snapshot of the Neni-11 elements at
+/// issue time, so the next annex diffs against this snapshot. The DOCX is rendered on demand.
+model EmployeeContractAnnex {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// Sequential per employee (Aneks nr. 1, 2, …).
+  annexNumber Int
+
+  /// When the amendment takes effect.
+  effectiveDate DateTime
+
+  /// Which categories changed: e.g. ["SALARY","JOB_TITLE","HOURS","CONTRACT_TERM"].
+  changeCategories String[]
+
+  /// Array of { field, label, from, to } describing each change, as rendered in the document.
+  changesJson Json
+
+  /// Snapshot of the Neni-11 elements at issue time (the baseline the next annex diffs against).
+  snapshotJobTitle        String?
+  snapshotJobDescription  String? @db.Text
+  snapshotDepartment      String?
+  snapshotWorkplace       String?
+  snapshotWeeklyHours     Decimal? @db.Decimal(6, 2)
+  snapshotBaseSalary      Decimal? @db.Decimal(14, 2)
+  snapshotContractStart   DateTime?
+  snapshotContractEnd     DateTime?
+  snapshotContractType    ContractTermType?
+
+  createdById String?
+  createdBy   User?   @relation("ContractAnnexBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([employeeId, annexNumber])
+  @@index([companyId, employeeId])
+  @@index([companyId])
+  @@map("employee_contract_annexes")
 }
 
 /// HR employment history stream (position/status snapshots). Works alongside EmploymentPeriod legal segments.

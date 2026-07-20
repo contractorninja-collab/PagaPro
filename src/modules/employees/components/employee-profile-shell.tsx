@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employees/actions/employee-actions";
 import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto, SalaryChangeDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
+import { AnnexPanel } from "@/modules/annex/components/annex-panel";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
@@ -702,7 +703,8 @@ export function EmployeeProfileShell(props: {
           <TabsContent value="payroll" className="mt-5">
             <SalaryHistoryCard rows={employee.salaryHistory} />
           </TabsContent>
-          <TabsContent value="contracts" className="mt-5">
+          <TabsContent value="contracts" className="mt-5 space-y-5">
+            <AnnexPanel employeeId={employee.id} canEdit={canEdit} />
             <ContractsTab rows={bundle.contracts} />
           </TabsContent>
           <TabsContent value="documents" className="mt-5">
