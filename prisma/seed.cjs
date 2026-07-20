@@ -332,6 +332,20 @@ async function main() {
     console.log("Created default PayrollParameterSet for dev.");
   }
 
+  const leavePolicy = await prisma.leavePolicyParameterSet.findFirst({
+    where: { companyId: company.id },
+  });
+
+  if (!leavePolicy) {
+    await prisma.leavePolicyParameterSet.create({
+      data: {
+        companyId: company.id,
+        effectiveFrom: new Date("2000-01-01T00:00:00.000Z"),
+      },
+    });
+    console.log("Created default LeavePolicyParameterSet.");
+  }
+
   if (upsertDevCompanyIdInEnv(company.id)) {
   console.log(`\nUpdated .env → DEV_DEFAULT_COMPANY_ID=${company.id}`);
 

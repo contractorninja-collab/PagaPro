@@ -1,6 +1,25 @@
 import type { LeavePolicyParameterSet } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+const DEFAULT_POLICY_EFFECTIVE_FROM = new Date("2000-01-01T00:00:00.000Z");
+
+export async function ensureDefaultLeavePolicyParameterSet(
+  companyId: string,
+): Promise<LeavePolicyParameterSet> {
+  const existing = await prisma.leavePolicyParameterSet.findFirst({
+    where: { companyId },
+    orderBy: { effectiveFrom: "desc" },
+  });
+  if (existing) return existing;
+
+  return prisma.leavePolicyParameterSet.create({
+    data: {
+      companyId,
+      effectiveFrom: DEFAULT_POLICY_EFFECTIVE_FROM,
+    },
+  });
+}
+
 /** Effective policy row for `at` (UTC instant). Falls back to latest set if gaps exist. */
 export async function resolveLeavePolicyParameterSet(
   companyId: string,
@@ -22,5 +41,5 @@ export async function resolveLeavePolicyParameterSet(
   });
   if (fallback) return fallback;
 
-  throw new Error("Mungon LeavePolicyParameterSet për këtë kompani — ekzekutoni migrimet Kosova.");
+  return ensureDefaultLeavePolicyParameterSet(companyId);
 }
