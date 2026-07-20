@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   /** Avoid picking parent-folder lockfile when multiple exist on the machine */
   outputFileTracingRoot: path.join(__dirname),
+  outputFileTracingIncludes: {
+    "/*": ["./templates/**/*.docx", "./templates/**/*.json"],
+  },
   async redirects() {
     return [{ source: "/konfigurimet", destination: "/konfigurime", permanent: true }];
   },

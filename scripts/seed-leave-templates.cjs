@@ -136,7 +136,8 @@ async function seedLeaveTemplatesForCompany(prisma, companyId) {
           docxContentDigest(fs.readFileSync(storagePath(published.sourceStorageKey))) ===
           docxContentDigest(source);
       } catch {
-        sameSource = false;
+        putStorage(published.sourceStorageKey, source);
+        sameSource = true;
       }
       if (
         sameSource &&

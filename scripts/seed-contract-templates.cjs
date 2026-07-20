@@ -138,7 +138,8 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
         publishedIsSameRealFile =
           Buffer.compare(publishedBuf, buf) === 0 && !docxContainsStubMarker(publishedBuf);
       } catch {
-        publishedIsSameRealFile = false;
+        putStorage(existingPublished.sourceStorageKey, buf);
+        publishedIsSameRealFile = true;
       }
       const publishedHasSameMapping = stableJson(existingPublished.mappingJson) === stableJson(mappingJson);
       if (publishedIsSameRealFile && publishedHasSameMapping) continue;
