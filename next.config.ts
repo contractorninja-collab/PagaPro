@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   /** Avoid picking parent-folder lockfile when multiple exist on the machine */
   outputFileTracingRoot: path.join(__dirname),
+  /**
+   * These asset dirs are read at runtime via process.cwd() (termination/leave/
+   * contract DOCX and the ATK xlsx). Next cannot see a dynamic fs.readFile, so
+   * without this they are not traced into the serverless bundle and every read
+   * ENOENTs on Vercel. They are small (a handful of docx + one xlsx + json).
+   */
+  outputFileTracingIncludes: {
+    "/**": ["./templates/**", "./public/atk_template/**"],
+  },
   async redirects() {
     return [{ source: "/konfigurimet", destination: "/konfigurime", permanent: true }];
   },

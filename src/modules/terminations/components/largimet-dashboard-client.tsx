@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { payrollMonthNameSq } from "@/modules/payroll/helpers/month-label";
-import { logDocumentDownloadAction } from "@/modules/documents/actions/documents-actions";
 import {
   createTerminationAction,
   approveTerminationAction,
@@ -654,70 +653,44 @@ function useRowRunner(startTransition: (fn: () => void) => void) {
   };
 }
 
-/**
- * Streams an artifact's DOCX to the browser.
- *
- * Deliberately not the `window.open` idiom used on the document detail page: here the
- * call can follow a full server-side render, which puts the popup outside the user-gesture
- * window and gets it blocked. Fetching the blob also turns a missing file into a toast
- * instead of a raw JSON error page.
- */
-async function downloadArtifactDocx(artifactId: string, filename: string): Promise<void> {
-  const res = await fetch(`/api/dokumentet/artifacts/${artifactId}/docx?inline=0`);
-  if (!res.ok) {
-    toast.error("Skedari i dokumentit nuk u gjet.");
-    return;
-  }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  void logDocumentDownloadAction({ artifactId });
-}
-
 function docxFilenameFor(row: LargimetRowSerialized): string {
-  const stored = row.generatedDocument?.displayFilename?.replace(/\.[^.]+$/, "");
-  if (stored) return `${stored}.docx`;
-  return `Largim-${row.employee.lastName}-${row.employee.firstName}.docx`.replace(/\s+/g, "-");
+  return `Nderprerje-${row.employee.lastName}-${row.employee.firstName}.docx`.replace(/\s+/g, "-");
 }
 
 /**
- * Generates the termination document if it doesn't exist yet, then downloads it.
- * Uses its own transition so one row's spinner doesn't disable every other row.
+ * Downloads the termination document, rendered in-request by
+ * /api/largimet/[id]/document. That route persists nothing and falls back to the
+ * repo's bundled template when no seeded blob exists, so it works with or without
+ * an object store. Uses its own transition so one row's spinner doesn't disable
+ * every other row.
  */
 function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean }) {
   const { row } = props;
-  const router = useRouter();
   const [busy, startDownload] = useTransition();
 
   function onClick() {
     startDownload(async () => {
-      const filename = docxFilenameFor(row);
-
-      if (row.generatedDocument?.generatedDocxStorageKey) {
-        await downloadArtifactDocx(row.generatedDocument.id, filename);
-        return;
-      }
-
-      const res = await generateTerminationDocumentActionServer({ id: row.id });
+      const res = await fetch(`/api/largimet/${row.id}/document?inline=0`);
       if (!res.ok) {
-        // The "no template seeded" message is long but actionable — show it in full.
-        toast.error(res.error, { duration: 8000 });
+        let message = "Dokumenti nuk u gjenerua.";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body.error) message = body.error;
+        } catch {
+          /* keep the generic message */
+        }
+        toast.error(message, { duration: 8000 });
         return;
       }
-      const artifactId = res.data?.artifactId;
-      if (!artifactId) {
-        toast.error("Dokumenti u gjenerua, por nuk u kthye ID e tij.");
-        return;
-      }
-      toast.success("Dokumenti u gjenerua.");
-      await downloadArtifactDocx(artifactId, filename);
-      router.refresh();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = docxFilenameFor(row);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     });
   }
 
@@ -729,7 +702,7 @@ function RowDownloadButton(props: { row: LargimetRowSerialized; pending: boolean
       onClick={onClick}
     >
       <Download className="h-3.5 w-3.5" aria-hidden />
-      {busy ? "Duke gjeneruar…" : "Shkarko"}
+      {busy ? "Duke shkarkuar…" : "Shkarko"}
     </button>
   );
 }

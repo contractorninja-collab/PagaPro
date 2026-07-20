@@ -1,5 +1,3 @@
-import "server-only";
-
 /**
  * Which blob backend the app uses, resolved once per process.
  *

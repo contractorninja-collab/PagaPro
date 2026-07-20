@@ -1,5 +1,3 @@
-import "server-only";
-
 import { LocalFsDocumentStorage } from "@/modules/documents/engine/storage/local-fs-storage";
 import { SupabaseDocumentStorage } from "@/modules/documents/engine/storage/supabase-storage";
 import type { DocumentStorage } from "@/modules/documents/engine/storage/types";

@@ -1,5 +1,3 @@
-import "server-only";
-
 import { StorageClient } from "@supabase/storage-js";
 import type { DocumentStorage, DocumentStoragePutOptions } from "./types";
 import {
@@ -12,8 +10,9 @@ import {
 /**
  * Supabase Storage implementation of DocumentStorage.
  *
- * Holds a service-role credential, so this module is `server-only`. It must never
- * be re-exported from a barrel that a client component can reach.
+ * Holds a service-role credential. It is only ever constructed by
+ * getCompanyAssetStorage() (a server module) and must never be re-exported from a
+ * barrel that a client component can reach.
  *
  * Error contract, matching LocalFsDocumentStorage:
  *   get()    — StorageNotFoundError when absent, StorageUnavailableError otherwise
