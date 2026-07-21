@@ -342,15 +342,14 @@ export async function finalizeDocumentGeneration(
 
     } else if ("skipped" in conv && conv.skipped) {
 
-      if (params.artifactKind === "ARCHIVED_FINAL") {
-
-        throw new Error(
-
-          "Konvertimi PDF nuk është i disponueshëm. Instaloni LibreOffice ose vendosni DOCX_TO_PDF_URL.",
-
-        );
-
-      }
+      // No converter configured (the serverless runtime has none) — accepted
+      // DOCX-only mode. The artifact is stored without a PDF; the PDF route's
+      // ensureArtifactPdf backfills lazily once DOCX_TO_PDF_URL is configured.
+      // A configured-but-failing converter (the "error" branch below) still
+      // throws for finals, because that is a broken setup, not a chosen one.
+      console.warn(
+        "[pagapro] PDF converter unavailable — storing ARCHIVED_FINAL artifact as DOCX only.",
+      );
 
     } else if ("error" in conv) {
 
