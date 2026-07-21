@@ -202,6 +202,36 @@ export async function updateContractTerm(
   return { ok: true };
 }
 
+/**
+ * Deletes an annex created by mistake. Only removes the record — the employee's
+ * data (and any contract-term change a renewal applied) is left as-is; the
+ * contract-term editor can correct that separately. The snapshot chain re-points
+ * to the new latest annex automatically, since each annex carries its own snapshot.
+ */
+export async function deleteEmployeeContractAnnex(
+  companyId: string,
+  annexId: string,
+  actorUserId: string | null,
+): Promise<{ ok: true; employeeId: string } | { ok: false; error: string }> {
+  const annex = await prisma.employeeContractAnnex.findFirst({
+    where: { id: annexId, companyId },
+    select: { id: true, employeeId: true, annexNumber: true },
+  });
+  if (!annex) return { ok: false, error: "Aneksi nuk u gjet." };
+
+  await prisma.employeeContractAnnex.deleteMany({ where: { id: annexId, companyId } });
+
+  await appendEmpAuditLog({
+    companyId,
+    employeeId: annex.employeeId,
+    action: "EMPLOYEE_CONTRACT_ANNEX_DELETED",
+    actorUserId,
+    diff: JSON.parse(JSON.stringify({ annexNumber: annex.annexNumber })),
+  });
+
+  return { ok: true, employeeId: annex.employeeId };
+}
+
 export interface CreateAnnexInput {
   employeeId: string;
   effectiveDate: Date;

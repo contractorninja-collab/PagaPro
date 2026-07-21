@@ -5,6 +5,7 @@ import { getCompanyContext, companyContextErrorMessage } from "@/server/company-
 import {
   computeAnnexDiff,
   createEmployeeContractAnnex,
+  deleteEmployeeContractAnnex,
   getAnnexPanelData,
   updateContractTerm,
   type AnnexPanelData,
@@ -81,6 +82,28 @@ export async function updateContractTermAction(raw: unknown): Promise<AnnexActio
   if (!res.ok) return res;
   try {
     revalidatePath(`/punonjesit/${parsed.data.employeeId}`);
+  } catch {
+    /* ignore */
+  }
+  return { ok: true };
+}
+
+const annexIdSchema = z.object({ annexId: z.string().min(1) });
+
+export async function deleteAnnexAction(raw: unknown): Promise<AnnexActionResult> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const parsed = annexIdSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
+
+  const res = await deleteEmployeeContractAnnex(
+    ctx.context.companyId,
+    parsed.data.annexId,
+    ctx.context.user.id,
+  );
+  if (!res.ok) return res;
+  try {
+    revalidatePath(`/punonjesit/${res.employeeId}`);
   } catch {
     /* ignore */
   }

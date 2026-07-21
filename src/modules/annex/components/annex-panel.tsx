@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { FileText, Printer, Plus } from "lucide-react";
+import { FileText, Printer, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ContractTermType } from "@prisma/client";
 import { CONTRACT_TERM_LABELS, ANNEX_CATEGORY_LABELS, type AnnexChangeCategory } from "@/modules/annex/types";
 import {
   getAnnexPanelDataAction,
   updateContractTermAction,
+  deleteAnnexAction,
 } from "@/modules/annex/actions/annex-actions";
 import type { AnnexPanelData } from "@/modules/annex/services/annex-service";
 import { AnnexDialog } from "./annex-dialog";
@@ -35,6 +37,8 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTerm, setEditingTerm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     getAnnexPanelDataAction({ employeeId }).then((res) => {
@@ -70,6 +74,22 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
 
   function printAnnex(annexId: string) {
     window.open(`/punonjesit/${employeeId}/aneks/${annexId}/print`, "_blank", "noopener,noreferrer");
+  }
+
+  async function deleteAnnex(annexId: string) {
+    setDeletingId(annexId);
+    try {
+      const res = await deleteAnnexAction({ annexId });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Aneksi u fshi.");
+      setConfirmDeleteId(null);
+      load();
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   if (!data) {
@@ -125,21 +145,53 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
                       .join(", ")}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button type="button" className={BTN_DENSE} onClick={() => printAnnex(a.id)}>
-                    <Printer className="h-3.5 w-3.5" aria-hidden />
-                    Printo
-                  </button>
-                  <button
-                    type="button"
-                    className={BTN_DENSE}
-                    disabled={busyId === a.id}
-                    onClick={() => downloadDocx(a.id)}
-                  >
-                    <FileText className="h-3.5 w-3.5" aria-hidden />
-                    {busyId === a.id ? "…" : "Shkarko"}
-                  </button>
-                </div>
+                {confirmDeleteId === a.id ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-[12px] font-medium text-[#b45309]">Fshij aneksin?</span>
+                    <button
+                      type="button"
+                      className={cn(BTN_DENSE, "border-destructive/40 text-destructive")}
+                      disabled={deletingId === a.id}
+                      onClick={() => deleteAnnex(a.id)}
+                    >
+                      {deletingId === a.id ? "…" : "Po, fshij"}
+                    </button>
+                    <button
+                      type="button"
+                      className={BTN_DENSE}
+                      disabled={deletingId === a.id}
+                      onClick={() => setConfirmDeleteId(null)}
+                    >
+                      Jo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button type="button" className={BTN_DENSE} onClick={() => printAnnex(a.id)}>
+                      <Printer className="h-3.5 w-3.5" aria-hidden />
+                      Printo
+                    </button>
+                    <button
+                      type="button"
+                      className={BTN_DENSE}
+                      disabled={busyId === a.id}
+                      onClick={() => downloadDocx(a.id)}
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden />
+                      {busyId === a.id ? "…" : "Shkarko"}
+                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-destructive")}
+                        aria-label="Fshij aneksin"
+                        onClick={() => setConfirmDeleteId(a.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
