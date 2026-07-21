@@ -18,7 +18,6 @@ import { validateMinimumCompensation } from "./validation/minimum-wage";
 function mergeIssues(...groups: PayrollCalculationIssue[][]): PayrollCalculationIssue[] {
   return groups.flat();
 }
-
 export function calculateEmployeeLine(
   input: CalculateEmployeeLineInput,
   snapshot: LegislationSnapshot,

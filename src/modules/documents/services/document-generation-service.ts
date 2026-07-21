@@ -28,6 +28,8 @@ import { convertDocxBufferToPdf } from "../engine/convert-docx-to-pdf";
 
 import { buildGeneratedDocumentBasename } from "../storage/filename-builder";
 
+import { loadTemplateSource } from "./bundled-template-source";
+
 import {
 
   assertTemplateReadyForGeneration,
@@ -284,7 +286,7 @@ export async function finalizeDocumentGeneration(
 
 
 
-  const templateDocxBuffer = await params.storage.get(version.sourceStorageKey);
+  const templateDocxBuffer = await loadTemplateSource(params.storage, version);
 
   if (category === "CONTRACT" && isGeneratedContractStub(templateDocxBuffer)) {
     throw new Error(

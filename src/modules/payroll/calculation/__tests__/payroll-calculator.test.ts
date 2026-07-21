@@ -6,7 +6,6 @@ import { calculateEmployeeLine } from "../payroll-calculator";
 const snapshotWithStandardHours = kosovo2026AtkDefaults({
   standardMonthlyHours: "173.33",
 });
-
 /** Snapshot without derived hourly rules — useful for gross override scenarios. */
 const snapshotPlain = kosovo2026AtkDefaults();
 

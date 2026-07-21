@@ -17,7 +17,7 @@ export const EMPLOYEE_IMPORT_HEADERS = [
   "Data e punësimit",
   "Paga bruto",
   "Banka",
-  "IBAN",
+  "Numri i llogarisë",
 ] as const;
 
 type ImportField =
@@ -38,6 +38,9 @@ const HEADER_FIELDS: Record<string, ImportField> = {
   "data e punesimit": "hireDate",
   "paga bruto": "baseSalaryMonthly",
   banka: "bankName",
+  "numri i llogarise": "iban",
+  "nr i llogarise": "iban",
+  "nr llogarise": "iban",
   iban: "iban",
 };
 
@@ -110,13 +113,13 @@ function parseSalary(value: string): { amount: string; provided: boolean; error:
   return { amount: amount.toFixed(2), provided: true, error: null };
 }
 
-function normalizeIban(value: string): { iban: string | null; error: string | null } {
-  const iban = value.replace(/\s+/g, "").toUpperCase();
-  if (!iban) return { iban: null, error: null };
-  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) {
-    return { iban, error: "IBAN-i nuk ka format valid." };
+function normalizeBankAccountNumber(value: string): { accountNumber: string | null; error: string | null } {
+  const accountNumber = value.replace(/\s+/g, "").toUpperCase();
+  if (!accountNumber) return { accountNumber: null, error: null };
+  if (!/^[A-Z0-9][A-Z0-9./-]{2,63}$/.test(accountNumber)) {
+    return { accountNumber, error: "Numri i llogarisë nuk ka format valid." };
   }
-  return { iban, error: null };
+  return { accountNumber, error: null };
 }
 
 export function employeeImportTemplateBuffer(): Buffer {
@@ -159,7 +162,7 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       hireDate: "Data e punësimit",
       baseSalaryMonthly: "Paga bruto",
       bankName: "Banka",
-      iban: "IBAN",
+      iban: "Numri i llogarisë",
     };
     throw new EmployeeImportError(`Mungojnë kolonat e detyrueshme: ${missing.map((field) => labels[field]).join(", ")}.`);
   }
@@ -185,8 +188,8 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
 
     const salary = parseSalary(values.baseSalaryMonthly ?? "");
     if (salary.error) errors.push(salary.error);
-    const normalizedIban = normalizeIban(values.iban ?? "");
-    if (normalizedIban.error) errors.push(normalizedIban.error);
+    const normalizedAccountNumber = normalizeBankAccountNumber(values.iban ?? "");
+    if (normalizedAccountNumber.error) errors.push(normalizedAccountNumber.error);
 
     return {
       rowNumber: index + 2,
@@ -197,7 +200,7 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       hireDateIso: hireDate.iso ?? "",
       baseSalaryMonthly: salary.amount,
       bankName: values.bankName || null,
-      iban: normalizedIban.iban,
+      iban: normalizedAccountNumber.accountNumber,
       intendedStatus: salary.provided && !salary.error && Number(salary.amount) > 0 ? "ACTIVE" : "INACTIVE",
       errors,
     };

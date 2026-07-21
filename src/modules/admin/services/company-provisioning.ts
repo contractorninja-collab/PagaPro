@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { companySlugFromName } from "@/lib/company-url";
 import { maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty } from "@/modules/payroll/services/company-holiday-service";
+import { ensureDefaultLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 import type { CompanyUpsertInput } from "@/modules/admin/validation/admin-schemas";
 
 export type ProvisionCompanyResult =
@@ -87,6 +88,12 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
     });
   } catch (err) {
     console.error(`[provisionCompany] payroll parameter set creation failed for ${companyId}:`, err);
+  }
+
+  try {
+    await ensureDefaultLeavePolicyParameterSet(companyId);
+  } catch (err) {
+    console.error(`[provisionCompany] leave policy creation failed for ${companyId}:`, err);
   }
 
   return { ok: true, id: companyId };

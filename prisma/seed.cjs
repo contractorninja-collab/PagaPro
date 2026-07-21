@@ -126,7 +126,7 @@ const PLACEHOLDER_REGISTRY_SEEDS = [
   { placeholderKey: "weekly_hours", label: "Orët javore", category: "payroll", isRequired: false, sourcePath: "employee.weeklyHours" },
   { placeholderKey: "monthly_hours", label: "Orët mujore", category: "payroll", isRequired: false, sourcePath: "employee.standardMonthlyHours" },
   { placeholderKey: "bank_name", label: "Banka", category: "payroll", isRequired: false, sourcePath: "employee.bankName" },
-  { placeholderKey: "iban", label: "IBAN", category: "payroll", isRequired: false, sourcePath: "employeeBankAccount.iban" },
+  { placeholderKey: "iban", label: "Numri i llogarisë", category: "payroll", isRequired: false, sourcePath: "employeeBankAccount.iban" },
   { placeholderKey: "apply_pension", label: "Apliko pensionin", category: "payroll", isRequired: false, sourcePath: "employee.applyTrust" },
   { placeholderKey: "apply_tax", label: "Apliko tatimin", category: "payroll", isRequired: false, sourcePath: "employee.applyTax" },
   { placeholderKey: "company_name", label: "Emri i kompanisë", category: "company", isRequired: true, sourcePath: "company.legalName" },
@@ -330,6 +330,20 @@ async function main() {
       },
     });
     console.log("Created default PayrollParameterSet for dev.");
+  }
+
+  const leavePolicy = await prisma.leavePolicyParameterSet.findFirst({
+    where: { companyId: company.id },
+  });
+
+  if (!leavePolicy) {
+    await prisma.leavePolicyParameterSet.create({
+      data: {
+        companyId: company.id,
+        effectiveFrom: new Date("2000-01-01T00:00:00.000Z"),
+      },
+    });
+    console.log("Created default LeavePolicyParameterSet.");
   }
 
   if (upsertDevCompanyIdInEnv(company.id)) {

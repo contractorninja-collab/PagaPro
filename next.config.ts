@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
    * contract DOCX and the ATK xlsx). Next cannot see a dynamic fs.readFile, so
    * without this they are not traced into the serverless bundle and every read
    * ENOENTs on Vercel. They are small (a handful of docx + one xlsx + json).
+   * "/**" (not "/*") so nested routes like /api/largimet/[id]/document get them.
    */
   outputFileTracingIncludes: {
     "/**": ["./templates/**", "./public/atk_template/**"],

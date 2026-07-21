@@ -235,7 +235,7 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
           <div className="grid gap-2.5">
             <Row label="Orët javore" value={e.weeklyHours} className="tabular-nums" />
             <Row label="Banka" value={e.bankName ?? "—"} />
-            <Row label="IBAN" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
+            <Row label="Numri i llogarisë" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
             <Row label="Apliko Trustin" value={e.applyTrust ? "Po" : "Jo"} />
             <Row label="Apliko tatimin" value={e.applyTax ? "Po" : "Jo"} />
           </div>
