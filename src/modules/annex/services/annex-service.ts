@@ -202,6 +202,37 @@ export async function updateContractTerm(
   return { ok: true };
 }
 
+/** Corrects the effective date of an already-issued annex. */
+export async function updateAnnexEffectiveDate(
+  companyId: string,
+  annexId: string,
+  effectiveDate: Date,
+  actorUserId: string | null,
+): Promise<{ ok: true; employeeId: string } | { ok: false; error: string }> {
+  const annex = await prisma.employeeContractAnnex.findFirst({
+    where: { id: annexId, companyId },
+    select: { id: true, employeeId: true, annexNumber: true },
+  });
+  if (!annex) return { ok: false, error: "Aneksi nuk u gjet." };
+
+  await prisma.employeeContractAnnex.updateMany({
+    where: { id: annexId, companyId },
+    data: { effectiveDate },
+  });
+
+  await appendEmpAuditLog({
+    companyId,
+    employeeId: annex.employeeId,
+    action: "EMPLOYEE_CONTRACT_ANNEX_UPDATED",
+    actorUserId,
+    diff: JSON.parse(
+      JSON.stringify({ annexNumber: annex.annexNumber, effectiveDate: effectiveDate.toISOString() }),
+    ),
+  });
+
+  return { ok: true, employeeId: annex.employeeId };
+}
+
 /**
  * Deletes an annex created by mistake. Only removes the record — the employee's
  * data (and any contract-term change a renewal applied) is left as-is; the

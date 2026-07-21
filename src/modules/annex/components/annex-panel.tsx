@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { FileText, Printer, Plus, Trash2 } from "lucide-react";
+import { FileText, Printer, Plus, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContractTermType } from "@prisma/client";
 import { CONTRACT_TERM_LABELS, ANNEX_CATEGORY_LABELS, type AnnexChangeCategory } from "@/modules/annex/types";
@@ -10,6 +10,7 @@ import {
   getAnnexPanelDataAction,
   updateContractTermAction,
   deleteAnnexAction,
+  updateAnnexEffectiveDateAction,
 } from "@/modules/annex/actions/annex-actions";
 import type { AnnexPanelData } from "@/modules/annex/services/annex-service";
 import { AnnexDialog } from "./annex-dialog";
@@ -39,6 +40,9 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editDateId, setEditDateId] = useState<string | null>(null);
+  const [editDateValue, setEditDateValue] = useState("");
+  const [savingDateId, setSavingDateId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     getAnnexPanelDataAction({ employeeId }).then((res) => {
@@ -89,6 +93,32 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
       load();
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function startEditDate(annexId: string, current: string) {
+    setConfirmDeleteId(null);
+    setEditDateId(annexId);
+    setEditDateValue(current);
+  }
+
+  async function saveDate(annexId: string) {
+    if (!editDateValue) {
+      toast.error("Zgjidhni një datë.");
+      return;
+    }
+    setSavingDateId(annexId);
+    try {
+      const res = await updateAnnexEffectiveDateAction({ annexId, effectiveDate: editDateValue });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Data e hyrjes në fuqi u përditësua.");
+      setEditDateId(null);
+      load();
+    } finally {
+      setSavingDateId(null);
     }
   }
 
@@ -145,7 +175,32 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
                       .join(", ")}
                   </p>
                 </div>
-                {confirmDeleteId === a.id ? (
+                {editDateId === a.id ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <input
+                      type="date"
+                      className={FIELD}
+                      value={editDateValue}
+                      onChange={(e) => setEditDateValue(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className={cn(BTN_DENSE, "border-brand-blue/40 text-brand-blue")}
+                      disabled={savingDateId === a.id}
+                      onClick={() => saveDate(a.id)}
+                    >
+                      {savingDateId === a.id ? "…" : "Ruaj"}
+                    </button>
+                    <button
+                      type="button"
+                      className={BTN_DENSE}
+                      disabled={savingDateId === a.id}
+                      onClick={() => setEditDateId(null)}
+                    >
+                      Anulo
+                    </button>
+                  </div>
+                ) : confirmDeleteId === a.id ? (
                   <div className="flex shrink-0 items-center gap-1.5">
                     <span className="text-[12px] font-medium text-[#b45309]">Fshij aneksin?</span>
                     <button
@@ -181,14 +236,24 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
                       {busyId === a.id ? "…" : "Shkarko"}
                     </button>
                     {canEdit ? (
-                      <button
-                        type="button"
-                        className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-destructive")}
-                        aria-label="Fshij aneksin"
-                        onClick={() => setConfirmDeleteId(a.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-brand-blue")}
+                          aria-label="Ndrysho datën e hyrjes në fuqi"
+                          onClick={() => startEditDate(a.id, a.effectiveDate)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-destructive")}
+                          aria-label="Fshij aneksin"
+                          onClick={() => setConfirmDeleteId(a.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      </>
                     ) : null}
                   </div>
                 )}

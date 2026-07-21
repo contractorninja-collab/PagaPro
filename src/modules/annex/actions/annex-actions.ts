@@ -7,6 +7,7 @@ import {
   createEmployeeContractAnnex,
   deleteEmployeeContractAnnex,
   getAnnexPanelData,
+  updateAnnexEffectiveDate,
   updateContractTerm,
   type AnnexPanelData,
 } from "@/modules/annex/services/annex-service";
@@ -89,6 +90,39 @@ export async function updateContractTermAction(raw: unknown): Promise<AnnexActio
 }
 
 const annexIdSchema = z.object({ annexId: z.string().min(1) });
+
+const updateAnnexDateSchema = z.object({
+  annexId: z.string().min(1),
+  effectiveDate: z.string().min(1),
+});
+
+export async function updateAnnexEffectiveDateAction(
+  raw: unknown,
+): Promise<AnnexActionResult> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const parsed = updateAnnexDateSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+  const effectiveDate = new Date(parsed.data.effectiveDate);
+  if (Number.isNaN(effectiveDate.getTime())) {
+    return { ok: false, error: "Data e hyrjes në fuqi është e pavlefshme." };
+  }
+
+  const res = await updateAnnexEffectiveDate(
+    ctx.context.companyId,
+    parsed.data.annexId,
+    effectiveDate,
+    ctx.context.user.id,
+  );
+  if (!res.ok) return res;
+  try {
+    revalidatePath(`/punonjesit/${res.employeeId}`);
+  } catch {
+    /* ignore */
+  }
+  return { ok: true };
+}
 
 export async function deleteAnnexAction(raw: unknown): Promise<AnnexActionResult> {
   const ctx = await getCompanyContext();
