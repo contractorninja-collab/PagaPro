@@ -110,8 +110,8 @@ export function AnnexDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="!flex max-h-[88vh] max-w-2xl flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Gjenero Aneks Kontrate</DialogTitle>
           <DialogDescription>
             Zgjidhni dhe konfirmoni ndryshimet. Vlerat paraprake mbushen automatikisht; për
@@ -122,7 +122,7 @@ export function AnnexDialog(props: {
         {loading ? (
           <p className="py-8 text-center text-[13px] text-[#64748b]">Duke ngarkuar…</p>
         ) : (
-          <div className="space-y-4">
+          <div className="-mr-1 flex-1 space-y-4 overflow-y-auto pr-1">
             <div className="space-y-2">
               {rows.map((r, i) => (
                 <div
@@ -213,7 +213,7 @@ export function AnnexDialog(props: {
           </div>
         )}
 
-        <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 border-t border-[#eef2f7] bg-white px-6 py-3">
+        <DialogFooter className="shrink-0 border-t border-[#eef2f7] pt-3">
           <button type="button" className={BTN_SECONDARY} onClick={() => props.onOpenChange(false)}>
             Anulo
           </button>
