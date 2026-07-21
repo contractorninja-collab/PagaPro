@@ -12,10 +12,22 @@ function joinAddress(parts: Array<string | null | undefined>): string {
   return parts.map((part) => part?.trim()).filter(Boolean).join(", ");
 }
 
+/** Full country names for document text — ISO codes read poorly in a legal document. */
+const COUNTRY_NAMES: Record<string, string> = {
+  XK: "Republika e Kosovës",
+  RKS: "Republika e Kosovës",
+};
+
+function formatCountry(code: string | null | undefined): string {
+  const trimmed = code?.trim();
+  if (!trimmed) return "";
+  return COUNTRY_NAMES[trimmed.toUpperCase()] ?? trimmed;
+}
+
 function resolveCompanyAddress(company: CompanyContractDto, settings: CompanySettingContractDto | null): string {
   return (
     settings?.companyAddressLine?.trim() ||
-    joinAddress([company.addressLine, company.postalCode, company.city, company.country])
+    joinAddress([company.addressLine, company.postalCode, company.city, formatCountry(company.country)])
   );
 }
 
@@ -97,7 +109,7 @@ export function buildCoreOrganizationalContext(
   const employeeAddress = joinAddress([
     employee.addressLine,
     employee.addressCity,
-    employee.addressCountry,
+    formatCountry(employee.addressCountry),
   ]);
 
   const displayCompanyName = company.tradeName?.trim() || company.legalName;
