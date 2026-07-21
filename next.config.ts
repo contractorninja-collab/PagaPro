@@ -16,7 +16,9 @@ const nextConfig: NextConfig = {
    * "/**" (not "/*") so nested routes like /api/largimet/[id]/document get them.
    */
   outputFileTracingIncludes: {
-    "/**": ["./templates/**", "./public/atk_template/**"],
+    // scripts/** because company provisioning loads the per-company template
+    // seeders (scripts/seed-*-templates.cjs) at runtime via createRequire.
+    "/**": ["./templates/**", "./public/atk_template/**", "./scripts/**"],
   },
   async redirects() {
     return [{ source: "/konfigurimet", destination: "/konfigurime", permanent: true }];

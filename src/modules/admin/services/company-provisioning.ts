@@ -2,10 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { companySlugFromName } from "@/lib/company-url";
 import { maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty } from "@/modules/payroll/services/company-holiday-service";
 import { ensureDefaultLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
+import { seedDocumentTemplatesForCompany } from "@/modules/admin/services/company-template-seeding";
 import type { CompanyUpsertInput } from "@/modules/admin/validation/admin-schemas";
 
 export type ProvisionCompanyResult =
-  | { ok: true; id: string }
+  | {
+      ok: true;
+      id: string;
+      /** Bundled document-template versions published for this company. */
+      templatesSeeded: number;
+      /** Non-fatal provisioning problems the operator should see and fix. */
+      warnings: string[];
+    }
   | {
       ok: false;
       code: "DUPLICATE_NUI" | "DUPLICATE_NRB" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
@@ -68,11 +76,15 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
     return { ok: false, code: "DB_ERROR", message };
   }
 
-  // Baseline provisioning — failures here must not orphan the company silently; log and continue.
+  // Baseline provisioning — failures here must not orphan the company, but they
+  // must also not be silent: collect them as warnings for the operator.
+  const warnings: string[] = [];
+
   try {
     await maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty(companyId);
   } catch (err) {
     console.error(`[provisionCompany] holiday seeding failed for ${companyId}:`, err);
+    warnings.push("Festat zyrtare nuk u krijuan automatikisht.");
   }
 
   try {
@@ -88,13 +100,20 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
     });
   } catch (err) {
     console.error(`[provisionCompany] payroll parameter set creation failed for ${companyId}:`, err);
+    warnings.push("Parametrat e pagës nuk u krijuan automatikisht.");
   }
 
   try {
     await ensureDefaultLeavePolicyParameterSet(companyId);
   } catch (err) {
     console.error(`[provisionCompany] leave policy creation failed for ${companyId}:`, err);
+    warnings.push("Politika e pushimeve nuk u krijua automatikisht.");
   }
 
-  return { ok: true, id: companyId };
+  // Document templates (contracts, leave, termination) — previously only the
+  // build seeded these, so a company created between deploys had none.
+  const templates = await seedDocumentTemplatesForCompany(prisma, companyId);
+  warnings.push(...templates.warnings);
+
+  return { ok: true, id: companyId, templatesSeeded: templates.seeded, warnings };
 }

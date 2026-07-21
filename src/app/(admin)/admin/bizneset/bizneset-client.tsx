@@ -54,7 +54,12 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
     startTransition(async () => {
       const res = await createCompanyAction(values);
       if (res.ok && res.data) {
-        toast.success("Biznesi u krijua me sukses.");
+        toast.success(
+          `Biznesi u krijua. U instaluan ${res.data.templatesSeeded} shabllone dokumentesh.`,
+        );
+        for (const warning of res.data.warnings) {
+          toast.warning(warning, { duration: 10000 });
+        }
         setCreateOpen(false);
         router.push(adminPath(`bizneset/${res.data.id}`));
       } else if (!res.ok) {

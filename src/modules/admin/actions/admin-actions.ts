@@ -39,7 +39,9 @@ function revalidateBizneset(companyId?: string) {
   }
 }
 
-export async function createCompanyAction(raw: unknown): Promise<AdminActionResult<{ id: string }>> {
+export async function createCompanyAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ id: string; templatesSeeded: number; warnings: string[] }>> {
   try {
     if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
 
@@ -86,7 +88,10 @@ export async function createCompanyAction(raw: unknown): Promise<AdminActionResu
     }
 
     revalidateBizneset(res.id);
-    return { ok: true, data: { id: res.id } };
+    return {
+      ok: true,
+      data: { id: res.id, templatesSeeded: res.templatesSeeded, warnings: res.warnings },
+    };
   } catch (err) {
     console.error("[createCompanyAction] unexpected:", err);
     return { ok: false, error: "Krijimi i biznesit dështoi papritur." };
