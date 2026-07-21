@@ -110,7 +110,7 @@ export function AnnexDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gjenero Aneks Kontrate</DialogTitle>
           <DialogDescription>
@@ -213,7 +213,7 @@ export function AnnexDialog(props: {
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 border-t border-[#eef2f7] bg-white px-6 py-3">
           <button type="button" className={BTN_SECONDARY} onClick={() => props.onOpenChange(false)}>
             Anulo
           </button>
