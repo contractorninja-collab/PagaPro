@@ -8,9 +8,16 @@ import {
 
 const HEADER_REL_TYPE =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+const FOOTER_REL_TYPE =
+  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
 const IMAGE_REL_TYPE =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+const SETTINGS_REL_TYPE =
+  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
 const MM_TO_EMU = 36_000;
+const MM_TO_TWIPS = 1_440 / 25.4;
+const LOGO_HEADER_OFFSET_MM = 3;
+const LOGO_HEADER_GAP_MM = 6;
 
 function relationshipTarget(relsXml: string, relationshipId: string): string | null {
   const escaped = relationshipId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,17 +42,54 @@ function insertBeforeClosing(xml: string, closingTag: string, content: string): 
   return `${xml.slice(0, index)}${content}${xml.slice(index)}`;
 }
 
-function logoDrawingXml(logo: CompanyLogoAsset, relationshipId: string): string {
-  const size = containDimensions(
+function displayedLogoSize(logo: CompanyLogoAsset): { width: number; height: number } {
+  return containDimensions(
     logo.width,
     logo.height,
     COMPANY_LOGO_MAX_WIDTH_MM,
     COMPANY_LOGO_MAX_HEIGHT_MM,
   );
+}
+
+function logoDrawingXml(
+  size: { width: number; height: number },
+  relationshipId: string,
+): string {
   const cx = Math.round(size.width * MM_TO_EMU);
   const cy = Math.round(size.height * MM_TO_EMU);
 
-  return `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="1" w:lineRule="exact"/><w:jc w:val="left"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="900001" name="PagaPRO Company Logo"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="company-logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>`;
+  return `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="left"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="900001" name="PagaPRO Company Logo" descr="Company logo"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="company-logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+
+function setTwipsAttribute(tag: string, name: string, value: number): string {
+  const attribute = new RegExp(`\\s${name}=["'][^"']*["']`);
+  if (attribute.test(tag)) return tag.replace(attribute, ` ${name}="${value}"`);
+  return tag.replace(/\s*\/?>(?=$)/, (ending) => ` ${name}="${value}"${ending}`);
+}
+
+function reserveHeaderSpace(section: string, logoHeightMm: number): string {
+  const requiredTop = Math.ceil(
+    (LOGO_HEADER_OFFSET_MM + logoHeightMm + LOGO_HEADER_GAP_MM) * MM_TO_TWIPS,
+  );
+  const headerOffset = Math.round(LOGO_HEADER_OFFSET_MM * MM_TO_TWIPS);
+  const pageMargins = section.match(/<w:pgMar\b[^>]*\/?\s*>/)?.[0];
+
+  if (!pageMargins) {
+    const margins = `<w:pgMar w:top="${requiredTop}" w:right="1440" w:bottom="1440" w:left="1440" w:header="${headerOffset}" w:footer="720" w:gutter="0"/>`;
+    return section.replace(/(<w:cols\b|<w:docGrid\b|<\/w:sectPr>)/, `${margins}$1`);
+  }
+
+  const currentTop = Number(pageMargins.match(/\bw:top=["'](\d+)["']/)?.[1] ?? 0);
+  const currentHeader = Number(
+    pageMargins.match(/\bw:header=["'](\d+)["']/)?.[1] ?? headerOffset,
+  );
+  let nextMargins = setTwipsAttribute(pageMargins, "w:top", Math.max(currentTop, requiredTop));
+  nextMargins = setTwipsAttribute(
+    nextMargins,
+    "w:header",
+    Math.min(currentHeader, headerOffset),
+  );
+  return section.replace(pageMargins, nextMargins);
 }
 
 function emptyHeaderXml(): string {
@@ -68,12 +112,49 @@ function ensureHeaderNamespaces(xml: string): string {
   });
 }
 
-function headerPartFromTarget(target: string): string {
+function wordPartFromTarget(target: string): string {
   const normalized = target.replace(/\\/g, "/").replace(/^\.\//, "");
   return normalized.startsWith("word/") ? normalized : `word/${normalized}`;
 }
 
-/** Adds a floating, left-aligned logo to repeating headers without changing body content. */
+function headerReferenceId(section: string, type: string): string | null {
+  const reference = section.match(
+    new RegExp(`<w:headerReference\\b(?=[^>]*\\bw:type=["']${type}["'])[^>]*>`),
+  )?.[0];
+  return reference?.match(/\br:id=["']([^"']+)["']/)?.[1] ?? null;
+}
+
+function insertHeaderReference(section: string, type: string, relationshipId: string): string {
+  const references = Array.from(section.matchAll(/<w:headerReference\b[^>]*>/g));
+  const boundaryReference = type === "even" ? references[0] : references.at(-1);
+  const insertAt = boundaryReference?.index !== undefined
+    ? boundaryReference.index + (type === "even" ? 0 : boundaryReference[0].length)
+    : section.indexOf(">") + 1;
+  const reference = `<w:headerReference w:type="${type}" r:id="${relationshipId}"/>`;
+  return `${section.slice(0, insertAt)}${reference}${section.slice(insertAt)}`;
+}
+
+function footerReferenceId(section: string, type: string): string | null {
+  const reference = section.match(
+    new RegExp(`<w:footerReference\\b(?=[^>]*\\bw:type=["']${type}["'])[^>]*>`),
+  )?.[0];
+  return reference?.match(/\br:id=["']([^"']+)["']/)?.[1] ?? null;
+}
+
+function insertEvenFooterReference(section: string, relationshipId: string): string {
+  const firstFooter = section.match(/<w:footerReference\b[^>]*>/);
+  const insertAt = firstFooter?.index ?? (() => {
+    const headers = Array.from(section.matchAll(/<w:headerReference\b[^>]*>/g));
+    const lastHeader = headers.at(-1);
+    return lastHeader?.index !== undefined
+      ? lastHeader.index + lastHeader[0].length
+      : section.indexOf(">") + 1;
+  })();
+  const reference = `<w:footerReference w:type="even" r:id="${relationshipId}"/>`;
+  return `${section.slice(0, insertAt)}${reference}${section.slice(insertAt)}`;
+}
+
+/** Adds a left-aligned logo to repeating headers and reserves enough space above the body. */
 export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsset | null): Buffer {
   if (!logo) return docxBuffer;
 
@@ -84,12 +165,15 @@ export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsse
 
   let documentXml = documentFile.asText();
   let documentRelsXml = documentRelsFile.asText();
+  const logoSize = displayedLogoSize(logo);
   const referencedHeaders = new Set<string>();
   const createdHeaders = new Set<string>();
+  const createdFooters = new Set<string>();
+  let createdSettings = false;
 
   documentXml.replace(/<w:headerReference\b[^>]*\br:id=["']([^"']+)["'][^>]*\/?\s*>/g, (_all, id: string) => {
     const target = relationshipTarget(documentRelsXml, id);
-    if (target) referencedHeaders.add(headerPartFromTarget(target));
+    if (target) referencedHeaders.add(wordPartFromTarget(target));
     return _all;
   });
 
@@ -98,6 +182,11 @@ export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsse
     .filter((value): value is string => Boolean(value))
     .map(Number);
   let nextHeaderNumber = Math.max(0, ...headerNumbers) + 1;
+  const footerNumbers = Object.keys(zip.files)
+    .map((name) => name.match(/^word\/footer(\d+)\.xml$/)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map(Number);
+  let nextFooterNumber = Math.max(0, ...footerNumbers) + 1;
 
   const addSharedHeader = (): { part: string; relId: string } => {
     const part = `word/header${nextHeaderNumber++}.xml`;
@@ -113,21 +202,97 @@ export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsse
     return { part, relId };
   };
 
+  const cloneHeader = (sourceRelId: string): string | null => {
+    const target = relationshipTarget(documentRelsXml, sourceRelId);
+    if (!target) return null;
+    const sourcePart = wordPartFromTarget(target);
+    const sourceFile = zip.file(sourcePart);
+    if (!sourceFile) return null;
+
+    const part = `word/header${nextHeaderNumber++}.xml`;
+    const relId = nextRelationshipId(documentRelsXml, "rIdPagaproHeaderClone");
+    documentRelsXml = insertBeforeClosing(
+      documentRelsXml,
+      "</Relationships>",
+      `<Relationship Id="${relId}" Type="${HEADER_REL_TYPE}" Target="${part.slice("word/".length)}"/>`,
+    );
+    zip.file(part, sourceFile.asText());
+    const sourceRelsPart = `word/_rels/${sourcePart.slice("word/".length)}.rels`;
+    const clonedRelsPart = `word/_rels/${part.slice("word/".length)}.rels`;
+    const sourceRelsFile = zip.file(sourceRelsPart);
+    if (sourceRelsFile) zip.file(clonedRelsPart, sourceRelsFile.asText());
+    referencedHeaders.add(part);
+    createdHeaders.add(part);
+    return relId;
+  };
+
+  const cloneFooter = (sourceRelId: string): string | null => {
+    const target = relationshipTarget(documentRelsXml, sourceRelId);
+    if (!target) return null;
+    const sourcePart = wordPartFromTarget(target);
+    const sourceFile = zip.file(sourcePart);
+    if (!sourceFile) return null;
+
+    const part = `word/footer${nextFooterNumber++}.xml`;
+    const relId = nextRelationshipId(documentRelsXml, "rIdPagaproFooterClone");
+    documentRelsXml = insertBeforeClosing(
+      documentRelsXml,
+      "</Relationships>",
+      `<Relationship Id="${relId}" Type="${FOOTER_REL_TYPE}" Target="${part.slice("word/".length)}"/>`,
+    );
+    zip.file(part, sourceFile.asText());
+    const sourceRelsPart = `word/_rels/${sourcePart.slice("word/".length)}.rels`;
+    const clonedRelsPart = `word/_rels/${part.slice("word/".length)}.rels`;
+    const sourceRelsFile = zip.file(sourceRelsPart);
+    if (sourceRelsFile) zip.file(clonedRelsPart, sourceRelsFile.asText());
+    createdFooters.add(part);
+    return relId;
+  };
+
+  const settingsFile = zip.file("word/settings.xml");
+  if (settingsFile) {
+    let settingsXml = settingsFile
+      .asText()
+      .replace(/<w:evenAndOddHeaders\b[^>]*\/?\s*>/g, "");
+    settingsXml = settingsXml.replace(
+      /(<w:characterSpacingControl\b|<w:footnotePr\b|<w:endnotePr\b|<w:compat\b|<\/w:settings>)/,
+      "<w:evenAndOddHeaders/>$1",
+    );
+    zip.file("word/settings.xml", settingsXml);
+  } else {
+    const settingsRelId = nextRelationshipId(documentRelsXml, "rIdPagaproSettings");
+    documentRelsXml = insertBeforeClosing(
+      documentRelsXml,
+      "</Relationships>",
+      `<Relationship Id="${settingsRelId}" Type="${SETTINGS_REL_TYPE}" Target="settings.xml"/>`,
+    );
+    zip.file(
+      "word/settings.xml",
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:evenAndOddHeaders/></w:settings>',
+    );
+    createdSettings = true;
+  }
+
   let sharedHeader: { part: string; relId: string } | null = null;
-  const evenHeadersEnabled = /<w:evenAndOddHeaders\b/.test(zip.file("word/settings.xml")?.asText() ?? "");
   documentXml = documentXml.replace(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g, (section) => {
-    const requiredTypes = ["default"];
+    const requiredTypes = ["default", "even"];
     if (/<w:titlePg\b/.test(section)) requiredTypes.push("first");
-    if (evenHeadersEnabled) requiredTypes.push("even");
     let next = section;
     for (const type of requiredTypes) {
-      const hasType = new RegExp(`<w:headerReference\\b(?=[^>]*\\bw:type=["']${type}["'])`).test(next);
-      if (!hasType) {
-        sharedHeader ??= addSharedHeader();
-        next = next.replace(/(<w:sectPr\b[^>]*>)/, `$1<w:headerReference w:type="${type}" r:id="${sharedHeader.relId}"/>`);
+      if (!headerReferenceId(next, type)) {
+        const defaultRelId = type === "default" ? null : headerReferenceId(next, "default");
+        const clonedRelId = defaultRelId ? cloneHeader(defaultRelId) : null;
+        if (!clonedRelId) sharedHeader ??= addSharedHeader();
+        const relId = clonedRelId ?? sharedHeader!.relId;
+        next = insertHeaderReference(next, type, relId);
       }
     }
-    return next;
+    const defaultFooterRelId = footerReferenceId(next, "default");
+    if (defaultFooterRelId && !footerReferenceId(next, "even")) {
+      const evenFooterRelId = cloneFooter(defaultFooterRelId);
+      if (evenFooterRelId) next = insertEvenFooterReference(next, evenFooterRelId);
+    }
+    return reserveHeaderSpace(next, logoSize.height);
   });
 
   const mediaName = "word/media/pagapro-company-logo.png";
@@ -148,7 +313,7 @@ export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsse
     zip.file(relsPart, relsXml);
 
     let headerXml = ensureHeaderNamespaces(file.asText());
-    headerXml = headerXml.replace(/(<w:hdr\b[^>]*>)/, `$1${logoDrawingXml(logo, imageRelId)}`);
+    headerXml = headerXml.replace(/(<w:hdr\b[^>]*>)/, `$1${logoDrawingXml(logoSize, imageRelId)}`);
     zip.file(headerPart, headerXml);
   }
 
@@ -166,6 +331,23 @@ export function applyCompanyLogoToDocx(docxBuffer: Buffer, logo: CompanyLogoAsse
         `<Override PartName="${partName}" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`,
       );
     }
+  }
+  for (const footerPart of createdFooters) {
+    const partName = `/${footerPart}`;
+    if (!contentTypes.includes(`PartName="${partName}"`)) {
+      contentTypes = insertBeforeClosing(
+        contentTypes,
+        "</Types>",
+        `<Override PartName="${partName}" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`,
+      );
+    }
+  }
+  if (createdSettings && !contentTypes.includes('PartName="/word/settings.xml"')) {
+    contentTypes = insertBeforeClosing(
+      contentTypes,
+      "</Types>",
+      '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>',
+    );
   }
   zip.file("[Content_Types].xml", contentTypes);
 

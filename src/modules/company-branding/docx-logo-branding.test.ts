@@ -23,7 +23,7 @@ function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
   );
   zip.file(
     "word/document.xml",
-    `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>Body stays here</w:t></w:r></w:p><w:sectPr>${withHeader ? '<w:headerReference w:type="default" r:id="rId1"/>' : ""}${titleAndEven ? "<w:titlePg/>" : ""}</w:sectPr></w:body></w:document>`,
+    `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>Body stays here</w:t></w:r></w:p><w:sectPr>${withHeader ? '<w:headerReference w:type="default" r:id="rId1"/>' : ""}${titleAndEven ? "<w:titlePg/>" : ""}<w:pgMar w:top="792" w:right="1037" w:bottom="792" w:left="1037" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`,
   );
   zip.file(
     "word/_rels/document.xml.rels",
@@ -38,7 +38,7 @@ function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
   if (titleAndEven) {
     zip.file(
       "word/settings.xml",
-      '<?xml version="1.0"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:evenAndOddHeaders/></w:settings>',
+      '<?xml version="1.0"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="doNotCompress"/></w:settings>',
     );
   }
   return zip.generate({ type: "nodebuffer" }) as Buffer;
@@ -53,12 +53,17 @@ describe("DOCX company logo branding", () => {
 
     expect(header).toContain("Existing contract header text");
     expect(header).toContain("PagaPRO Company Logo");
-    expect(header).toContain('relativeFrom="margin"');
+    expect(header).toContain("<wp:inline");
+    expect(header).not.toContain("<wp:anchor");
+    expect(header).toContain('<w:jc w:val="left"');
     expect(header).toContain('cx="1260000"');
     expect(header).toContain('cy="630000"');
     expect(rels).toContain("relationships/image");
     expect(zip.file("word/media/pagapro-company-logo.png")).not.toBeNull();
-    expect(zip.file("word/document.xml")?.asText()).toContain("Body stays here");
+    const documentXml = zip.file("word/document.xml")?.asText() ?? "";
+    expect(documentXml).toContain("Body stays here");
+    expect(documentXml).toContain('w:top="1503"');
+    expect(documentXml).toContain('w:header="170"');
   });
 
   it("creates repeating default, first, and even header references when needed", async () => {
@@ -70,8 +75,25 @@ describe("DOCX company logo branding", () => {
     expect(documentXml).toContain('w:type="default"');
     expect(documentXml).toContain('w:type="first"');
     expect(documentXml).toContain('w:type="even"');
+    expect(documentXml.indexOf('w:type="even"')).toBeLessThan(
+      documentXml.indexOf('w:type="default"'),
+    );
+    const headerReferenceIds = Array.from(
+      documentXml.matchAll(/<w:headerReference\b[^>]*\br:id="([^"]+)"/g),
+      (match) => match[1],
+    );
+    expect(new Set(headerReferenceIds).size).toBe(headerReferenceIds.length);
+    const settingsXml = zip.file("word/settings.xml")?.asText() ?? "";
+    expect(settingsXml).toContain("<w:evenAndOddHeaders/>");
+    expect(settingsXml.indexOf("<w:evenAndOddHeaders/>")).toBeLessThan(
+      settingsXml.indexOf("<w:characterSpacingControl"),
+    );
     expect(contentTypes).toContain("wordprocessingml.header+xml");
-    expect(Object.keys(zip.files).some((name) => /^word\/header\d+\.xml$/.test(name))).toBe(true);
+    const headerParts = Object.keys(zip.files).filter((name) => /^word\/header\d+\.xml$/.test(name));
+    expect(headerParts).toHaveLength(3);
+    for (const headerPart of headerParts) {
+      expect(zip.file(headerPart)?.asText()).toContain("PagaPRO Company Logo");
+    }
   });
 
   it("preserves all text in the bundled fixed-term contract header", async () => {
@@ -87,6 +109,9 @@ describe("DOCX company logo branding", () => {
     expect(originalText.length).toBeGreaterThan(0);
     for (const text of originalText) expect(brandedHeader).toContain(text);
     expect(brandedHeader).toContain("PagaPRO Company Logo");
+    expect(new PizZip(output).file("word/document.xml")?.asText()).toContain(
+      '<w:footerReference w:type="even"',
+    );
   });
 
   it("is a no-op when no logo is configured", () => {
