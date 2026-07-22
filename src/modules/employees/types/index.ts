@@ -71,6 +71,8 @@ export interface EmployeeDetailDto {
   bankAccountIban: string | null;
   applyTrust: boolean;
   applyTax: boolean;
+  isForeignNational: boolean;
+  residencePermitExpiryDate: string | null;
   emergencyContact: EmployeeEmergencyContactDto | null;
   internalNotes: string | null;
   documentsMissing: boolean;

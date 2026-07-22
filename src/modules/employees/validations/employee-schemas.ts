@@ -75,6 +75,10 @@ export const employeeUpsertSchema = z
     applyTrust: z.boolean(),
     applyTax: z.boolean(),
 
+    /// Shtetas i huaj (qëndrim i përkohshëm) — the form auto-sets applyTrust=false.
+    isForeignNational: z.boolean().default(false),
+    residencePermitExpiryDate: z.preprocess(parseOptionalDate, z.date().nullable().optional()),
+
     emergencyContactName: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
     emergencyContactPhone: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
     emergencyContactRelationship: z.preprocess(emptyToNull, z.string().trim().max(120).nullable().optional()),

@@ -65,6 +65,46 @@ describe("employeeUpsertSchema", () => {
     expect(r.success).toBe(false);
   });
 
+  it("defaults isForeignNational to false and permit date to absent", () => {
+    const r = employeeUpsertSchema.safeParse(minimal);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isForeignNational).toBe(false);
+      expect(r.data.residencePermitExpiryDate ?? null).toBeNull();
+    }
+  });
+
+  it("accepts a foreign national with a permit expiry date", () => {
+    const r = employeeUpsertSchema.safeParse({
+      ...minimal,
+      isForeignNational: true,
+      residencePermitExpiryDate: "2027-03-31",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isForeignNational).toBe(true);
+      expect(r.data.residencePermitExpiryDate).toBeInstanceOf(Date);
+      // The flag never overrides the calculation switches by itself —
+      // the form drives applyTrust; the schema must pass both through untouched.
+      expect(r.data.applyTrust).toBe(true);
+      expect(r.data.applyTax).toBe(true);
+    }
+  });
+
+  it("keeps the CONTRACTOR transform independent of the foreigner flag", () => {
+    const r = employeeUpsertSchema.safeParse({
+      ...minimal,
+      employmentType: "CONTRACTOR",
+      isForeignNational: true,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.applyTrust).toBe(false);
+      expect(r.data.applyTax).toBe(false);
+      expect(r.data.isForeignNational).toBe(true);
+    }
+  });
+
   it("accepts optional whole-number probation months", () => {
     const empty = employeeUpsertSchema.safeParse({ ...minimal, probationMonths: "" });
     expect(empty.success).toBe(true);

@@ -238,6 +238,22 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
             <Row label="Numri i llogarisë" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
             <Row label="Apliko Trustin" value={e.applyTrust ? "Po" : "Jo"} />
             <Row label="Apliko tatimin" value={e.applyTax ? "Po" : "Jo"} />
+            <Row label="Shtetas i huaj" value={e.isForeignNational ? "Po" : "Jo"} />
+            {e.isForeignNational ? (
+              <Row
+                label="Leja e qëndrimit skadon"
+                value={
+                  e.residencePermitExpiryDate ? formatSqDate(e.residencePermitExpiryDate) : "—"
+                }
+                className={
+                  e.residencePermitExpiryDate &&
+                  new Date(e.residencePermitExpiryDate).getTime() - Date.now() <
+                    60 * 24 * 60 * 60 * 1000
+                    ? "font-semibold text-[#b45309]"
+                    : undefined
+                }
+              />
+            ) : null}
           </div>
         </SectionCard>
 

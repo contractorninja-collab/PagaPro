@@ -66,6 +66,8 @@ export interface EmployeeFormValues {
   bankAccountIban: string;
   applyTrust: boolean;
   applyTax: boolean;
+  isForeignNational: boolean;
+  residencePermitExpiryDate: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -99,6 +101,8 @@ function defaults(): EmployeeFormValues {
     bankAccountIban: "",
     applyTrust: true,
     applyTax: true,
+    isForeignNational: false,
+    residencePermitExpiryDate: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
     emergencyContactRelationship: "",
@@ -137,6 +141,8 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     bankAccountIban: e.bankAccountIban ?? "",
     applyTrust: e.applyTrust,
     applyTax: e.applyTax,
+    isForeignNational: e.isForeignNational,
+    residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
     emergencyContactName: ec?.fullName ?? "",
     emergencyContactPhone: ec?.phone ?? "",
     emergencyContactRelationship: ec?.relationship ?? "",
@@ -181,6 +187,8 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     bankAccountIban: v.bankAccountIban || null,
     applyTrust: v.applyTrust,
     applyTax: v.applyTax,
+    isForeignNational: v.isForeignNational,
+    residencePermitExpiryDate: v.residencePermitExpiryDate || null,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
     emergencyContactRelationship: v.emergencyContactRelationship,
@@ -705,8 +713,52 @@ export function EmployeeFormSheet(props: {
               <div className="flex flex-col gap-4 rounded-md border border-border bg-muted/30 p-4 md:col-span-2">
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
+                    <Label>Shtetas i huaj</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Me leje qëndrimi të përkohshëm — i përjashtuar nga Trusti; tatimi aplikohet
+                      (Ligji 04/L-101).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={values.isForeignNational}
+                    disabled={pending}
+                    onCheckedChange={(v) =>
+                      // One-shot: enabling the flag switches Trust off, but HR may
+                      // re-enable it afterwards (voluntary contributions are legal).
+                      setValues((s) => ({
+                        ...s,
+                        isForeignNational: v,
+                        applyTrust: v ? false : s.applyTrust,
+                      }))
+                    }
+                  />
+                </div>
+                {values.isForeignNational ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="residence-permit-expiry">Skadimi i lejes së qëndrimit</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Paneli ju njofton para skadimit.
+                      </p>
+                    </div>
+                    <Input
+                      id="residence-permit-expiry"
+                      type="date"
+                      className="w-44"
+                      value={values.residencePermitExpiryDate}
+                      onChange={(e) =>
+                        setValues((s) => ({ ...s, residencePermitExpiryDate: e.target.value }))
+                      }
+                      disabled={pending}
+                    />
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
                     <Label>Apliko Trustin</Label>
-                    <p className="text-xs text-muted-foreground">Kontraktorët: gjithmonë jo.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Kontraktorët: gjithmonë jo. Shtetasit e huaj: jo, përveç kontributit vullnetar.
+                    </p>
                   </div>
                   <Switch
                     checked={values.applyTrust}

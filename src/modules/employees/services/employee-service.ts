@@ -179,6 +179,10 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     bankAccountIban: iban,
     applyTrust: e.applyTrust,
     applyTax: e.applyTax,
+    isForeignNational: e.isForeignNational,
+    residencePermitExpiryDate: e.residencePermitExpiryDate
+      ? e.residencePermitExpiryDate.toISOString()
+      : null,
     emergencyContact: ec
       ? {
           fullName: ec.fullName,
@@ -377,6 +381,8 @@ export async function createEmployee(
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
+          isForeignNational: input.isForeignNational,
+          residencePermitExpiryDate: input.residencePermitExpiryDate ?? undefined,
           bankName: input.bankName ?? undefined,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || undefined,
           addressLine: input.addressLine ?? undefined,
@@ -505,6 +511,8 @@ export async function updateEmployee(
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
+          isForeignNational: input.isForeignNational,
+          residencePermitExpiryDate: input.residencePermitExpiryDate ?? null,
           bankName: input.bankName ?? null,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || null,
           addressLine: input.addressLine ?? null,

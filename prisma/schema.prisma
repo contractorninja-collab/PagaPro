@@ -769,6 +769,14 @@ model Employee {
   applyTrust Boolean @default(true)
   applyTax   Boolean @default(true)
 
+  /// Shtetas i huaj me qëndrim të përkohshëm (Ligji 04/L-101: i përjashtuar nga
+  /// kontributet e detyrueshme të Trustit; tatimi në paga aplikohet normalisht).
+  /// The form auto-sets applyTrust=false when this is enabled; applyTrust stays
+  /// the single calculation switch so voluntary contributions remain possible.
+  isForeignNational Boolean @default(false)
+  /// Skadimi i lejes së qëndrimit — drives the dashboard expiry alert.
+  residencePermitExpiryDate DateTime?
+
   /// Emri i bankës (kopjim i shpejtë për UI; llogaria kryesore në EmployeeBankAccount)
   bankName String?
 

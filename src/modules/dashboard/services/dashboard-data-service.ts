@@ -624,6 +624,23 @@ export async function loadDashboardOperationalData(
     fullName: `${e.firstName} ${e.lastName}`.trim(),
   }));
 
+  // Residence-permit expiry for foreign nationals (Shtetas i huaj) — company-wide
+  // compliance, deliberately not narrowed by the department filter.
+  const permitNow = new Date();
+  const permitHorizon = new Date(permitNow.getTime() + 60 * 24 * 60 * 60 * 1000);
+  const permitRows = await prisma.employee.findMany({
+    where: {
+      companyId,
+      isForeignNational: true,
+      status: { not: "TERMINATED" },
+      residencePermitExpiryDate: { not: null, lte: permitHorizon },
+    },
+    select: { residencePermitExpiryDate: true },
+  });
+  const expiredResidencePermits = permitRows.filter(
+    (r) => r.residencePermitExpiryDate != null && r.residencePermitExpiryDate < permitNow,
+  ).length;
+
   const alerts = buildOperationalAlerts({
     ...payloadWithoutAlerts,
     payrollSettingsPresent: settingsRow != null,
@@ -631,6 +648,8 @@ export async function loadDashboardOperationalData(
     documentsMissingEmployees,
     openPayrollCorrections: correctionsOpen,
     expiringContractsTotal: contractsExpiringWithin30Days,
+    expiringResidencePermits: permitRows.length,
+    expiredResidencePermits,
     payrollRowExists: payrollRow != null,
     registerPdfGenerated,
   });

@@ -38,6 +38,8 @@ const alertExtras: Omit<AlertBuilderInput, keyof typeof basePayload> = {
   documentsMissingEmployees: [],
   openPayrollCorrections: 0,
   expiringContractsTotal: 0,
+  expiringResidencePermits: 0,
+  expiredResidencePermits: 0,
   payrollRowExists: true,
   registerPdfGenerated: true,
 };
@@ -70,5 +72,38 @@ describe("buildOperationalAlerts missing docs routing", () => {
     expect(alert?.title).toBe("2 punonjës kanë dokumentacion të paplotë");
     expect(alert?.href).toBe("/punonjesit?documentsMissing=1");
     expect(alert?.actionLabel).toBe("Rishiko punonjësit");
+  });
+});
+
+describe("buildOperationalAlerts residence permits (Shtetas i huaj)", () => {
+  it("emits no permit alert when nothing expires", () => {
+    const alerts = buildOperationalAlerts({ ...basePayload, ...alertExtras });
+    expect(alerts.find((a) => a.id === "residence-permits-expiring")).toBeUndefined();
+  });
+
+  it("warns when permits expire within 60 days", () => {
+    const alerts = buildOperationalAlerts({
+      ...basePayload,
+      ...alertExtras,
+      expiringResidencePermits: 2,
+      expiredResidencePermits: 0,
+    });
+    const alert = alerts.find((a) => a.id === "residence-permits-expiring");
+    expect(alert?.severity).toBe("warning");
+    expect(alert?.title).toBe("2 leje qëndrimi në skadencë (60 ditë)");
+  });
+
+  it("escalates to critical when a permit is already expired", () => {
+    const alerts = buildOperationalAlerts({
+      ...basePayload,
+      ...alertExtras,
+      expiringResidencePermits: 3,
+      expiredResidencePermits: 1,
+    });
+    const alert = alerts.find((a) => a.id === "residence-permits-expiring");
+    expect(alert?.severity).toBe("critical");
+    expect(alert?.title).toBe("1 leje qëndrimi e skaduar");
+    // critical sorts first
+    expect(alerts[0]?.id).toBe("residence-permits-expiring");
   });
 });

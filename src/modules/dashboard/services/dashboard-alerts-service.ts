@@ -7,6 +7,10 @@ export type AlertBuilderInput = Omit<DashboardOperationalPayload, "alerts" | "re
   documentsMissingEmployees: DocumentsMissingEmployeeRef[];
   openPayrollCorrections: number;
   expiringContractsTotal: number;
+  /** Foreign nationals whose residence permit expires within 60 days (incl. already expired). */
+  expiringResidencePermits: number;
+  /** Subset of the above already past their expiry date. */
+  expiredResidencePermits: number;
   payrollRowExists: boolean;
   registerPdfGenerated: boolean;
 };
@@ -36,6 +40,27 @@ export function buildOperationalAlerts(input: AlertBuilderInput): OperationalAle
       detail: "Rishikoni listën dhe planifikoni rinovimin.",
       href: "#contracts-expiry",
       actionLabel: "Shiko kontratat",
+    });
+  }
+
+  if (input.expiringResidencePermits > 0) {
+    const n = input.expiringResidencePermits;
+    const expired = input.expiredResidencePermits;
+    alerts.push({
+      id: "residence-permits-expiring",
+      severity: expired > 0 ? "critical" : "warning",
+      title:
+        expired > 0
+          ? expired === 1
+            ? "1 leje qëndrimi e skaduar"
+            : `${expired} leje qëndrimi të skaduara`
+          : n === 1
+            ? "1 leje qëndrimi në skadencë (60 ditë)"
+            : `${n} leje qëndrimi në skadencë (60 ditë)`,
+      detail:
+        "Punësimi i shtetasve të huaj pa leje të vlefshme qëndrimi është shkelje ligjore — rinovoni lejet.",
+      href: "/punonjesit",
+      actionLabel: "Shiko punonjësit",
     });
   }
 
