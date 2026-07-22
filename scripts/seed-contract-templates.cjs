@@ -42,6 +42,27 @@ const REQUIRED_BUNDLED_FIELDS = new Set([
   "salary_gross",
 ]);
 
+/** Required keys for PLACEHOLDER-mode contract entries (e.g. Praktikant — always fixed-term). */
+const REQUIRED_PLACEHOLDER_FIELDS = new Set([
+  "company_name",
+  "employee_name",
+  "contract_start_date",
+  "contract_end_date",
+  "salary_gross",
+]);
+
+/** {{placeholder}}-based mapping for entries with mode: "PLACEHOLDER" (mirrors the leave seeder). */
+function buildPlaceholderContractMapping(detection) {
+  return {
+    blankFields: [],
+    placeholders: detection.placeholders.map((key) => ({
+      key,
+      required: REQUIRED_PLACEHOLDER_FIELDS.has(key),
+      fallback: "",
+    })),
+  };
+}
+
 function buildBundledMapping(entry, detection) {
   const fields = Array.isArray(entry.fields) ? entry.fields : [];
   if (fields.length !== detection.blankFields.length) {
@@ -90,8 +111,17 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
       console.warn(`[contracts:seed] Skip ${entry.filename} — generated stub detected. Replace with the real Word contract.`);
       continue;
     }
+    const isPlaceholderEntry = entry.mode === "PLACEHOLDER";
     const detection = detectDocxTemplateBuffer(buf, entry.templateSubtype);
-    const mappingJson = buildBundledMapping(entry, detection);
+    if (isPlaceholderEntry && detection.placeholders.length === 0) {
+      throw new Error(`${entry.filename}: no {{placeholder}} fields were detected.`);
+    }
+    const mappingJson = isPlaceholderEntry
+      ? buildPlaceholderContractMapping(detection)
+      : buildBundledMapping(entry, detection);
+    // Placeholder entries: underscore runs are signature formatting, not inputs.
+    const detectionMode = isPlaceholderEntry ? "PLACEHOLDER" : detection.detectionMode;
+    const detectedBlankFields = isPlaceholderEntry ? [] : detection.blankFields;
 
     let template = await prisma.documentTemplate.findFirst({
       where: {
@@ -160,8 +190,8 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
         sourceStorageKey,
         originalFilename: entry.filename,
         detectedPlaceholders: detection.placeholders,
-        detectedBlankFields: detection.blankFields,
-        detectionMode: detection.detectionMode,
+        detectedBlankFields,
+        detectionMode,
         mappingJson,
         isMapped: true,
         isPublished: true,
@@ -171,7 +201,11 @@ async function seedContractTemplatesForCompany(prisma, companyId) {
 
     seeded += 1;
     console.log(
-      `[contracts:seed] ${entry.name} → company ${companyId} (v${versionNumber}, ${detection.blankFields.length} blanks, mapped)`,
+      `[contracts:seed] ${entry.name} → company ${companyId} (v${versionNumber}, ${
+        isPlaceholderEntry
+          ? `${detection.placeholders.length} placeholders`
+          : `${detection.blankFields.length} blanks`
+      }, mapped)`,
     );
   }
 

@@ -46,6 +46,12 @@
         "authorized_person_name",
         "employee_name"
       ]
+    },
+    {
+      "filename": "kontrate-praktikant.docx",
+      "name": "Kontratë Pune për Praktikant",
+      "templateSubtype": "PRAKTIKANT",
+      "mode": "PLACEHOLDER"
     }
   ]
 }

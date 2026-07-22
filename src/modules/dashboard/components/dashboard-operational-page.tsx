@@ -12,11 +12,26 @@ import { DashboardPayrollPanel } from "../widgets/dashboard-payroll-panel";
 import { DashboardQuickActions } from "../widgets/dashboard-quick-actions";
 import { DashboardKpiCards } from "../widgets/dashboard-summary-cards";
 
-/** Greeting by server-side hour: Mirëmëngjes <12h, Mirëdita <18h, else Mirëmbrëma. */
-function greetingForHour(hour: number): string {
-  if (hour < 12) return "Mirëmëngjes";
-  if (hour < 18) return "Mirëdita";
-  return "Mirëmbrëma";
+/**
+ * Greeting by KOSOVO local time (the server runs UTC, so raw getHours() is off
+ * by 1–2h): 00:01–10:30 Mirëmëngjes · 10:31–18:00 Përshëndetje ·
+ * 18:01–24:00 Mirëmbrëma (midnight itself counts as evening).
+ */
+export function greetingForKosovoTime(now: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Belgrade",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const m = hour * 60 + minute;
+
+  if (m === 0) return "Mirëmbrëma"; // exactly 00:00
+  if (m <= 10 * 60 + 30) return "Mirëmëngjes"; // 00:01–10:30
+  if (m <= 18 * 60) return "Përshëndetje"; // 10:31–18:00
+  return "Mirëmbrëma"; // 18:01–23:59
 }
 
 /** "E enjte · 9 korrik 2026" — Albanian weekday + date eyebrow. */
@@ -66,7 +81,7 @@ export function DashboardOperationalPage(props: {
 
   const now = new Date();
   const firstName = props.userDisplayName?.trim().split(/\s+/)[0] || null;
-  const greeting = greetingForHour(now.getHours());
+  const greeting = greetingForKosovoTime(now);
   const atkDeadline = buildAtkDeadline(data, now);
 
   return (

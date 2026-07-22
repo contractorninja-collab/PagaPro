@@ -34,7 +34,17 @@ function parseOptionalDocumentDate(v: unknown): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-export const documentTemplateSubtypeSchema = z.enum(["AFAT_I_CAKTUAR", "AFAT_I_PACAKTUAR"]);
+export const documentTemplateSubtypeSchema = z.enum([
+  "AFAT_I_CAKTUAR",
+  "AFAT_I_PACAKTUAR",
+  "PRAKTIKANT",
+]);
+
+/** Subtypes whose contracts are always fixed-term — an end date is mandatory. */
+export const FIXED_TERM_SUBTYPES: ReadonlyArray<z.infer<typeof documentTemplateSubtypeSchema>> = [
+  "AFAT_I_CAKTUAR",
+  "PRAKTIKANT",
+];
 
 export const generateDocumentPayloadSchema = z.object({
   documentTemplateId: z.string().min(1),
@@ -74,7 +84,7 @@ export const generateContractDocumentsSchema = z
     documentDateIso: z.string().optional(),
   })
   .superRefine((val, ctx) => {
-    if (val.templateSubtype === "AFAT_I_CAKTUAR" && !val.contractEndDateIso?.trim()) {
+    if (FIXED_TERM_SUBTYPES.includes(val.templateSubtype) && !val.contractEndDateIso?.trim()) {
       ctx.addIssue({
         code: "custom",
         message: "Për kontratën me afat të caktuar zgjidhni datën e mbarimit.",

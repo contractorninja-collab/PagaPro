@@ -44,6 +44,19 @@ function main() {
   let ok = true;
 
   for (const tpl of templates) {
+    // PLACEHOLDER-mode entries (e.g. Praktikant) use {{tags}}, not underline
+    // blanks — their underscores are signature formatting, so the blank-count
+    // check does not apply.
+    if (tpl.mode === "PLACEHOLDER") {
+      const full = path.join(dir, tpl.filename ?? "");
+      if (!tpl.filename || !fs.existsSync(full)) {
+        console.error(`Missing real DOCX file: ${tpl.filename}`);
+        ok = false;
+      } else {
+        console.log(`OK ${tpl.filename} (PLACEHOLDER mode — blank check skipped)`);
+      }
+      continue;
+    }
     if (!tpl.filename || !Array.isArray(tpl.fields)) {
       console.error(`Invalid manifest entry: ${JSON.stringify(tpl)}`);
       ok = false;

@@ -198,7 +198,7 @@ export function DocumentGenerateWizardClient(props: {
         documentDateIso: documentDate,
         contractStartDateIso: category === "CONTRACT" ? contractStart : undefined,
         contractEndDateIso:
-          category === "CONTRACT" && selectedTemplate.templateSubtype === "AFAT_I_CAKTUAR"
+          category === "CONTRACT" && ["AFAT_I_CAKTUAR", "PRAKTIKANT"].includes(selectedTemplate.templateSubtype ?? "")
             ? contractEnd
             : category === "CONTRACT"
               ? null
@@ -224,7 +224,7 @@ export function DocumentGenerateWizardClient(props: {
           documentDateIso: documentDate,
           contractStartDateIso: category === "CONTRACT" ? contractStart : undefined,
           contractEndDateIso:
-            category === "CONTRACT" && selectedTemplate!.templateSubtype === "AFAT_I_CAKTUAR"
+            category === "CONTRACT" && ["AFAT_I_CAKTUAR", "PRAKTIKANT"].includes(selectedTemplate!.templateSubtype ?? "")
               ? contractEnd
               : category === "CONTRACT"
                 ? null
@@ -525,7 +525,7 @@ export function DocumentGenerateWizardClient(props: {
                           onChange={(e) => setContractStart(e.target.value)}
                         />
                       </div>
-                      {selectedTemplate.templateSubtype === "AFAT_I_CAKTUAR" ? (
+                      {["AFAT_I_CAKTUAR", "PRAKTIKANT"].includes(selectedTemplate.templateSubtype ?? "") ? (
                         <div className="grid gap-1.5">
                           <label className="text-[12px] font-semibold text-[#64748b]">Mbarimi i kontratës</label>
                           <input

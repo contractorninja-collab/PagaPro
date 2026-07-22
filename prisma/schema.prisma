@@ -209,6 +209,7 @@ enum DocumentTemplateSubtype {
   AFAT_I_CAKTUAR // fixed-term
   AFAT_I_PACAKTUAR // open-ended / indefinite
   KONTRATE_SPECIFIKE // specific / special-purpose agreement
+  PRAKTIKANT // internship contract (Neni 16), part-time, always fixed-term
 }
 
 enum DocumentSourceFormat {
