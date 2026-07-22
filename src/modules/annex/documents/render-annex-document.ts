@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { buildMergedPlaceholderContext } from "@/modules/documents/services/build-placeholder-context";
 import { resolveBundledAnnexTemplate } from "./bundled-annex-template";
 import type { AnnexChange } from "@/modules/annex/types";
+import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
+import { applyCompanyLogoToDocx } from "@/modules/company-branding/docx-logo-branding";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 const DOCX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -114,7 +117,9 @@ export async function renderAnnexDocument(
       },
     });
     doc.render({ ...built.data.flat, changes: built.data.changes });
-    buffer = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+    const rendered = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+    const companyLogo = await loadCompanyLogo(prisma, getCompanyAssetStorage(), companyId);
+    buffer = applyCompanyLogoToDocx(rendered, companyLogo);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

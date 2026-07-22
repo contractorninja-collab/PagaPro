@@ -17,6 +17,8 @@ import { DocumentGenerationStatus } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
 
 import PizZip from "pizzip";
+import { applyCompanyLogoToDocx } from "@/modules/company-branding/docx-logo-branding";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 import { composePlaceholderRegistry, generationArtifactDocxKey, generationArtifactPdfKey } from "../engine";
 
@@ -298,7 +300,7 @@ export async function finalizeDocumentGeneration(
 
 
 
-  const { buffer: renderedBuffer, detectedKeys } = generateDocxFromTemplate({
+  const { buffer: unbrandedBuffer, detectedKeys } = generateDocxFromTemplate({
 
     templateDocxBuffer,
 
@@ -317,6 +319,8 @@ export async function finalizeDocumentGeneration(
     placeholderRegistry: registry,
 
   });
+  const companyLogo = await loadCompanyLogo(params.prisma, params.storage, params.companyId);
+  const renderedBuffer = applyCompanyLogoToDocx(unbrandedBuffer, companyLogo);
 
 
 

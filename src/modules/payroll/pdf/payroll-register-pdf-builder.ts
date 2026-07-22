@@ -1,6 +1,12 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
 import type { PayslipPdfCompany } from "@/modules/payroll/pdf/payslip-pdf-builder";
+import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
+import {
+  drawCompanyLogoPlate,
+  embedCompanyLogo,
+  type EmbeddedCompanyLogo,
+} from "@/modules/company-branding/pdf-logo-branding";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -93,6 +99,7 @@ export interface PayrollRegisterPdfInput {
   documentRef: string;
   withAmounts: boolean;
   rows: PayrollRegisterRow[];
+  logo?: CompanyLogoAsset | null;
 }
 
 function txt(s: string): string {
@@ -173,12 +180,17 @@ function drawCompanyHeader(
   periodLabel: string,
   font: PDFFont,
   fontBold: PDFFont,
+  logo: EmbeddedCompanyLogo | null,
 ) {
   drawRect(page, 0, PAGE_H - 72, PAGE_W, 72, NAVY);
-  drawText(page, company.displayName.toUpperCase(), MARGIN, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
+  const companyTextX = logo
+    ? drawCompanyLogoPlate(page, logo, { x: 16, top: PAGE_H - 7 }) + 10
+    : MARGIN;
+  const companyTextWidth = PAGE_W - companyTextX - MARGIN - 170;
+  drawText(page, fitText(company.displayName.toUpperCase(), fontBold, 16, companyTextWidth), companyTextX, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
   const subLine = [company.addressLine, company.cityLine].filter(Boolean).join(" · ");
   if (subLine) {
-    drawText(page, fitText(subLine, font, 8, CONTENT_W), MARGIN, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
+    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
   }
   drawText(page, docTitle, PAGE_W - MARGIN - 160, PAGE_H - 38, fontBold, 11, rgb(1, 1, 1));
   drawText(page, periodLabel, PAGE_W - MARGIN - 160, PAGE_H - 54, font, 9, rgb(0.85, 0.88, 0.92));
@@ -268,12 +280,6 @@ function drawTableHeader(
   return y - 24;
 }
 
-function drawContinuationBanner(page: PDFPage, title: string, periodLabel: string, fontBold: PDFFont) {
-  drawRect(page, MARGIN, PAGE_H - 56, CONTENT_W, 22, NAVY_LIGHT);
-  drawText(page, `${title} — ${periodLabel} (vazhdim)`, MARGIN + 8, PAGE_H - 48, fontBold, 9, ACCENT);
-  drawHLine(page, PAGE_H - 62, MARGIN, CONTENT_W);
-}
-
 function drawDataRow(
   page: PDFPage,
   row: PayrollRegisterRow,
@@ -338,10 +344,11 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
 
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const companyLogo = await embedCompanyLogo(pdf, input.logo);
   const layout = buildLayout(input.withAmounts);
 
   let page = pdf.addPage([PAGE_W, PAGE_H]);
-  drawCompanyHeader(page, input.company, docTitle, input.periodLabel, font, fontBold);
+  drawCompanyHeader(page, input.company, docTitle, input.periodLabel, font, fontBold, companyLogo);
 
   let y = PAGE_H - 100;
   y = drawMetaBlock(page, input, layout, font, fontBold, y);
@@ -356,8 +363,8 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
   input.rows.forEach((row, idx) => {
     if (y < minY) {
       page = pdf.addPage([PAGE_W, PAGE_H]);
-      drawContinuationBanner(page, docTitle, input.periodLabel, fontBold);
-      y = PAGE_H - 80;
+      drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
+      y = PAGE_H - 100;
       y = drawTableHeader(page, layout, fontBold, y);
     }
     drawDataRow(page, row, idx, layout, input.currency, y, font);
@@ -367,8 +374,8 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
   if (layout.withAmounts && input.rows.length > 0) {
     if (y < minY + 50) {
       page = pdf.addPage([PAGE_W, PAGE_H]);
-      drawContinuationBanner(page, docTitle, input.periodLabel, fontBold);
-      y = PAGE_H - 80;
+      drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
+      y = PAGE_H - 100;
     }
     y = drawTotalsRow(
       page,
@@ -384,8 +391,8 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
 
   if (y < minY + 70) {
     page = pdf.addPage([PAGE_W, PAGE_H]);
-    drawContinuationBanner(page, docTitle, input.periodLabel, fontBold);
-    y = PAGE_H - 80;
+    drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
+    y = PAGE_H - 100;
   }
 
   y = drawSignatureBlock(page, font, y);

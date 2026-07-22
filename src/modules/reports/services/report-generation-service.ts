@@ -19,6 +19,7 @@ import { appendReportExportLog } from "@/modules/reports/services/report-log-ser
 import { generatePayrollAtkExport } from "@/modules/payroll/atk/services/atk-payroll-export-service";
 import type { PayrollPeriodFilters } from "@/modules/reports/validators/report-schemas";
 import type { TerminationMonthFilters } from "@/modules/reports/validators/report-schemas";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 export const PREVIEW_ROW_CAP = 350;
 
@@ -130,6 +131,10 @@ async function buildFileBuffer(params: {
     return { buffer: buf, columns: preview.columns, rows: preview.rows };
   }
 
+  const logo = format === "CSV"
+    ? null
+    : await loadCompanyLogo(prisma, getCompanyAssetStorage(), params.companyId);
+
   if (reportType === "FINANCE_PAYROLL_WORKBOOK" && format === "XLSX") {
     const pf = params.filters as PayrollPeriodFilters;
     const fd = await fetchFinanceWorkbookData(ctx, pf);
@@ -138,6 +143,7 @@ async function buildFileBuffer(params: {
       summaryRows: projectRowsForExport(fd.summary.columns, fd.summary.rows),
       detailColumns: fd.detail.columns,
       detailRows: projectRowsForExport(fd.detail.columns, fd.detail.rows),
+      logo,
     });
     return { buffer, columns: fd.summary.columns, rows: fd.summary.rows };
   }
@@ -164,6 +170,7 @@ async function buildFileBuffer(params: {
       sheetName: title.slice(0, 28),
       columns,
       rows,
+      logo,
     });
     return { buffer, columns, rows };
   }
@@ -178,6 +185,7 @@ async function buildFileBuffer(params: {
       subtitle,
       columns,
       rows,
+      logo,
     });
     return { buffer, columns, rows };
   }

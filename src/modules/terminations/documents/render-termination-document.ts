@@ -6,6 +6,8 @@ import { composePlaceholderRegistry } from "@/modules/documents/engine/placehold
 import { generateDocxFromTemplate } from "@/modules/documents/engine/generate-docx";
 import { StorageNotFoundError } from "@/modules/documents/engine/storage/key-safety";
 import { resolveBundledTerminationTemplate } from "./bundled-termination-template";
+import { applyCompanyLogoToDocx } from "@/modules/company-branding/docx-logo-branding";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 const DOCX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -120,7 +122,9 @@ export async function renderTerminationDocument(
       values: merged,
       placeholderRegistry: composePlaceholderRegistry(["TERMINATION"]),
     });
-    renderedBuffer = result.buffer;
+    const storage = getCompanyAssetStorage();
+    const companyLogo = await loadCompanyLogo(prisma, storage, companyId);
+    renderedBuffer = applyCompanyLogoToDocx(result.buffer, companyLogo);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

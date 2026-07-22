@@ -6,6 +6,8 @@ import { generateBrandedFinancialWorkbookBuffer } from "@/modules/reports/export
 import { buildLibriPagaveRows, type LibriPagaveEntryInput } from "@/modules/reports/exporters/libri-pagave-rows";
 import { rowsToCsvBuffer } from "@/modules/reports/exporters/csv-export";
 import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
+import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const result = await getCompanyContext();
@@ -211,6 +213,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   // Default is Excel format
   try {
+    const logo = await loadCompanyLogo(prisma, getCompanyAssetStorage(), companyId);
     const buf = await generateBrandedFinancialWorkbookBuffer({
       payroll: {
         year: payroll.year,
@@ -220,6 +223,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       companyLabel: data.companyLabel,
       totals: data.totals,
       entries: entriesMapped,
+      logo,
     });
 
     return new NextResponse(new Uint8Array(buf), {

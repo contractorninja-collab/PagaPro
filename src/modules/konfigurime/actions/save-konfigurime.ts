@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
+import { getCompanyAssetStorage, safeDeleteAsset } from "@/lib/company-asset-storage";
 import { prisma } from "@/lib/prisma";
 import {
   formatKonfigurimeFieldErrors,
@@ -9,6 +9,10 @@ import {
 } from "@/modules/konfigurime/validation/konfigurime-schemas";
 import { persistKonfigurimeSave } from "@/modules/konfigurime/services/konfigurime-service";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import {
+  companyLogoStorageKey,
+  normalizeCompanyLogo,
+} from "@/modules/company-branding/company-logo";
 
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -77,6 +81,12 @@ export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKon
 
   const assetKeys = new Map<number, { signatureStorageKey?: string; stampStorageKey?: string }>();
   const repCount = parsed.data.representatives.length;
+  const priorSettings = await prisma.companySetting.findUnique({
+    where: { companyId },
+    select: { companyLogoStorageKey: true },
+  });
+  const priorLogoKey = priorSettings?.companyLogoStorageKey ?? null;
+  let uploadedLogoKey: string | null = null;
 
   try {
     for (let i = 0; i < repCount; i++) {
@@ -95,7 +105,17 @@ export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKon
         assetKeys.set(i, patch);
       }
     }
+
+    const logo = formData.get("company_logo");
+    if (logo instanceof File && logo.size > 0) {
+      const normalized = await normalizeCompanyLogo(Buffer.from(await logo.arrayBuffer()), logo.type);
+      uploadedLogoKey = companyLogoStorageKey(companyId);
+      await getCompanyAssetStorage().put(uploadedLogoKey, normalized.bytes, {
+        contentType: normalized.mimeType,
+      });
+    }
   } catch (e) {
+    if (uploadedLogoKey) await safeDeleteAsset(uploadedLogoKey);
     const msg = e instanceof Error ? e.message : "Ngarkimi dështoi.";
     if (msg === "INVALID_FILE_TYPE") {
       return { ok: false, error: "Lejohen vetëm PNG, JPEG ose WebP për nënshkrim dhe vulë." };
@@ -103,12 +123,22 @@ export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKon
     if (msg === "FILE_TOO_LARGE") {
       return { ok: false, error: "Skedari është shumë i madh (maks. 3 MB)." };
     }
+    if (msg === "INVALID_LOGO_FILE_TYPE" || msg === "INVALID_LOGO_IMAGE") {
+      return { ok: false, error: "Logoja duhet të jetë një skedar PNG, JPEG ose WebP valid." };
+    }
+    if (msg === "LOGO_FILE_TOO_LARGE") {
+      return { ok: false, error: "Logoja është shumë e madhe (maks. 3 MB)." };
+    }
     return { ok: false, error: msg };
   }
 
+  const removeLogo = formData.get("remove_company_logo") === "true";
+  const nextLogoKey = uploadedLogoKey ?? (removeLogo ? null : priorLogoKey);
+
   try {
-    await persistKonfigurimeSave(companyId, parsed.data, assetKeys);
+    await persistKonfigurimeSave(companyId, parsed.data, assetKeys, nextLogoKey);
   } catch (e) {
+    if (uploadedLogoKey) await safeDeleteAsset(uploadedLogoKey);
     const msg = e instanceof Error ? e.message : "";
     if (msg === "REPRESENTATIVE_EMPLOYEE_NOT_FOUND") {
       return {
@@ -124,6 +154,10 @@ export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKon
     }
     console.error(e);
     return { ok: false, error: "Ruajtja në databazë dështoi." };
+  }
+
+  if (priorLogoKey && priorLogoKey !== nextLogoKey) {
+    await safeDeleteAsset(priorLogoKey);
   }
 
   return { ok: true };

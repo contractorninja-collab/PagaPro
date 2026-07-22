@@ -1,7 +1,8 @@
 "use client";
 
-import { UserPlus } from "lucide-react";
+import { ImagePlus, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -156,6 +157,9 @@ export function KonfigurimeConfigurator({
   const [company, setCompany] = useState(initial.company);
   const [cfg, setCfg] = useState(initial.configuration);
   const [reps, setReps] = useState<RepDraft[]>(() => assignRepresentativeRowKeys(initial.representatives));
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
+  const [removeCompanyLogo, setRemoveCompanyLogo] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -169,9 +173,19 @@ export function KonfigurimeConfigurator({
     setCompany(initial.company);
     setCfg(initial.configuration);
     setReps(assignRepresentativeRowKeys(initial.representatives));
+    setCompanyLogoFile(null);
+    setCompanyLogoPreview(null);
+    setRemoveCompanyLogo(false);
     setFieldErrors({});
     setFormError(null);
   }, [initial]);
+
+  useEffect(() => {
+    if (!companyLogoFile) return;
+    const url = URL.createObjectURL(companyLogoFile);
+    setCompanyLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [companyLogoFile]);
 
   const fixPayloadRepresentativeKeys = () =>
     reps.map((r) => ({
@@ -186,6 +200,7 @@ export function KonfigurimeConfigurator({
     setFieldErrors({});
 
     const payload = {
+      companyLogoStorageKey: removeCompanyLogo ? null : initial.companyLogoStorageKey,
       company: {
         legalName: company.legalName,
         fiscalNumber: company.fiscalNumber,
@@ -221,6 +236,8 @@ export function KonfigurimeConfigurator({
 
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
+    if (companyLogoFile) fd.append("company_logo", companyLogoFile);
+    fd.append("remove_company_logo", String(removeCompanyLogo));
 
     try {
       const result = await submit(fd);
@@ -234,6 +251,8 @@ export function KonfigurimeConfigurator({
         return;
       }
       toast.success("Konfigurimet u ruajtën me sukses.");
+      setCompanyLogoFile(null);
+      setCompanyLogoPreview(null);
       router.refresh();
     } catch {
       toast.error("Gabim papritur gjatë ruajtjes.");
@@ -648,7 +667,80 @@ export function KonfigurimeConfigurator({
           </TabsContent>
 
           <TabsContent value="dokumentet">
-            <Card>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Logoja e kompanisë</CardTitle>
+                  <CardDescription>
+                    Përdoret në dokumentet dhe raportet e reja. PNG, JPEG ose WebP, deri në 3 MB.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <div className="flex h-28 w-full max-w-56 items-center justify-center overflow-hidden rounded-md border border-border bg-white p-4">
+                      {companyLogoPreview || (initial.companyLogoStorageKey && !removeCompanyLogo) ? (
+                        <Image
+                          src={companyLogoPreview ?? `/api/konfigurime/asset?key=${encodeURIComponent(initial.companyLogoStorageKey ?? "")}`}
+                          alt="Logoja e kompanisë"
+                          width={224}
+                          height={112}
+                          unoptimized
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Nuk ka logo</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outlinePrimary" asChild disabled={pending}>
+                        <label htmlFor="company-logo" className="cursor-pointer">
+                          <ImagePlus className="mr-2 h-4 w-4" />
+                          {initial.companyLogoStorageKey && !removeCompanyLogo ? "Zëvendëso" : "Ngarko logon"}
+                        </label>
+                      </Button>
+                      <Input
+                        id="company-logo"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="sr-only"
+                        disabled={pending}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          if (!file) return;
+                          if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+                            toast.error("Lejohen vetëm PNG, JPEG ose WebP.");
+                            event.target.value = "";
+                            return;
+                          }
+                          if (file.size > 3 * 1024 * 1024) {
+                            toast.error("Logoja mund të jetë maksimumi 3 MB.");
+                            event.target.value = "";
+                            return;
+                          }
+                          setCompanyLogoFile(file);
+                          setRemoveCompanyLogo(false);
+                        }}
+                      />
+                      {(initial.companyLogoStorageKey || companyLogoFile) && !removeCompanyLogo ? (
+                        <Button
+                          type="button"
+                          variant="outlinePrimary"
+                          disabled={pending}
+                          onClick={() => {
+                            setCompanyLogoFile(null);
+                            setCompanyLogoPreview(null);
+                            setRemoveCompanyLogo(true);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Hiq logon
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
               <CardHeader>
                 <CardTitle>Dokumentet — prefikset</CardTitle>
                 <CardDescription>Përdoren nga motori i gjenerimit të dokumenteve dhe eksporteve PDF.</CardDescription>
@@ -703,7 +795,8 @@ export function KonfigurimeConfigurator({
                   </FormField>
                 </FormStack>
               </CardContent>
-            </Card>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="pushimet">
