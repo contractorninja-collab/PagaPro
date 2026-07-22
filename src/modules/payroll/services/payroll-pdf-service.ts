@@ -14,6 +14,7 @@ import {
 } from "@/modules/payroll/pdf/payslip-pdf-builder";
 import { buildPayrollRegisterPdf } from "@/modules/payroll/pdf/payroll-register-pdf-builder";
 import { buildPayslipBundleFilename, buildPayslipFilename } from "@/modules/payroll/pdf/payslip-filename";
+import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 type PayrollEntryWithEmployee = PayrollEntry & {
   employee: Employee & { bankAccounts: EmployeeBankAccount[] };
@@ -161,6 +162,7 @@ async function generatePayrollPdfArtifactsInner(params: {
   const monthSlug = `${pay.year}-${String(pay.month).padStart(2, "0")}`;
 
   const storage = getCompanyAssetStorage();
+  const companyLogo = await loadCompanyLogo(prisma, storage, params.companyId);
   const payDate = pay.lockedAt ?? pay.approvedAt ?? new Date();
   const companyPdf = {
     displayName: pay.company.tradeName?.trim() || pay.company.legalName,
@@ -192,6 +194,7 @@ async function generatePayrollPdfArtifactsInner(params: {
     currency: pay.currency,
     payDateLabel,
     rows: registerRows,
+    logo: companyLogo,
   };
 
   await prisma.payrollGeneratedDocument.deleteMany({ where: { payrollId: pay.id } });
@@ -239,6 +242,7 @@ async function generatePayrollPdfArtifactsInner(params: {
       settings,
       documentRef,
     });
+    slipInput.logo = companyLogo;
     const slip = await buildProfessionalPayslipPdf(slipInput);
     payslipBodies.push(slip);
     buffers.push({

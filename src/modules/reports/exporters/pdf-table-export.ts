@@ -1,16 +1,20 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
+import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
+import { drawCompanyLogoPlate, embedCompanyLogo } from "@/modules/company-branding/pdf-logo-branding";
 
 export async function rowsToPdfTableBuffer(params: {
   title: string;
   subtitle?: string;
   columns: ReportColumnDef[];
   rows: ReportRow[];
+  logo?: CompanyLogoAsset | null;
 }): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const companyLogo = await embedCompanyLogo(pdf, params.logo);
 
   const margin = 40;
   const lineHeight = 12;
@@ -18,12 +22,18 @@ export async function rowsToPdfTableBuffer(params: {
   const pageHeight = 841.89;
 
   let page = pdf.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - 48;
+  const drawPageBranding = () => {
+    if (!companyLogo) return;
+    drawCompanyLogoPlate(page, companyLogo, { x: margin, top: pageHeight - 12 });
+  };
+  drawPageBranding();
+  let y = pageHeight - (companyLogo ? 88 : 48);
 
   const newPageIfNeeded = () => {
     if (y < margin + lineHeight) {
       page = pdf.addPage([pageWidth, pageHeight]);
-      y = pageHeight - 48;
+      drawPageBranding();
+      y = pageHeight - (companyLogo ? 88 : 48);
     }
   };
 

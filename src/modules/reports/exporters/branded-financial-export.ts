@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { buildLibriPagaveRows, type LibriPagaveEntryInput } from "./libri-pagave-rows";
+import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
 
 export type BrandedFinancialExportEntry = LibriPagaveEntryInput;
 
@@ -16,18 +17,32 @@ export async function generateBrandedFinancialWorkbookBuffer(params: {
     pensionEmployer: string;
   };
   entries: BrandedFinancialExportEntry[];
+  logo?: CompanyLogoAsset | null;
 }): Promise<Buffer> {
   const { payroll, companyLabel, totals, entries } = params;
   const rows = buildLibriPagaveRows(entries);
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet("Libri i Pagave");
 
+  if (params.logo) {
+    const imageId = workbook.addImage({
+      base64: `data:image/png;base64,${params.logo.bytes.toString("base64")}`,
+      extension: "png",
+    });
+    const scale = Math.min(132 / params.logo.width, 68 / params.logo.height, 1);
+    ws.addImage(imageId, {
+      tl: { col: 0, row: 0 },
+      ext: { width: params.logo.width * scale, height: params.logo.height * scale },
+    });
+    ws.getRow(1).height = 54;
+  }
+
   // Enable gridlines explicitly
   ws.views = [{ showGridLines: true }];
 
   // 1. Add Title block
-  ws.mergeCells("A2:Y2");
-  const titleCell = ws.getCell("A2");
+  ws.mergeCells(params.logo ? "D2:Y2" : "A2:Y2");
+  const titleCell = ws.getCell(params.logo ? "D2" : "A2");
   titleCell.value = "PagaPRO · Libri i Pagave (Pagat per ATK)";
   titleCell.font = { name: "Inter", size: 14, bold: true, color: { argb: "FF0B1220" } };
   titleCell.alignment = { vertical: "middle" };

@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
+import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
+import { drawCompanyLogoPlate, embedCompanyLogo } from "@/modules/company-branding/pdf-logo-branding";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -71,6 +73,7 @@ export interface PayslipPdfInput {
   period: PayslipPdfPeriod;
   amounts: PayslipPdfAmounts;
   documentRef: string;
+  logo?: CompanyLogoAsset | null;
 }
 
 function txt(s: string): string {
@@ -88,6 +91,15 @@ function money(amount: string, currency: string): string {
 function isZeroAmount(v: string): boolean {
   const n = Number(v.replace(",", "."));
   return !Number.isFinite(n) || n === 0;
+}
+
+function fitText(text: string, font: PDFFont, size: number, maxWidth: number): string {
+  if (font.widthOfTextAtSize(txt(text), size) <= maxWidth) return text;
+  let value = text;
+  while (value.length > 1 && font.widthOfTextAtSize(txt(`${value}..`), size) > maxWidth) {
+    value = value.slice(0, -1);
+  }
+  return `${value}..`;
 }
 
 function drawText(
@@ -214,13 +226,26 @@ export async function buildProfessionalPayslipPdf(input: PayslipPdfInput): Promi
 
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const companyLogo = await embedCompanyLogo(pdf, input.logo);
   const page = pdf.addPage([PAGE_W, PAGE_H]);
 
   drawRect(page, 0, PAGE_H - 72, PAGE_W, 72, NAVY);
-  drawText(page, input.company.displayName.toUpperCase(), MARGIN, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
+  const companyTextX = companyLogo
+    ? drawCompanyLogoPlate(page, companyLogo, { x: 16, top: PAGE_H - 7 }) + 10
+    : MARGIN;
+  const companyTextWidth = PAGE_W - companyTextX - MARGIN - 120;
+  drawText(
+    page,
+    fitText(input.company.displayName.toUpperCase(), fontBold, 16, companyTextWidth),
+    companyTextX,
+    PAGE_H - 38,
+    fontBold,
+    16,
+    rgb(1, 1, 1),
+  );
   const subLine = [input.company.addressLine, input.company.cityLine].filter(Boolean).join(" · ");
   if (subLine) {
-    drawText(page, subLine, MARGIN, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
+    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
   }
 
   drawText(page, "FLETEPAGESE", PAGE_W - MARGIN - 100, PAGE_H - 38, fontBold, 11, rgb(1, 1, 1));

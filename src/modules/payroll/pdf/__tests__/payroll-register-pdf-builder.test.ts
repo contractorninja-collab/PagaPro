@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
+import sharp from "sharp";
 import { buildPayrollRegisterPdf, getRegisterLayoutForTests } from "../payroll-register-pdf-builder";
 
 const sampleCompany = {
@@ -68,5 +70,34 @@ describe("payroll register PDF layout", () => {
     });
     expect(buf.byteLength).toBeGreaterThan(500);
     expect(new TextDecoder().decode(buf.subarray(0, 4))).toBe("%PDF");
+  });
+
+  it("draws the company logo on every register page", async () => {
+    const logoBytes = await sharp({
+      create: { width: 300, height: 100, channels: 4, background: { r: 30, g: 120, b: 210, alpha: 1 } },
+    }).png().toBuffer();
+    const rows = Array.from({ length: 80 }, (_, index) => ({
+      name: `Punonjesi ${index + 1}`,
+      personalId: String(1000000000 + index),
+      gross: "1000.00",
+      net: "850.00",
+    }));
+    const buf = await buildPayrollRegisterPdf({
+      company: sampleCompany,
+      periodLabel: "Qershor 2026",
+      currency: "EUR",
+      payDateLabel: "24 qershor 2026",
+      documentRef: "PAY-REG-LOGO",
+      withAmounts: true,
+      rows,
+      logo: { bytes: logoBytes, width: 300, height: 100, mimeType: "image/png" },
+    });
+
+    const pdf = await PDFDocument.load(buf);
+    expect(pdf.getPageCount()).toBeGreaterThan(1);
+    for (const page of pdf.getPages()) {
+      const xObjects = page.node.Resources()?.lookup(PDFName.of("XObject"), PDFDict);
+      expect(xObjects?.keys().length ?? 0).toBeGreaterThan(0);
+    }
   });
 });

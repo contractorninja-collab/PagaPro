@@ -542,6 +542,9 @@ model CompanySetting {
   /// Future: stamp image in object storage (company seal)
   authorizedStampStorageKey String?
 
+  /// Tenant-owned logo embedded in newly generated company documents
+  companyLogoStorageKey String?
+
   /// Registered address line(s) for contracts / letters (letterhead; Company.addressLine is legal registry block)
   companyAddressLine String?
 

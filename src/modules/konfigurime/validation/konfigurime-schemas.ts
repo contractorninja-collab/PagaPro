@@ -84,6 +84,7 @@ export const konfigurimeCompanySchema = z.object({
 });
 
 export const konfigurimePayloadSchema = z.object({
+  companyLogoStorageKey: z.preprocess(emptyToNull, z.string().max(512).nullable().optional()),
   company: konfigurimeCompanySchema,
   representatives: z.array(konfigurimeRepresentativeSchema).min(1, "Duhet të përcaktohet të paku një përfaqësues"),
   configuration: konfigurimeConfigurationSchema,

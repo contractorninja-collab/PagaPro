@@ -29,6 +29,7 @@ export interface KonfigurimeEmployeeOptionDto {
 
 export interface KonfigurimePageDto {
   companyId: string;
+  companyLogoStorageKey: string | null;
   company: {
     legalName: string;
     fiscalNumber: string | null;
@@ -146,6 +147,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
 
   return {
     companyId: row.id,
+    companyLogoStorageKey: row.settings?.companyLogoStorageKey ?? null,
     company: {
       legalName: row.legalName,
       fiscalNumber: row.fiscalNumber ?? null,
@@ -275,6 +277,7 @@ export async function persistKonfigurimeSave(
   companyId: string,
   payload: KonfigurimePayloadValidated,
   assetKeys: Map<number, { signatureStorageKey?: string; stampStorageKey?: string }>,
+  companyLogoStorageKey: string | null,
 ): Promise<void> {
   const priorLeaveConfig = await prisma.companyConfiguration.findUnique({
     where: { companyId },
@@ -351,12 +354,14 @@ export async function persistKonfigurimeSave(
       where: { companyId },
       create: {
         companyId,
+        companyLogoStorageKey,
         authorizedRepresentativeName: primary?.fullName ?? null,
         authorizedRepresentativePosition: primary?.position ?? null,
         authorizedSignatureStorageKey: primary?.signatureStorageKey ?? null,
         authorizedStampStorageKey: primary?.stampStorageKey ?? null,
       },
       update: {
+        companyLogoStorageKey,
         authorizedRepresentativeName: primary?.fullName ?? null,
         authorizedRepresentativePosition: primary?.position ?? null,
         authorizedSignatureStorageKey: primary?.signatureStorageKey ?? null,
