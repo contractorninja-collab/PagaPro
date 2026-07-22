@@ -50,14 +50,32 @@ export async function POST(request: Request) {
 
   for (const artifact of artifacts) {
     const pdf = await ensureArtifactPdf(artifact, storage);
-    if (!pdf.ok) continue;
-    const safeName = pdf.filename.replace(/[/\\?%*:|"<>]/g, "_");
-    zip.file(safeName, pdf.buffer);
-    added += 1;
+    if (pdf.ok) {
+      const safeName = pdf.filename.replace(/[/\\?%*:|"<>]/g, "_");
+      zip.file(safeName, pdf.buffer);
+      added += 1;
+      continue;
+    }
+    // DOCX-only mode (no PDF converter on this server): fall back to the stored
+    // DOCX so the bulk download still delivers every document.
+    if (artifact.generatedDocxStorageKey) {
+      try {
+        const buf = await storage.get(artifact.generatedDocxStorageKey);
+        const base = artifact.displayFilename.replace(/\.[^.]+$/, "") || "dokument";
+        const safeName = `${base}.docx`.replace(/[/\\?%*:|"<>]/g, "_");
+        zip.file(safeName, buf);
+        added += 1;
+      } catch {
+        // blob missing — skip, matching the existing per-artifact skip semantics
+      }
+    }
   }
 
   if (added === 0) {
-    return NextResponse.json({ error: "No PDFs available for selected artifacts." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Asnjë skedar i disponueshëm për dokumentet e zgjedhura." },
+      { status: 404 },
+    );
   }
 
   const zipBuffer = zip.generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;

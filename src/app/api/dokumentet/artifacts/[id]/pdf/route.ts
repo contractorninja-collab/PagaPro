@@ -29,10 +29,10 @@ export async function GET(
   const pdf = await ensureArtifactPdf(artifact, getCompanyAssetStorage());
   if (!pdf.ok) {
     if (pdf.reason === "ERROR") {
-      return NextResponse.json({ error: "PDF conversion failed" }, { status: 500 });
+      return NextResponse.json({ error: "Konvertimi në PDF dështoi." }, { status: 500 });
     }
     return NextResponse.json(
-      { error: "PDF not available (converter disabled or generation pending)." },
+      { error: "PDF nuk është i disponueshëm në këtë server — shkarkoni dokumentin DOCX." },
       { status: 404 },
     );
   }

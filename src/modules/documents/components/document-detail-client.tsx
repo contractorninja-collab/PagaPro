@@ -54,6 +54,45 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
     return missing;
   }, [artifact.detectedKeys, artifact.mergedPayload]);
 
+  /**
+   * Opens the artifact file in a new tab, popup-safe: the tab is opened
+   * synchronously (inside the user gesture), then pointed at the file.
+   *
+   * For PDF the endpoint is probed first — this server may run DOCX-only (no
+   * converter), and blindly opening the URL used to dump a raw JSON error at
+   * the user. On a missing PDF the SAME tab is rerouted to the DOCX instead,
+   * with a toast explaining the substitution. A successful probe also warms
+   * the lazily-converted PDF, so the subsequent navigation streams the cached copy.
+   */
+  async function openArtifactFile(kind: "pdf" | "docx", inline: boolean) {
+    const url = (k: "pdf" | "docx") =>
+      `/api/dokumentet/artifacts/${artifact.id}/${k}?inline=${inline ? 1 : 0}`;
+
+    // No "noopener" here: it would make window.open return null and we need the
+    // handle to point the tab at the file. Same-origin URLs only, so this is safe.
+    const tab = window.open("about:blank", "_blank");
+
+    if (kind === "docx") {
+      if (tab) tab.location.href = url("docx");
+      return;
+    }
+
+    const probe = await fetch(url("pdf"), { method: "GET" }).catch(() => null);
+    if (probe?.ok) {
+      if (tab) tab.location.href = url("pdf");
+      return;
+    }
+    if (artifact.hasDocx) {
+      toast.info("PDF s'është i disponueshëm në këtë server — u hap dokumenti DOCX.", {
+        duration: 6000,
+      });
+      if (tab) tab.location.href = url("docx");
+      return;
+    }
+    tab?.close();
+    toast.error("PDF nuk është i disponueshëm dhe dokumenti nuk ka DOCX.");
+  }
+
   async function download(kind: "pdf" | "docx") {
     startTransition(async () => {
       const log = await logDocumentDownloadAction({ artifactId: artifact.id });
@@ -61,12 +100,12 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
         toast.error(log.error);
         return;
       }
-      window.open(`/api/dokumentet/artifacts/${artifact.id}/${kind}?inline=0`, "_blank", "noopener,noreferrer");
+      await openArtifactFile(kind, false);
     });
   }
 
   function preview(kind: "pdf" | "docx") {
-    window.open(`/api/dokumentet/artifacts/${artifact.id}/${kind}?inline=1`, "_blank", "noopener,noreferrer");
+    void openArtifactFile(kind, true);
   }
 
   function toggleArchive(archived: boolean) {
