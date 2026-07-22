@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import PizZip from "pizzip";
+import contractManifest from "../../../../templates/contracts/manifest.json";
 import { detectDocxTemplate } from "../engine/detect-docx-template";
 
 const fixedTermKeys = [
@@ -7,7 +8,7 @@ const fixedTermKeys = [
   "authorized_person_name",
   "employee_name",
   "employee_job_description",
-  "employee_address",
+  "company_address",
   "contract_start_date",
   "contract_end_date",
   "employment_start_date",
@@ -27,7 +28,7 @@ const indefiniteKeys = [
   "authorized_person_name",
   "employee_name",
   "employee_job_description",
-  "employee_address",
+  "company_address",
   "contract_start_date",
   "employment_start_date",
   "probation_period",
@@ -69,6 +70,14 @@ function docxWithBlanks(count: number): Buffer {
 }
 
 describe("detectDocxTemplate", () => {
+  it("maps the NENI 3 workplace field to the company address", () => {
+    for (const template of contractManifest.templates) {
+      const fields = "fields" in template ? template.fields : undefined;
+      if (!fields) continue;
+      expect(fields[4]).toBe("company_address");
+    }
+  });
+
   it("detects 17 blanks for fixed-term contract template", () => {
     const buf = docxWithBlanks(17);
     const result = detectDocxTemplate(buf, { templateSubtype: "AFAT_I_CAKTUAR" });
