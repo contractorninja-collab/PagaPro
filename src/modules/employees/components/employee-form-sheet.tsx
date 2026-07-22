@@ -68,6 +68,7 @@ export interface EmployeeFormValues {
   applyTax: boolean;
   isForeignNational: boolean;
   residencePermitExpiryDate: string;
+  workplace: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -103,6 +104,7 @@ function defaults(): EmployeeFormValues {
     applyTax: true,
     isForeignNational: false,
     residencePermitExpiryDate: "",
+    workplace: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
     emergencyContactRelationship: "",
@@ -143,6 +145,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     applyTax: e.applyTax,
     isForeignNational: e.isForeignNational,
     residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
+    workplace: e.workplace ?? "",
     emergencyContactName: ec?.fullName ?? "",
     emergencyContactPhone: ec?.phone ?? "",
     emergencyContactRelationship: ec?.relationship ?? "",
@@ -189,6 +192,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     applyTax: v.applyTax,
     isForeignNational: v.isForeignNational,
     residencePermitExpiryDate: v.residencePermitExpiryDate || null,
+    workplace: v.workplace,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
     emergencyContactRelationship: v.emergencyContactRelationship,
@@ -656,6 +660,18 @@ export function EmployeeFormSheet(props: {
                     </option>
                   ))}
                 </select>
+              </FormField>
+              <FormField label="Vendi i punës" error={fieldErrors.workplace}>
+                <Input
+                  className={errClass("workplace")}
+                  value={values.workplace}
+                  placeholder="Bosh = selia e kompanisë"
+                  onChange={(e) => {
+                    clearKey("workplace");
+                    setValues((s) => ({ ...s, workplace: e.target.value }));
+                  }}
+                  disabled={pending}
+                />
               </FormField>
             </div>
           </section>

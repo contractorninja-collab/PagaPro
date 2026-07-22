@@ -73,6 +73,7 @@ export interface EmployeeDetailDto {
   applyTax: boolean;
   isForeignNational: boolean;
   residencePermitExpiryDate: string | null;
+  workplace: string | null;
   emergencyContact: EmployeeEmergencyContactDto | null;
   internalNotes: string | null;
   documentsMissing: boolean;

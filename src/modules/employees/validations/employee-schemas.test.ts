@@ -105,6 +105,16 @@ describe("employeeUpsertSchema", () => {
     }
   });
 
+  it("passes workplace through and nulls it when empty", () => {
+    const set = employeeUpsertSchema.safeParse({ ...minimal, workplace: "Zyra në Prizren" });
+    expect(set.success).toBe(true);
+    if (set.success) expect(set.data.workplace).toBe("Zyra në Prizren");
+
+    const empty = employeeUpsertSchema.safeParse({ ...minimal, workplace: "" });
+    expect(empty.success).toBe(true);
+    if (empty.success) expect(empty.data.workplace).toBeNull();
+  });
+
   it("accepts optional whole-number probation months", () => {
     const empty = employeeUpsertSchema.safeParse({ ...minimal, probationMonths: "" });
     expect(empty.success).toBe(true);

@@ -104,7 +104,7 @@ function buildBody() {
   s.push(h("Neni 1 — Objekti i kontratës"));
   s.push(
     p(
-      "Praktikanti/ja pranohet për kryerjen e punës praktike në pozitën {{employee_position}}, me detyrat: {{employee_job_description}}. Në pajtim me nenin 16.2 të Ligjit të Punës, praktikanti/ja i realizon të gjitha të drejtat dhe detyrimet nga marrëdhënia e punës sikurse të punësuarit e tjerë, në proporcion me orët e punës (neni 21.3).",
+      "Praktikanti/ja pranohet për kryerjen e punës praktike në pozitën {{employee_position}}, me detyrat: {{employee_job_description}}. Vendi i punës: {{workplace}} (neni 11.1.4). Në pajtim me nenin 16.2 të Ligjit të Punës, praktikanti/ja i realizon të gjitha të drejtat dhe detyrimet nga marrëdhënia e punës sikurse të punësuarit e tjerë, në proporcion me orët e punës (neni 21.3).",
     ),
   );
 

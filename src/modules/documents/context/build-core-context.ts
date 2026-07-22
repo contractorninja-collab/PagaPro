@@ -63,6 +63,20 @@ function formatProbationPeriod(months: number | null | undefined): string {
   return `${months} Muaj`;
 }
 
+/** Standard Neni 11.1.4 notice appended to every workplace value. */
+const MULTI_LOCATION_CLAUSE =
+  ", me mundësi të kryerjes së punës edhe në lokacione të tjera të punëdhënësit sipas nevojës së procesit të punës";
+
+/** Vendi i punës: the employee's own workplace, else the company seat — plus the notice. */
+function resolveWorkplace(
+  employeeWorkplace: string | null | undefined,
+  company: CompanyContractDto,
+  settings: CompanySettingContractDto | null,
+): string {
+  const base = employeeWorkplace?.trim() || resolveCompanyAddress(company, settings);
+  return base ? `${base}${MULTI_LOCATION_CLAUSE}` : "";
+}
+
 /** Company letterhead slice when no employee is bound (OTHER / annex templates). */
 export function buildCompanyScopedPlaceholderContext(params: {
   company: CompanyContractDto;
@@ -85,6 +99,7 @@ export function buildCompanyScopedPlaceholderContext(params: {
     employee_personal_number: "",
     employee_department: "",
     employee_address: "",
+    workplace: resolveWorkplace(null, company, settings),
     salary_gross: "",
     company_name: displayCompanyName,
     company_nui: company.fiscalNumber ?? "",
@@ -130,6 +145,7 @@ export function buildCoreOrganizationalContext(
     employee_department: employee.departmentName?.trim() ?? "",
     employee_address: employeeAddress,
     employee_city: employee.addressCity ?? "",
+    workplace: resolveWorkplace(employee.workplace, company, settings),
     salary_gross: formatMoneyEUR(employee.baseSalaryMonthly),
     salary_gross_words: employee.baseSalaryMonthly,
     weekly_hours: stripTrailingZeros(employee.weeklyHours),

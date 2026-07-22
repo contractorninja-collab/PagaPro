@@ -79,6 +79,9 @@ export const employeeUpsertSchema = z
     isForeignNational: z.boolean().default(false),
     residencePermitExpiryDate: z.preprocess(parseOptionalDate, z.date().nullable().optional()),
 
+    /// Vendi i punës (Neni 11.1.4) — bosh = selia e kompanisë.
+    workplace: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
+
     emergencyContactName: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
     emergencyContactPhone: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
     emergencyContactRelationship: z.preprocess(emptyToNull, z.string().trim().max(120).nullable().optional()),
