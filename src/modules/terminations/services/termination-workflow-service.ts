@@ -10,6 +10,7 @@ import {
 } from "@/modules/employees/services/employee-audit";
 import { prepareTerminationFinalPayroll } from "@/modules/terminations/payroll/prepare-final-payroll";
 import { generateTerminationArtifact } from "@/modules/terminations/documents/generate-termination-document";
+import { normalizeOptionalDecimalInput } from "@/modules/terminations/helpers/normalize-decimal-input";
 import {
   appendTerminationAuditLog,
   appendTerminationDomainActivity,
@@ -66,10 +67,8 @@ export async function createTerminationWorkflow(
 
     await assertNoBlockingTermination(companyId, input.employeeId);
 
-    const severance =
-      input.severanceAmount?.trim() !== ""
-        ? new Prisma.Decimal(input.severanceAmount!.replace(",", "."))
-        : undefined;
+    const severanceRaw = normalizeOptionalDecimalInput(input.severanceAmount);
+    const severance = severanceRaw ? new Prisma.Decimal(severanceRaw) : undefined;
 
     const row = await prisma.termination.create({
       data: {
@@ -149,8 +148,8 @@ export async function updateTerminationWorkflow(
     if (input.finalPayrollRequired !== undefined) payload.finalPayrollRequired = input.finalPayrollRequired;
 
     if (input.severanceAmount !== undefined) {
-      const raw = input.severanceAmount?.trim() ?? "";
-      payload.severanceAmount = raw !== "" ? new Prisma.Decimal(raw.replace(",", ".")) : null;
+      const raw = normalizeOptionalDecimalInput(input.severanceAmount);
+      payload.severanceAmount = raw ? new Prisma.Decimal(raw) : null;
     }
 
     const typeForRules = input.type ?? existing.type;
