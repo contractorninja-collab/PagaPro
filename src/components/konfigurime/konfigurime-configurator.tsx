@@ -691,51 +691,57 @@ export function KonfigurimeConfigurator({
                         <span className="text-sm text-muted-foreground">Nuk ka logo</span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outlinePrimary" asChild disabled={pending}>
-                        <label htmlFor="company-logo" className="cursor-pointer">
-                          <ImagePlus className="mr-2 h-4 w-4" />
-                          {initial.companyLogoStorageKey && !removeCompanyLogo ? "Zëvendëso" : "Ngarko logon"}
-                        </label>
-                      </Button>
-                      <Input
-                        id="company-logo"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="sr-only"
-                        disabled={pending}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          if (!file) return;
-                          if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-                            toast.error("Lejohen vetëm PNG, JPEG ose WebP.");
-                            event.target.value = "";
-                            return;
-                          }
-                          if (file.size > 3 * 1024 * 1024) {
-                            toast.error("Logoja mund të jetë maksimumi 3 MB.");
-                            event.target.value = "";
-                            return;
-                          }
-                          setCompanyLogoFile(file);
-                          setRemoveCompanyLogo(false);
-                        }}
-                      />
-                      {(initial.companyLogoStorageKey || companyLogoFile) && !removeCompanyLogo ? (
-                        <Button
-                          type="button"
-                          variant="outlinePrimary"
-                          disabled={pending}
-                          onClick={() => {
-                            setCompanyLogoFile(null);
-                            setCompanyLogoPreview(null);
-                            setRemoveCompanyLogo(true);
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Hiq logon
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outlinePrimary" asChild disabled={pending}>
+                          <label htmlFor="company-logo" className="cursor-pointer">
+                            <ImagePlus className="mr-2 h-4 w-4" />
+                            {initial.companyLogoStorageKey && !removeCompanyLogo ? "Zëvendëso" : "Ngarko logon"}
+                          </label>
                         </Button>
-                      ) : null}
+                        <Input
+                          id="company-logo"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="sr-only"
+                          disabled={pending}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            if (!file) return;
+                            if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+                              toast.error("Lejohen vetëm PNG, JPEG ose WebP.");
+                              event.target.value = "";
+                              return;
+                            }
+                            if (file.size > 3 * 1024 * 1024) {
+                              toast.error("Logoja mund të jetë maksimumi 3 MB.");
+                              event.target.value = "";
+                              return;
+                            }
+                            setCompanyLogoFile(file);
+                            setRemoveCompanyLogo(false);
+                          }}
+                        />
+                        {(initial.companyLogoStorageKey || companyLogoFile) && !removeCompanyLogo ? (
+                          <Button
+                            type="button"
+                            variant="outlinePrimary"
+                            disabled={pending}
+                            onClick={() => {
+                              setCompanyLogoFile(null);
+                              setCompanyLogoPreview(null);
+                              setRemoveCompanyLogo(true);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Hiq logon
+                          </Button>
+                        ) : null}
+                      </div>
+                      <p className="max-w-md text-xs leading-5 text-muted-foreground">
+                        Dimensionet e rekomanduara: 600 × 310 px. Në dokumente logoja shfaqet deri në
+                        35 × 18 mm, duke ruajtur proporcionet.
+                      </p>
                     </div>
                   </div>
                 </CardContent>
