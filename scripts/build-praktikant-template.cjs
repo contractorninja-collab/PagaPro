@@ -8,8 +8,9 @@
  * duration 1 year university / 6 months secondary education, safety per Ligji
  * Nr. 2003/19, unpaid internships allowed only with registry evidence — this
  * template is for PAID interns processed through payroll), Neni 20-21
- * (part-time work, rights proportional to hours; the intern works
- * {{daily_hours}} h/day, {{weekly_hours}} h/week from the employee profile).
+ * (part-time work, rights proportional to hours). The schedule is FIXED in the
+ * text: 4 h/day, 20 h/week (company policy) — set the intern's weeklyHours to
+ * 20 in the profile so payroll matches the contract.
  *
  * PLACEHOLDER mode ({{tags}}), like the leave/termination templates — the
  * signature underscores are formatting, not fillable blanks.
@@ -117,7 +118,7 @@ function buildBody() {
   s.push(h("Neni 3 — Orari i punës"));
   s.push(
     p(
-      "Praktikanti/ja punon me orar jo të plotë pune (neni 21): {{daily_hours}} orë në ditë, gjithsej {{weekly_hours}} orë në javë, nga e hëna në të premte. Orari i saktë ditor përcaktohet nga punëdhënësi në pajtim me natyrën e punës.",
+      "Praktikanti/ja punon me orar jo të plotë pune (neni 21): katër (4) orë në ditë, gjithsej njëzet (20) orë në javë, nga e hëna në të premte. Orari i saktë ditor përcaktohet nga punëdhënësi në pajtim me natyrën e punës.",
     ),
   );
 
