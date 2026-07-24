@@ -20,6 +20,20 @@ const sampleRows = [
   { name: "Fjolla Gashi", personalId: "1122334455", gross: "1100.00", net: "974.00" },
 ];
 
+function pageFontNames(pdf: PDFDocument): string[] {
+  const names = new Set<string>();
+  for (const page of pdf.getPages()) {
+    const fonts = page.node.Resources()?.lookup(PDFName.of("Font"), PDFDict);
+    if (!fonts) continue;
+    for (const key of fonts.keys()) {
+      const font = fonts.lookup(key, PDFDict);
+      const baseFont = font?.get(PDFName.of("BaseFont"))?.toString();
+      if (baseFont) names.add(baseFont);
+    }
+  }
+  return [...names];
+}
+
 describe("payroll register PDF layout", () => {
   it("money columns do not overlap (gross ends before net starts)", () => {
     const layout = getRegisterLayoutForTests(true);
@@ -56,6 +70,9 @@ describe("payroll register PDF layout", () => {
     });
     expect(buf.byteLength).toBeGreaterThan(500);
     expect(new TextDecoder().decode(buf.subarray(0, 4))).toBe("%PDF");
+    const names = pageFontNames(await PDFDocument.load(buf)).join(" ");
+    expect(names).toContain("LiberationSerif");
+    expect(names).toContain("LiberationSans");
   });
 
   it("generates lista per nenshkrime PDF buffer", async () => {

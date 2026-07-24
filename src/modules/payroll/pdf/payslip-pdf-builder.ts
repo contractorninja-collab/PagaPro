@@ -1,7 +1,11 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
 import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
 import { drawCompanyLogoPlate, embedCompanyLogo } from "@/modules/company-branding/pdf-logo-branding";
+import {
+  drawPagaproGeneratedFooter,
+  embedPayrollPdfFonts,
+} from "@/modules/payroll/pdf/payroll-pdf-fonts";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -224,8 +228,7 @@ export async function buildProfessionalPayslipPdf(input: PayslipPdfInput): Promi
   pdf.setAuthor(txt(input.company.displayName));
   pdf.setSubject(txt("Fletepagese"));
 
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const { body: font, heading: fontBold } = await embedPayrollPdfFonts(pdf);
   const companyLogo = await embedCompanyLogo(pdf, input.logo);
   const page = pdf.addPage([PAGE_W, PAGE_H]);
 
@@ -234,18 +237,28 @@ export async function buildProfessionalPayslipPdf(input: PayslipPdfInput): Promi
     ? drawCompanyLogoPlate(page, companyLogo, { x: 16, top: PAGE_H - 7 }) + 10
     : MARGIN;
   const companyTextWidth = PAGE_W - companyTextX - MARGIN - 120;
-  drawText(
-    page,
-    fitText(input.company.displayName.toUpperCase(), fontBold, 16, companyTextWidth),
-    companyTextX,
-    PAGE_H - 38,
-    fontBold,
-    16,
-    rgb(1, 1, 1),
-  );
+  if (!companyLogo) {
+    drawText(
+      page,
+      fitText(input.company.displayName.toUpperCase(), fontBold, 16, companyTextWidth),
+      companyTextX,
+      PAGE_H - 38,
+      fontBold,
+      16,
+      rgb(1, 1, 1),
+    );
+  }
   const subLine = [input.company.addressLine, input.company.cityLine].filter(Boolean).join(" · ");
   if (subLine) {
-    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
+    drawText(
+      page,
+      fitText(subLine, font, 8, companyTextWidth),
+      companyTextX,
+      companyLogo ? PAGE_H - 45 : PAGE_H - 56,
+      font,
+      8,
+      rgb(0.85, 0.88, 0.92),
+    );
   }
 
   drawText(page, "FLETEPAGESE", PAGE_W - MARGIN - 100, PAGE_H - 38, fontBold, 11, rgb(1, 1, 1));
@@ -352,6 +365,7 @@ export async function buildProfessionalPayslipPdf(input: PayslipPdfInput): Promi
     7,
     MUTED,
   );
+  drawPagaproGeneratedFooter(page, fontBold, { pageWidth: PAGE_W, margin: MARGIN });
 
   return pdf.save();
 }

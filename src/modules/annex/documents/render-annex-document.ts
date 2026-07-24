@@ -119,7 +119,9 @@ export async function renderAnnexDocument(
     doc.render({ ...built.data.flat, changes: built.data.changes });
     const rendered = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
     const companyLogo = await loadCompanyLogo(prisma, getCompanyAssetStorage(), companyId);
-    buffer = applyCompanyLogoToDocx(rendered, companyLogo);
+    buffer = applyCompanyLogoToDocx(rendered, companyLogo, {
+      companyName: built.data.flat.company_name,
+    });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

@@ -13,7 +13,25 @@ async function sampleLogo(): Promise<CompanyLogoAsset> {
   return { bytes, width: 400, height: 200, mimeType: "image/png" };
 }
 
-function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
+interface MinimalDocxOptions {
+  withHeader?: boolean;
+  titleAndEven?: boolean;
+  bodyParagraphs?: string[];
+  headerParagraphs?: string[];
+}
+
+function paragraphsXml(paragraphs: string[]): string {
+  return paragraphs
+    .map((text) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`)
+    .join("");
+}
+
+function minimalDocx({
+  withHeader = false,
+  titleAndEven = false,
+  bodyParagraphs = ["Body stays here"],
+  headerParagraphs = ["Existing contract header text"],
+}: MinimalDocxOptions = {}): Buffer {
   const zip = new PizZip();
   zip.file(
     "[Content_Types].xml",
@@ -23,7 +41,7 @@ function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
   );
   zip.file(
     "word/document.xml",
-    `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>Body stays here</w:t></w:r></w:p><w:sectPr>${withHeader ? '<w:headerReference w:type="default" r:id="rId1"/>' : ""}${titleAndEven ? "<w:titlePg/>" : ""}<w:pgMar w:top="792" w:right="1037" w:bottom="792" w:left="1037" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`,
+    `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${paragraphsXml(bodyParagraphs)}<w:sectPr>${withHeader ? '<w:headerReference w:type="default" r:id="rId1"/>' : ""}${titleAndEven ? "<w:titlePg/>" : ""}<w:pgMar w:top="792" w:right="1037" w:bottom="792" w:left="1037" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`,
   );
   zip.file(
     "word/_rels/document.xml.rels",
@@ -32,7 +50,7 @@ function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
   if (withHeader) {
     zip.file(
       "word/header1.xml",
-      '<?xml version="1.0"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>Existing contract header text</w:t></w:r></w:p></w:hdr>',
+      `<?xml version="1.0"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${paragraphsXml(headerParagraphs)}</w:hdr>`,
     );
   }
   if (titleAndEven) {
@@ -46,7 +64,10 @@ function minimalDocx(withHeader: boolean, titleAndEven = false): Buffer {
 
 describe("DOCX company logo branding", () => {
   it("reuses the default header and preserves its existing text", async () => {
-    const output = applyCompanyLogoToDocx(minimalDocx(true), await sampleLogo());
+    const output = applyCompanyLogoToDocx(
+      minimalDocx({ withHeader: true }),
+      await sampleLogo(),
+    );
     const zip = new PizZip(output);
     const header = zip.file("word/header1.xml")?.asText() ?? "";
     const rels = zip.file("word/_rels/header1.xml.rels")?.asText() ?? "";
@@ -67,7 +88,10 @@ describe("DOCX company logo branding", () => {
   });
 
   it("creates repeating default, first, and even header references when needed", async () => {
-    const output = applyCompanyLogoToDocx(minimalDocx(false, true), await sampleLogo());
+    const output = applyCompanyLogoToDocx(
+      minimalDocx({ titleAndEven: true }),
+      await sampleLogo(),
+    );
     const zip = new PizZip(output);
     const documentXml = zip.file("word/document.xml")?.asText() ?? "";
     const contentTypes = zip.file("[Content_Types].xml")?.asText() ?? "";
@@ -114,8 +138,57 @@ describe("DOCX company logo branding", () => {
     );
   });
 
-  it("is a no-op when no logo is configured", () => {
-    const input = minimalDocx(true);
-    expect(applyCompanyLogoToDocx(input, null)).toBe(input);
+  it("adds the generated-by footer even when no logo is configured", () => {
+    const output = applyCompanyLogoToDocx(
+      minimalDocx({ withHeader: true }),
+      null,
+    );
+    const zip = new PizZip(output);
+    const documentXml = zip.file("word/document.xml")?.asText() ?? "";
+    const footerParts = Object.keys(zip.files).filter((name) =>
+      /^word\/footer\d+\.xml$/.test(name),
+    );
+
+    expect(documentXml).toContain("Body stays here");
+    expect(documentXml).toContain('<w:footerReference w:type="default"');
+    expect(documentXml).not.toContain('<w:footerReference w:type="even"');
+    expect(zip.file("word/media/pagapro-company-logo.png")).toBeNull();
+    expect(zip.file("word/settings.xml")).toBeNull();
+    expect(footerParts).toHaveLength(1);
+    for (const footerPart of footerParts) {
+      const footer = zip.file(footerPart)?.asText() ?? "";
+      expect(footer).toContain("Gjeneruar nga PagaPRO");
+      expect(footer).toContain('w:ascii="Liberation Sans"');
+      expect(footer).toContain('<w:sz w:val="14"');
+    }
+  });
+
+  it("uses the logo instead of a duplicate display-name header without removing legal text", async () => {
+    const companyName = "Acme LLC";
+    const output = applyCompanyLogoToDocx(
+      minimalDocx({
+        withHeader: true,
+        headerParagraphs: [companyName, "Existing contract header text"],
+        bodyParagraphs: [
+          companyName,
+          `${companyName} is the legal employer under this agreement.`,
+          "Employee terms remain here.",
+        ],
+      }),
+      await sampleLogo(),
+      { companyName },
+    );
+    const zip = new PizZip(output);
+    const header = zip.file("word/header1.xml")?.asText() ?? "";
+    const documentXml = zip.file("word/document.xml")?.asText() ?? "";
+
+    expect(header).not.toContain(`<w:t>${companyName}</w:t>`);
+    expect(header).toContain("Existing contract header text");
+    expect(header).toContain("PagaPRO Company Logo");
+    expect(documentXml).not.toContain(`<w:t>${companyName}</w:t>`);
+    expect(documentXml).toContain(
+      `${companyName} is the legal employer under this agreement.`,
+    );
+    expect(documentXml).toContain("Employee terms remain here.");
   });
 });
