@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import type { DepartmentOptionDto } from "@/modules/employees/types";
+import { UNASSIGNED_DEPARTMENT_FILTER } from "@/modules/employees/filters/department-filter";
 
 export interface EmployeesFilterValues {
   q: string;
@@ -96,6 +97,7 @@ export function EmployeesFilters(props: {
           className={SELECT_PILL}
         >
           <option value="">Departamenti: Të gjitha</option>
+          <option value={UNASSIGNED_DEPARTMENT_FILTER}>Pa departament</option>
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}

@@ -9,6 +9,7 @@ import type {
 } from "@/modules/employees/types";
 import { listDepartmentsForCompany } from "@/modules/departments/services/department-service";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
+import { employeeDepartmentWhere } from "@/modules/employees/filters/department-filter";
 import type { EmployeeUpsertInput } from "@/modules/employees/validations/employee-schemas";
 import {
   appendDomainEmployeeActivity,
@@ -86,7 +87,7 @@ export async function getEmployeesPageData(
         : {},
       filters.status ? { status: filters.status } : {},
       filters.employmentType ? { employmentType: filters.employmentType } : {},
-      filters.departmentId ? { departmentId: filters.departmentId } : {},
+      employeeDepartmentWhere(filters.departmentId),
       filters.documentsMissing
         ? { documentsMissing: true, status: { not: "TERMINATED" } }
         : {},
