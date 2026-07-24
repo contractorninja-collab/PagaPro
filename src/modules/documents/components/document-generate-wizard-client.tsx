@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  Printer,
   Search,
 } from "lucide-react";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
@@ -29,6 +30,7 @@ import {
   docInput,
   docSelect,
 } from "@/modules/documents/components/doc-ui";
+import { openBulkPrintPreview } from "@/modules/documents/components/open-bulk-print-preview";
 
 const workflowCategories: DocumentCategory[] = ["CONTRACT", "LEAVE", "TERMINATION", "WARNING", "OTHER"];
 
@@ -294,6 +296,11 @@ export function DocumentGenerateWizardClient(props: {
     URL.revokeObjectURL(url);
   }
 
+  async function previewBulkPrint() {
+    const result = await openBulkPrintPreview(artifactIds);
+    if (!result.ok) toast.error(result.error);
+  }
+
   // Step-rail states (presentation only).
   const steps = [
     { label: "Lloji", done: Boolean(category) },
@@ -555,10 +562,20 @@ export function DocumentGenerateWizardClient(props: {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {artifactIds.length > 1 ? (
-                    <button type="button" className={docBtnSecondaryDense} onClick={downloadZip}>
-                      <Download className="h-3.5 w-3.5" aria-hidden />
-                      Shkarko ZIP
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={docBtnSecondaryDense}
+                        onClick={() => void previewBulkPrint()}
+                      >
+                        <Printer className="h-3.5 w-3.5" aria-hidden />
+                        Parapamje për printim
+                      </button>
+                      <button type="button" className={docBtnSecondaryDense} onClick={downloadZip}>
+                        <Download className="h-3.5 w-3.5" aria-hidden />
+                        Shkarko ZIP
+                      </button>
+                    </>
                   ) : null}
                   {artifactIds.map((id) => (
                     <Link key={id} href={`/dokumentet/${id}`} className={docBtnSecondaryDense}>
