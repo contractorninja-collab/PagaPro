@@ -79,6 +79,12 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     labelSq: "Adresa e punonjësit",
   },
   {
+    key: "workplace",
+    requiredByDefault: false,
+    sources: ["employee", "company"],
+    labelSq: "Vendi i punës",
+  },
+  {
     key: "salary_gross",
     requiredByDefault: true,
     sources: ["employee"],
@@ -221,16 +227,6 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
       sources: ["employee"],
       applicableCategories: ["CONTRACT"],
       labelSq: "Periudha e punës praktike",
-    },
-    {
-      // Neni 11.1.4 — vendi i punës + njoftimi për lokacione të ndryshme.
-      // Resolves to Employee.workplace, falling back to the company seat, always
-      // suffixed with the multi-location clause; never empty, hence not required.
-      key: "workplace",
-      requiredByDefault: false,
-      sources: ["employee", "company"],
-      applicableCategories: ["CONTRACT"],
-      labelSq: "Vendi i punës",
     },
   ],
   LEAVE: [
