@@ -126,6 +126,7 @@ export async function renderTerminationDocument(
     const companyLogo = await loadCompanyLogo(prisma, storage, companyId);
     renderedBuffer = applyCompanyLogoToDocx(result.buffer, companyLogo, {
       companyName: merged.company_name,
+      documentReferencePrefix: merged.document_reference_prefix,
     });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

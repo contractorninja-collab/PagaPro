@@ -4,6 +4,7 @@ export type PlaceholderSource =
   | "employee"
   | "company"
   | "company_setting"
+  | "company_configuration"
   | "authorized_rep"
   | "document_metadata"
   | "contract_runtime";
@@ -167,6 +168,12 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     requiredByDefault: false,
     sources: ["document_metadata", "company"],
     labelSq: "Vendi i nënshkrimit",
+  },
+  {
+    key: "document_reference_prefix",
+    requiredByDefault: false,
+    sources: ["company_configuration"],
+    labelSq: "Prefiksi i numrit të protokollit",
   },
   {
     key: "company_registered_address",

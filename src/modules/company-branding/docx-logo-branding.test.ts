@@ -189,6 +189,86 @@ describe("DOCX company logo branding", () => {
     }
   });
 
+  it("adds the configured prefix to legacy protocol-number blanks", () => {
+    const sourceZip = new PizZip(
+      minimalDocx({
+        bodyParagraphs: ["Nr. i protokollit: ______/______"],
+      }),
+    );
+    const documentXml = sourceZip.file("word/document.xml")?.asText() ?? "";
+    sourceZip.file(
+      "word/document.xml",
+      documentXml.replace(
+        "<w:t>Nr. i protokollit: ______/______</w:t>",
+        "<w:t>Nr. i protokollit: </w:t></w:r><w:r><w:t>______</w:t></w:r><w:r><w:t>/______</w:t>",
+      ),
+    );
+
+    const output = applyCompanyLogoToDocx(
+      sourceZip.generate({ type: "nodebuffer" }) as Buffer,
+      null,
+      { documentReferencePrefix: "DOC-" },
+    );
+    const renderedXml =
+      new PizZip(output).file("word/document.xml")?.asText() ?? "";
+    const renderedText = Array.from(
+      renderedXml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g),
+      (match) => match[1],
+    ).join("");
+
+    expect(renderedText).toContain("Nr. i protokollit: DOC-______/______");
+  });
+
+  it("does not duplicate a prefix already rendered by a placeholder", () => {
+    const output = applyCompanyLogoToDocx(
+      minimalDocx({
+        bodyParagraphs: ["Numri i protokollit: DOC-______/______"],
+      }),
+      null,
+      { documentReferencePrefix: "DOC-" },
+    );
+    const documentXml =
+      new PizZip(output).file("word/document.xml")?.asText() ?? "";
+
+    expect(documentXml).toContain("DOC-______/______");
+    expect(documentXml).not.toContain("DOC-DOC-");
+  });
+
+  it("adds the general prefix to the bundled leave and termination templates", async () => {
+    const templatePaths = [
+      path.join(
+        process.cwd(),
+        "templates",
+        "leave",
+        "vendim-pushim-vjetor.docx",
+      ),
+      path.join(
+        process.cwd(),
+        "templates",
+        "termination",
+        "vendim-nderprerje-vullnetare.docx",
+      ),
+    ];
+
+    for (const templatePath of templatePaths) {
+      const output = applyCompanyLogoToDocx(
+        await readFile(templatePath),
+        null,
+        { documentReferencePrefix: "DOC-" },
+      );
+      const documentXml =
+        new PizZip(output).file("word/document.xml")?.asText() ?? "";
+      const documentText = Array.from(
+        documentXml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g),
+        (match) => match[1],
+      ).join("");
+
+      expect(documentText).toContain(
+        "Nr. i protokollit: DOC-______/______",
+      );
+    }
+  });
+
   it("uses the logo instead of a duplicate display-name header without removing legal text", async () => {
     const companyName = "Acme LLC";
     const output = applyCompanyLogoToDocx(

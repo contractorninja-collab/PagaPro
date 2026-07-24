@@ -322,6 +322,7 @@ export async function finalizeDocumentGeneration(
   const companyLogo = await loadCompanyLogo(params.prisma, params.storage, params.companyId);
   const renderedBuffer = applyCompanyLogoToDocx(unbrandedBuffer, companyLogo, {
     companyName: mergedContext.company_name,
+    documentReferencePrefix: mergedContext.document_reference_prefix,
   });
 
 

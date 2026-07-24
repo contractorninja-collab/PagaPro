@@ -121,6 +121,7 @@ export async function renderAnnexDocument(
     const companyLogo = await loadCompanyLogo(prisma, getCompanyAssetStorage(), companyId);
     buffer = applyCompanyLogoToDocx(rendered, companyLogo, {
       companyName: built.data.flat.company_name,
+      documentReferencePrefix: built.data.flat.document_reference_prefix,
     });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

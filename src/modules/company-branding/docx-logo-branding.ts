@@ -23,6 +23,7 @@ const GENERATED_BY_TEXT = "Gjeneruar nga PagaPRO";
 
 export interface DocxBrandingOptions {
   companyName?: string | null;
+  documentReferencePrefix?: string | null;
 }
 
 function relationshipTarget(relsXml: string, relationshipId: string): string | null {
@@ -142,6 +143,65 @@ function paragraphText(paragraphXml: string): string {
   ).join("").trim();
 }
 
+function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function insertTextAtParagraphOffset(
+  paragraphXml: string,
+  offset: number,
+  text: string,
+): string {
+  let cursor = 0;
+  let inserted = false;
+  return paragraphXml.replace(
+    /(<w:t\b[^>]*>)([\s\S]*?)(<\/w:t>)/g,
+    (full, opening: string, rawText: string, closing: string) => {
+      if (inserted) return full;
+      const decoded = decodeXmlText(rawText);
+      const end = cursor + decoded.length;
+      if (offset >= cursor && offset <= end) {
+        const position = offset - cursor;
+        inserted = true;
+        return `${opening}${escapeXmlText(
+          `${decoded.slice(0, position)}${text}${decoded.slice(position)}`,
+        )}${closing}`;
+      }
+      cursor = end;
+      return full;
+    },
+  );
+}
+
+function injectProtocolPrefix(xml: string, configuredPrefix: string): string {
+  const prefix = configuredPrefix.trim();
+  if (!prefix) return xml;
+
+  return xml.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (paragraph) => {
+    const text = Array.from(
+      paragraph.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g),
+      (match) => decodeXmlText(match[1] ?? ""),
+    ).join("");
+    const label = /(?:nr\.?\s*i\s*protokollit|numri\s+i\s+protokollit)\s*:\s*/i.exec(
+      text,
+    );
+    if (!label || label.index == null) return paragraph;
+
+    const afterLabel = label.index + label[0].length;
+    const blank = /_{4,}/.exec(text.slice(afterLabel));
+    if (!blank || blank.index == null) return paragraph;
+
+    const blankOffset = afterLabel + blank.index;
+    if (text.slice(afterLabel, blankOffset).trim()) return paragraph;
+    return insertTextAtParagraphOffset(paragraph, blankOffset, prefix);
+  });
+}
+
 function suppressLeadingCompanyName(documentXml: string, companyName: string): string {
   const expected = companyName.trim();
   if (!expected) return documentXml;
@@ -216,6 +276,16 @@ export function applyCompanyLogoToDocx(
 
   let documentXml = documentFile.asText();
   let documentRelsXml = documentRelsFile.asText();
+  const referencePrefix = options.documentReferencePrefix?.trim();
+  if (referencePrefix) {
+    documentXml = injectProtocolPrefix(documentXml, referencePrefix);
+    for (const part of Object.keys(zip.files).filter((name) =>
+      /^word\/(?:header|footer)\d*\.xml$/.test(name),
+    )) {
+      const file = zip.file(part);
+      if (file) zip.file(part, injectProtocolPrefix(file.asText(), referencePrefix));
+    }
+  }
   const logoSize = logo ? displayedLogoSize(logo) : null;
   const referencedHeaders = new Set<string>();
   const referencedFooters = new Set<string>();

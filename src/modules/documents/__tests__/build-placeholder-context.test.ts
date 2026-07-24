@@ -31,6 +31,7 @@ function prismaMock(overrides: Record<string, unknown>): PrismaClient {
   return {
     company: { findUnique: async () => company },
     companySetting: { findUnique: async () => null },
+    companyConfiguration: { findUnique: async () => null },
     ...overrides,
   } as unknown as PrismaClient;
 }
@@ -80,5 +81,60 @@ describe("buildMergedPlaceholderContext workplace", () => {
 
     expect(result.merged.workplace).toMatch(/^Dega në Prizren,/);
     expect(result.merged.workplace).not.toContain("Adresa e shtëpisë");
+  });
+
+  it("uses the general document prefix for non-contract paperwork", async () => {
+    const prisma = prismaMock({
+      companyConfiguration: {
+        findUnique: async () => ({
+          contractReferencePrefix: "KON-",
+          payrollPdfPrefix: "PAY-",
+          generalDocumentPrefix: "DOC-",
+        }),
+      },
+      employee: { findFirst: async () => employee },
+    });
+
+    const result = await buildMergedPlaceholderContext(prisma, {
+      companyId: "company-1",
+      subjectKind: "OTHER",
+      subjectId: "employee-1",
+      employeeId: "employee-1",
+      documentDate: new Date("2026-07-24T00:00:00.000Z"),
+    });
+
+    expect(result.merged.document_reference_prefix).toBe("DOC-");
+  });
+
+  it("uses the contract prefix for contracts and annex context", async () => {
+    const prisma = prismaMock({
+      companyConfiguration: {
+        findUnique: async () => ({
+          contractReferencePrefix: "KON-",
+          payrollPdfPrefix: "PAY-",
+          generalDocumentPrefix: "DOC-",
+        }),
+      },
+      employee: {
+        findFirst: async () => ({
+          ...employee,
+          hireDate: new Date("2026-01-15T00:00:00.000Z"),
+          terminationDate: null,
+          probationMonths: null,
+          weeklyHours: null,
+          standardMonthlyHours: null,
+        }),
+      },
+    });
+
+    const result = await buildMergedPlaceholderContext(prisma, {
+      companyId: "company-1",
+      subjectKind: "CONTRACT",
+      subjectId: "employee-1",
+      employeeId: "employee-1",
+      documentDate: new Date("2026-07-24T00:00:00.000Z"),
+    });
+
+    expect(result.merged.document_reference_prefix).toBe("KON-");
   });
 });
