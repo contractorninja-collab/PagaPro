@@ -62,6 +62,32 @@ function minimalDocx({
   return zip.generate({ type: "nodebuffer" }) as Buffer;
 }
 
+function legacyCalibriDocx(): Buffer {
+  const zip = new PizZip(
+    minimalDocx({
+      bodyParagraphs: ["Legacy body", "Legacy heading"],
+    }),
+  );
+  const documentXml = zip.file("word/document.xml")?.asText() ?? "";
+  zip.file(
+    "word/document.xml",
+    documentXml
+      .replace(
+        "<w:r><w:t>Legacy body</w:t></w:r>",
+        '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/></w:rPr><w:t>Legacy body</w:t></w:r>',
+      )
+      .replace(
+        "<w:r><w:t>Legacy heading</w:t></w:r>",
+        '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:b/><w:sz w:val="24"/></w:rPr><w:t>Legacy heading</w:t></w:r>',
+      ),
+  );
+  zip.file(
+    "word/styles.xml",
+    '<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsiTheme="minorHAnsi"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Calibri"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:rPr><w:rFonts w:ascii="Calibri"/></w:rPr></w:style></w:styles>',
+  );
+  return zip.generate({ type: "nodebuffer" }) as Buffer;
+}
+
 describe("DOCX company logo branding", () => {
   it("reuses the default header and preserves its existing text", async () => {
     const output = applyCompanyLogoToDocx(
@@ -190,5 +216,27 @@ describe("DOCX company logo branding", () => {
       `${companyName} is the legal employer under this agreement.`,
     );
     expect(documentXml).toContain("Employee terms remain here.");
+  });
+
+  it("normalizes legacy stored-template fonts during every generation", () => {
+    const output = applyCompanyLogoToDocx(legacyCalibriDocx(), null);
+    const zip = new PizZip(output);
+    const documentXml = zip.file("word/document.xml")?.asText() ?? "";
+    const stylesXml = zip.file("word/styles.xml")?.asText() ?? "";
+    const footer = zip.file("word/footer1.xml")?.asText() ?? "";
+
+    expect(documentXml).not.toContain("Calibri");
+    expect(documentXml).toContain(
+      '<w:rFonts w:ascii="Liberation Serif" w:hAnsi="Liberation Serif"',
+    );
+    expect(documentXml).toContain(
+      '<w:rFonts w:ascii="Liberation Sans" w:hAnsi="Liberation Sans"',
+    );
+    expect(stylesXml).not.toContain("Calibri");
+    expect(stylesXml).toContain('w:styleId="Normal"');
+    expect(stylesXml).toContain('w:ascii="Liberation Serif"');
+    expect(stylesXml).toContain('w:styleId="Heading1"');
+    expect(stylesXml).toContain('w:ascii="Liberation Sans"');
+    expect(footer).toContain('w:ascii="Liberation Sans"');
   });
 });

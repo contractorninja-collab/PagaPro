@@ -5,6 +5,7 @@ import {
   containDimensions,
   type CompanyLogoAsset,
 } from "@/modules/company-branding/company-logo";
+import { normalizeDocxFontsInZip } from "@/modules/documents/engine/render/normalize-docx-fonts";
 
 const HEADER_REL_TYPE =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
@@ -208,6 +209,7 @@ export function applyCompanyLogoToDocx(
   options: DocxBrandingOptions = {},
 ): Buffer {
   const zip = new PizZip(docxBuffer);
+  normalizeDocxFontsInZip(zip);
   const documentFile = zip.file("word/document.xml");
   const documentRelsFile = zip.file("word/_rels/document.xml.rels");
   if (!documentFile || !documentRelsFile) throw new Error("DOCX is missing document relationships");
