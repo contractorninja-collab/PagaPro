@@ -299,6 +299,7 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
             <Row label="Pozita" value={e.jobTitle ?? "—"} />
             <Row label="Departamenti" value={e.departmentName ?? "—"} />
             <Row label="Vendi i punës" value={e.workplace ?? "Selia e kompanisë"} />
+            <Row label="Kualifikimi" value={e.qualification ?? "—"} />
             <Row
               label="Muaj pune praktike"
               value={e.probationMonths && e.probationMonths > 0 ? `${e.probationMonths}` : "—"}

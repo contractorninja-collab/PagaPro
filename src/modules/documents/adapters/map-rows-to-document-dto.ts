@@ -19,6 +19,7 @@ export function mapEmployeeRowToContractDto(row: {
   addressCity: string | null;
   addressCountry: string | null;
   workplace?: string | null;
+  qualification?: string | null;
   baseSalaryMonthly: string | { toFixed(n: number): string };
   weeklyHours?: string | { toFixed(n: number): string } | null;
   standardMonthlyHours?: string | { toFixed(n: number): string } | null;
@@ -54,6 +55,7 @@ export function mapEmployeeRowToContractDto(row: {
     addressCity: row.addressCity,
     addressCountry: row.addressCountry,
     workplace: row.workplace ?? null,
+    qualification: row.qualification ?? null,
     baseSalaryMonthly: gross,
     weeklyHours,
     standardMonthlyHours,

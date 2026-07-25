@@ -69,6 +69,7 @@ export interface EmployeeFormValues {
   isForeignNational: boolean;
   residencePermitExpiryDate: string;
   workplace: string;
+  qualification: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -105,6 +106,7 @@ function defaults(): EmployeeFormValues {
     isForeignNational: false,
     residencePermitExpiryDate: "",
     workplace: "",
+    qualification: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
     emergencyContactRelationship: "",
@@ -146,6 +148,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     isForeignNational: e.isForeignNational,
     residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
     workplace: e.workplace ?? "",
+    qualification: e.qualification ?? "",
     emergencyContactName: ec?.fullName ?? "",
     emergencyContactPhone: ec?.phone ?? "",
     emergencyContactRelationship: ec?.relationship ?? "",
@@ -193,6 +196,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     isForeignNational: v.isForeignNational,
     residencePermitExpiryDate: v.residencePermitExpiryDate || null,
     workplace: v.workplace,
+    qualification: v.qualification,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
     emergencyContactRelationship: v.emergencyContactRelationship,
@@ -669,6 +673,18 @@ export function EmployeeFormSheet(props: {
                   onChange={(e) => {
                     clearKey("workplace");
                     setValues((s) => ({ ...s, workplace: e.target.value }));
+                  }}
+                  disabled={pending}
+                />
+              </FormField>
+              <FormField label="Kualifikimi" error={fieldErrors.qualification}>
+                <Input
+                  className={errClass("qualification")}
+                  value={values.qualification}
+                  placeholder="p.sh. Bachelor Ekonomik"
+                  onChange={(e) => {
+                    clearKey("qualification");
+                    setValues((s) => ({ ...s, qualification: e.target.value }));
                   }}
                   disabled={pending}
                 />

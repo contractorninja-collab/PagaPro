@@ -115,6 +115,16 @@ describe("employeeUpsertSchema", () => {
     if (empty.success) expect(empty.data.workplace).toBeNull();
   });
 
+  it("passes qualification through and nulls it when empty", () => {
+    const set = employeeUpsertSchema.safeParse({ ...minimal, qualification: "Bachelor Ekonomik" });
+    expect(set.success).toBe(true);
+    if (set.success) expect(set.data.qualification).toBe("Bachelor Ekonomik");
+
+    const empty = employeeUpsertSchema.safeParse({ ...minimal, qualification: "   " });
+    expect(empty.success).toBe(true);
+    if (empty.success) expect(empty.data.qualification).toBeNull();
+  });
+
   it("accepts optional whole-number probation months", () => {
     const empty = employeeUpsertSchema.safeParse({ ...minimal, probationMonths: "" });
     expect(empty.success).toBe(true);

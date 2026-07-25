@@ -185,6 +185,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
       ? e.residencePermitExpiryDate.toISOString()
       : null,
     workplace: e.workplace,
+    qualification: e.qualification,
     emergencyContact: ec
       ? {
           fullName: ec.fullName,
@@ -386,6 +387,7 @@ export async function createEmployee(
           isForeignNational: input.isForeignNational,
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? undefined,
           workplace: input.workplace ?? undefined,
+          qualification: input.qualification ?? undefined,
           bankName: input.bankName ?? undefined,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || undefined,
           addressLine: input.addressLine ?? undefined,
@@ -517,6 +519,7 @@ export async function updateEmployee(
           isForeignNational: input.isForeignNational,
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? null,
           workplace: input.workplace ?? null,
+          qualification: input.qualification ?? null,
           bankName: input.bankName ?? null,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || null,
           addressLine: input.addressLine ?? null,

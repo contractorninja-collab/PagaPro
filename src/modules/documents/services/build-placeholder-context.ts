@@ -156,6 +156,7 @@ export async function buildMergedPlaceholderContext(
       addressCity: string | null;
       addressCountry: string | null;
       workplace?: string | null;
+      qualification?: string | null;
       baseSalaryMonthly: { toFixed(n: number): string };
       weeklyHours?: { toFixed(n: number): string } | null;
       standardMonthlyHours?: { toFixed(n: number): string } | null;
@@ -176,6 +177,7 @@ export async function buildMergedPlaceholderContext(
       addressCity: row.addressCity,
       addressCountry: row.addressCountry,
       workplace: row.workplace ?? null,
+      qualification: row.qualification ?? null,
       baseSalaryMonthly: row.baseSalaryMonthly,
       weeklyHours: row.weeklyHours ?? null,
       standardMonthlyHours: row.standardMonthlyHours ?? null,
@@ -237,6 +239,7 @@ export async function buildMergedPlaceholderContext(
             addressCity: employee.addressCity,
             addressCountry: employee.addressCountry,
             workplace: employee.workplace,
+            qualification: employee.qualification,
             baseSalaryMonthly: employee.baseSalaryMonthly,
             weeklyHours: employee.weeklyHours,
             standardMonthlyHours: employee.standardMonthlyHours,
@@ -292,6 +295,7 @@ export async function buildMergedPlaceholderContext(
           addressCity: employee.addressCity,
           addressCountry: employee.addressCountry,
           workplace: employee.workplace,
+          qualification: employee.qualification,
           baseSalaryMonthly: employee.baseSalaryMonthly,
           weeklyHours: employee.weeklyHours,
           standardMonthlyHours: employee.standardMonthlyHours,
@@ -371,6 +375,7 @@ export async function buildMergedPlaceholderContext(
           addressCity: employee.addressCity,
           addressCountry: employee.addressCountry,
           workplace: employee.workplace,
+          qualification: employee.qualification,
           baseSalaryMonthly: employee.baseSalaryMonthly,
         },
         employee.id,

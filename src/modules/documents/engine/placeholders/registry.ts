@@ -86,6 +86,12 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     labelSq: "Vendi i punës",
   },
   {
+    key: "employee_qualification",
+    requiredByDefault: false,
+    sources: ["employee"],
+    labelSq: "Kualifikimi",
+  },
+  {
     key: "salary_gross",
     requiredByDefault: true,
     sources: ["employee"],

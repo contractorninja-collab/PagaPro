@@ -10,6 +10,7 @@ const fixedTermKeys = [
   "employee_personal_number",
   "employee_address",
   "employee_job_description",
+  "employee_qualification",
   "workplace",
   "contract_start_date",
   "contract_end_date",
@@ -32,6 +33,7 @@ const indefiniteKeys = [
   "employee_personal_number",
   "employee_address",
   "employee_job_description",
+  "employee_qualification",
   "workplace",
   "contract_start_date",
   "employment_start_date",
@@ -74,26 +76,27 @@ function docxWithBlanks(count: number): Buffer {
 }
 
 describe("detectDocxTemplate", () => {
-  it("maps the NENI 3 workplace field to the workplace placeholder", () => {
+  it("maps the Neni 2 qualification and Neni 3 workplace blanks", () => {
     for (const template of contractManifest.templates) {
       const fields = "fields" in template ? template.fields : undefined;
       if (!fields) continue;
-      expect(fields[6]).toBe("workplace");
+      expect(fields[6]).toBe("employee_qualification");
+      expect(fields[7]).toBe("workplace");
     }
   });
 
-  it("detects 19 blanks for fixed-term contract template", () => {
-    const buf = docxWithBlanks(19);
+  it("detects 20 blanks for fixed-term contract template", () => {
+    const buf = docxWithBlanks(20);
     const result = detectDocxTemplate(buf, { templateSubtype: "AFAT_I_CAKTUAR" });
     expect(result.detectionMode).toBe("BLANK_FIELDS");
-    expect(result.blankFields).toHaveLength(19);
+    expect(result.blankFields).toHaveLength(20);
     expect(result.blankFields.map((field) => field.suggestedKey)).toEqual(fixedTermKeys);
   });
 
-  it("detects 18 blanks for indefinite contract template", () => {
-    const buf = docxWithBlanks(18);
+  it("detects 19 blanks for indefinite contract template", () => {
+    const buf = docxWithBlanks(19);
     const result = detectDocxTemplate(buf, { templateSubtype: "AFAT_I_PACAKTUAR" });
-    expect(result.blankFields).toHaveLength(18);
+    expect(result.blankFields).toHaveLength(19);
     expect(result.blankFields.map((field) => field.suggestedKey)).toEqual(indefiniteKeys);
   });
 });

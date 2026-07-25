@@ -16,6 +16,8 @@ export interface EmployeeContractDto {
   addressCountry: string | null;
   /** Vendi i punës (Neni 11.1.4); empty/null falls back to the company seat. */
   workplace?: string | null;
+  /** Kualifikimi (Neni 11.1.3) — schooling / professional qualification. */
+  qualification?: string | null;
   /** Monthly gross salary string (already normalized), e.g. "850.00" */
   baseSalaryMonthly: string;
   /** Weekly contractual hours, e.g. "40" */

@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 const emptyToNull = (v: unknown): unknown => {
-  if (v === "" || v === undefined) return null;
+  if (v === undefined) return null;
+  // A field left as spaces is an empty field: store null, not "".
+  if (typeof v === "string" && v.trim() === "") return null;
   return v;
 };
 
@@ -81,6 +83,9 @@ export const employeeUpsertSchema = z
 
     /// Vendi i punës (Neni 11.1.4) — bosh = selia e kompanisë.
     workplace: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
+
+    /// Kualifikimi (Neni 11.1.3) — shkollimi/përgatitja profesionale, printohet në kontratë.
+    qualification: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
 
     emergencyContactName: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
     emergencyContactPhone: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),

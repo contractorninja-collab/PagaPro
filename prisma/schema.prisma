@@ -754,6 +754,8 @@ model Employee {
   contractType      ContractTermType @default(INDEFINITE)
   /// Vendi i punës (Neni 11.4); falls back to the company address when empty.
   workplace         String?
+  /// Kualifikimi: schooling / professional qualification (Neni 11.1.3), printed in the contract.
+  qualification     String?
 
   /// Orët kontraktuale javore (UI default 40)
   weeklyHours Decimal @default(40) @db.Decimal(6, 2)
