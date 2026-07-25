@@ -7,6 +7,8 @@ const fixedTermKeys = [
   "company_name",
   "authorized_person_name",
   "employee_name",
+  "employee_personal_number",
+  "employee_address",
   "employee_job_description",
   "workplace",
   "contract_start_date",
@@ -27,6 +29,8 @@ const indefiniteKeys = [
   "company_name",
   "authorized_person_name",
   "employee_name",
+  "employee_personal_number",
+  "employee_address",
   "employee_job_description",
   "workplace",
   "contract_start_date",
@@ -74,22 +78,22 @@ describe("detectDocxTemplate", () => {
     for (const template of contractManifest.templates) {
       const fields = "fields" in template ? template.fields : undefined;
       if (!fields) continue;
-      expect(fields[4]).toBe("workplace");
+      expect(fields[6]).toBe("workplace");
     }
   });
 
-  it("detects 17 blanks for fixed-term contract template", () => {
-    const buf = docxWithBlanks(17);
+  it("detects 19 blanks for fixed-term contract template", () => {
+    const buf = docxWithBlanks(19);
     const result = detectDocxTemplate(buf, { templateSubtype: "AFAT_I_CAKTUAR" });
     expect(result.detectionMode).toBe("BLANK_FIELDS");
-    expect(result.blankFields).toHaveLength(17);
+    expect(result.blankFields).toHaveLength(19);
     expect(result.blankFields.map((field) => field.suggestedKey)).toEqual(fixedTermKeys);
   });
 
-  it("detects 16 blanks for indefinite contract template", () => {
-    const buf = docxWithBlanks(16);
+  it("detects 18 blanks for indefinite contract template", () => {
+    const buf = docxWithBlanks(18);
     const result = detectDocxTemplate(buf, { templateSubtype: "AFAT_I_PACAKTUAR" });
-    expect(result.blankFields).toHaveLength(16);
+    expect(result.blankFields).toHaveLength(18);
     expect(result.blankFields.map((field) => field.suggestedKey)).toEqual(indefiniteKeys);
   });
 });
