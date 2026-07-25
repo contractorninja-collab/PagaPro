@@ -1,7 +1,9 @@
+import Link from "next/link";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
 } from "@/modules/employees/components/employees-labels";
+import { employeeDepartmentHref } from "@/modules/employees/filters/department-filter";
 import type { EmploymentStatus, EmploymentType } from "@prisma/client";
 import type { EmployeeDistributionSlice } from "../types/dashboard-types";
 
@@ -37,32 +39,39 @@ export function DashboardEmployeeDistribution({
           {distribution.byDepartment.map((d, i) => (
             <li
               key={d.departmentId ?? "none"}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 text-[12.5px] sm:grid-cols-[minmax(120px,180px)_minmax(0,1fr)_32px]"
             >
-              <span className="flex min-w-0 items-center gap-2 font-medium text-[#334155]">
-                <span
-                  className="h-[9px] w-[9px] flex-none rounded-[3px]"
-                  style={{ background: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }}
-                  aria-hidden
-                />
-                <span className="truncate">{d.departmentName}</span>
-              </span>
-              <div
-                className="col-span-2 h-2 overflow-hidden rounded bg-[#f1f5f9] sm:col-span-1"
-                role="img"
-                aria-label={`${d.departmentName}: ${d.count} nga ${total} punonjës`}
+              <Link
+                href={employeeDepartmentHref(d.departmentId)}
+                aria-label={`Shiko ${d.count} punonjës në ${d.departmentName}`}
+                className="group -mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 rounded-md px-2 py-1 text-[12.5px] transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 sm:grid-cols-[minmax(120px,180px)_minmax(0,1fr)_32px]"
               >
-                <div
-                  className="h-full rounded"
-                  style={{
-                    width: `${(d.count / largestDepartment) * 100}%`,
-                    background: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
-                  }}
-                />
-              </div>
-              <span className="row-start-1 text-right font-bold tabular-nums text-[#0f172a] sm:col-start-3">
-                {d.count}
-              </span>
+                <span className="flex min-w-0 items-center gap-2 font-medium text-[#334155]">
+                  <span
+                    className="h-[9px] w-[9px] flex-none rounded-[3px]"
+                    style={{ background: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }}
+                    aria-hidden
+                  />
+                  <span className="truncate group-hover:text-brand-blue">
+                    {d.departmentName}
+                  </span>
+                </span>
+                <span
+                  className="col-span-2 h-2 overflow-hidden rounded bg-[#f1f5f9] sm:col-span-1"
+                  role="img"
+                  aria-label={`${d.departmentName}: ${d.count} nga ${total} punonjës`}
+                >
+                  <span
+                    className="block h-full rounded"
+                    style={{
+                      width: `${(d.count / largestDepartment) * 100}%`,
+                      background: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+                    }}
+                  />
+                </span>
+                <span className="row-start-1 text-right font-bold tabular-nums text-[#0f172a] sm:col-start-3">
+                  {d.count}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { DocumentTemplateSubtype } from "@prisma/client";
+import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { generateContractDocumentsAction } from "@/modules/documents/actions/documents-actions";
 import type { SubjectOption } from "@/modules/documents/components/documents-dashboard-client";
+import { openBulkPrintPreview } from "@/modules/documents/components/open-bulk-print-preview";
 
 export interface ContractTemplatePick {
   id: string;
@@ -143,6 +145,11 @@ export function ContractsGenerationPanel({
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  async function previewBulkPrint() {
+    const result = await openBulkPrintPreview(lastArtifactIds);
+    if (!result.ok) toast.error(result.error);
   }
 
   const subtypeCards = useMemo(
@@ -286,9 +293,21 @@ export function ContractsGenerationPanel({
                     : "Gjenero PDF"}
               </Button>
               {lastArtifactIds.length > 1 ? (
-                <Button type="button" variant="secondary" disabled={pending} onClick={downloadZip}>
-                  Shkarko ZIP ({lastArtifactIds.length})
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={pending}
+                    onClick={() => void previewBulkPrint()}
+                  >
+                    <Printer className="h-4 w-4" aria-hidden />
+                    Parapamje për printim ({lastArtifactIds.length})
+                  </Button>
+                  <Button type="button" variant="secondary" disabled={pending} onClick={downloadZip}>
+                    <Download className="h-4 w-4" aria-hidden />
+                    Shkarko ZIP
+                  </Button>
+                </>
               ) : null}
             </div>
           </>

@@ -63,4 +63,25 @@ describe("buildCoreOrganizationalContext", () => {
 
     expect(ctx.document_place).toBe("Ferizaj");
   });
+
+  it("uses the employee workplace in document context", () => {
+    const ctx = buildCoreOrganizationalContext({
+      employee: { ...employee, workplace: "Dega në Prizren" },
+      company: { ...company, addressLine: "Selia në Prishtinë" },
+      settings: null,
+    });
+
+    expect(ctx.workplace).toMatch(/^Dega në Prizren,/);
+    expect(ctx.workplace).not.toContain("Selia në Prishtinë");
+  });
+
+  it("falls back to the company address when employee workplace is empty", () => {
+    const ctx = buildCoreOrganizationalContext({
+      employee: { ...employee, workplace: null },
+      company: { ...company, addressLine: "Selia në Prishtinë" },
+      settings: null,
+    });
+
+    expect(ctx.workplace).toMatch(/^Selia në Prishtinë,/);
+  });
 });

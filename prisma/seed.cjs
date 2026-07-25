@@ -120,6 +120,7 @@ const PLACEHOLDER_REGISTRY_SEEDS = [
   { placeholderKey: "employee_job_responsibilities", label: "Përgjegjësitë e punës", category: "employee", isRequired: false, sourcePath: "employee.jobTitleProfile.responsibilities" },
   { placeholderKey: "employee_job_requirements", label: "Kërkesat e punës", category: "employee", isRequired: false, sourcePath: "employee.jobTitleProfile.requirements" },
   { placeholderKey: "employee_department", label: "Departamenti", category: "employee", isRequired: false, sourcePath: "employee.department.name" },
+  { placeholderKey: "workplace", label: "Vendi i punës", category: "employee", isRequired: false, sourcePath: "employee.workplace" },
   { placeholderKey: "salary_gross", label: "Paga bruto", category: "payroll", isRequired: true, sourcePath: "employee.baseSalaryMonthly" },
   { placeholderKey: "salary_gross_words", label: "Paga bruto me fjalë", category: "payroll", isRequired: false, sourcePath: "employee.baseSalaryMonthly" },
   { placeholderKey: "daily_hours", label: "Orët ditore", category: "payroll", isRequired: false, sourcePath: "employee.weeklyHours/5" },

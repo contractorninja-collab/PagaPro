@@ -42,34 +42,54 @@ async function loadCompanySlice(
 ): Promise<{
   companyDto: ReturnType<typeof mapCompanyRowToContractDto>;
   settingsDto: ReturnType<typeof mapCompanySettingRowToContractDto>;
+  prefixes: {
+    contractReferencePrefix: string | null;
+    payrollPdfPrefix: string | null;
+    generalDocumentPrefix: string | null;
+  };
 }> {
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: {
-      legalName: true,
-      tradeName: true,
-      fiscalNumber: true,
-      businessRegistrationNumber: true,
-      addressLine: true,
-      city: true,
-      postalCode: true,
-      country: true,
-    },
-  });
+  const [company, settings, configuration] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        legalName: true,
+        tradeName: true,
+        fiscalNumber: true,
+        businessRegistrationNumber: true,
+        addressLine: true,
+        city: true,
+        postalCode: true,
+        country: true,
+      },
+    }),
+    prisma.companySetting.findUnique({
+      where: { companyId },
+      select: {
+        authorizedRepresentativeName: true,
+        authorizedRepresentativePosition: true,
+        companyAddressLine: true,
+      },
+    }),
+    prisma.companyConfiguration.findUnique({
+      where: { companyId },
+      select: {
+        contractReferencePrefix: true,
+        payrollPdfPrefix: true,
+        generalDocumentPrefix: true,
+      },
+    }),
+  ]);
   if (!company) {
     throw new Error("Kompania nuk u gjet.");
   }
-  const settings = await prisma.companySetting.findUnique({
-    where: { companyId },
-    select: {
-      authorizedRepresentativeName: true,
-      authorizedRepresentativePosition: true,
-      companyAddressLine: true,
-    },
-  });
   return {
     companyDto: mapCompanyRowToContractDto(company),
     settingsDto: mapCompanySettingRowToContractDto(settings),
+    prefixes: {
+      contractReferencePrefix: configuration?.contractReferencePrefix ?? null,
+      payrollPdfPrefix: configuration?.payrollPdfPrefix ?? null,
+      generalDocumentPrefix: configuration?.generalDocumentPrefix ?? null,
+    },
   };
 }
 
@@ -77,10 +97,29 @@ function withDocDate(
   base: Record<string, string>,
   documentDate: Date,
   locale: string,
+  documentReferencePrefix: string,
 ): Record<string, string> {
   return mergeDocumentMetadata(base, {
     document_date: formatTemplateDate(documentDate, locale),
+    document_reference_prefix: documentReferencePrefix,
   });
+}
+
+function resolveDocumentReferencePrefix(
+  subjectKind: DocumentSubjectKind,
+  prefixes: {
+    contractReferencePrefix: string | null;
+    payrollPdfPrefix: string | null;
+    generalDocumentPrefix: string | null;
+  },
+): string {
+  const configured =
+    subjectKind === "CONTRACT"
+      ? prefixes.contractReferencePrefix ?? prefixes.generalDocumentPrefix
+      : subjectKind === "PAYROLL"
+        ? prefixes.payrollPdfPrefix ?? prefixes.generalDocumentPrefix
+        : prefixes.generalDocumentPrefix;
+  return configured?.trim() ?? "";
 }
 
 /**
@@ -91,7 +130,14 @@ export async function buildMergedPlaceholderContext(
   params: BuildMergedPlaceholderContextParams,
 ): Promise<BuildMergedPlaceholderContextResult> {
   const locale = params.locale ?? "sq-AL";
-  const { companyDto, settingsDto } = await loadCompanySlice(prisma, params.companyId);
+  const { companyDto, settingsDto, prefixes } = await loadCompanySlice(
+    prisma,
+    params.companyId,
+  );
+  const documentReferencePrefix = resolveDocumentReferencePrefix(
+    params.subjectKind,
+    prefixes,
+  );
 
   const coreFromEmployeeRow = (
     row: {
@@ -109,6 +155,7 @@ export async function buildMergedPlaceholderContext(
       addressLine: string | null;
       addressCity: string | null;
       addressCountry: string | null;
+      workplace?: string | null;
       baseSalaryMonthly: { toFixed(n: number): string };
       weeklyHours?: { toFixed(n: number): string } | null;
       standardMonthlyHours?: { toFixed(n: number): string } | null;
@@ -128,6 +175,7 @@ export async function buildMergedPlaceholderContext(
       addressLine: row.addressLine,
       addressCity: row.addressCity,
       addressCountry: row.addressCountry,
+      workplace: row.workplace ?? null,
       baseSalaryMonthly: row.baseSalaryMonthly,
       weeklyHours: row.weeklyHours ?? null,
       standardMonthlyHours: row.standardMonthlyHours ?? null,
@@ -139,7 +187,12 @@ export async function buildMergedPlaceholderContext(
       locale,
     });
     return {
-      merged: withDocDate(core, params.documentDate, locale),
+      merged: withDocDate(
+        core,
+        params.documentDate,
+        locale,
+        documentReferencePrefix,
+      ),
       resolvedEmployeeId,
       resolvedPayrollId: params.payrollId ?? null,
     };
@@ -194,7 +247,12 @@ export async function buildMergedPlaceholderContext(
           locale,
         });
         return {
-          merged: withDocDate(placeholderCtx, params.documentDate, locale),
+          merged: withDocDate(
+            placeholderCtx,
+            params.documentDate,
+            locale,
+            documentReferencePrefix,
+          ),
           resolvedEmployeeId: employee.id,
           resolvedPayrollId: params.payrollId ?? null,
         };
@@ -244,7 +302,12 @@ export async function buildMergedPlaceholderContext(
         locale,
       });
       return {
-        merged: withDocDate(placeholderCtx, params.documentDate, locale),
+        merged: withDocDate(
+          placeholderCtx,
+          params.documentDate,
+          locale,
+          documentReferencePrefix,
+        ),
         resolvedEmployeeId: employee.id,
         resolvedPayrollId: params.payrollId ?? null,
       };
@@ -307,6 +370,7 @@ export async function buildMergedPlaceholderContext(
           addressLine: employee.addressLine,
           addressCity: employee.addressCity,
           addressCountry: employee.addressCountry,
+          workplace: employee.workplace,
           baseSalaryMonthly: employee.baseSalaryMonthly,
         },
         employee.id,
@@ -377,7 +441,12 @@ export async function buildMergedPlaceholderContext(
           locale,
         });
         empCore = {
-          merged: withDocDate(letter, params.documentDate, locale),
+          merged: withDocDate(
+            letter,
+            params.documentDate,
+            locale,
+            documentReferencePrefix,
+          ),
           resolvedEmployeeId: null,
           resolvedPayrollId: payroll.id,
         };
@@ -409,7 +478,12 @@ export async function buildMergedPlaceholderContext(
         locale,
       });
       return {
-        merged: withDocDate(letter, params.documentDate, locale),
+        merged: withDocDate(
+          letter,
+          params.documentDate,
+          locale,
+          documentReferencePrefix,
+        ),
         resolvedEmployeeId: null,
         resolvedPayrollId: params.payrollId ?? null,
       };

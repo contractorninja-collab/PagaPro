@@ -105,6 +105,15 @@ describe("composePlaceholderRegistry", () => {
     expect(reg.document_title).toBeDefined();
     expect(reg.document_date).toBeDefined();
   });
+
+  it.each(["CONTRACT", "LEAVE", "TERMINATION", "WARNING", "PAYROLL", "OTHER"] as const)(
+    "includes the employee workplace for %s paperwork",
+    (category) => {
+      const reg = composePlaceholderRegistry([category]);
+      expect(reg.workplace).toBeDefined();
+      expect(reg.workplace?.applicableCategories).toBeUndefined();
+    },
+  );
 });
 
 describe("validatePlaceholdersForRender", () => {

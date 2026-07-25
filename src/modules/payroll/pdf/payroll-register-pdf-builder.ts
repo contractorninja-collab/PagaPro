@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
 import type { PayslipPdfCompany } from "@/modules/payroll/pdf/payslip-pdf-builder";
 import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
@@ -7,6 +7,10 @@ import {
   embedCompanyLogo,
   type EmbeddedCompanyLogo,
 } from "@/modules/company-branding/pdf-logo-branding";
+import {
+  drawPagaproGeneratedFooter,
+  embedPayrollPdfFonts,
+} from "@/modules/payroll/pdf/payroll-pdf-fonts";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -187,10 +191,12 @@ function drawCompanyHeader(
     ? drawCompanyLogoPlate(page, logo, { x: 16, top: PAGE_H - 7 }) + 10
     : MARGIN;
   const companyTextWidth = PAGE_W - companyTextX - MARGIN - 170;
-  drawText(page, fitText(company.displayName.toUpperCase(), fontBold, 16, companyTextWidth), companyTextX, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
+  if (!logo) {
+    drawText(page, fitText(company.displayName.toUpperCase(), fontBold, 16, companyTextWidth), companyTextX, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
+  }
   const subLine = [company.addressLine, company.cityLine].filter(Boolean).join(" · ");
   if (subLine) {
-    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
+    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, logo ? PAGE_H - 45 : PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
   }
   drawText(page, docTitle, PAGE_W - MARGIN - 160, PAGE_H - 38, fontBold, 11, rgb(1, 1, 1));
   drawText(page, periodLabel, PAGE_W - MARGIN - 160, PAGE_H - 54, font, 9, rgb(0.85, 0.88, 0.92));
@@ -342,8 +348,7 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
   pdf.setAuthor(txt(input.company.displayName));
   pdf.setSubject(txt(pdfTitle));
 
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const { body: font, heading: fontBold } = await embedPayrollPdfFonts(pdf);
   const companyLogo = await embedCompanyLogo(pdf, input.logo);
   const layout = buildLayout(input.withAmounts);
 
@@ -397,6 +402,12 @@ export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): P
 
   y = drawSignatureBlock(page, font, y);
   drawLegalFooter(page, input.company, font, y);
+  for (const outputPage of pdf.getPages()) {
+    drawPagaproGeneratedFooter(outputPage, fontBold, {
+      pageWidth: PAGE_W,
+      margin: MARGIN,
+    });
+  }
 
   return pdf.save();
 }
