@@ -104,10 +104,6 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
     });
   }
 
-  function preview(kind: "pdf" | "docx") {
-    void openArtifactFile(kind, true);
-  }
-
   function toggleArchive(archived: boolean) {
     startTransition(async () => {
       const res = await archiveArtifactAction({ artifactId: artifact.id, archived });
@@ -153,16 +149,23 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
         actions={
           <>
             <div className="flex flex-wrap items-center gap-2 justify-end">
+              {/* Browser print view — the only preview that works when no PDF converter is configured. */}
+              {artifact.hasDocx ? (
+                <Button type="button" size="sm" variant="secondary" asChild>
+                  <a
+                    href={`/api/dokumentet/print?ids=${artifact.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Parapamje & printo
+                  </a>
+                </Button>
+              ) : null}
               {/* PDF is served lazily from the stored DOCX when not yet converted. */}
               {artifact.hasPdf || artifact.hasDocx ? (
-                <>
-                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("pdf")}>
-                    Parapamje PDF
-                  </Button>
-                  <Button type="button" size="sm" disabled={pending} onClick={() => void download("pdf")}>
-                    Shkarko PDF
-                  </Button>
-                </>
+                <Button type="button" size="sm" disabled={pending} onClick={() => void download("pdf")}>
+                  Shkarko PDF
+                </Button>
               ) : (
                 <p className="max-w-xs text-xs text-amber-800">
                   PDF nuk është disponueshëm
@@ -170,14 +173,9 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
                 </p>
               )}
               {artifact.hasDocx ? (
-                <>
-                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => preview("docx")}>
-                    Parapamje DOCX
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => void download("docx")}>
-                    Shkarko DOCX
-                  </Button>
-                </>
+                <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => void download("docx")}>
+                  Shkarko DOCX
+                </Button>
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2 justify-end">

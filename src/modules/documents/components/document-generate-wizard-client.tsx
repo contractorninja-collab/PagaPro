@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  Printer,
   Search,
 } from "lucide-react";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
@@ -554,17 +555,30 @@ export function DocumentGenerateWizardClient(props: {
             >
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
+                  {artifactIds.length > 0 ? (
+                    <a
+                      href={`/api/dokumentet/print?ids=${artifactIds.join(",")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={docBtnPrimary}
+                    >
+                      <Printer className="h-3.5 w-3.5" aria-hidden />
+                      {artifactIds.length > 1
+                        ? `Parapamje & printo (${artifactIds.length})`
+                        : "Parapamje & printo"}
+                    </a>
+                  ) : null}
                   {artifactIds.length > 1 ? (
                     <button type="button" className={docBtnSecondaryDense} onClick={downloadZip}>
                       <Download className="h-3.5 w-3.5" aria-hidden />
-                      Shkarko ZIP
+                      Shkarko ZIP ({artifactIds.length})
                     </button>
                   ) : null}
-                  {artifactIds.map((id) => (
-                    <Link key={id} href={`/dokumentet/${id}`} className={docBtnSecondaryDense}>
+                  {artifactIds.length === 1 ? (
+                    <Link href={`/dokumentet/${artifactIds[0]}`} className={docBtnSecondaryDense}>
                       Hap dokumentin
                     </Link>
-                  ))}
+                  ) : null}
                 </div>
                 {failures.length > 0 ? (
                   <ul className="m-0 list-disc space-y-1 pl-5 text-[13px] text-[#dc2626]">
