@@ -32,20 +32,34 @@ function fontStack(family: string | null): string {
  * Assembles one printable HTML page holding every requested document, each on its
  * own sheet with a page break in between, so a batch of contracts is previewed and
  * printed in a single pass instead of opening them one by one.
+ *
+ * Page margins are built into the document rather than declared on `@page`. A
+ * browser draws its own header and footer — page title, date, source URL, page
+ * numbers — inside the `@page` margin box, and no CSS can suppress that text while
+ * the box exists. With `@page { margin: 0 }` there is no box and nothing is drawn,
+ * so each sheet recreates the margins itself: sides as padding, top and bottom as
+ * spacer rows in a wrapper table. Those rows are `<thead>`/`<tfoot>`, which the
+ * browser repeats on every page a document spills onto, so a contract's second and
+ * third pages keep the same margins as its first.
  */
 export function buildPrintPageHtml(documents: PrintablePageDocument[], options?: { autoPrint?: boolean }): string {
   const geometry = documents.find((d) => d.render.geometry)?.render.geometry ?? A4;
   const first = documents[0]?.render;
   const bodyFont = fontStack(first?.fontFamily ?? null);
   const bodySize = first?.fontSizePt ?? 11;
-  const contentWidthMm = geometry.widthMm - geometry.marginLeftMm - geometry.marginRightMm;
   const autoPrint = options?.autoPrint ?? true;
 
   const sheets = documents
     .map(
       (doc) => `<section class="sheet" aria-label="${escapeHtml(doc.title)}">
+<table class="frame">
+<thead><tr><td class="gap-top"></td></tr></thead>
+<tfoot><tr><td class="gap-bottom"></td></tr></tfoot>
+<tbody><tr><td class="content">
 ${doc.render.logoDataUri ? `<img class="logo" src="${doc.render.logoDataUri}" alt="">` : ""}
 ${doc.render.html}
+</td></tr></tbody>
+</table>
 </section>`,
     )
     .join("\n");
@@ -62,10 +76,8 @@ ${doc.render.html}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Printo — ${label}</title>
 <style>
-  @page {
-    size: ${geometry.widthMm}mm ${geometry.heightMm}mm;
-    margin: ${geometry.marginTopMm}mm ${geometry.marginRightMm}mm ${geometry.marginBottomMm}mm ${geometry.marginLeftMm}mm;
-  }
+  /* No margin box means the browser has nowhere to print its own header/footer. */
+  @page { size: ${geometry.widthMm}mm ${geometry.heightMm}mm; margin: 0; }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -106,25 +118,33 @@ ${doc.render.html}
     width: ${geometry.widthMm}mm;
     min-height: ${geometry.heightMm}mm;
     margin: 16px auto;
-    padding: ${geometry.marginTopMm}mm ${geometry.marginRightMm}mm ${geometry.marginBottomMm}mm ${geometry.marginLeftMm}mm;
     background: #fff;
     box-shadow: 0 1px 6px rgba(15, 23, 42, 0.18);
   }
-  .sheet p { orphans: 2; widows: 2; white-space: pre-wrap; }
+  .frame { width: 100%; border-collapse: collapse; }
+  /* Repeated by the browser on every page of a document that runs long. */
+  .gap-top { height: ${geometry.marginTopMm}mm; }
+  .gap-bottom { height: ${geometry.marginBottomMm}mm; }
+  .content {
+    padding: 0 ${geometry.marginRightMm}mm 0 ${geometry.marginLeftMm}mm;
+    vertical-align: top;
+  }
+  .content p { orphans: 2; widows: 2; white-space: pre-wrap; }
   .logo { max-width: 35mm; max-height: 18mm; margin-bottom: 6mm; }
-  table { page-break-inside: avoid; }
+  .content table { page-break-inside: avoid; }
   /* A full-width sheet would scroll sideways in a narrow window; print keeps the real page size. */
   @media screen and (max-width: ${Math.ceil(geometry.widthMm) + 20}mm) {
-    .sheet { width: auto; min-height: 0; margin: 12px; padding: 8mm; }
+    .sheet { width: auto; min-height: 0; margin: 12px; }
+    .gap-top, .gap-bottom { height: 8mm; }
+    .content { padding: 0 8mm; }
   }
   @media print {
     body { background: #fff; }
     .no-print { display: none !important; }
     .sheet {
-      width: ${contentWidthMm}mm;
+      width: auto;
       min-height: 0;
       margin: 0;
-      padding: 0;
       box-shadow: none;
     }
     .sheet + .sheet { page-break-before: always; break-before: page; }

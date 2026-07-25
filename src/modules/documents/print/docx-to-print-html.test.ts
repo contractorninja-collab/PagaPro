@@ -155,6 +155,16 @@ describe("buildPrintPageHtml", () => {
     expect(page).toContain("window.print()");
   });
 
+  it("leaves no @page margin box for the browser to print its header and footer into", () => {
+    const page = buildPrintPageHtml([{ title: "Kontrata", render: render("<p>A</p>") }]);
+
+    expect(page).toMatch(/@page \{[^}]*margin: 0;/);
+    // The margins move into the sheet, repeated per page by the wrapper table.
+    expect(page.match(/class="gap-top"/g)).toHaveLength(1);
+    expect(page).toContain("<thead>");
+    expect(page).toContain("<tfoot>");
+  });
+
   it("escapes document titles", () => {
     const page = buildPrintPageHtml([
       { title: '<img src=x onerror="alert(1)">', render: render("<p>A</p>") },
