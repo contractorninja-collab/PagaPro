@@ -134,6 +134,15 @@ export default async function DokumentetPage({
           </>
         }
       />
+      {/* Issuing sits above the register: it is an action, and the register is a long list. */}
+      <div id="verejtje" className="mb-5 scroll-mt-24">
+        <WarningIssuePanel
+          employees={employees.map((e) => ({
+            id: e.id,
+            label: `${e.lastName} ${e.firstName}`.trim(),
+          }))}
+        />
+      </div>
       <DocumentsDashboardClient
         artifacts={artifactRows}
         templateSummary={templateSummary}
@@ -152,13 +161,7 @@ export default async function DokumentetPage({
           />
         }
       />
-      <div className="mt-5 space-y-5">
-        <WarningIssuePanel
-          employees={employees.map((e) => ({
-            id: e.id,
-            label: `${e.lastName} ${e.firstName}`.trim(),
-          }))}
-        />
+      <div id="anekset" className="mt-5 scroll-mt-24">
         <AnnexBulkPrintPanel annexes={annexes} />
       </div>
     </>

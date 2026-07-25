@@ -40,9 +40,17 @@ const workflowCategories: DocumentCategory[] = ["CONTRACT", "LEAVE", "TERMINATIO
  * exists. When none do, say where the case is opened rather than leaving the step
  * empty — the list looking like a missing employee picker is the confusing part.
  */
-function emptySubjectsHint(category: DocumentCategory | ""): string {
+function emptySubjectsHint(category: DocumentCategory | ""): React.ReactNode {
   if (category === "WARNING") {
-    return "Nuk ka vërejtje të lëshuara. Lëshoni një vërejtje te profili i punonjësit → skeda «Vërejtjet», pastaj kthehuni këtu për ta printuar (ose printojeni drejtpërdrejt nga ajo skedë).";
+    return (
+      <>
+        Nuk ka vërejtje të lëshuara. Zgjidhni punonjësit dhe lëshoni vërejtjen te{" "}
+        <Link href="/dokumentet#verejtje" className="font-semibold text-brand-blue hover:underline">
+          Dokumentet → «Lësho vërejtje»
+        </Link>{" "}
+        (ose te skeda «Vërejtjet» e punonjësit), pastaj kthehuni këtu për ta printuar.
+      </>
+    );
   }
   if (category === "TERMINATION") {
     return "Nuk ka largime të regjistruara. Hapni një largim te moduli «Largimet», pastaj kthehuni këtu.";
