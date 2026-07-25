@@ -175,6 +175,44 @@ export async function getAnnexPanelData(
   };
 }
 
+export interface CompanyAnnexRow {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  annexNumber: number;
+  effectiveDate: string;
+  changeCategories: string[];
+}
+
+/** Every annex in the company, newest first — the picker behind bulk printing. */
+export async function listCompanyAnnexes(
+  companyId: string,
+  limit = 200,
+): Promise<CompanyAnnexRow[]> {
+  const rows = await prisma.employeeContractAnnex.findMany({
+    where: { companyId },
+    orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+    take: limit,
+    select: {
+      id: true,
+      employeeId: true,
+      annexNumber: true,
+      effectiveDate: true,
+      changeCategories: true,
+      employee: { select: { firstName: true, lastName: true } },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    employeeId: row.employeeId,
+    employeeName: `${row.employee.firstName} ${row.employee.lastName}`.trim(),
+    annexNumber: row.annexNumber,
+    effectiveDate: row.effectiveDate.toISOString().slice(0, 10),
+    changeCategories: row.changeCategories,
+  }));
+}
+
 export async function updateContractTerm(
   companyId: string,
   employeeId: string,

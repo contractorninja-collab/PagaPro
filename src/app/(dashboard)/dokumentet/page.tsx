@@ -11,6 +11,8 @@ import {
   listDocumentTemplatesWithVersions,
   listEmployeesForDocumentFilters,
 } from "@/modules/documents/services/document-queries";
+import { listCompanyAnnexes } from "@/modules/annex/services/annex-service";
+import { AnnexBulkPrintPanel } from "@/modules/annex/components/annex-bulk-print-panel";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -53,6 +55,7 @@ export default async function DokumentetPage({
   let templates;
   let employees;
   let authors;
+  let annexes;
 
   try {
     ;[
@@ -60,6 +63,7 @@ export default async function DokumentetPage({
       templates,
       employees,
       authors,
+      annexes,
     ] = await Promise.all([
       listDocumentArtifacts(companyId, {
         q: q || undefined,
@@ -72,6 +76,7 @@ export default async function DokumentetPage({
       listDocumentTemplatesWithVersions(companyId),
       listEmployeesForDocumentFilters(companyId),
       listArtifactAuthorsForFilter(companyId),
+      listCompanyAnnexes(companyId),
     ]);
   } catch (err) {
     console.error("[pagapro] DokumentetPage load failed", err);
@@ -146,6 +151,9 @@ export default async function DokumentetPage({
           />
         }
       />
+      <div className="mt-5">
+        <AnnexBulkPrintPanel annexes={annexes} />
+      </div>
     </>
   );
 }

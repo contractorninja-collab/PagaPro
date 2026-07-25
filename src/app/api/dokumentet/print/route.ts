@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { renderAnnexDocument } from "@/modules/annex/documents/render-annex-document";
 import { renderDocxToPrintHtml } from "@/modules/documents/print/docx-to-print-html";
 import {
   buildPrintErrorPage,
@@ -35,15 +36,22 @@ export async function GET(request: Request) {
   }
   const { companyId } = context.context;
 
-  const requestedIds = (new URL(request.url).searchParams.get("ids") ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
+  const params = new URL(request.url).searchParams;
+  const idList = (value: string | null) =>
+    (value ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
 
-  if (requestedIds.length === 0) {
+  const requestedIds = idList(params.get("ids"));
+  // Annexes are rendered on demand rather than stored as artifacts, so they come
+  // in under their own parameter and are appended after the stored documents.
+  const requestedAnnexIds = idList(params.get("annexIds"));
+
+  if (requestedIds.length + requestedAnnexIds.length === 0) {
     return htmlResponse(buildPrintErrorPage("Nuk u specifikua asnjë dokument për printim."), 400);
   }
-  if (requestedIds.length > MAX_DOCUMENTS) {
+  if (requestedIds.length + requestedAnnexIds.length > MAX_DOCUMENTS) {
     return htmlResponse(
       buildPrintErrorPage(`Printimi mbështet deri në ${MAX_DOCUMENTS} dokumente njëherësh.`),
       400,
@@ -77,6 +85,19 @@ export async function GET(request: Request) {
       console.error("[pagapro] print view could not render artifact", id, error);
       skipped.push(artifact.displayFilename || artifact.title);
     }
+  }
+
+  for (const annexId of requestedAnnexIds) {
+    const rendered = await renderAnnexDocument(companyId, annexId);
+    if (!rendered.ok) {
+      console.error("[pagapro] print view could not render annex", annexId, rendered.error);
+      skipped.push(annexId);
+      continue;
+    }
+    documents.push({
+      title: rendered.filename.replace(/\.[^.]+$/, ""),
+      render: renderDocxToPrintHtml(rendered.buffer),
+    });
   }
 
   if (documents.length === 0) {

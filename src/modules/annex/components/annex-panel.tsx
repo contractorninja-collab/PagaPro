@@ -77,7 +77,11 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
   }
 
   function printAnnex(annexId: string) {
-    window.open(`/punonjesit/${employeeId}/aneks/${annexId}/print`, "_blank", "noopener,noreferrer");
+    window.open(
+      `/api/punonjesit/${employeeId}/aneks/${annexId}/print`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 
   async function deleteAnnex(annexId: string) {
