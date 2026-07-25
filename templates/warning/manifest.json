@@ -1,0 +1,19 @@
+{
+  "templates": [
+    {
+      "filename": "verejtje.docx",
+      "name": "Vërejtje",
+      "measure": null
+    },
+    {
+      "filename": "verejtje-me-goje.docx",
+      "name": "Vërejtje me gojë",
+      "measure": "VERBALE"
+    },
+    {
+      "filename": "verejtje-me-shkrim.docx",
+      "name": "Vërejtje me shkrim",
+      "measure": "ME_SHKRIM"
+    }
+  ]
+}

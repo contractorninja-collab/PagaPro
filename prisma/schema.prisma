@@ -1762,6 +1762,12 @@ model DisciplinaryWarning {
 
   severity String?
 
+  /// Masa e shqiptuar sipas nenit 85.1: VERBALE | ME_SHKRIM. Null = e papërcaktuar (rreshta të vjetër).
+  measure String?
+
+  /// Afati për përmirësim (neni 70.2) — kërkohet që vërejtja me shkrim të mbajë pasoja.
+  improvementDeadline DateTime?
+
   status DisciplinaryWarningStatus @default(DRAFT)
 
   createdAt DateTime @default(now())

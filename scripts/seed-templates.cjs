@@ -3,7 +3,7 @@
  * Runs the DOCX template seeders against whichever database and blob store the
  * environment points at.
  *
- * Usage: node scripts/seed-templates.cjs <contracts|leave|termination|all>
+ * Usage: node scripts/seed-templates.cjs <contracts|leave|termination|warning|all>
  *
  * Replaces three inline `node -e` one-liners that had two defects making remote
  * seeding silently wrong:
@@ -48,6 +48,7 @@ const SEEDERS = {
   contracts: () => require("./seed-contract-templates.cjs").seedContractTemplates,
   leave: () => require("./seed-leave-templates.cjs").seedLeaveTemplates,
   termination: () => require("./seed-termination-templates.cjs").seedTerminationTemplates,
+  warning: () => require("./seed-warning-templates.cjs").seedWarningTemplates,
 };
 
 const which = (process.argv[2] || "all").toLowerCase();
@@ -55,7 +56,7 @@ const selected = which === "all" ? Object.keys(SEEDERS) : [which];
 
 for (const name of selected) {
   if (!SEEDERS[name]) {
-    console.error(`Unknown seeder "${name}". Use one of: contracts, leave, termination, all.`);
+    console.error(`Unknown seeder "${name}". Use one of: contracts, leave, termination, warning, all.`);
     process.exit(1);
   }
 }

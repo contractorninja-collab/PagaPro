@@ -479,6 +479,20 @@ const CATEGORY_EXTENSIONS: Record<DocumentCategory, PlaceholderDefinition[]> = {
       labelSq: "Rëndësia",
     },
     {
+      key: "warning_measure",
+      requiredByDefault: false,
+      sources: ["document_metadata"],
+      applicableCategories: ["WARNING"],
+      labelSq: "Masa e shqiptuar",
+    },
+    {
+      key: "warning_improvement_deadline",
+      requiredByDefault: false,
+      sources: ["document_metadata"],
+      applicableCategories: ["WARNING"],
+      labelSq: "Afati për përmirësim",
+    },
+    {
       key: "warning_status",
       requiredByDefault: false,
       sources: ["document_metadata"],

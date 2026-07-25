@@ -15,6 +15,7 @@ import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employe
 import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto, SalaryChangeDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import { AnnexPanel } from "@/modules/annex/components/annex-panel";
+import { WarningsPanel } from "@/modules/warnings/components/warnings-panel";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
@@ -732,7 +733,7 @@ export function EmployeeProfileShell(props: {
             <EmptyTab title="Pushimet" body="Kërkesat dhe bilanci i lejeve." />
           </TabsContent>
           <TabsContent value="warnings" className="mt-5">
-            <EmptyTab title="Vërejtjet" body="Disiplina dhe vërejtjet formale." />
+            <WarningsPanel employeeId={employee.id} canEdit={canEdit} />
           </TabsContent>
           <TabsContent value="timeline" className="mt-5">
             <EmptyTab title="Timeline" body="Ngjarjet operative dhe auditimi." />

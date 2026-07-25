@@ -417,6 +417,8 @@ export async function buildMergedPlaceholderContext(
           summary: w.summary,
           severity: w.severity,
           status: w.status,
+          measure: w.measure,
+          improvementDeadline: w.improvementDeadline,
         },
         locale,
       );

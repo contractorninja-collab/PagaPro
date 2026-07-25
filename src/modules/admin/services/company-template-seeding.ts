@@ -23,6 +23,7 @@ const FAMILIES: ReadonlyArray<{ label: string; module: string; export: string }>
   { label: "kontratat", module: "./seed-contract-templates.cjs", export: "seedContractTemplatesForCompany" },
   { label: "pushimet", module: "./seed-leave-templates.cjs", export: "seedLeaveTemplatesForCompany" },
   { label: "largimet", module: "./seed-termination-templates.cjs", export: "seedTerminationTemplatesForCompany" },
+  { label: "vërejtjet", module: "./seed-warning-templates.cjs", export: "seedWarningTemplatesForCompany" },
 ];
 
 export interface CompanyTemplateSeedResult {
