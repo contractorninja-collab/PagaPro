@@ -22,6 +22,13 @@ export const warningCreateSchema = z.object({
 
 export type WarningCreateInput = z.infer<typeof warningCreateSchema>;
 
+/** Same warning issued to several employees at once (one record each). */
+export const warningBulkCreateSchema = warningCreateSchema
+  .omit({ employeeId: true })
+  .extend({ employeeIds: z.array(z.string().min(1)).min(1, "Zgjidhni së paku një punonjës.") });
+
+export type WarningBulkCreateInput = z.infer<typeof warningBulkCreateSchema>;
+
 export const warningDeleteSchema = z.object({
   warningId: z.string().min(1),
 });

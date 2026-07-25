@@ -8,6 +8,7 @@ import {
   listEmployeeWarnings,
 } from "@/modules/warnings/services/warning-service";
 import {
+  warningBulkCreateSchema,
   warningCreateSchema,
   warningDeleteSchema,
 } from "@/modules/warnings/validators/warning-schemas";
@@ -50,6 +51,44 @@ export async function createWarningAction(raw: unknown): Promise<WarningActionRe
   revalidatePath(`/punonjesit/${parsed.data.employeeId}`);
   revalidatePath("/dokumentet");
   return { ok: true, data: { id: res.id } };
+}
+
+/** Issues the same warning to several employees, one record each. */
+export async function createWarningsBulkAction(
+  raw: unknown,
+): Promise<WarningActionResult<{ warningIds: string[]; failed: string[] }>> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+
+  const parsed = warningBulkCreateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Të dhëna të pavlefshme." };
+  }
+  const { employeeIds, ...rest } = parsed.data;
+
+  const warningIds: string[] = [];
+  const failed: string[] = [];
+
+  for (const employeeId of employeeIds) {
+    const res = await createDisciplinaryWarning(
+      ctx.context.companyId,
+      { ...rest, employeeId },
+      ctx.context.user.id,
+    );
+    if (res.ok) {
+      warningIds.push(res.id);
+      revalidatePath(`/punonjesit/${employeeId}`);
+    } else {
+      failed.push(res.error);
+    }
+  }
+
+  if (warningIds.length === 0) {
+    return { ok: false, error: failed[0] ?? "Asnjë vërejtje nuk u lëshua." };
+  }
+
+  revalidatePath("/dokumentet");
+  return { ok: true, data: { warningIds, failed } };
 }
 
 export async function deleteWarningAction(raw: unknown): Promise<WarningActionResult> {

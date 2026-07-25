@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
 import { renderAnnexDocument } from "@/modules/annex/documents/render-annex-document";
+import { renderWarningDocument } from "@/modules/warnings/documents/render-warning-document";
 import { renderDocxToPrintHtml } from "@/modules/documents/print/docx-to-print-html";
 import {
   buildPrintErrorPage,
@@ -47,11 +48,14 @@ export async function GET(request: Request) {
   // Annexes are rendered on demand rather than stored as artifacts, so they come
   // in under their own parameter and are appended after the stored documents.
   const requestedAnnexIds = idList(params.get("annexIds"));
+  const requestedWarningIds = idList(params.get("warningIds"));
+  const totalRequested =
+    requestedIds.length + requestedAnnexIds.length + requestedWarningIds.length;
 
-  if (requestedIds.length + requestedAnnexIds.length === 0) {
+  if (totalRequested === 0) {
     return htmlResponse(buildPrintErrorPage("Nuk u specifikua asnjë dokument për printim."), 400);
   }
-  if (requestedIds.length + requestedAnnexIds.length > MAX_DOCUMENTS) {
+  if (totalRequested > MAX_DOCUMENTS) {
     return htmlResponse(
       buildPrintErrorPage(`Printimi mbështet deri në ${MAX_DOCUMENTS} dokumente njëherësh.`),
       400,
@@ -92,6 +96,19 @@ export async function GET(request: Request) {
     if (!rendered.ok) {
       console.error("[pagapro] print view could not render annex", annexId, rendered.error);
       skipped.push(annexId);
+      continue;
+    }
+    documents.push({
+      title: rendered.filename.replace(/\.[^.]+$/, ""),
+      render: renderDocxToPrintHtml(rendered.buffer),
+    });
+  }
+
+  for (const warningId of requestedWarningIds) {
+    const rendered = await renderWarningDocument(companyId, warningId);
+    if (!rendered.ok) {
+      console.error("[pagapro] print view could not render warning", warningId, rendered.error);
+      skipped.push(warningId);
       continue;
     }
     documents.push({

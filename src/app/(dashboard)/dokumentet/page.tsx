@@ -13,6 +13,7 @@ import {
 } from "@/modules/documents/services/document-queries";
 import { listCompanyAnnexes } from "@/modules/annex/services/annex-service";
 import { AnnexBulkPrintPanel } from "@/modules/annex/components/annex-bulk-print-panel";
+import { WarningIssuePanel } from "@/modules/warnings/components/warning-issue-panel";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -151,7 +152,13 @@ export default async function DokumentetPage({
           />
         }
       />
-      <div className="mt-5">
+      <div className="mt-5 space-y-5">
+        <WarningIssuePanel
+          employees={employees.map((e) => ({
+            id: e.id,
+            label: `${e.lastName} ${e.firstName}`.trim(),
+          }))}
+        />
         <AnnexBulkPrintPanel annexes={annexes} />
       </div>
     </>
