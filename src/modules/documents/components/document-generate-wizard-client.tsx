@@ -34,6 +34,25 @@ import { openBulkPrintPreview } from "@/modules/documents/components/open-bulk-p
 
 const workflowCategories: DocumentCategory[] = ["CONTRACT", "LEAVE", "TERMINATION", "WARNING", "OTHER"];
 
+/**
+ * Contracts are generated straight from employees, but a leave, termination or
+ * warning document describes a specific case and is printed for one that already
+ * exists. When none do, say where the case is opened rather than leaving the step
+ * empty — the list looking like a missing employee picker is the confusing part.
+ */
+function emptySubjectsHint(category: DocumentCategory | ""): string {
+  if (category === "WARNING") {
+    return "Nuk ka vërejtje të lëshuara. Lëshoni një vërejtje te profili i punonjësit → skeda «Vërejtjet», pastaj kthehuni këtu për ta printuar (ose printojeni drejtpërdrejt nga ajo skedë).";
+  }
+  if (category === "TERMINATION") {
+    return "Nuk ka largime të regjistruara. Hapni një largim te moduli «Largimet», pastaj kthehuni këtu.";
+  }
+  if (category === "LEAVE") {
+    return "Nuk ka kërkesa pushimi. Regjistroni një pushim te moduli «Pushimet», pastaj kthehuni këtu.";
+  }
+  return "Nuk ka rreshta të disponueshëm për këtë lloj dokumenti.";
+}
+
 export interface GenerateTemplateOption {
   templateId: string;
   templateName: string;
@@ -470,9 +489,7 @@ export function DocumentGenerateWizardClient(props: {
                 </div>
 
                 {subjectOptions.length === 0 ? (
-                  <p className="text-[13px] text-[#64748b]">
-                    Nuk ka rreshta të disponueshëm për këtë lloj dokumenti.
-                  </p>
+                  <p className="text-[13px] text-[#64748b]">{emptySubjectsHint(category)}</p>
                 ) : (
                   <div className="max-h-72 overflow-auto rounded-[10px] border border-[#eef2f7]">
                     {filteredSubjects.length === 0 ? (
