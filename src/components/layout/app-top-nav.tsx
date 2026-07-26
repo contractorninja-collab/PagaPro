@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertsSheet } from "@/components/layout/alerts-sheet";
 import { SIDEBAR_MODULES } from "@/components/layout/nav-config";
-import { PagaProLogo } from "@/components/branding/logo";
+import { PagaProLogo, PagaProMark } from "@/components/branding/logo";
 import { logoutAction } from "@/modules/auth/actions/auth-actions";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +68,10 @@ export function AppTopNav({
         className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         aria-label="PagaPRO — ballina"
       >
-        <PagaProLogo variant="onDark" ariaHidden />
+        <span className="inline-flex items-center gap-2">
+          <PagaProMark size={26} surface="bareOnDark" />
+          <PagaProLogo variant="onDark" ariaHidden />
+        </span>
       </Link>
 
       <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex" aria-label="Navigimi kryesor">

@@ -20,7 +20,7 @@ export default async function HyrjePage() {
     <main className="flex min-h-screen items-center justify-center bg-brand-canvas px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <PagaProMark size={48} />
+          <PagaProMark size={56} surface="bareOnLight" />
           <PagaProLogo ariaHidden />
           <p className="text-sm text-muted-foreground">Hyni në llogarinë tuaj</p>
         </div>

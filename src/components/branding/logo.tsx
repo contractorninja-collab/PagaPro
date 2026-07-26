@@ -82,38 +82,52 @@ interface PagaProMarkProps {
   className?: string;
   /** For sidebar strip or favicon-scale UI */
   rounded?: "sm" | "md";
+  /**
+   * "tile" draws the navy plate (app icon, favicon scale); "bare" draws the ring
+   * alone for placement on an existing navy or light surface.
+   */
+  surface?: "tile" | "bareOnDark" | "bareOnLight";
 }
 
 /**
- * Icon mark: navy tile + **PP** monogram (operations / payroll trust cue).
- * SVG text uses system UI stack so it renders without loading Inter in standalone SVG contexts.
+ * Icon mark — the "Rrota" ring: an open ring whose 12→3 segment is brand blue.
+ * The geometry is authored on a 64-unit grid and scales with `size`; the segment
+ * never rotates, per the brand sheet.
  */
-export function PagaProMark({ size = 32, className, rounded = "md" }: PagaProMarkProps) {
-  const rx = rounded === "sm" ? 6 : 8;
-  const fs = Math.round(size * 0.38);
-  const y = Math.round(size * 0.67);
+export function PagaProMark({
+  size = 32,
+  className,
+  rounded = "md",
+  surface = "tile",
+}: PagaProMarkProps) {
+  // 15/64 matches the app icon's 240/1024 corner radius.
+  const rx = rounded === "sm" ? 12 : 15;
+  const ringColor =
+    surface === "bareOnLight" ? BRAND.navy : surface === "tile" ? BRAND.canvas : BRAND.wordmarkOnDark;
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className={cn("shrink-0 overflow-visible", className)}
+      viewBox="0 0 64 64"
+      className={cn("shrink-0", className)}
       aria-hidden
     >
-      <rect width={size} height={size} rx={rx} fill={BRAND.navy} />
-      <text
-        x={size / 2}
-        y={y}
-        textAnchor="middle"
-        fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter, sans-serif"
-        fontSize={fs}
-        fontWeight="700"
-        letterSpacing={`-${size * 0.02}`}
-      >
-        <tspan fill={BRAND.canvas}>P</tspan>
-        <tspan fill={BRAND.blue}>P</tspan>
-      </text>
+      {surface === "tile" ? <rect width="64" height="64" rx={rx} fill={BRAND.navy} /> : null}
+      <path
+        d="M52.20 35.47 A20.5 20.5 0 1 1 28.44 11.55"
+        fill="none"
+        stroke={ringColor}
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M32 11.5 A20.5 20.5 0 0 1 52.19 28.54"
+        fill="none"
+        stroke={BRAND.blue}
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

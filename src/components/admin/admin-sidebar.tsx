@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, type LucideIcon } from "lucide-react";
-import { PagaProLogo } from "@/components/branding/logo";
+import { PagaProLogo, PagaProMark } from "@/components/branding/logo";
 import { sidebarItemClass } from "@/components/layout/sidebar-styles";
 import { adminPath } from "@/lib/admin-path";
 
@@ -21,6 +21,7 @@ export function AdminSidebar() {
   return (
     <aside className="sidebar-shell">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-[18px]">
+        <PagaProMark size={22} surface="bareOnDark" />
         <PagaProLogo variant="onDark" asLink aria-label="PagaPRO — ballina" />
         <span className="rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
           Admin
