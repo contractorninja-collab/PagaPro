@@ -271,3 +271,37 @@ describe("computePayrollSpreadsheetLine — hourly × hours (full-precision rate
     expect(r.value.grossSalary).toBe("1136.36");
   });
 });
+
+describe("computePayrollSpreadsheetLine — statutory monthly minimum", () => {
+  const employeeAtMinimum = { ...employeeGross1000, baseSalaryMonthly: "500" };
+
+  it("rejects a full month paid below the monthly minimum", () => {
+    const r = computePayrollSpreadsheetLine(
+      { ...employeeAtMinimum, baseSalaryMonthly: "300" },
+      lineInput(),
+      snapshot,
+      "1",
+      calendarBase,
+    );
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.some((i) => i.code === "BELOW_MINIMUM_GROSS")).toBe(true);
+  });
+
+  it("allows a pro-rata part month below it — a mid-month leaver is paid for days worked", () => {
+    // Half the month's expected hours: someone who left on the 15th.
+    const r = computePayrollSpreadsheetLine(
+      employeeAtMinimum,
+      lineInput({ expectedRegularHours: "88", actualRegularHours: "88" }),
+      snapshot,
+      "1",
+      calendarBase,
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 500 ÷ 176 × 88 = 250.00 — below the monthly floor, and lawful for half a month.
+    expect(r.value.grossSalary).toBe("250.00");
+  });
+});

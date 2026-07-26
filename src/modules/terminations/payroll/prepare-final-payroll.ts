@@ -32,9 +32,10 @@ export async function prepareTerminationFinalPayroll(params: {
   });
 
   if (!payroll) {
-    const created = await createPayrollDraft(params.companyId, year, month, params.actorUserId, [
-      params.employeeId,
-    ]);
+    // No employee list: the termination month's payroll belongs to the whole company.
+    // Seeding it with just this employee would pin the month to one person, and a later
+    // "Ripëllogarit punonjësit" would then rebuild the payroll with only them in it.
+    const created = await createPayrollDraft(params.companyId, year, month, params.actorUserId);
     if (!created.ok) {
       return {
         ok: false,
@@ -54,13 +55,20 @@ export async function prepareTerminationFinalPayroll(params: {
     };
   }
 
-  await prisma.payrollIncludedEmployee.upsert({
-    where: {
-      payrollId_employeeId: { payrollId: payroll.id, employeeId: params.employeeId },
-    },
-    create: { payrollId: payroll.id, employeeId: params.employeeId },
-    update: {},
+  // An empty inclusion list means "every eligible employee", so adding a row here would
+  // narrow the payroll to this one person. Only extend a list that already restricts.
+  const restricted = await prisma.payrollIncludedEmployee.count({
+    where: { payrollId: payroll.id },
   });
+  if (restricted > 0) {
+    await prisma.payrollIncludedEmployee.upsert({
+      where: {
+        payrollId_employeeId: { payrollId: payroll.id, employeeId: params.employeeId },
+      },
+      create: { payrollId: payroll.id, employeeId: params.employeeId },
+      update: {},
+    });
+  }
 
   const existingEntry = await prisma.payrollEntry.findFirst({
     where: { payrollId: payroll.id, employeeId: params.employeeId },

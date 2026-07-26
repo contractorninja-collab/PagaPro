@@ -59,9 +59,17 @@ async function findEmployeesEligibleForPayrollMonth(
   const eligibleWhere = {
     companyId,
     employmentType: "EMPLOYEE" as const,
-    status: { in: [...PAYROLL_ELIGIBLE_EMPLOYMENT_STATUSES] },
     hireDate: { lte: end },
-    OR: [{ terminationDate: null }, { terminationDate: { gte: start } }],
+    OR: [
+      {
+        status: { in: [...PAYROLL_ELIGIBLE_EMPLOYMENT_STATUSES] },
+        OR: [{ terminationDate: null }, { terminationDate: { gte: start } }],
+      },
+      // Someone who left during this month is still owed pay for the days worked,
+      // and their status is already TERMINATED by the time payroll runs. Without
+      // this branch the final salary can never be calculated or recalculated.
+      { status: "TERMINATED" as const, terminationDate: { gte: start } },
+    ],
   };
 
   const employees = await prisma.employee.findMany({
@@ -93,7 +101,7 @@ async function findEmployeesEligibleForPayrollMonth(
     return {
       ok: false,
       error:
-        "Nuk ka punonjës me status ACTIVE ose ON_LEAVE për këtë kompani. Payroll përfshin vetëm këta statusa (jo INACTIVE / SUSPENDED / TERMINATED).",
+        "Nuk ka punonjës me status ACTIVE ose ON_LEAVE për këtë kompani, dhe asnjë i larguar brenda kësaj periudhe. Payroll përfshin këta statusa, si dhe punonjësit e larguar gjatë muajit (për ditët e punuara).",
     };
   }
 
@@ -115,7 +123,6 @@ async function findEmployeesEligibleForPayrollMonth(
   const terminatedBefore = await prisma.employee.count({
     where: {
       companyId,
-      status: { in: [...PAYROLL_ELIGIBLE_EMPLOYMENT_STATUSES] },
       terminationDate: { lt: start },
     },
   });
@@ -492,6 +499,20 @@ export async function createPayrollDraft(
   }
 }
 
+/**
+ * Caps pay at the termination date for anyone who left during the period, so a
+ * rebuild pro-rates a leaver instead of paying them a whole month. Callers that
+ * know the last working day (the termination workflow) override these.
+ */
+function terminationDayCaps(employees: Employee[], start: Date, end: Date): Record<string, Date> {
+  const caps: Record<string, Date> = {};
+  for (const employee of employees) {
+    const left = employee.terminationDate;
+    if (left && left >= start && left <= end) caps[employee.id] = left;
+  }
+  return caps;
+}
+
 async function createPayrollEntriesForEmployeesTx(
   tx: Prisma.TransactionClient,
   params: {
@@ -801,7 +822,10 @@ export async function recalculatePayrollEntriesForEmployees(params: {
         ctx,
         wt,
         sickPct,
-        lastWorkingDayByEmployeeId: params.lastWorkingDayByEmployeeId,
+        lastWorkingDayByEmployeeId: {
+          ...terminationDayCaps(employees, start, end),
+          ...(params.lastWorkingDayByEmployeeId ?? {}),
+        },
         entryStatus,
         lineOverridesByEmployeeId: params.lineOverridesByEmployeeId,
       });
@@ -874,6 +898,18 @@ export async function regeneratePayrollEntriesAndCalculate(
 
   const employees = picked.employees.filter((e) => inclSet.size === 0 || inclSet.has(e.id));
 
+  // The rebuild below deletes every entry first. Refuse rather than empty a draft
+  // that cannot be repopulated — that silently destroyed calculated lines.
+  if (employees.length === 0) {
+    return {
+      ok: false,
+      error:
+        inclSet.size > 0
+          ? "Ky payroll është i kufizuar te një listë punonjësish që nuk janë më të përshtatshëm për këtë muaj. Rreshtat ekzistues nuk u prekën. Hiqni kufizimin ose krijoni payroll të ri për muajin."
+          : "Nuk u gjet asnjë punonjës i përshtatshëm për këtë muaj. Rreshtat ekzistues nuk u prekën.",
+    };
+  }
+
   let aggPaidLeaveHrs = 0;
   let aggSickLeaveHrs = 0;
   let aggUnpaidLeaveHrs = 0;
@@ -891,6 +927,7 @@ export async function regeneratePayrollEntriesAndCalculate(
         ctx,
         wt,
         sickPct,
+        lastWorkingDayByEmployeeId: terminationDayCaps(employees, start, end),
         entryStatus: "FINAL",
       });
       aggPaidLeaveHrs = totals.aggPaidLeaveHrs;

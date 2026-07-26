@@ -190,6 +190,16 @@ export function computePayrollSpreadsheetLine(
     };
   }
 
+  /**
+   * A line whose expected hours are below the month's calendar covers only part of
+   * the period — someone hired or terminated mid-month. The statutory floor is a
+   * *monthly* minimum for a full month of work, so comparing it to a pro-rata gross
+   * would reject a lawful partial payment. The hourly minimum still applies.
+   */
+  const partialPeriod =
+    calendarReg.isFinite() && calendarReg.gt(0) && expectedReg.gt(0) && expectedReg.lt(calendarReg);
+  const enforceMonthlyMinimum = !employee.exemptFromMinimumSalary && !partialPeriod;
+
   const sickPct = D(sickLeavePayPercent);
   const regularPay = roundMoneyEUR(hourlyPrecise.mul(actualReg));
   const paidLeavePay = roundMoneyEUR(hourlyPrecise.mul(paidLeav));
@@ -266,7 +276,7 @@ export function computePayrollSpreadsheetLine(
       grossSalaryOverride: grossSubject.toFixed(2),
       bonusAmount: "0",
       otherDeductions: roundMoneyEUR(otherDed.plus(advance)).toFixed(2),
-      enforceMinimumGross: !employee.exemptFromMinimumSalary,
+      enforceMinimumGross: enforceMonthlyMinimum,
       applyTrust: employee.applyTrust,
       applyTax: employee.applyTax,
     },
