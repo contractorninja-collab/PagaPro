@@ -260,7 +260,15 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
   const settings = await prisma.payrollSettings.findUnique({ where: { companyId } });
   const wt = await resolvePayrollMonthWorkingTime(companyId, payroll.year, payroll.month);
 
+  // A non-empty inclusion list restricts the payroll to those employees; an empty
+  // one means every eligible employee. Surfaced so the restriction is visible
+  // rather than looking like employees are missing.
+  const restrictedToEmployeeCount = await prisma.payrollIncludedEmployee.count({
+    where: { payrollId },
+  });
+
   return {
+    restrictedToEmployeeCount,
     payroll: {
       id: payroll.id,
       year: payroll.year,
@@ -861,6 +869,43 @@ export async function recalculatePayrollEntriesForEmployees(params: {
   });
 
   return { ok: true };
+}
+
+/**
+ * Drops the payroll's employee restriction so the month covers every eligible
+ * employee again, then rebuilds it.
+ *
+ * A payroll can be limited to a chosen list; until this existed the limit could
+ * only be set, never lifted, which left months stuck showing a subset.
+ */
+export async function includeAllEmployeesInPayroll(
+  companyId: string,
+  payrollId: string,
+  actorUserId?: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const payroll = await prisma.payroll.findFirst({
+    where: { id: payrollId, companyId },
+    select: { id: true, status: true, year: true, month: true },
+  });
+  if (!payroll) return { ok: false, error: "Payroll nuk u gjet." };
+  if (payroll.status !== "DRAFT") {
+    return { ok: false, error: "Ndryshimi i listës lejohet vetëm për payroll në DRAFT." };
+  }
+
+  const removed = await prisma.payrollIncludedEmployee.deleteMany({ where: { payrollId } });
+  if (removed.count === 0) {
+    return { ok: false, error: "Ky payroll nuk ka kufizim punonjësish — përfshin të gjithë të përshtatshmit." };
+  }
+
+  await appendPayrollDomainActivity({
+    companyId,
+    payrollId,
+    verb: "UPDATED",
+    summary: `U hoq kufizimi i punonjësve (${removed.count}); payroll-i përfshin të gjithë të përshtatshmit.`,
+    actorUserId,
+  });
+
+  return regeneratePayrollEntriesAndCalculate(companyId, payrollId, actorUserId);
 }
 
 export async function regeneratePayrollEntriesAndCalculate(

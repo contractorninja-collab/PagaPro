@@ -26,6 +26,7 @@ import {
   generatePayrollAtkExportAction,
   generatePayrollPdfsAction,
   lockPayrollAction,
+  includeAllEmployeesInPayrollAction,
   regeneratePayrollAction,
   returnPayrollReviewToDraftAction,
   reviewPayrollAction,
@@ -318,6 +319,31 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
               Pushimi mjekësor (% e normës): {(Number(data.operationalSettings.sickLeavePayPercent) * 100).toFixed(2)}%
               — Neni 60, Ligji i Punës: 100% është minimumi ligjor dhe zbatohet automatikisht si dysheme.
             </p>
+          </div>
+        </section>
+      ) : null}
+
+      {data.restrictedToEmployeeCount > 0 ? (
+        <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <h2 className="mb-2 text-[13px] font-bold text-[#b45309]">
+            Ky payroll është i kufizuar te {data.restrictedToEmployeeCount} punonjës
+          </h2>
+          <div className="space-y-2 text-[13px] leading-relaxed text-[#92400e]">
+            <p>
+              Ripëllogaritja përfshin vetëm këta punonjës — punonjësit e tjerë të përshtatshëm nuk
+              shfaqen. Hiqni kufizimin që payroll-i të mbulojë të gjithë punonjësit e muajit.
+            </p>
+            {draftEditable ? (
+              <button
+                type="button"
+                className={BTN_S}
+                onClick={() =>
+                  void exec("U përfshinë të gjithë punonjësit.", includeAllEmployeesInPayrollAction(payroll.id))
+                }
+              >
+                Përfshi të gjithë punonjësit
+              </button>
+            ) : null}
           </div>
         </section>
       ) : null}

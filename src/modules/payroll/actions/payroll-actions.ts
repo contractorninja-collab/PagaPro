@@ -10,6 +10,7 @@ import {
   createPayrollDraft,
   lockPayrollWithSnapshot,
   patchPayrollEntriesBulk,
+  includeAllEmployeesInPayroll,
   regeneratePayrollEntriesAndCalculate,
   returnPayrollReviewToDraft,
   reviewPayrollExplicit,
@@ -142,6 +143,20 @@ export async function regeneratePayrollAction(payrollId: string): Promise<Payrol
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
   const { companyId, user } = result.context;
   const res = await regeneratePayrollEntriesAndCalculate(companyId, payrollId, user.id);
+  if (!res.ok) return { ok: false, error: res.error };
+  safeRevalidatePath("/pagat");
+  safeRevalidatePath(`/pagat/${payrollId}`);
+  return { ok: true };
+}
+
+/** Lifts an employee restriction on the payroll and rebuilds it for everyone eligible. */
+export async function includeAllEmployeesInPayrollAction(
+  payrollId: string,
+): Promise<PayrollActionResult> {
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const { companyId, user } = result.context;
+  const res = await includeAllEmployeesInPayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath("/pagat");
   safeRevalidatePath(`/pagat/${payrollId}`);
