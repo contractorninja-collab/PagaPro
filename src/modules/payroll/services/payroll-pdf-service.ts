@@ -181,11 +181,27 @@ async function generatePayrollPdfArtifactsInner(params: {
     year: "numeric",
   });
 
+  // Every column is a frozen entry value — the list renders, it never recomputes.
   const registerRows = pay.entries.map((e) => ({
     name: `${e.employee.firstName} ${e.employee.lastName}`,
     gross: decimalToPlain(e.grossSalary),
     net: decimalToPlain(e.netPay),
     personalId: e.employee.personalId,
+    position: e.jobTitleSnapshot ?? e.employee.jobTitle ?? null,
+    days: e.expectedWorkingDays != null ? String(e.expectedWorkingDays) : null,
+    base: decimalToPlain(e.regularPay),
+    extra: decimalToPlain(
+      e.overtimeAmount
+        .plus(e.holidayAmount)
+        .plus(e.weekendAmount)
+        .plus(e.nightAmount)
+        .plus(e.bonuses),
+    ),
+    pensionEmployee: decimalToPlain(e.pensionEmployee),
+    taxable: decimalToPlain(e.taxableIncome),
+    tax: decimalToPlain(e.pitWithheld),
+    otherDeductions: decimalToPlain(e.otherDeductions.plus(e.salaryAdvanceDeduction)),
+    pensionEmployer: decimalToPlain(e.pensionEmployer),
   }));
 
   const registerBase = {

@@ -35,27 +35,34 @@ function pageFontNames(pdf: PDFDocument): string[] {
 }
 
 describe("payroll register PDF layout", () => {
-  it("money columns do not overlap (gross ends before net starts)", () => {
+  it("lays 13 columns across the salary list without overlap", () => {
     const layout = getRegisterLayoutForTests(true);
-    expect(layout.gross.x + layout.gross.width).toBeLessThanOrEqual(layout.net.x + 1);
-    expect(layout.gross.right).toBeLessThan(layout.net.x);
+    expect(layout.columns).toHaveLength(13);
+    for (let i = 0; i < layout.columns.length - 1; i += 1) {
+      const a = layout.columns[i]!;
+      const b = layout.columns[i + 1]!;
+      expect(a.right).toBeLessThanOrEqual(b.x + 0.001);
+    }
   });
 
-  it("signature list columns do not overlap (pid ends before sign starts)", () => {
-    const layout = getRegisterLayoutForTests(false);
-    expect(layout.pid.x + layout.pid.width).toBeLessThanOrEqual(layout.sign.x + 1);
-    expect(layout.pid.right).toBeLessThanOrEqual(layout.sign.x);
-  });
-
-  it("meta columns are evenly spaced without overlap", () => {
+  it("fills exactly the content width in both variants", () => {
     for (const withAmounts of [true, false]) {
       const layout = getRegisterLayoutForTests(withAmounts);
-      for (let i = 0; i < layout.meta.length - 1; i++) {
-        const a = layout.meta[i]!;
-        const b = layout.meta[i + 1]!;
-        expect(a.x + a.width).toBeLessThanOrEqual(b.x + 1);
-      }
+      const last = layout.columns[layout.columns.length - 1]!;
+      const spanned = last.right - layout.columns[0]!.x;
+      expect(spanned).toBeCloseTo(layout.contentWidth, 6);
     }
+  });
+
+  it("is A4 landscape", () => {
+    const layout = getRegisterLayoutForTests(true);
+    expect(Math.round(layout.pageWidth)).toBe(842);
+    expect(Math.round(layout.pageHeight)).toBe(595);
+  });
+
+  it("keeps a signature column on the signature list", () => {
+    const layout = getRegisterLayoutForTests(false);
+    expect(layout.columns.map((c) => c.key)).toContain("sign");
   });
 
   it("generates lista e pagave PDF buffer", async () => {
@@ -71,8 +78,9 @@ describe("payroll register PDF layout", () => {
     expect(buf.byteLength).toBeGreaterThan(500);
     expect(new TextDecoder().decode(buf.subarray(0, 4))).toBe("%PDF");
     const names = pageFontNames(await PDFDocument.load(buf)).join(" ");
-    expect(names).toContain("LiberationSerif");
+    // The redesign is set in sans throughout; the serif body font is gone.
     expect(names).toContain("LiberationSans");
+    expect(names).not.toContain("LiberationSerif");
   });
 
   it("generates lista per nenshkrime PDF buffer", async () => {

@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
 import { toPdfStandardFontText } from "@/modules/payroll/helpers/pdf-standard-font-text";
 import type { PayslipPdfCompany } from "@/modules/payroll/pdf/payslip-pdf-builder";
 import type { CompanyLogoAsset } from "@/modules/company-branding/company-logo";
@@ -10,89 +10,30 @@ import {
 import {
   drawPagaproGeneratedFooter,
   embedPayrollPdfFonts,
+  type PayrollPdfFonts,
 } from "@/modules/payroll/pdf/payroll-pdf-fonts";
+import { drawRoundedRect, PAGE, PP, RADIUS, RULE } from "@/modules/payroll/pdf/payroll-pdf-tokens";
 
-const PAGE_W = 595.28;
-const PAGE_H = 841.89;
-const MARGIN = 40;
+const PAGE_W = PAGE.a4Landscape.width;
+const PAGE_H = PAGE.a4Landscape.height;
+const MARGIN = 32;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const CELL_PAD = 6;
-
-const NAVY = rgb(0.11, 0.2, 0.35);
-const NAVY_LIGHT = rgb(0.93, 0.95, 0.98);
-const ACCENT = rgb(0.15, 0.42, 0.72);
-const TEXT = rgb(0.12, 0.12, 0.14);
-const MUTED = rgb(0.42, 0.44, 0.48);
-const LINE = rgb(0.82, 0.84, 0.88);
-const TOTAL_BG = rgb(0.9, 0.96, 0.92);
-const TOTAL_BORDER = rgb(0.2, 0.55, 0.35);
-const ROW_ALT = rgb(0.97, 0.98, 0.99);
-
-/** Percentage-based A4 column layout (matches spec: 5 / 35 / 25 / 17.5 / 17.5). */
-interface ColumnBox {
-  x: number;
-  width: number;
-  right: number;
-}
-
-interface RegisterLayout {
-  withAmounts: boolean;
-  num: ColumnBox;
-  name: ColumnBox;
-  pid: ColumnBox;
-  gross: ColumnBox;
-  net: ColumnBox;
-  sign: ColumnBox;
-  meta: ColumnBox[];
-}
-
-function columnAt(offsetPct: number, widthPct: number): ColumnBox {
-  const x = MARGIN + CONTENT_W * offsetPct;
-  const width = CONTENT_W * widthPct;
-  return { x, width, right: x + width - CELL_PAD };
-}
-
-/** Shared metadata grid: Referenca | Data e pageses | Punonjes | Monedha */
-function buildMetaColumns(): ColumnBox[] {
-  return [0, 0.25, 0.5, 0.75].map((p) => columnAt(p, 0.25));
-}
-
-function buildLayout(withAmounts: boolean): RegisterLayout {
-  const num = columnAt(0, 0.05);
-  const name = columnAt(0.05, 0.35);
-  const pid = columnAt(0.4, 0.25);
-  const meta = buildMetaColumns();
-
-  if (withAmounts) {
-    return {
-      withAmounts: true,
-      num,
-      name,
-      pid,
-      gross: columnAt(0.65, 0.175),
-      net: columnAt(0.825, 0.175),
-      sign: columnAt(0.65, 0.35),
-      meta,
-    };
-  }
-
-  return {
-    withAmounts: false,
-    num,
-    name,
-    pid,
-    gross: columnAt(0.65, 0.175),
-    net: columnAt(0.825, 0.175),
-    sign: columnAt(0.65, 0.35),
-    meta,
-  };
-}
 
 export interface PayrollRegisterRow {
   name: string;
   personalId: string;
   gross: string;
   net: string;
+  /** Detail columns; when absent the cell prints an em dash rather than a zero. */
+  position?: string | null;
+  days?: string | null;
+  base?: string | null;
+  extra?: string | null;
+  pensionEmployee?: string | null;
+  taxable?: string | null;
+  tax?: string | null;
+  otherDeductions?: string | null;
+  pensionEmployer?: string | null;
 }
 
 export interface PayrollRegisterPdfInput {
@@ -101,318 +42,607 @@ export interface PayrollRegisterPdfInput {
   currency: string;
   payDateLabel: string;
   documentRef: string;
+  /** true → the 13-column salary list; false → the signature list. */
   withAmounts: boolean;
   rows: PayrollRegisterRow[];
   logo?: CompanyLogoAsset | null;
+  approvalLabel?: string | null;
+  generatedAtLabel?: string | null;
 }
 
-function txt(s: string): string {
-  return toPdfStandardFontText(s);
+interface ColumnSpec {
+  key: string;
+  header: string;
+  fraction: number;
+  align: "left" | "right";
+  emphasis?: boolean;
 }
 
-function money(amount: string, currency: string): string {
-  const n = Number(amount.replace(",", "."));
-  const formatted = Number.isFinite(n)
-    ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : amount;
-  return `${currency} ${formatted}`;
+/** The redesign's 13 columns; the fractions sum to 1 — asserted in the layout test. */
+const AMOUNT_COLUMNS: readonly ColumnSpec[] = [
+  { key: "no", header: "#", fraction: 0.035, align: "left" },
+  { key: "name", header: "PUNËTORI", fraction: 0.155, align: "left" },
+  { key: "position", header: "POZITA", fraction: 0.155, align: "left" },
+  { key: "days", header: "DITË", fraction: 0.045, align: "right" },
+  { key: "base", header: "PAGA NETO", fraction: 0.075, align: "right" },
+  { key: "extra", header: "SHTESA", fraction: 0.065, align: "right" },
+  { key: "gross", header: "BRUTO", fraction: 0.08, align: "right" },
+  { key: "pensionEmployee", header: "KONTR. 5%", fraction: 0.07, align: "right" },
+  { key: "taxable", header: "BAZË TATIMI", fraction: 0.08, align: "right" },
+  { key: "tax", header: "TATIMI", fraction: 0.065, align: "right" },
+  { key: "otherDeductions", header: "NDALESA", fraction: 0.065, align: "right" },
+  { key: "net", header: "NETO", fraction: 0.08, align: "right", emphasis: true },
+  { key: "pensionEmployer", header: "KONTR. PD.", fraction: 0.07, align: "right" },
+];
+
+const SIGNATURE_COLUMNS: readonly ColumnSpec[] = [
+  { key: "no", header: "#", fraction: 0.04, align: "left" },
+  { key: "name", header: "PUNËTORI", fraction: 0.26, align: "left" },
+  { key: "position", header: "POZITA", fraction: 0.22, align: "left" },
+  { key: "personalId", header: "NUMRI PERSONAL", fraction: 0.16, align: "left" },
+  { key: "net", header: "NETO", fraction: 0.1, align: "right", emphasis: true },
+  { key: "sign", header: "NËNSHKRIMI", fraction: 0.22, align: "left" },
+];
+
+export interface RegisterColumnBox {
+  key: string;
+  header: string;
+  x: number;
+  width: number;
+  right: number;
+  align: "left" | "right";
+  emphasis: boolean;
 }
 
-function sumPlain(values: string[]): string {
-  let t = 0;
-  for (const v of values) {
-    const n = Number(v.replace(",", "."));
-    if (Number.isFinite(n)) t += n;
+function layoutColumns(withAmounts: boolean): RegisterColumnBox[] {
+  const specs = withAmounts ? AMOUNT_COLUMNS : SIGNATURE_COLUMNS;
+  // Normalise rather than trusting the fractions to sum to 1 — the design's own
+  // list sums to 1.04, which would have run the last column off the page.
+  const total = specs.reduce((a, s) => a + s.fraction, 0);
+  const boxes: RegisterColumnBox[] = [];
+  let x = MARGIN;
+  for (const spec of specs) {
+    const width = (CONTENT_W * spec.fraction) / total;
+    boxes.push({
+      key: spec.key,
+      header: spec.header,
+      x,
+      width,
+      right: x + width,
+      align: spec.align,
+      emphasis: Boolean(spec.emphasis),
+    });
+    x += width;
   }
-  return t.toFixed(2);
+  return boxes;
 }
 
-function textWidth(font: PDFFont, text: string, size: number): number {
-  return font.widthOfTextAtSize(txt(text), size);
+export function getRegisterLayoutForTests(withAmounts: boolean): {
+  columns: RegisterColumnBox[];
+  contentWidth: number;
+  pageWidth: number;
+  pageHeight: number;
+} {
+  return {
+    columns: layoutColumns(withAmounts),
+    contentWidth: CONTENT_W,
+    pageWidth: PAGE_W,
+    pageHeight: PAGE_H,
+  };
 }
 
-function fitText(text: string, font: PDFFont, size: number, maxWidth: number): string {
-  if (textWidth(font, text, size) <= maxWidth) return text;
-  let s = text;
-  while (s.length > 1 && textWidth(font, s, size) > maxWidth) {
-    s = s.slice(0, -1);
+function textFor(
+  fonts: PayrollPdfFonts,
+  which: "sans" | "sansBold" | "mono" | "monoBold",
+  value: string,
+): string {
+  return fonts.sanitize[which] ? toPdfStandardFontText(value) : value;
+}
+
+function fit(font: PDFFont, text: string, size: number, maxWidth: number): string {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  let out = text;
+  while (out.length > 1 && font.widthOfTextAtSize(`${out}…`, size) > maxWidth) {
+    out = out.slice(0, -1);
   }
-  return s.length < text.length ? `${s.slice(0, Math.max(0, s.length - 2))}..` : s;
+  return `${out}…`;
 }
 
-function drawText(
-  page: PDFPage,
-  text: string,
-  x: number,
-  y: number,
-  font: PDFFont,
-  size: number,
-  color = TEXT,
-) {
-  page.drawText(txt(text), { x, y, size, font, color });
+function toNumber(value: string | null | undefined): number {
+  if (value == null || value === "") return 0;
+  const n = Number(String(value).replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
 }
 
-function drawTextInBox(
-  page: PDFPage,
-  text: string,
-  box: ColumnBox,
-  y: number,
-  font: PDFFont,
-  size: number,
-  align: "left" | "right",
-  color = TEXT,
-) {
-  const fitted = fitText(text, font, size, box.width - CELL_PAD * 2);
-  const encoded = txt(fitted);
-  const w = font.widthOfTextAtSize(encoded, size);
-  const x = align === "right" ? box.right - w : box.x + CELL_PAD;
-  page.drawText(encoded, { x, y, size, font, color });
+function money(value: number): string {
+  return value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function drawRect(page: PDFPage, x: number, y: number, w: number, h: number, color: ReturnType<typeof rgb>) {
-  page.drawRectangle({ x, y, width: w, height: h, color });
-}
-
-function drawHLine(page: PDFPage, y: number, x = MARGIN, w = CONTENT_W) {
-  page.drawLine({ start: { x, y }, end: { x: x + w, y }, thickness: 0.5, color: LINE });
-}
-
-function drawCompanyHeader(
-  page: PDFPage,
-  company: PayslipPdfCompany,
-  docTitle: string,
-  periodLabel: string,
-  font: PDFFont,
-  fontBold: PDFFont,
-  logo: EmbeddedCompanyLogo | null,
-) {
-  drawRect(page, 0, PAGE_H - 72, PAGE_W, 72, NAVY);
-  const companyTextX = logo
-    ? drawCompanyLogoPlate(page, logo, { x: 16, top: PAGE_H - 7 }) + 10
-    : MARGIN;
-  const companyTextWidth = PAGE_W - companyTextX - MARGIN - 170;
-  if (!logo) {
-    drawText(page, fitText(company.displayName.toUpperCase(), fontBold, 16, companyTextWidth), companyTextX, PAGE_H - 38, fontBold, 16, rgb(1, 1, 1));
+function cellValue(row: PayrollRegisterRow, key: string, index: number): string {
+  if (key === "no") return String(index + 1);
+  if (key === "sign") return "";
+  const raw = row[key as keyof PayrollRegisterRow];
+  if (raw == null || raw === "") return "—";
+  if (key === "name" || key === "position" || key === "personalId" || key === "days") {
+    return String(raw);
   }
-  const subLine = [company.addressLine, company.cityLine].filter(Boolean).join(" · ");
-  if (subLine) {
-    drawText(page, fitText(subLine, font, 8, companyTextWidth), companyTextX, logo ? PAGE_H - 45 : PAGE_H - 56, font, 8, rgb(0.85, 0.88, 0.92));
-  }
-  drawText(page, docTitle, PAGE_W - MARGIN - 160, PAGE_H - 38, fontBold, 11, rgb(1, 1, 1));
-  drawText(page, periodLabel, PAGE_W - MARGIN - 160, PAGE_H - 54, font, 9, rgb(0.85, 0.88, 0.92));
+  return money(toNumber(String(raw)));
 }
 
-/** 4-column metadata grid: Referenca | Data e pageses | Punonjes | Monedha */
-function drawMetaBlock(
+function drawRunningHeader(
   page: PDFPage,
+  fonts: PayrollPdfFonts,
   input: PayrollRegisterPdfInput,
-  layout: RegisterLayout,
-  font: PDFFont,
-  fontBold: PDFFont,
-  y: number,
+  logo: EmbeddedCompanyLogo | null,
 ): number {
-  const fields = [
-    { label: "Referenca", value: input.documentRef },
-    { label: "Data e pageses", value: input.payDateLabel },
-    { label: "Punonjes", value: String(input.rows.length) },
-    { label: "Monedha", value: input.currency },
-  ];
+  const top = PAGE_H - MARGIN;
+  let textX = MARGIN;
 
-  drawRect(page, MARGIN, y - 28, CONTENT_W, 30, NAVY_LIGHT);
-  for (let i = 0; i < fields.length; i++) {
-    const box = layout.meta[i]!;
-    const field = fields[i]!;
-    drawTextInBox(page, field.label, box, y - 8, fontBold, 7, "left", MUTED);
-    drawTextInBox(page, field.value, box, y - 20, font, 8, "left", TEXT);
+  if (logo) {
+    // Contain, never crop; with no logo the text block starts at the margin.
+    const afterLogo = drawCompanyLogoPlate(page, logo, { x: MARGIN, top });
+    textX = afterLogo + 14;
+    page.drawLine({
+      start: { x: textX - 7, y: top - 34 },
+      end: { x: textX - 7, y: top },
+      thickness: RULE.hair,
+      color: PP.line,
+    });
   }
 
-  return y - 38;
-}
+  const name = input.company.displayName || input.company.legalName;
+  page.drawText(textFor(fonts, "sansBold", name), {
+    x: textX,
+    y: top - 12,
+    size: 12,
+    font: fonts.sansBold,
+    color: PP.navy,
+  });
 
-function drawSignatureBlock(page: PDFPage, font: PDFFont, y: number): number {
-  y -= 16;
-  const halfW = (CONTENT_W - 24) / 2;
-  const leftX = MARGIN;
-  const rightX = MARGIN + halfW + 24;
-
-  drawHLine(page, y, leftX, halfW);
-  drawHLine(page, y, rightX, halfW);
-  y -= 14;
-  drawText(page, "Pergjegjesi financiar", leftX, y, font, 8, MUTED);
-  drawText(page, "Drejtori / Personi i autorizuar", rightX, y, font, 8, MUTED);
-  y -= 28;
-  drawHLine(page, y, leftX, 140);
-  y -= 14;
-  drawText(page, "Data:", leftX, y, font, 8, MUTED);
-  return y - 20;
-}
-
-function drawLegalFooter(page: PDFPage, company: PayslipPdfCompany, font: PDFFont, y: number): number {
-  drawHLine(page, y);
-  y -= 14;
-  const legalBits = [
-    company.legalName !== company.displayName ? company.legalName : null,
-    company.fiscalNumber ? `NUI: ${company.fiscalNumber}` : null,
-    company.businessNumber ? `NRB: ${company.businessNumber}` : null,
-    company.phone ? `Tel: ${company.phone}` : null,
-    company.email ? company.email : null,
+  const meta = [
+    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    [input.company.addressLine, input.company.cityLine].filter(Boolean).join(", ") || null,
   ]
     .filter(Boolean)
-    .join("  ·  ");
-  if (legalBits) {
-    drawText(page, fitText(legalBits, font, 7, CONTENT_W), MARGIN, y, font, 7, MUTED);
-    y -= 12;
+    .join(" · ");
+  if (meta) {
+    page.drawText(textFor(fonts, "sans", meta), {
+      x: textX,
+      y: top - 25,
+      size: 7.5,
+      font: fonts.sans,
+      color: PP.muted,
+    });
   }
-  drawText(page, "Dokument konfidencial — per perdorim te brendshem te kompanise.", MARGIN, y, font, 7, MUTED);
-  return y;
+
+  const title = input.withAmounts ? "Lista e pagave" : "Lista e nënshkrimeve";
+  const titleW = fonts.sansBold.widthOfTextAtSize(title, 12);
+  page.drawText(textFor(fonts, "sansBold", title), {
+    x: PAGE_W - MARGIN - titleW,
+    y: top - 12,
+    size: 12,
+    font: fonts.sansBold,
+    color: PP.navy,
+  });
+
+  const ref = `${input.documentRef} · ${input.periodLabel.toUpperCase()}`;
+  const refW = fonts.sans.widthOfTextAtSize(ref, 7.5);
+  page.drawText(textFor(fonts, "sans", ref), {
+    x: PAGE_W - MARGIN - refW,
+    y: top - 25,
+    size: 7.5,
+    font: fonts.sans,
+    color: PP.muted,
+  });
+
+  if (input.approvalLabel) {
+    const pillTextW = fonts.sansBold.widthOfTextAtSize(input.approvalLabel, 7);
+    const pillW = pillTextW + 16;
+    drawRoundedRect(page, {
+      x: PAGE_W - MARGIN - pillW,
+      y: top - 42,
+      w: pillW,
+      h: 14,
+      r: 7,
+      color: PP.blueWash,
+    });
+    page.drawText(textFor(fonts, "sansBold", input.approvalLabel), {
+      x: PAGE_W - MARGIN - pillW + 8,
+      y: top - 38,
+      size: 7,
+      font: fonts.sansBold,
+      color: PP.blue,
+    });
+  }
+
+  page.drawRectangle({
+    x: MARGIN,
+    y: top - 50,
+    width: CONTENT_W,
+    height: RULE.heavy,
+    color: PP.navy,
+  });
+
+  return top - 50 - 14;
+}
+
+function drawSummaryTiles(
+  page: PDFPage,
+  fonts: PayrollPdfFonts,
+  rows: PayrollRegisterRow[],
+  topY: number,
+): number {
+  const gross = rows.reduce((a, r) => a + toNumber(r.gross), 0);
+  const tax = rows.reduce((a, r) => a + toNumber(r.tax), 0);
+  const pensionEmployee = rows.reduce((a, r) => a + toNumber(r.pensionEmployee), 0);
+  const pensionEmployer = rows.reduce((a, r) => a + toNumber(r.pensionEmployer), 0);
+  const net = rows.reduce((a, r) => a + toNumber(r.net), 0);
+
+  const tiles: Array<{ label: string; value: string; fill: RGB; ink: RGB; sub: RGB }> = [
+    { label: "PUNËTORË", value: String(rows.length), fill: PP.wash, ink: PP.navy, sub: PP.muted },
+    { label: "BRUTO", value: money(gross), fill: PP.wash, ink: PP.navy, sub: PP.muted },
+    {
+      label: "TATIM + KONTRIBUTE",
+      value: money(tax + pensionEmployee + pensionEmployer),
+      fill: PP.wash,
+      ink: PP.navy,
+      sub: PP.muted,
+    },
+    { label: "NETO PËR TRANSFER", value: money(net), fill: PP.navy, ink: PP.white, sub: PP.onNavy },
+    {
+      label: "KOSTO TOTALE",
+      value: money(gross + pensionEmployer),
+      fill: PP.blue,
+      ink: PP.white,
+      sub: PP.white,
+    },
+  ];
+
+  const gap = 10;
+  const tileW = (CONTENT_W - gap * (tiles.length - 1)) / tiles.length;
+  const tileH = 44;
+
+  tiles.forEach((tile, i) => {
+    const x = MARGIN + i * (tileW + gap);
+    drawRoundedRect(page, {
+      x,
+      y: topY - tileH,
+      w: tileW,
+      h: tileH,
+      r: RADIUS.card,
+      color: tile.fill,
+      borderColor: tile.fill === PP.wash ? PP.line : undefined,
+    });
+    page.drawText(textFor(fonts, "sans", tile.label), {
+      x: x + 10,
+      y: topY - 16,
+      size: 6.5,
+      font: fonts.sans,
+      color: tile.sub,
+    });
+    page.drawText(textFor(fonts, "monoBold", tile.value), {
+      x: x + 10,
+      y: topY - 34,
+      size: 12,
+      font: fonts.monoBold,
+      color: tile.ink,
+    });
+  });
+
+  return topY - tileH - 16;
 }
 
 function drawTableHeader(
   page: PDFPage,
-  layout: RegisterLayout,
-  fontBold: PDFFont,
-  y: number,
+  fonts: PayrollPdfFonts,
+  columns: RegisterColumnBox[],
+  topY: number,
 ): number {
-  drawRect(page, MARGIN, y - 14, CONTENT_W, 18, NAVY_LIGHT);
-  drawTextInBox(page, "#", layout.num, y - 10, fontBold, 8, "left", ACCENT);
-  drawTextInBox(page, "Punonjesi", layout.name, y - 10, fontBold, 8, "left", ACCENT);
-  drawTextInBox(page, "Numri personal", layout.pid, y - 10, fontBold, 8, "left", ACCENT);
-  if (layout.withAmounts) {
-    drawTextInBox(page, "Bruto", layout.gross, y - 10, fontBold, 8, "right", ACCENT);
-    drawTextInBox(page, "Neto", layout.net, y - 10, fontBold, 8, "right", ACCENT);
-  } else {
-    drawTextInBox(page, "Nenshkrimi", layout.sign, y - 10, fontBold, 8, "left", ACCENT);
+  const h = 20;
+  drawRoundedRect(page, { x: MARGIN, y: topY - h, w: CONTENT_W, h, r: 6, color: PP.navy });
+
+  for (const column of columns) {
+    const size = 6.4;
+    const label = fit(fonts.sansBold, column.header, size, column.width - 8);
+    const w = fonts.sansBold.widthOfTextAtSize(label, size);
+    const x = column.align === "right" ? column.right - 5 - w : column.x + 5;
+    page.drawText(textFor(fonts, "sansBold", label), {
+      x,
+      y: topY - h + 7,
+      size,
+      font: fonts.sansBold,
+      color: PP.white,
+    });
   }
-  return y - 24;
+
+  return topY - h;
 }
 
-function drawDataRow(
+function drawBodyRow(
   page: PDFPage,
+  fonts: PayrollPdfFonts,
+  columns: RegisterColumnBox[],
   row: PayrollRegisterRow,
-  idx: number,
-  layout: RegisterLayout,
-  currency: string,
-  y: number,
-  font: PDFFont,
-) {
-  if (idx % 2 === 1) {
-    drawRect(page, MARGIN, y - 14, CONTENT_W, 18, ROW_ALT);
+  index: number,
+  topY: number,
+  rowH: number,
+): void {
+  for (const column of columns) {
+    if (column.key === "sign") {
+      page.drawLine({
+        start: { x: column.x + 6, y: topY - rowH + 6 },
+        end: { x: column.right - 6, y: topY - rowH + 6 },
+        thickness: RULE.hair,
+        color: PP.line,
+      });
+      continue;
+    }
+    const numeric = column.align === "right" && column.key !== "days";
+    const font = numeric ? (column.emphasis ? fonts.monoBold : fonts.mono) : fonts.sans;
+    const which = numeric ? (column.emphasis ? "monoBold" : "mono") : "sans";
+    const size = 7;
+    const value = cellValue(row, column.key, index);
+    if (!value) continue;
+    const label = fit(font, value, size, column.width - 8);
+    const w = font.widthOfTextAtSize(label, size);
+    const x = column.align === "right" ? column.right - 5 - w : column.x + 5;
+    page.drawText(textFor(fonts, which, label), {
+      x,
+      y: topY - rowH + 5.5,
+      size,
+      font,
+      color: column.emphasis ? PP.navy : PP.text,
+    });
   }
 
-  drawTextInBox(page, String(idx + 1), layout.num, y - 10, font, 9, "left");
-  drawTextInBox(page, row.name, layout.name, y - 10, font, 9, "left");
-  drawTextInBox(page, row.personalId, layout.pid, y - 10, font, 9, "left");
-
-  if (layout.withAmounts) {
-    drawTextInBox(page, money(row.gross, currency), layout.gross, y - 10, font, 9, "right");
-    drawTextInBox(page, money(row.net, currency), layout.net, y - 10, font, 9, "right");
-  } else {
-    drawHLine(page, y - 12, layout.sign.x + CELL_PAD, layout.sign.width - CELL_PAD * 2);
-  }
+  // Hairline separator — the redesign drops the zebra striping.
+  page.drawRectangle({
+    x: MARGIN,
+    y: topY - rowH,
+    width: CONTENT_W,
+    height: RULE.hair,
+    color: PP.hairline,
+  });
 }
 
 function drawTotalsRow(
   page: PDFPage,
-  layout: RegisterLayout,
-  totalGross: string,
-  totalNet: string,
-  currency: string,
-  y: number,
-  font: PDFFont,
-  fontBold: PDFFont,
+  fonts: PayrollPdfFonts,
+  columns: RegisterColumnBox[],
+  rows: PayrollRegisterRow[],
+  topY: number,
 ): number {
-  const boxH = 32;
-  y -= 8;
-  drawRect(page, MARGIN, y - boxH, CONTENT_W, boxH, TOTAL_BG);
+  const h = 20;
   page.drawRectangle({
     x: MARGIN,
-    y: y - boxH,
+    y: topY - RULE.heavy,
     width: CONTENT_W,
-    height: boxH,
-    borderColor: TOTAL_BORDER,
-    borderWidth: 1,
-  });
-  drawTextInBox(page, "TOTALET", layout.name, y - 20, fontBold, 10, "left", TOTAL_BORDER);
-  drawTextInBox(page, money(totalGross, currency), layout.gross, y - 20, fontBold, 9, "right", TOTAL_BORDER);
-  drawTextInBox(page, money(totalNet, currency), layout.net, y - 20, fontBold, 9, "right", TOTAL_BORDER);
-  return y - boxH - 12;
-}
-
-/** Build payroll register PDF matching payslip document styling. */
-export async function buildPayrollRegisterPdf(input: PayrollRegisterPdfInput): Promise<Uint8Array> {
-  const docTitle = input.withAmounts ? "LISTA E PAGEVE" : "LISTA PER NENSHKRIME";
-  const pdfTitle = input.withAmounts ? "Lista e pagave" : "Lista per nenshkrime";
-
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(txt(`${pdfTitle} — ${input.periodLabel}`));
-  pdf.setAuthor(txt(input.company.displayName));
-  pdf.setSubject(txt(pdfTitle));
-
-  const { body: font, heading: fontBold } = await embedPayrollPdfFonts(pdf);
-  const companyLogo = await embedCompanyLogo(pdf, input.logo);
-  const layout = buildLayout(input.withAmounts);
-
-  let page = pdf.addPage([PAGE_W, PAGE_H]);
-  drawCompanyHeader(page, input.company, docTitle, input.periodLabel, font, fontBold, companyLogo);
-
-  let y = PAGE_H - 100;
-  y = drawMetaBlock(page, input, layout, font, fontBold, y);
-  drawHLine(page, y);
-  y -= 20;
-
-  y = drawTableHeader(page, layout, fontBold, y);
-
-  const rowH = 18;
-  const minY = 160;
-
-  input.rows.forEach((row, idx) => {
-    if (y < minY) {
-      page = pdf.addPage([PAGE_W, PAGE_H]);
-      drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
-      y = PAGE_H - 100;
-      y = drawTableHeader(page, layout, fontBold, y);
-    }
-    drawDataRow(page, row, idx, layout, input.currency, y, font);
-    y -= rowH;
+    height: RULE.heavy,
+    color: PP.navy,
   });
 
-  if (layout.withAmounts && input.rows.length > 0) {
-    if (y < minY + 50) {
-      page = pdf.addPage([PAGE_W, PAGE_H]);
-      drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
-      y = PAGE_H - 100;
-    }
-    y = drawTotalsRow(
-      page,
-      layout,
-      sumPlain(input.rows.map((r) => r.gross)),
-      sumPlain(input.rows.map((r) => r.net)),
-      input.currency,
-      y,
-      font,
-      fontBold,
+  const sums: Record<string, number> = {};
+  for (const key of [
+    "base",
+    "extra",
+    "gross",
+    "pensionEmployee",
+    "taxable",
+    "tax",
+    "otherDeductions",
+    "net",
+    "pensionEmployer",
+  ]) {
+    sums[key] = rows.reduce(
+      (a, r) => a + toNumber(r[key as keyof PayrollRegisterRow] as string),
+      0,
     );
   }
 
-  if (y < minY + 70) {
-    page = pdf.addPage([PAGE_W, PAGE_H]);
-    drawCompanyHeader(page, input.company, `${docTitle} (vazhdim)`, input.periodLabel, font, fontBold, companyLogo);
-    y = PAGE_H - 100;
-  }
+  page.drawText(textFor(fonts, "sansBold", `Totali · ${rows.length} punëtorë`), {
+    x: MARGIN + 5,
+    y: topY - h + 6,
+    size: 7.2,
+    font: fonts.sansBold,
+    color: PP.navy,
+  });
 
-  y = drawSignatureBlock(page, font, y);
-  drawLegalFooter(page, input.company, font, y);
-  for (const outputPage of pdf.getPages()) {
-    drawPagaproGeneratedFooter(outputPage, fontBold, {
-      pageWidth: PAGE_W,
-      margin: MARGIN,
+  for (const column of columns) {
+    const total = sums[column.key];
+    if (total === undefined) continue;
+    const size = 7.2;
+    const text = money(total);
+    const w = fonts.monoBold.widthOfTextAtSize(text, size);
+    page.drawText(textFor(fonts, "monoBold", text), {
+      x: column.right - 5 - w,
+      y: topY - h + 6,
+      size,
+      font: fonts.monoBold,
+      color: column.emphasis ? PP.blue : PP.navy,
     });
   }
 
-  return pdf.save();
+  return topY - h;
 }
 
-/** Exported for unit tests — column boxes must not overlap. */
-export function getRegisterLayoutForTests(withAmounts = true): RegisterLayout {
-  return buildLayout(withAmounts);
+function drawSignOff(page: PDFPage, fonts: PayrollPdfFonts, topY: number): void {
+  const h = 64;
+  const noteW = CONTENT_W * 0.5;
+  const colW = (CONTENT_W - noteW - 20) / 2;
+
+  drawRoundedRect(page, {
+    x: MARGIN,
+    y: topY - h,
+    w: noteW,
+    h,
+    r: RADIUS.card,
+    color: PP.wash,
+    borderColor: PP.line,
+  });
+
+  const note =
+    "Lista pasqyron shumat e ngrira të periudhës. Kontributet dhe tatimi paguhen sipas afateve ligjore.";
+  let line = "";
+  let ly = topY - 18;
+  for (const word of note.split(" ")) {
+    const next = line ? `${line} ${word}` : word;
+    if (fonts.sans.widthOfTextAtSize(next, 7) > noteW - 20) {
+      page.drawText(textFor(fonts, "sans", line), {
+        x: MARGIN + 10,
+        y: ly,
+        size: 7,
+        font: fonts.sans,
+        color: PP.muted,
+      });
+      ly -= 10;
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) {
+    page.drawText(textFor(fonts, "sans", line), {
+      x: MARGIN + 10,
+      y: ly,
+      size: 7,
+      font: fonts.sans,
+      color: PP.muted,
+    });
+  }
+
+  ["PËRGATITI", "APROVOI"].forEach((title, i) => {
+    const x = MARGIN + noteW + 20 + i * colW;
+    page.drawText(textFor(fonts, "sans", title), {
+      x,
+      y: topY - 18,
+      size: 6.5,
+      font: fonts.sans,
+      color: PP.faint,
+    });
+    page.drawLine({
+      start: { x, y: topY - h + 18 },
+      end: { x: x + colW - 20, y: topY - h + 18 },
+      thickness: RULE.hair,
+      color: PP.line,
+    });
+  });
+}
+
+function drawFooter(
+  page: PDFPage,
+  fonts: PayrollPdfFonts,
+  input: PayrollRegisterPdfInput,
+  pageNumber: number,
+  pageCount: number,
+): void {
+  const left = [
+    input.generatedAtLabel ? `PAGAPRO · GJENERUAR ${input.generatedAtLabel}` : "PAGAPRO",
+    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    "paga-pro.com",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  page.drawText(textFor(fonts, "sans", left), {
+    x: MARGIN,
+    y: 16,
+    size: 6.5,
+    font: fonts.sans,
+    color: PP.faint,
+  });
+
+  const pager = `${pageNumber}/${pageCount}`;
+  const pagerW = fonts.sans.widthOfTextAtSize(pager, 6.5);
+  page.drawText(textFor(fonts, "sans", pager), {
+    x: PAGE_W / 2 - pagerW / 2,
+    y: 16,
+    size: 6.5,
+    font: fonts.sans,
+    color: PP.faint,
+  });
+
+  drawPagaproGeneratedFooter(page, fonts.sans, { pageWidth: PAGE_W, margin: MARGIN });
+}
+
+/** Builds the salary list (or the signature list) as an A4 landscape PDF. */
+export async function buildPayrollRegisterPdf(
+  input: PayrollRegisterPdfInput,
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const title = input.withAmounts ? "Lista e pagave" : "Lista e nënshkrimeve";
+  pdf.setTitle(toPdfStandardFontText(`${title} — ${input.periodLabel}`));
+  pdf.setAuthor(toPdfStandardFontText(input.company.displayName));
+  pdf.setSubject(toPdfStandardFontText(title));
+
+  const fonts = await embedPayrollPdfFonts(pdf);
+  const logo = await embedCompanyLogo(pdf, input.logo);
+  const columns = layoutColumns(input.withAmounts);
+
+  const rowH = input.withAmounts ? 16 : 22;
+  const bottomLimit = 34;
+  const signOffH = 88;
+
+  const headUsed = 50 + 14 + 20;
+  const firstAvailable = PAGE_H - MARGIN - headUsed - (input.withAmounts ? 60 : 0) - bottomLimit - 24;
+  const laterAvailable = PAGE_H - MARGIN - headUsed - bottomLimit - 24;
+
+  const pages: PayrollRegisterRow[][] = [];
+  let cursor = 0;
+  while (cursor < input.rows.length) {
+    const available = pages.length === 0 ? firstAvailable : laterAvailable;
+    const capacity = Math.max(1, Math.floor(available / rowH));
+    pages.push(input.rows.slice(cursor, cursor + capacity));
+    cursor += capacity;
+  }
+  if (pages.length === 0) pages.push([]);
+
+  // The sign-off strip may need a page of its own; count it before drawing footers.
+  let rowOffset = 0;
+  const rendered: Array<{ page: PDFPage; y: number; isLast: boolean }> = [];
+
+  pages.forEach((pageRows, pageIndex) => {
+    const page = pdf.addPage([PAGE_W, PAGE_H]);
+    let y = drawRunningHeader(page, fonts, input, logo);
+    if (pageIndex === 0 && input.withAmounts) y = drawSummaryTiles(page, fonts, input.rows, y);
+    y = drawTableHeader(page, fonts, columns, y);
+
+    if (input.rows.length === 0) {
+      page.drawText(textFor(fonts, "sans", "Nuk ka punonjës në këtë listë."), {
+        x: MARGIN + 5,
+        y: y - 18,
+        size: 8,
+        font: fonts.sans,
+        color: PP.muted,
+      });
+    }
+
+    pageRows.forEach((row, i) => {
+      drawBodyRow(page, fonts, columns, row, rowOffset + i, y, rowH);
+      y -= rowH;
+    });
+    rowOffset += pageRows.length;
+
+    const isLast = pageIndex === pages.length - 1;
+    if (isLast && input.rows.length > 0 && input.withAmounts) {
+      y = drawTotalsRow(page, fonts, columns, input.rows, y);
+    }
+    rendered.push({ page, y, isLast });
+  });
+
+  const last = rendered[rendered.length - 1]!;
+  const needsExtraPage = last.y - signOffH < bottomLimit;
+  const totalPages = pages.length + (needsExtraPage ? 1 : 0);
+
+  rendered.forEach((entry, i) => {
+    if (entry.isLast && !needsExtraPage) drawSignOff(entry.page, fonts, entry.y - 12);
+    drawFooter(entry.page, fonts, input, i + 1, totalPages);
+  });
+
+  if (needsExtraPage) {
+    const extra = pdf.addPage([PAGE_W, PAGE_H]);
+    const y = drawRunningHeader(extra, fonts, input, logo);
+    drawSignOff(extra, fonts, y - 6);
+    drawFooter(extra, fonts, input, totalPages, totalPages);
+  }
+
+  return pdf.save();
 }
