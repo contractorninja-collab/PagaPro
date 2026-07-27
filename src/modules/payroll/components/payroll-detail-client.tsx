@@ -7,15 +7,6 @@ import { Download, Printer } from "lucide-react";
 import type { PayrollPeriodStatus } from "@prisma/client";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
 import type { PayrollActionResult } from "@/modules/payroll/actions/payroll-actions";
@@ -30,7 +21,6 @@ import {
   regeneratePayrollAction,
   returnPayrollReviewToDraftAction,
   reviewPayrollAction,
-  updatePayrollEntryAction,
   validatePayrollAction,
 } from "@/modules/payroll/actions/payroll-actions";
 import { PayrollSpreadsheet } from "@/modules/payroll/components/spreadsheet/payroll-spreadsheet";
@@ -160,51 +150,6 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
     atkStatusEligible && (payroll.status === "LOCKED" ? latestAtkExport === undefined : true);
 
   const [tab, setTab] = useState("spreadsheet");
-  const [advancedEntry, setAdvancedEntry] = useState<(typeof data.entries)[0] | null>(null);
-  const [bonusInput, setBonusInput] = useState("");
-  const [deductInput, setDeductInput] = useState("");
-  const [advanceInput, setAdvanceInput] = useState("");
-  const [grossOv, setGrossOv] = useState("");
-  const [netOv, setNetOv] = useState("");
-  const [grossReason, setGrossReason] = useState("");
-  const [netReason, setNetReason] = useState("");
-  const [notesInput, setNotesInput] = useState("");
-
-  function openAdvanced(e: (typeof data.entries)[0]) {
-    setAdvancedEntry(e);
-    setBonusInput(e.bonuses);
-    setDeductInput(e.otherDeductions);
-    setAdvanceInput(e.salaryAdvanceDeduction);
-    setGrossOv(e.manualGrossOverride ?? "");
-    setNetOv(e.manualNetOverride ?? "");
-    setGrossReason(e.manualGrossReason ?? "");
-    setNetReason(e.manualNetReason ?? "");
-    setNotesInput(e.notes ?? "");
-  }
-
-  async function saveAdvanced() {
-    if (!advancedEntry) return;
-    const r = await updatePayrollEntryAction({
-      payrollId: payroll.id,
-      entryId: advancedEntry.id,
-      bonuses: bonusInput,
-      otherDeductions: deductInput,
-      salaryAdvanceDeduction: advanceInput,
-      manualGrossOverride: grossOv.trim() === "" ? null : grossOv,
-      manualNetOverride: netOv.trim() === "" ? null : netOv,
-      manualGrossReason: grossReason.trim() === "" ? null : grossReason,
-      manualNetReason: netReason.trim() === "" ? null : netReason,
-      notes: notesInput.trim() === "" ? null : notesInput,
-    });
-    if (!r.ok) {
-      toast.error(r.error);
-      return;
-    }
-    toast.success("Rreshti u përditësua.");
-    setAdvancedEntry(null);
-    router.refresh();
-  }
-
   async function exec(label: string, p: Promise<PayrollActionResult<unknown>>) {
     try {
       const r = await p;
@@ -447,18 +392,6 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             pensionEmployeePercent={data.operationalSettings?.pensionEmployeePercent}
             pensionEmployerPercent={data.operationalSettings?.pensionEmployerPercent}
           />
-          {draftEditable && data.entries.length > 0 ? (
-            <div className={cn(CARD, "px-4 py-3")}>
-              <p className="mb-2 text-xs font-semibold text-[#64748b]">Mbivendosje manuale bruto/neto (me arsye):</p>
-              <div className="flex flex-wrap gap-2">
-                {data.entries.map((e) => (
-                  <button key={e.id} type="button" className={BTN_SM_S} onClick={() => openAdvanced(e)}>
-                    Avancuar · {e.employeeName.split(" ")[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4 space-y-4">
@@ -799,60 +732,6 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         </div>
       </div>
 
-      <Dialog
-        open={!!advancedEntry}
-        onOpenChange={(open) => {
-          if (!open) setAdvancedEntry(null);
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Redaktim i avancuar — {advancedEntry?.employeeName}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2 sm:grid-cols-2">
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="bonus">Bonus (EUR)</Label>
-              <Input id="bonus" value={bonusInput} onChange={(ev) => setBonusInput(ev.target.value)} />
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="ded">Zbritje të tjera (EUR)</Label>
-              <Input id="ded" value={deductInput} onChange={(ev) => setDeductInput(ev.target.value)} />
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="adv">Zbritje avansi (EUR)</Label>
-              <Input id="adv" value={advanceInput} onChange={(ev) => setAdvanceInput(ev.target.value)} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="gov">Mbivendosje bruto</Label>
-              <Input id="gov" value={grossOv} onChange={(ev) => setGrossOv(ev.target.value)} placeholder=" bosh për auto" />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="gr">Arsyeja (bruto)</Label>
-              <Input id="gr" value={grossReason} onChange={(ev) => setGrossReason(ev.target.value)} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="nov">Mbivendosje neto</Label>
-              <Input id="nov" value={netOv} onChange={(ev) => setNetOv(ev.target.value)} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="nr">Arsyeja (neto)</Label>
-              <Input id="nr" value={netReason} onChange={(ev) => setNetReason(ev.target.value)} />
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="notes">Shënime</Label>
-              <Input id="notes" value={notesInput} onChange={(ev) => setNotesInput(ev.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="secondary" type="button" onClick={() => setAdvancedEntry(null)}>
-              Anulo
-            </Button>
-            <Button type="button" onClick={() => void saveAdvanced()}>
-              Ruaj & ripëllogarit rreshtin
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       </div>
     </>
   );
