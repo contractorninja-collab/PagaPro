@@ -6,6 +6,7 @@ import { generateBrandedFinancialWorkbookBuffer } from "@/modules/reports/export
 import { buildLibriPagaveRows, type LibriPagaveEntryInput } from "@/modules/reports/exporters/libri-pagave-rows";
 import { rowsToCsvBuffer } from "@/modules/reports/exporters/csv-export";
 import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
+import { LIBRI_PAGAVE_COLUMNS } from "@/modules/reports/exporters/libri-pagave-columns";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
@@ -108,33 +109,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   if (format === "csv") {
     // Generate CSV using rowsToCsvBuffer matching the exact columns in the screenshot
-    const columns: ReportColumnDef[] = [
-      { key: "idp", headerSq: "IDP (1)" },
-      { key: "nr", headerSq: "Nr. (2)" },
-      { key: "fullName", headerSq: "Emri dhe mbiemri (3)" },
-      { key: "sektori", headerSq: "Sektori (4)" },
-      { key: "primacy", headerSq: "Për pun. të dytë shkr. 2 (5)" },
-      { key: "hourlyRate", headerSq: "Çmimi për Orë të rregullta (6)" },
-      { key: "regularHours", headerSq: "Totali i Orëve të rregullta të realizuara (7)" },
-      { key: "regularGross", headerSq: "Paga Bruto për orë të rregullta 6 x 7 (8)" },
-      { key: "overtimeNightHours", headerSq: "J - Jashtë orarit dhe Natën (9)" },
-      { key: "onCallHours", headerSq: "K - Kujdestari (10)" },
-      { key: "holidayWeekendHours", headerSq: "F - Festave/Fundjav. (11)" },
-      { key: "overtimeNightRate", headerSq: "Çmimi për Orë me rritje 30% J (12)" },
-      { key: "onCallRate", headerSq: "Çmimi për Orë me rritje 20% K (13)" },
-      { key: "holidayWeekendRate", headerSq: "Çmimi për Orë me rritje 50% F (14)" },
-      { key: "premiumPay", headerSq: "Paga Bruto Shtesë 9 x 12 + 10 x 13 + 11 x 14 (15)" },
-      { key: "totalGross", headerSq: "TOTALI Paga Bruto 8 + 15 (16)" },
-      { key: "employeeTrustPercent", headerSq: "Punëtori % (17)" },
-      { key: "employerTrustPercent", headerSq: "Punëdhënësi % (18)" },
-      { key: "employeeTrustAmount", headerSq: "Punëtori 16 x 17 Euro (€) (19)" },
-      { key: "employerTrustAmount", headerSq: "Punëdhënësi 16 x 18 Euro (€) (20)" },
-      { key: "taxableIncome", headerSq: "Paga që tatohet 16 - 19 Euro (€) (21)" },
-      { key: "taxAmount", headerSq: "TATIMI Euro (€) (22)" },
-      { key: "netIncome", headerSq: "PAGA NETO 21 - 22 Euro (€) (23)" },
-      { key: "advance", headerSq: "Avans Euro (€) (24)" },
-      { key: "netToPay", headerSq: "Paga Neto për pagesë 23 - 24 Euro (€) (25)" }
-    ];
+    // Single source for the 25 columns — the PDF book renders the same list.
+    const columns: ReportColumnDef[] = LIBRI_PAGAVE_COLUMNS.map((c) => ({
+      key: c.key,
+      headerSq: c.headerSq,
+    }));
 
     const parseNum = (val: string) => {
       const n = Number(String(val).replace(",", "."));
