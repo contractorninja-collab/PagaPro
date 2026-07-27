@@ -575,6 +575,10 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
                   <Download className="h-3.5 w-3.5" aria-hidden />
                   Shkarko Excel (Branded)
                 </a>
+                <a className={BTN_SM_S} href={`/api/payroll/${payroll.id}/export-financial?format=pdf`} download>
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Shkarko PDF
+                </a>
                 <a className={BTN_SM_S} href={`/api/payroll/${payroll.id}/export-financial?format=csv`} download>
                   <Download className="h-3.5 w-3.5" aria-hidden />
                   Shkarko CSV

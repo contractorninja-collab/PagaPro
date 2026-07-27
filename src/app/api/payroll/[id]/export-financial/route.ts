@@ -7,6 +7,7 @@ import { buildLibriPagaveRows, type LibriPagaveEntryInput } from "@/modules/repo
 import { rowsToCsvBuffer } from "@/modules/reports/exporters/csv-export";
 import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
 import { LIBRI_PAGAVE_COLUMNS } from "@/modules/reports/exporters/libri-pagave-columns";
+import { buildLibriPagavePdf } from "@/modules/payroll/pdf/libri-pagave-pdf-builder";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
@@ -106,6 +107,50 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       department: e.employee.department,
     }
   }));
+
+  if (format === "pdf") {
+    // Same rows as the XLSX and CSV — the book is a rendering, not a calculation.
+    const [logo, company] = await Promise.all([
+      loadCompanyLogo(prisma, getCompanyAssetStorage(), companyId),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          legalName: true,
+          tradeName: true,
+          businessRegistrationNumber: true,
+          addressLine: true,
+          city: true,
+        },
+      }),
+    ]);
+
+    const buffer = await buildLibriPagavePdf({
+      company: {
+        legalName: company?.legalName ?? data.companyLabel ?? "",
+        tradeName: company?.tradeName ?? null,
+        businessNumber: company?.businessRegistrationNumber ?? null,
+        addressLine: company?.addressLine ?? null,
+        city: company?.city ?? null,
+      },
+      rows: buildLibriPagaveRows(entriesMapped),
+      periodLabel: data.payroll.monthLabel,
+      periodRef: slug,
+      status: payroll.status,
+      statusDateLabel: (payroll.approvedAt ?? payroll.lockedAt ?? payroll.archivedAt)
+        ?.toLocaleDateString("sq-AL", { timeZone: "Europe/Belgrade" }) ?? null,
+      snapshotRef: null,
+      logo,
+      generatedAtLabel: new Date().toLocaleString("sq-AL", { timeZone: "Europe/Belgrade" }),
+    });
+
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filenameBase}_${slug}.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
   if (format === "csv") {
     // Generate CSV using rowsToCsvBuffer matching the exact columns in the screenshot
