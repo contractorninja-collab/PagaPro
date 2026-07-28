@@ -86,6 +86,8 @@ export interface AdminCompanyDetail {
   city: string | null;
   postalCode: string | null;
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  /** Badge time-clock entitlement — admin-only, deliberately not on CompanyConfiguration. */
+  timeClockEnabled: boolean;
   createdAt: string;
   users: AdminCompanyUser[];
 }
@@ -108,6 +110,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       city: true,
       postalCode: true,
       status: true,
+      timeClockEnabled: true,
       createdAt: true,
       memberships: {
         orderBy: { createdAt: "asc" },
@@ -142,6 +145,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
     city: row.city,
     postalCode: row.postalCode,
     status: row.status,
+    timeClockEnabled: row.timeClockEnabled,
     createdAt: row.createdAt.toISOString(),
     users: row.memberships.map((m) => ({
       membershipId: m.id,
@@ -223,6 +227,22 @@ export async function setCompanyStatusForAdmin(
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED",
 ): Promise<boolean> {
   const res = await prisma.company.updateMany({ where: { id: companyId }, data: { status } });
+  return res.count > 0;
+}
+
+/**
+ * Badge time-clock entitlement. Lives here rather than in Konfigurime because
+ * CompanyConfiguration is wholly client-editable — a client save would overwrite
+ * a flag only the platform admin is meant to set.
+ */
+export async function setCompanyTimeClockEnabledForAdmin(
+  companyId: string,
+  enabled: boolean,
+): Promise<boolean> {
+  const res = await prisma.company.updateMany({
+    where: { id: companyId },
+    data: { timeClockEnabled: enabled },
+  });
   return res.count > 0;
 }
 

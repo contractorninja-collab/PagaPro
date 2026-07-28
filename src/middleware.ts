@@ -36,6 +36,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // The badge kiosk authenticates with a device token, never a user session — a
+  // staff login sitting on a door tablet would expose payroll to passers-by.
+  if (pathname === "/skano" || pathname.startsWith("/skano/")) {
+    return NextResponse.next();
+  }
+
   if (isAdminPublicPathname(pathname)) {
     if (tenantSlug) {
       return new NextResponse("Not Found", {

@@ -4,6 +4,7 @@ import { EmployeesPageClient } from "@/modules/employees/components/employees-pa
 import type { EmployeeFiltersDto } from "@/modules/employees/types";
 import { getEmployeesPageData } from "@/modules/employees/services/employee-service";
 import { canImportEmployees } from "@/modules/employees/services/employee-import-access";
+import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -84,6 +85,7 @@ export default async function PunonjesitPage({
       filtersActive={Boolean(q || filters.status || filters.employmentType || filters.departmentId || documentsMissing)}
       filters={<EmployeesFilters departments={data.departments} defaults={defaults} />}
       canImportEmployees={canImportEmployees({ role, isPlatformAdmin: user.isPlatformAdmin })}
+      timeClockEnabled={await isTimeClockEnabled(companyId)}
     />
   );
 }

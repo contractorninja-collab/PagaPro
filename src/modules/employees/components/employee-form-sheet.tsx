@@ -70,6 +70,7 @@ export interface EmployeeFormValues {
   residencePermitExpiryDate: string;
   workplace: string;
   qualification: string;
+  badgeCode: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -107,6 +108,7 @@ function defaults(): EmployeeFormValues {
     residencePermitExpiryDate: "",
     workplace: "",
     qualification: "",
+    badgeCode: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
     emergencyContactRelationship: "",
@@ -149,6 +151,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
     workplace: e.workplace ?? "",
     qualification: e.qualification ?? "",
+    badgeCode: e.badgeCode ?? "",
     emergencyContactName: ec?.fullName ?? "",
     emergencyContactPhone: ec?.phone ?? "",
     emergencyContactRelationship: ec?.relationship ?? "",
@@ -197,6 +200,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     residencePermitExpiryDate: v.residencePermitExpiryDate || null,
     workplace: v.workplace,
     qualification: v.qualification,
+    badgeCode: v.badgeCode,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
     emergencyContactRelationship: v.emergencyContactRelationship,
@@ -214,8 +218,20 @@ export function EmployeeFormSheet(props: {
   departments: DepartmentOptionDto[];
   jobTitles: JobTitleOptionDto[];
   onSuccess?: () => void;
+  /** Badge time-clock entitlement — hides the badge field for clients without it. */
+  timeClockEnabled?: boolean;
 }) {
-  const { open, onOpenChange, mode, employeeId, initialDetail, departments, jobTitles, onSuccess } = props;
+  const {
+    open,
+    onOpenChange,
+    mode,
+    employeeId,
+    initialDetail,
+    departments,
+    jobTitles,
+    onSuccess,
+    timeClockEnabled = false,
+  } = props;
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [values, setValues] = useState<EmployeeFormValues>(defaults);
@@ -689,6 +705,20 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 />
               </FormField>
+              {timeClockEnabled ? (
+                <FormField label="Kodi i kartelës" error={fieldErrors.badgeCode}>
+                  <Input
+                    className={errClass("badgeCode")}
+                    value={values.badgeCode}
+                    placeholder="Skanoni kartelën ose shkruani numrin"
+                    onChange={(e) => {
+                      clearKey("badgeCode");
+                      setValues((s) => ({ ...s, badgeCode: e.target.value }));
+                    }}
+                    disabled={pending}
+                  />
+                </FormField>
+              ) : null}
             </div>
           </section>
 

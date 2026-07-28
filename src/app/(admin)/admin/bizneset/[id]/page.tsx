@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCompanyDetailForAdmin } from "@/modules/admin/services/admin-service";
+import { listTimeClockDevices } from "@/modules/timeclock/services/timeclock-device-service";
 import { BiznesDetailClient } from "./biznes-detail-client";
 
 export const metadata: Metadata = {
@@ -14,5 +16,14 @@ export default async function BiznesDetailPage({ params }: { params: Promise<{ i
   const company = await getCompanyDetailForAdmin(id);
   if (!company) notFound();
 
-  return <BiznesDetailClient company={company} />;
+  const devices = company.timeClockEnabled ? await listTimeClockDevices(company.id) : [];
+
+  // The kiosk lives on the client's own tenant host when they have one, so the
+  // pairing link we hand over opens the right company's screen.
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+  const proto = headerList.get("x-forwarded-proto") ?? "https";
+  const appOrigin = company.tenantUrl ?? (host ? `${proto}://${host}` : "");
+
+  return <BiznesDetailClient company={company} timeClockDevices={devices} appOrigin={appOrigin} />;
 }

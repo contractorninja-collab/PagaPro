@@ -11,6 +11,7 @@ import {
   listPayrollGeneratedDocsForEmployee,
 } from "@/modules/documents/services/document-queries";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
+import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
 
 type Props = {
@@ -105,6 +106,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       jobTitles={jobTitles}
       documentCenter={documentCenter}
       openEditDocuments={openEditDocuments}
+      timeClockEnabled={await isTimeClockEnabled(companyId)}
     />
   );
 }

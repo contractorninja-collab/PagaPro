@@ -75,6 +75,7 @@ export interface EmployeeDetailDto {
   residencePermitExpiryDate: string | null;
   workplace: string | null;
   qualification: string | null;
+  badgeCode: string | null;
   emergencyContact: EmployeeEmergencyContactDto | null;
   internalNotes: string | null;
   documentsMissing: boolean;

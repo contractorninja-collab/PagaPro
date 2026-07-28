@@ -87,6 +87,9 @@ export const employeeUpsertSchema = z
     /// Kualifikimi (Neni 11.1.3) — shkollimi/përgatitja profesionale, printohet në kontratë.
     qualification: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
 
+    /// Kodi i kartelës së skanimit — unik brenda kompanisë, vetëm kur ora e punës është aktive.
+    badgeCode: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
+
     emergencyContactName: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
     emergencyContactPhone: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
     emergencyContactRelationship: z.preprocess(emptyToNull, z.string().trim().max(120).nullable().optional()),

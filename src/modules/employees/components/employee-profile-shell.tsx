@@ -220,7 +220,7 @@ function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
   );
 }
 
-function SummaryTab({ e }: { e: EmployeeDetailDto }) {
+function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEnabled: boolean }) {
   const ec = e.emergencyContact;
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -300,6 +300,7 @@ function SummaryTab({ e }: { e: EmployeeDetailDto }) {
             <Row label="Pozita" value={e.jobTitle ?? "—"} />
             <Row label="Departamenti" value={e.departmentName ?? "—"} />
             <Row label="Vendi i punës" value={e.workplace ?? "Selia e kompanisë"} />
+            {timeClockEnabled ? <Row label="Kodi i kartelës" value={e.badgeCode ?? "—"} /> : null}
             <Row label="Kualifikimi" value={e.qualification ?? "—"} />
             <Row
               label="Muaj pune praktike"
@@ -589,8 +590,16 @@ export function EmployeeProfileShell(props: {
   jobTitles: JobTitleOptionDto[];
   documentCenter?: EmployeeProfileDocumentsBundle;
   openEditDocuments?: boolean;
+  timeClockEnabled?: boolean;
 }) {
-  const { employee: initial, departments, jobTitles, documentCenter, openEditDocuments = false } = props;
+  const {
+    employee: initial,
+    departments,
+    jobTitles,
+    documentCenter,
+    openEditDocuments = false,
+    timeClockEnabled = false,
+  } = props;
   const router = useRouter();
   const [employee, setEmployee] = useState(initial);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -717,7 +726,7 @@ export function EmployeeProfileShell(props: {
           </TabsList>
 
           <TabsContent value="summary" className="mt-5">
-            <SummaryTab e={employee} />
+            <SummaryTab e={employee} timeClockEnabled={timeClockEnabled} />
           </TabsContent>
           <TabsContent value="payroll" className="mt-5">
             <SalaryHistoryCard rows={employee.salaryHistory} />
@@ -749,6 +758,7 @@ export function EmployeeProfileShell(props: {
             initialDetail={employee}
             departments={departments}
             jobTitles={jobTitles}
+            timeClockEnabled={timeClockEnabled}
             onSuccess={() => void reload()}
           />
         ) : null}

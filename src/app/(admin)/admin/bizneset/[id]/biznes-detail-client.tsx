@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { TimeClockCard } from "@/components/admin/time-clock-card";
+import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
 import {
   createCompanyUserAction,
@@ -94,7 +96,15 @@ function TempPasswordDialog({
   );
 }
 
-export function BiznesDetailClient({ company }: { company: AdminCompanyDetail }) {
+export function BiznesDetailClient({
+  company,
+  timeClockDevices,
+  appOrigin,
+}: {
+  company: AdminCompanyDetail;
+  timeClockDevices: TimeClockDeviceRow[];
+  appOrigin: string;
+}) {
   const router = useRouter();
   const status = STATUS_LABELS[company.status];
 
@@ -349,6 +359,13 @@ export function BiznesDetailClient({ company }: { company: AdminCompanyDetail })
             )}
           </CardContent>
         </Card>
+
+        <TimeClockCard
+          companyId={company.id}
+          enabled={company.timeClockEnabled}
+          devices={timeClockDevices}
+          appOrigin={appOrigin}
+        />
       </div>
 
       <Dialog

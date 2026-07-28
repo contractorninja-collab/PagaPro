@@ -43,6 +43,7 @@ export function EmployeesPageClient(props: {
   filtersActive?: boolean;
   filters?: ReactNode;
   canImportEmployees?: boolean;
+  timeClockEnabled?: boolean;
 }) {
   const {
     employees,
@@ -202,6 +203,7 @@ export function EmployeesPageClient(props: {
         initialDetail={detail}
         departments={departments}
         jobTitles={jobTitles}
+        timeClockEnabled={props.timeClockEnabled}
         onSuccess={() => router.refresh()}
       />
       <EmployeeImportDialog

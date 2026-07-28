@@ -9,9 +9,15 @@ import {
   createCompanyUserForAdmin,
   resetUserPasswordForAdmin,
   setCompanyStatusForAdmin,
+  setCompanyTimeClockEnabledForAdmin,
   setMembershipActiveForAdmin,
   updateCompanyForAdmin,
 } from "@/modules/admin/services/admin-service";
+import {
+  createTimeClockDevice,
+  regenerateTimeClockPairingCode,
+  setTimeClockDeviceActive,
+} from "@/modules/timeclock/services/timeclock-device-service";
 import {
   companyStatusSchema,
   companyUpsertSchema,
@@ -173,6 +179,114 @@ export async function setCompanyStatusAction(raw: unknown): Promise<AdminActionR
   } catch (err) {
     console.error("[setCompanyStatusAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi i statusit dështoi papritur." };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Badge time clock — entitlement and door devices
+// ---------------------------------------------------------------------------
+
+const setTimeClockSchema = z.object({
+  companyId: z.string().min(1),
+  enabled: z.boolean(),
+});
+
+export async function setCompanyTimeClockEnabledAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = setTimeClockSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const ok = await setCompanyTimeClockEnabledForAdmin(parsed.data.companyId, parsed.data.enabled);
+    if (!ok) return { ok: false, error: "Biznesi nuk u gjet." };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setCompanyTimeClockEnabledAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi dështoi papritur." };
+  }
+}
+
+const createDeviceSchema = z.object({
+  companyId: z.string().min(1),
+  label: z.string().min(1).max(80),
+  location: z.string().max(120).optional(),
+});
+
+export async function createTimeClockDeviceAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ pairingCode: string }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = createDeviceSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Emri i pajisjes është i detyrueshëm." };
+
+    const user = await getCurrentUser();
+    const res = await createTimeClockDevice({
+      companyId: parsed.data.companyId,
+      label: parsed.data.label,
+      location: parsed.data.location,
+      actorUserId: user?.id ?? null,
+    });
+    if (!res.ok) return { ok: false, error: res.error };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true, data: { pairingCode: res.pairingCode } };
+  } catch (err) {
+    console.error("[createTimeClockDeviceAction] unexpected:", err);
+    return { ok: false, error: "Krijimi i pajisjes dështoi." };
+  }
+}
+
+const deviceRefSchema = z.object({
+  companyId: z.string().min(1),
+  deviceId: z.string().min(1),
+});
+
+export async function regenerateTimeClockPairingCodeAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ pairingCode: string }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = deviceRefSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const res = await regenerateTimeClockPairingCode(parsed.data.companyId, parsed.data.deviceId);
+    if (!res.ok) return { ok: false, error: res.error };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true, data: { pairingCode: res.pairingCode } };
+  } catch (err) {
+    console.error("[regenerateTimeClockPairingCodeAction] unexpected:", err);
+    return { ok: false, error: "Gjenerimi i kodit dështoi." };
+  }
+}
+
+export async function setTimeClockDeviceActiveAction(
+  raw: unknown,
+): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = deviceRefSchema.extend({ isActive: z.boolean() }).safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const res = await setTimeClockDeviceActive(
+      parsed.data.companyId,
+      parsed.data.deviceId,
+      parsed.data.isActive,
+    );
+    if (!res.ok) return { ok: false, error: res.error };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setTimeClockDeviceActiveAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi dështoi." };
   }
 }
 
