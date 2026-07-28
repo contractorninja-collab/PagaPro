@@ -111,15 +111,31 @@ export interface JobTitleOptionDto {
   status: "ACTIVE" | "ARCHIVED";
 }
 
+/**
+ * Company-wide totals, deliberately independent of the active filters — the
+ * stat strip states what the company is, not what the current query returned.
+ * Everything except `terminated` counts the live roster only.
+ */
+export interface EmployeeCountsDto {
+  total: number;
+  active: number;
+  onLeave: number;
+  contractors: number;
+  documentsMissing: number;
+  terminated: number;
+}
+
 export interface EmployeesPageDataDto {
   employees: EmployeeListRowDto[];
   departments: DepartmentOptionDto[];
   jobTitles: JobTitleOptionDto[];
+  counts: EmployeeCountsDto;
 }
 
 export interface EmployeeFiltersDto {
   search?: string;
-  status?: EmploymentStatus | "";
+  /** `""` hides leavers (the default roster view); `"ALL"` includes them. */
+  status?: EmploymentStatus | "" | "ALL";
   employmentType?: EmploymentType | "";
   departmentId?: string | "";
   documentsMissing?: boolean;

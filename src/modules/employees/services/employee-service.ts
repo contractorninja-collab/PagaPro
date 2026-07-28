@@ -2,6 +2,7 @@ import { DomainActivityVerb, EmployeeHistoryEventKind, Prisma } from "@prisma/cl
 import type { EmploymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type {
+  EmployeeCountsDto,
   EmployeeDetailDto,
   EmployeeFiltersDto,
   EmployeeListRowDto,
@@ -85,7 +86,13 @@ export async function getEmployeesPageData(
             ],
           }
         : {},
-      filters.status ? { status: filters.status } : {},
+      // Leavers are owned by Largimet; they only appear here when asked for,
+      // so a company with turnover still sees its live roster by default.
+      filters.status === "ALL"
+        ? {}
+        : filters.status
+          ? { status: filters.status }
+          : { status: { not: "TERMINATED" } },
       filters.employmentType ? { employmentType: filters.employmentType } : {},
       employeeDepartmentWhere(filters.departmentId),
       filters.documentsMissing
@@ -94,7 +101,9 @@ export async function getEmployeesPageData(
     ],
   };
 
-  const [employees, departments, jobTitles] = await Promise.all([
+  const live: Prisma.EmployeeWhereInput = { companyId, status: { not: "TERMINATED" } };
+
+  const [employees, departments, jobTitles, counts] = await Promise.all([
     prisma.employee.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -105,13 +114,32 @@ export async function getEmployeesPageData(
     }),
     listDepartmentsForCompany(companyId),
     listActiveJobTitleOptions(companyId),
+    countEmployeesForCompany(companyId, live),
   ]);
 
   return {
     employees: employees.map(mapListRow),
     departments,
     jobTitles,
+    counts,
   };
+}
+
+/** Unfiltered company totals for the stat strip. */
+async function countEmployeesForCompany(
+  companyId: string,
+  live: Prisma.EmployeeWhereInput,
+): Promise<EmployeeCountsDto> {
+  const [total, active, onLeave, contractors, documentsMissing, terminated] = await Promise.all([
+    prisma.employee.count({ where: live }),
+    prisma.employee.count({ where: { companyId, status: "ACTIVE" } }),
+    prisma.employee.count({ where: { companyId, status: "ON_LEAVE" } }),
+    prisma.employee.count({ where: { ...live, employmentType: "CONTRACTOR" } }),
+    prisma.employee.count({ where: { ...live, documentsMissing: true } }),
+    prisma.employee.count({ where: { companyId, status: "TERMINATED" } }),
+  ]);
+
+  return { total, active, onLeave, contractors, documentsMissing, terminated };
 }
 
 export async function getEmployeeById(companyId: string, id: string): Promise<EmployeeDetailDto | null> {

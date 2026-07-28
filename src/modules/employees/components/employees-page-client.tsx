@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { getEmployeeDetailAction } from "@/modules/employees/actions/employee-actions";
 import type {
   DepartmentOptionDto,
+  EmployeeCountsDto,
   EmployeeDetailDto,
   EmployeeListRowDto,
   JobTitleOptionDto,
@@ -20,39 +21,83 @@ import type {
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
 import { EmployeeImportDialog } from "@/modules/employees/components/employee-import-dialog";
 import { EmployeesTable } from "@/modules/employees/components/employees-table";
+import {
+  SalaryVisibilityProvider,
+  SalaryVisibilityToggle,
+} from "@/modules/employees/components/salary-visibility";
 
-function StatCard({ label, value }: { label: string; value: number }) {
+export interface EmployeeStatCard {
+  key: string;
+  label: string;
+  value: number;
+  href: string;
+  active: boolean;
+  /** What clicking does from here — the unfiltered card is not "a filter to remove". */
+  hint: string;
+  tone?: "warning";
+}
+
+/**
+ * A count and a filter in one control. The numbers are company-wide totals, not
+ * a summary of whatever the current query returned — a strip that changed
+ * meaning every time you filtered needed a disclaimer under it to be readable,
+ * which is a sign the strip was wrong.
+ */
+function StatCard({ card }: { card: EmployeeStatCard }) {
+  const warning = card.tone === "warning";
   return (
-    <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">{label}</p>
-      <p className="mt-1.5 text-[24px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-[#0f172a]">
-        {value}
+    <Link
+      href={card.href}
+      aria-current={card.active ? "true" : undefined}
+      className={cn(
+        "rounded-xl border bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-colors",
+        warning && "shadow-[inset_3px_0_0_#d97706,0_1px_3px_rgba(15,23,42,0.05)]",
+        card.active
+          ? warning
+            ? "border-[#fbbf24] bg-[#fffbeb]"
+            : "border-brand-blue bg-[#f5f8ff]"
+          : warning
+            ? "border-[#e2e8f0] hover:bg-[#fffbeb]"
+            : "border-[#e2e8f0] hover:bg-[#f8fafc]",
+      )}
+    >
+      <p
+        className={cn(
+          "text-[11px] font-bold uppercase tracking-[0.05em]",
+          warning ? "text-[#b45309]" : "text-[#94a3b8]",
+        )}
+      >
+        {card.label}
       </p>
-    </div>
+      <p className="mt-1.5 text-[24px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-[#0f172a]">
+        {card.value}
+      </p>
+      <p className="mt-1.5 text-[11px] font-medium text-[#94a3b8]">{card.hint}</p>
+    </Link>
   );
 }
 
 export function EmployeesPageClient(props: {
   employees: EmployeeListRowDto[];
+  counts: EmployeeCountsDto;
+  cards: EmployeeStatCard[];
   departments: DepartmentOptionDto[];
   jobTitles: JobTitleOptionDto[];
-  documentsMissingFilter?: boolean;
-  /** URL që ndez/fik filtrin documentsMissing duke ruajtur filtrat e tjerë aktivë. */
-  documentsMissingToggleHref?: string;
-  /** True kur ka filtra aktivë — statistikat reflektojnë nën-bashkësinë e filtruar. */
-  filtersActive?: boolean;
   filters?: ReactNode;
+  /** Leavers kept out of the default view — stated, never silently dropped. */
+  hiddenTerminated?: number;
+  showAllHref?: string;
   canImportEmployees?: boolean;
   timeClockEnabled?: boolean;
 }) {
   const {
     employees,
+    cards,
     departments,
     jobTitles,
-    documentsMissingFilter = false,
-    documentsMissingToggleHref = "/punonjesit?documentsMissing=1",
-    filtersActive = false,
     filters,
+    hiddenTerminated = 0,
+    showAllHref = "/punonjesit?status=ALL",
     canImportEmployees = false,
   } = props;
   const router = useRouter();
@@ -63,18 +108,6 @@ export function EmployeesPageClient(props: {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const editFetchGeneration = useRef(0);
-
-  const stats = useMemo(() => {
-    let active = 0;
-    let onLeave = 0;
-    let contractors = 0;
-    for (const e of employees) {
-      if (e.status === "ACTIVE") active += 1;
-      if (e.status === "ON_LEAVE") onLeave += 1;
-      if (e.employmentType === "CONTRACTOR") contractors += 1;
-    }
-    return { total: employees.length, active, onLeave, contractors };
-  }, [employees]);
 
   const openCreate = () => {
     editFetchGeneration.current += 1;
@@ -125,14 +158,12 @@ export function EmployeesPageClient(props: {
   };
 
   return (
-    <>
+    <SalaryVisibilityProvider>
       <AppSubBar
         eyebrow="Menaxhimi i fuqisë punëtore"
         title="Punonjësit"
         description={
-          documentsMissingFilter ? (
-            "Punonjës me dokumentacion të paplotë — i izoluar për kompaninë aktive."
-          ) : departments.length === 0 ? (
+          departments.length === 0 ? (
             <>
               Regjistri i punonjësve dhe kontraktorëve — i izoluar për kompaninë aktive.{" "}
               <Link href="/konfigurime?tab=departamentet" className="text-primary underline-offset-4 hover:underline">
@@ -147,6 +178,7 @@ export function EmployeesPageClient(props: {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {loadingDetail ? <Skeleton className="h-9 w-36" /> : null}
+            <SalaryVisibilityToggle />
             {canImportEmployees ? (
               <Button type="button" variant="outlinePrimary" onClick={() => setImportOpen(true)} disabled={loadingDetail}>
                 <Upload className="h-4 w-4" aria-hidden />
@@ -162,36 +194,24 @@ export function EmployeesPageClient(props: {
 
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          <StatCard label="Gjithsej" value={stats.total} />
-          <StatCard label="Aktivë" value={stats.active} />
-          <StatCard label="Në pushim" value={stats.onLeave} />
-          <StatCard label="Kontraktorë" value={stats.contractors} />
-          <Link
-            href={documentsMissingToggleHref}
-            className={cn(
-              "rounded-xl border bg-white px-4 py-3.5 shadow-[inset_3px_0_0_#d97706,0_1px_3px_rgba(15,23,42,0.05)] transition-colors",
-              documentsMissingFilter
-                ? "border-[#fbbf24] bg-[#fffbeb]"
-                : "border-[#e2e8f0] hover:bg-[#fffbeb]",
-            )}
-          >
-            <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#b45309]">Dok. mungojnë</p>
-            <p className="mt-1.5 text-[24px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-[#0f172a]">
-              {documentsMissingFilter ? stats.total : "—"}
-            </p>
-            <p className="mt-1.5 text-[11px] font-medium text-[#94a3b8]">
-              {documentsMissingFilter ? "Filtri aktiv — kliko për ta hequr" : "Kliko për të filtruar"}
-            </p>
-          </Link>
+          {cards.map((card) => (
+            <StatCard key={card.key} card={card} />
+          ))}
         </div>
 
-        {filtersActive ? (
+        {filters}
+
+        {hiddenTerminated > 0 ? (
           <p className="text-[11.5px] text-[#94a3b8]">
-            Statistikat reflektojnë filtrat aktivë — pastro filtrat për numrat e plotë të kompanisë.
+            {hiddenTerminated === 1
+              ? "1 punonjës i larguar nuk shfaqet në këtë listë."
+              : `${hiddenTerminated} punonjës të larguar nuk shfaqen në këtë listë.`}{" "}
+            <Link href={showAllHref} className="font-medium text-brand-blue hover:underline">
+              Shfaqi edhe ata
+            </Link>
           </p>
         ) : null}
 
-        {filters}
         <EmployeesTable rows={employees} onEdit={(row) => void openEdit(row)} />
       </div>
 
@@ -211,6 +231,6 @@ export function EmployeesPageClient(props: {
         onOpenChange={setImportOpen}
         onImported={() => router.refresh()}
       />
-    </>
+    </SalaryVisibilityProvider>
   );
 }

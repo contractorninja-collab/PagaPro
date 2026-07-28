@@ -11,7 +11,8 @@ export const metadata: Metadata = {
   title: "Punonjësit",
 };
 
-const STATUSES = new Set(["ACTIVE", "INACTIVE", "ON_LEAVE", "SUSPENDED", "TERMINATED"]);
+// "ALL" is not a status — it lifts the default hiding of leavers.
+const STATUSES = new Set(["ACTIVE", "INACTIVE", "ON_LEAVE", "SUSPENDED", "TERMINATED", "ALL"]);
 const TYPES = new Set(["EMPLOYEE", "CONTRACTOR"]);
 
 function first(v: string | string[] | undefined): string {
@@ -64,25 +65,88 @@ export default async function PunonjesitPage({
     documentsMissing,
   };
 
-  // URL that toggles the documentsMissing quick-filter while preserving the other applied filters.
-  const toggleParams = new URLSearchParams();
-  if (q) toggleParams.set("q", q);
-  if (filters.status) toggleParams.set("status", filters.status);
-  if (filters.employmentType) toggleParams.set("employmentType", filters.employmentType);
-  if (filters.departmentId) toggleParams.set("departmentId", filters.departmentId);
-  if (!documentsMissing) toggleParams.set("documentsMissing", "1");
-  const documentsMissingToggleHref = toggleParams.toString()
-    ? `/punonjesit?${toggleParams.toString()}`
-    : "/punonjesit";
+  /**
+   * Each stat card is a filter. Building its href from the *current* query
+   * means clicking one narrows the view instead of discarding the search or
+   * department the user already picked — and clicking the active card clears
+   * just that dimension.
+   */
+  function cardHref(patch: { status?: string; employmentType?: string; documentsMissing?: boolean }) {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (filters.departmentId) params.set("departmentId", filters.departmentId);
+
+    const status = "status" in patch ? patch.status : filters.status;
+    const type = "employmentType" in patch ? patch.employmentType : filters.employmentType;
+    const docs = "documentsMissing" in patch ? patch.documentsMissing : documentsMissing;
+
+    if (status) params.set("status", status);
+    if (type) params.set("employmentType", type);
+    if (docs) params.set("documentsMissing", "1");
+
+    const qs = params.toString();
+    return qs ? `/punonjesit?${qs}` : "/punonjesit";
+  }
+
+  const activeStatus = filters.status ?? "";
+  const unfiltered = !activeStatus && !filters.employmentType && !documentsMissing;
+  const hint = (active: boolean) =>
+    active ? "Filtri aktiv — kliko për ta hequr" : "Kliko për të filtruar";
 
   return (
     <EmployeesPageClient
       employees={data.employees}
+      counts={data.counts}
       departments={data.departments}
       jobTitles={data.jobTitles}
-      documentsMissingFilter={documentsMissing}
-      documentsMissingToggleHref={documentsMissingToggleHref}
-      filtersActive={Boolean(q || filters.status || filters.employmentType || filters.departmentId || documentsMissing)}
+      cards={[
+        {
+          key: "total",
+          label: "Gjithsej",
+          value: data.counts.total,
+          href: cardHref({ status: "", employmentType: "", documentsMissing: false }),
+          active: unfiltered,
+          // The cleared state is not "a filter to remove" — say what it is.
+          hint: unfiltered ? "E gjithë lista" : "Kliko për të pastruar filtrat",
+        },
+        {
+          key: "active",
+          label: "Aktivë",
+          value: data.counts.active,
+          href: cardHref({ status: activeStatus === "ACTIVE" ? "" : "ACTIVE" }),
+          active: activeStatus === "ACTIVE",
+          hint: hint(activeStatus === "ACTIVE"),
+        },
+        {
+          key: "onLeave",
+          label: "Në pushim",
+          value: data.counts.onLeave,
+          href: cardHref({ status: activeStatus === "ON_LEAVE" ? "" : "ON_LEAVE" }),
+          active: activeStatus === "ON_LEAVE",
+          hint: hint(activeStatus === "ON_LEAVE"),
+        },
+        {
+          key: "contractors",
+          label: "Kontraktorë",
+          value: data.counts.contractors,
+          href: cardHref({ employmentType: filters.employmentType === "CONTRACTOR" ? "" : "CONTRACTOR" }),
+          active: filters.employmentType === "CONTRACTOR",
+          hint: hint(filters.employmentType === "CONTRACTOR"),
+        },
+        {
+          key: "documentsMissing",
+          label: "Dok. mungojnë",
+          value: data.counts.documentsMissing,
+          href: cardHref({ documentsMissing: !documentsMissing }),
+          active: documentsMissing,
+          hint: hint(documentsMissing),
+          tone: "warning",
+        },
+      ]}
+      hiddenTerminated={
+        activeStatus === "" && data.counts.terminated > 0 ? data.counts.terminated : 0
+      }
+      showAllHref={cardHref({ status: "ALL" })}
       filters={<EmployeesFilters departments={data.departments} defaults={defaults} />}
       canImportEmployees={canImportEmployees({ role, isPlatformAdmin: user.isPlatformAdmin })}
       timeClockEnabled={await isTimeClockEnabled(companyId)}

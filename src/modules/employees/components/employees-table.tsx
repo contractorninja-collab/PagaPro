@@ -32,6 +32,7 @@ import {
   formatSqDate,
 } from "@/modules/employees/components/employees-labels";
 import { EmployeeStatusBadge, EmployeeTypeBadge } from "@/modules/employees/components/employee-status-badge";
+import { MaskedAmount } from "@/modules/employees/components/salary-visibility";
 import { TerminateEmployeeDialog } from "@/modules/employees/components/terminate-employee-dialog";
 
 const TH =
@@ -107,10 +108,8 @@ function RowActions(props: {
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
+        {/* No "Shiko profilin" here — the row and the name already open it. */}
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem asChild>
-            <Link href={`/punonjesit/${row.id}`}>Shiko profilin</Link>
-          </DropdownMenuItem>
           <DropdownMenuItem disabled={terminated} onClick={() => onEdit(row)}>
             Ndrysho
           </DropdownMenuItem>
@@ -209,14 +208,15 @@ export function EmployeesTable(props: {
     <>
       <div className="hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)] md:block">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] caption-bottom">
+          {/* Six columns rather than eight: Pozita sits under the name and the
+              status badge already carries the employment type, which kills the
+              horizontal scroll on a laptop. */}
+          <table className="w-full min-w-[720px] caption-bottom">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
                 <th className={TH}>Punonjësi</th>
-                <th className={TH}>Pozita</th>
-                <th className={TH}>Departamenti</th>
+                <th className={TH}>Pozita &amp; departamenti</th>
                 <th className={TH}>Statusi</th>
-                <th className={TH}>Lloji</th>
                 <th className={cn(TH, "text-right")}>Paga bruto</th>
                 <th className={TH}>Punësimi</th>
                 <th className={cn(TH, "w-10 text-right")}>
@@ -246,16 +246,20 @@ export function EmployeesTable(props: {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</td>
-                  <td className="px-4 py-3 text-[13px] text-[#64748b]">{row.departmentName ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
+                    <p className="truncate text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</p>
+                    <p className="truncate text-xs text-[#94a3b8]">{row.departmentName ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <EmployeeTypeBadge employmentType={row.employmentType} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
+                      {row.employmentType === "CONTRACTOR" ? (
+                        <EmployeeTypeBadge employmentType={row.employmentType} />
+                      ) : null}
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-[#0f172a]">
-                    {formatEur(row.baseSalaryMonthly)}
+                    <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-[#64748b]">
                     {formatSqDate(row.hireDate)}
@@ -320,7 +324,7 @@ export function EmployeesTable(props: {
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto</dt>
                 <dd className="text-[13px] font-semibold tabular-nums text-[#0f172a]">
-                  {formatEur(row.baseSalaryMonthly)}
+                  <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
                 </dd>
               </div>
               <div>

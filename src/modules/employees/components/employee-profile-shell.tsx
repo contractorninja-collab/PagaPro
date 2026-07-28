@@ -14,6 +14,11 @@ import { cn } from "@/lib/utils";
 import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employees/actions/employee-actions";
 import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto, SalaryChangeDto } from "@/modules/employees/types";
 import { EmployeeFormSheet } from "@/modules/employees/components/employee-form-sheet";
+import {
+  MaskedAmount,
+  SalaryVisibilityProvider,
+  SalaryVisibilityToggle,
+} from "@/modules/employees/components/salary-visibility";
 import { AnnexPanel } from "@/modules/annex/components/annex-panel";
 import { WarningsPanel } from "@/modules/warnings/components/warnings-panel";
 import {
@@ -204,10 +209,14 @@ function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
                 <tr key={r.id} className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]">
                   <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.effectiveFromIso)}</td>
                   <td className={cn(TD, "text-right tabular-nums text-[#64748b]")}>
-                    {r.previousBaseSalary ? formatEur(r.previousBaseSalary) : "—"}
+                    {r.previousBaseSalary ? (
+                      <MaskedAmount value={formatEur(r.previousBaseSalary)} />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className={cn(TD, "text-right font-semibold tabular-nums text-[#0f172a]")}>
-                    {formatEur(r.newBaseSalary)}
+                    <MaskedAmount value={formatEur(r.newBaseSalary)} />
                   </td>
                   <td className={cn(TD, "text-[#64748b]")}>{r.reason ?? "—"}</td>
                 </tr>
@@ -230,7 +239,7 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
           <div className="mb-4 rounded-[10px] bg-[#f8fafc] px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto mujore</p>
             <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
-              {formatEur(e.baseSalaryMonthly)}
+              <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
             </p>
           </div>
           <div className="grid gap-2.5">
@@ -649,7 +658,7 @@ export function EmployeeProfileShell(props: {
     .join(" · ");
 
   return (
-    <>
+    <SalaryVisibilityProvider>
       <AppSubBar
         dense
         backHref="/punonjesit"
@@ -663,13 +672,16 @@ export function EmployeeProfileShell(props: {
         }
         description={canEdit ? metaLine : `${metaLine} — Profili është i mbyllur (i larguar).`}
         actions={
-          canEdit ? (
-            <Button type="button" onClick={() => setSheetOpen(true)}>
-              Ndrysho profilin
-            </Button>
-          ) : (
-            <RehireControl employeeId={employee.id} onDone={reload} />
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            <SalaryVisibilityToggle />
+            {canEdit ? (
+              <Button type="button" onClick={() => setSheetOpen(true)}>
+                Ndrysho profilin
+              </Button>
+            ) : (
+              <RehireControl employeeId={employee.id} onDone={reload} />
+            )}
+          </div>
         }
       />
 
@@ -763,6 +775,6 @@ export function EmployeeProfileShell(props: {
           />
         ) : null}
       </div>
-    </>
+    </SalaryVisibilityProvider>
   );
 }
