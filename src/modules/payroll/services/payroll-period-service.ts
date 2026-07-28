@@ -1007,7 +1007,23 @@ export async function regeneratePayrollEntriesAndCalculate(
     },
   });
 
+  await clearPayrollValidation(payrollId);
+
   return { ok: true };
+}
+
+/**
+ * Validation describes the rows as they were when it ran. Rebuilding or editing
+ * them invalidates it, so the flag is cleared — otherwise the workflow would go
+ * on offering "Mirato" on the strength of checks that no longer apply.
+ */
+async function clearPayrollValidation(payrollId: string): Promise<void> {
+  await prisma.payroll
+    .updateMany({
+      where: { id: payrollId, status: "DRAFT", NOT: { validatedAt: null } },
+      data: { validatedAt: null, validationWarnings: Prisma.DbNull },
+    })
+    .catch(() => {});
 }
 
 export async function reviewPayrollExplicit(
@@ -1050,7 +1066,11 @@ export async function approvePayroll(
     include: { _count: { select: { entries: true } } },
   });
   if (!payroll) return { ok: false, error: "Payroll nuk u gjet." };
-  if (payroll.status !== "REVIEWED") return { ok: false, error: "Miratimi kërkon status REVIEWED." };
+  // The workflow now runs DRAFT → APPROVED directly. REVIEWED is still accepted
+  // so payrolls that entered that state under the old chain can still move on.
+  if (payroll.status !== "DRAFT" && payroll.status !== "REVIEWED") {
+    return { ok: false, error: "Miratimi kërkon payroll në draft." };
+  }
   if (payroll._count.entries === 0) return { ok: false, error: "S’ka rreshta pagë për të miratuar." };
 
   await prisma.payroll.update({
@@ -1425,6 +1445,8 @@ export async function updatePayrollEntryAmounts(
     diff: { entryId, patch },
   });
 
+  await clearPayrollValidation(entry.payrollId);
+
   return { ok: true };
   } catch (e) {
     console.error("[updatePayrollEntryAmounts]", e);
@@ -1466,7 +1488,13 @@ export async function returnPayrollReviewToDraft(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const payroll = await prisma.payroll.findFirst({ where: { id: payrollId, companyId } });
   if (!payroll) return { ok: false, error: "Payroll nuk u gjet." };
-  if (payroll.status !== "REVIEWED") return { ok: false, error: "Vetëm payroll në REVIEWED mund të kthehet në DRAFT." };
+  /**
+   * "Kthehu" reaches back from every step before the freeze. Locking writes a
+   * compliance snapshot, so LOCKED and ARCHIVED are deliberately one-way.
+   */
+  if (payroll.status !== "REVIEWED" && payroll.status !== "APPROVED") {
+    return { ok: false, error: "Kthimi lejohet vetëm para kyçjes së payroll-it." };
+  }
 
   await prisma.payroll.update({
     where: { id: payrollId },
@@ -1474,6 +1502,9 @@ export async function returnPayrollReviewToDraft(
       status: "DRAFT",
       reviewedAt: null,
       reviewedById: null,
+      // Undoing an approval must also clear who approved it and when.
+      approvedAt: null,
+      approvedById: null,
     },
   });
 

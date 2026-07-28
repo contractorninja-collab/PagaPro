@@ -19,7 +19,6 @@ import {
   includeAllEmployeesInPayrollAction,
   regeneratePayrollAction,
   returnPayrollReviewToDraftAction,
-  reviewPayrollAction,
   validatePayrollAction,
 } from "@/modules/payroll/actions/payroll-actions";
 import { PayrollSpreadsheet } from "@/modules/payroll/components/spreadsheet/payroll-spreadsheet";
@@ -109,17 +108,36 @@ function PayrollSubBarStatus({ status }: { status: PayrollPeriodStatus }) {
 }
 
 /**
- * One descriptor per action. Desktop renders `label`, the mobile bar renders
- * `shortLabel` — previously two hand-written lists, which is how "Kyç payroll &
- * snapshot" and "Kyç" ended up as the same button with different names.
+ * One descriptor per action. Desktop renders `label` with its `hint` beneath;
+ * the mobile bar renders `shortLabel` alone. Previously two hand-written lists,
+ * which is how "Kyç payroll & snapshot" and "Kyç" ended up as the same button
+ * under two different names.
  */
 interface WorkflowAction {
   id: string;
   label: string;
   shortLabel: string;
+  /** One line saying what pressing this actually does. */
+  hint: string;
   variant: "default" | "secondary" | "outlinePrimary";
   run: () => void;
   disabled?: boolean;
+}
+
+/** A workflow button carries its own explanation — nobody should have to guess. */
+function WorkflowButton({ action }: { action: WorkflowAction }) {
+  return (
+    <Button
+      type="button"
+      variant={action.variant}
+      onClick={action.run}
+      disabled={action.disabled}
+      className="h-auto flex-col items-start gap-0.5 py-2 text-left"
+    >
+      <span className="text-[13px] font-semibold leading-tight">{action.label}</span>
+      <span className="text-[10.5px] font-normal leading-tight opacity-75">{action.hint}</span>
+    </Button>
+  );
 }
 
 export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
@@ -171,64 +189,91 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
     }
   }
 
+  /**
+   * The chain is Llogarit Pagat → Valido → Mirato → Aprovo Pagat → Mbyll dhe
+   * Arkivo, and each step only appears once the one before it has been done —
+   * so the page never offers an action the payroll is not ready for.
+   *
+   * Kthehu reaches back over every step up to the freeze. Aprovo Pagat writes
+   * the compliance snapshot, so nothing after it can be undone.
+   */
+  const hasEntries = data.entries.length > 0;
+  const validated = payroll.validatedAt != null;
   const workflowActions: WorkflowAction[] = [];
+
   if (draftEditable) {
     workflowActions.push({
       id: "regenerate",
       label: "Llogarit Pagat",
       shortLabel: "Llogarit Pagat",
-      variant: "default",
+      hint: "Ndërton rreshtat nga punonjësit aktivë të muajit.",
+      variant: hasEntries ? "secondary" : "default",
       run: () => void exec("Pagat u llogaritën.", regeneratePayrollAction(payroll.id)),
     });
-    if (data.entries.length > 0) {
+    if (hasEntries) {
       workflowActions.push({
         id: "validate",
-        label: "Validizo (sinjalizime)",
-        shortLabel: "Validizo",
-        variant: "secondary",
-        run: () => void exec("Validuar.", validatePayrollAction(payroll.id)),
+        label: "Valido",
+        shortLabel: "Valido",
+        hint: "Kontrollon të dhënat dhe shfaq sinjalizimet përpara miratimit.",
+        variant: validated ? "secondary" : "default",
+        run: () => void exec("Të dhënat u validuan.", validatePayrollAction(payroll.id)),
       });
     }
-    workflowActions.push({
-      id: "review",
-      label: "Shëno të shqyrtuar",
-      shortLabel: "Shëno të shqyrtuar",
-      variant: "secondary",
-      run: () => void exec("Shqyrtuar.", reviewPayrollAction(payroll.id)),
-    });
+    if (hasEntries && validated) {
+      workflowActions.push({
+        id: "approve",
+        label: "Mirato",
+        shortLabel: "Mirato",
+        hint: "Kontrollet janë kryer — pagat janë gati për hapat e fundit.",
+        variant: "default",
+        run: () => void exec("Pagat u miratuan.", approvePayrollAction(payroll.id)),
+      });
+    }
   }
+
+  // Legacy rows that entered REVIEWED under the previous chain still move on.
   if (payroll.status === "REVIEWED") {
     workflowActions.push({
       id: "approve",
-      label: "Mirato për kyçje",
+      label: "Mirato",
       shortLabel: "Mirato",
+      hint: "Kontrollet janë kryer — pagat janë gati për hapat e fundit.",
       variant: "default",
-      run: () => void exec("Miratuar.", approvePayrollAction(payroll.id)),
-    });
-    workflowActions.push({
-      id: "return",
-      label: "Kthe në draft",
-      shortLabel: "Kthe në draft",
-      variant: "outlinePrimary",
-      run: () => void exec("Draft.", returnPayrollReviewToDraftAction(payroll.id)),
+      run: () => void exec("Pagat u miratuan.", approvePayrollAction(payroll.id)),
     });
   }
+
   if (payroll.status === "APPROVED") {
     workflowActions.push({
       id: "lock",
-      label: "Kyç payroll & snapshot",
-      shortLabel: "Kyç",
+      label: "Aprovo Pagat",
+      shortLabel: "Aprovo Pagat",
+      hint: "Ngrin pagat. Pas këtij hapi nuk mund të ktheheni për t'i ndryshuar.",
       variant: "default",
-      run: () => void exec("Kyçur.", lockPayrollAction(payroll.id)),
+      run: () => void exec("Pagat u aprovuan dhe u ngrinë.", lockPayrollAction(payroll.id)),
     });
   }
+
+  if (payroll.status === "REVIEWED" || payroll.status === "APPROVED") {
+    workflowActions.push({
+      id: "return",
+      label: "Kthehu",
+      shortLabel: "Kthehu",
+      hint: "Kthehu një hap prapa për të ndryshuar pagat.",
+      variant: "outlinePrimary",
+      run: () => void exec("U kthye për redaktim.", returnPayrollReviewToDraftAction(payroll.id)),
+    });
+  }
+
   if (payroll.status === "LOCKED") {
     workflowActions.push({
       id: "archive",
-      label: "Arkivo",
-      shortLabel: "Arkivo",
+      label: "Mbyll dhe Arkivo",
+      shortLabel: "Mbyll dhe Arkivo",
+      hint: "Mbyll muajin dhe e kalon në arkiv.",
       variant: "secondary",
-      run: () => void exec("Arkivuar.", archivePayrollAction(payroll.id)),
+      run: () => void exec("Muaji u mbyll dhe u arkivua.", archivePayrollAction(payroll.id)),
     });
   }
 
@@ -262,11 +307,9 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         description={subBarDescription || undefined}
         actions={
           workflowActions.length > 0 ? (
-            <div className="hidden flex-wrap items-center gap-2 lg:flex">
+            <div className="hidden flex-wrap items-stretch gap-2 lg:flex">
               {workflowActions.map((a) => (
-                <Button key={a.id} type="button" variant={a.variant} onClick={a.run} disabled={a.disabled}>
-                  {a.label}
-                </Button>
+                <WorkflowButton key={a.id} action={a} />
               ))}
             </div>
           ) : undefined
