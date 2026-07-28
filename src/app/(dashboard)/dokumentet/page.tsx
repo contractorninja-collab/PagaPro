@@ -3,19 +3,15 @@ import Link from "next/link";
 import type { DocumentCategory } from "@prisma/client";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import {
-  DocumentsDashboardClient,
-  type DocumentsTab,
-} from "@/modules/documents/components/documents-dashboard-client";
+import { DocumentsDashboardClient } from "@/modules/documents/components/documents-dashboard-client";
 import { DocumentsListFilters } from "@/modules/documents/components/documents-list-filters";
 import {
+  getDocumentRegisterCounts,
   listArtifactAuthorsForFilter,
-  listDocumentArtifacts,
+  listDocumentArtifactsPage,
   listDocumentTemplatesWithVersions,
   listEmployeesForDocumentFilters,
 } from "@/modules/documents/services/document-queries";
-import { listCompanyAnnexes } from "@/modules/annex/services/annex-service";
-import { AnnexBulkPrintPanel } from "@/modules/annex/components/annex-bulk-print-panel";
 import { WarningIssuePanel } from "@/modules/warnings/components/warning-issue-panel";
 import { requireCompanyContextPage } from "@/server/company-context";
 
@@ -49,68 +45,72 @@ export default async function DokumentetPage({
   const q = first(sp, "q");
   const employeeId = first(sp, "employeeId");
   const catRaw = first(sp, "documentCategory");
-  const documentCategory = CATEGORIES.has(catRaw as DocumentCategory) ? (catRaw as DocumentCategory) : undefined;
+  const documentCategory = CATEGORIES.has(catRaw as DocumentCategory)
+    ? (catRaw as DocumentCategory)
+    : undefined;
   const month = first(sp, "month");
   const archivedRaw = first(sp, "archived");
   const archived = archivedRaw === "yes" || archivedRaw === "no" ? archivedRaw : "all";
   const authorId = first(sp, "authorId");
-  const tabRaw = first(sp, "tab");
-  const tab: DocumentsTab =
-    tabRaw === "verejtje" || tabRaw === "anekset" ? tabRaw : "regjistri";
+  const pageNumber = Number(first(sp, "page")) || 1;
 
-  let artifacts;
+  const filters = {
+    q: q || undefined,
+    employeeId: employeeId || undefined,
+    documentCategory,
+    month: month || undefined,
+    archived,
+    createdByUserId: authorId || undefined,
+  } as const;
+
+  let artifactPage;
+  let counts;
   let templates;
   let employees;
   let authors;
-  let annexes;
 
   try {
-    ;[
-      artifacts,
-      templates,
-      employees,
-      authors,
-      annexes,
-    ] = await Promise.all([
-      listDocumentArtifacts(companyId, {
-        q: q || undefined,
-        employeeId: employeeId || undefined,
-        documentCategory,
-        month: month || undefined,
-        archived,
-        createdByUserId: authorId || undefined,
-      }),
+    [artifactPage, counts, templates, employees, authors] = await Promise.all([
+      listDocumentArtifactsPage(companyId, filters, pageNumber),
+      getDocumentRegisterCounts(companyId),
       listDocumentTemplatesWithVersions(companyId),
       listEmployeesForDocumentFilters(companyId),
       listArtifactAuthorsForFilter(companyId),
-      listCompanyAnnexes(companyId),
     ]);
   } catch (err) {
     console.error("[pagapro] DokumentetPage load failed", err);
     return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm font-medium text-destructive">
-          Nuk mund të lexohen dokumentet. Ekzekutoni{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npx prisma migrate deploy</code>.
-        </p>
-      </div>
+      <>
+        <AppSubBar
+          eyebrow="Menaxhimi i dokumenteve"
+          title="Dokumentet"
+          description="Regjistri i dokumenteve të lëshuara nga kompania."
+        />
+        <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-5 py-6">
+          <p className="text-sm font-semibold text-[#7f1d1d]">
+            Dokumentet nuk mund të lexohen për momentin.
+          </p>
+          <p className="mt-1 text-[13px] text-[#991b1b]">
+            Rifreskoni faqen. Nëse problemi vazhdon, njoftoni mbështetjen.
+          </p>
+        </div>
+      </>
     );
   }
 
-  const artifactRows = artifacts.map((a) => ({
+  const artifactRows = artifactPage.rows.map((a) => ({
     id: a.id,
     title: a.title,
     displayFilename: a.displayFilename,
     documentCategory: a.documentCategory,
     kind: a.kind,
+    generationStatus: a.generationStatus,
     createdAt: a.createdAt.toISOString(),
     createdAtLabel: a.createdAt.toLocaleString("sq-AL", { dateStyle: "short", timeStyle: "short" }),
     isArchived: a.isArchived,
     employeeLabel: a.employee ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : null,
     templateName: a.templateVersion.template.name,
-    authorLabel: a.createdBy
-      ? (a.createdBy.displayName?.trim() || a.createdBy.email || null)
-      : null,
+    authorLabel: a.createdBy ? a.createdBy.displayName?.trim() || a.createdBy.email || null : null,
     hasPdf: Boolean(a.generatedPdfStorageKey),
   }));
 
@@ -121,30 +121,40 @@ export default async function DokumentetPage({
     missingPublished: templates.filter((t) => !t.versions.some((v) => v.isPublished)).length,
   };
 
-  const authorOptions = authors.filter((a): a is NonNullable<typeof a> & { id: string } => Boolean(a?.id));
+  const authorOptions = authors.filter(
+    (a): a is NonNullable<typeof a> & { id: string } => Boolean(a?.id),
+  );
+
+  const filtersActive = Boolean(q || employeeId || catRaw || month || archivedRaw || authorId);
 
   return (
     <>
       <AppSubBar
         eyebrow="Menaxhimi i dokumenteve"
         title="Dokumentet"
-        description="Qendër e strukturuar për printimin e kontratave, pushimeve, largimeve dhe vërejtjeve me shabllone DOCX."
+        description="Regjistri i çdo dokumenti të lëshuar — kontrata, pushime, largime, aneks dhe vërejtje."
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" asChild>
-              <Link href="/dokumentet/templates">Konfigurimi i shablloneve</Link>
+              <Link href="/dokumentet/templates">Shabllonet</Link>
             </Button>
             <Button asChild>
               <Link href="/dokumentet/generate">Gjenero dokumente</Link>
             </Button>
-          </>
+          </div>
         }
       />
       <DocumentsDashboardClient
         artifacts={artifactRows}
+        counts={counts}
+        page={{
+          page: artifactPage.page,
+          pageCount: artifactPage.pageCount,
+          total: artifactPage.total,
+          pageSize: artifactPage.pageSize,
+        }}
+        filtersActive={filtersActive}
         templateSummary={templateSummary}
-        initialTab={tab}
-        annexCount={annexes.length}
         filtersSlot={
           <DocumentsListFilters
             defaults={{
@@ -167,7 +177,6 @@ export default async function DokumentetPage({
             }))}
           />
         }
-        annexesSlot={<AnnexBulkPrintPanel annexes={annexes} />}
       />
     </>
   );

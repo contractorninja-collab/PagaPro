@@ -20,7 +20,13 @@ export type ArtifactListFilters = {
   q?: string;
 };
 
-export async function listDocumentArtifacts(companyId: string, filters: ArtifactListFilters) {
+export const DOCUMENTS_PAGE_SIZE = 50;
+
+/** Turns the page's filter set into the `where` both the list and the count use. */
+function artifactWhere(
+  companyId: string,
+  filters: ArtifactListFilters,
+): Prisma.DocumentGenerationArtifactWhereInput {
   const where: Prisma.DocumentGenerationArtifactWhereInput = { companyId };
 
   if (filters.employeeId) where.employeeId = filters.employeeId;
@@ -49,16 +55,122 @@ export async function listDocumentArtifacts(companyId: string, filters: Artifact
     ];
   }
 
+  return where;
+}
+
+export interface ArtifactPage {
+  rows: Awaited<ReturnType<typeof findArtifactPage>>;
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+function findArtifactPage(where: Prisma.DocumentGenerationArtifactWhereInput, skip: number) {
   return prisma.documentGenerationArtifact.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 250,
+    skip,
+    take: DOCUMENTS_PAGE_SIZE,
     include: {
       templateVersion: { include: { template: true } },
       employee: { select: { id: true, firstName: true, lastName: true } },
       createdBy: { select: { id: true, displayName: true, email: true } },
     },
   });
+}
+
+/**
+ * One page of the register plus the true total.
+ *
+ * This used to return a flat `take: 250` with no total, and the page counted the
+ * returned array — so past 250 documents every figure on the screen was wrong
+ * and nothing said the list had been cut.
+ */
+export async function listDocumentArtifactsPage(
+  companyId: string,
+  filters: ArtifactListFilters,
+  page = 1,
+): Promise<ArtifactPage> {
+  const where = artifactWhere(companyId, filters);
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+
+  const [total, rows] = await Promise.all([
+    prisma.documentGenerationArtifact.count({ where }),
+    findArtifactPage(where, (safePage - 1) * DOCUMENTS_PAGE_SIZE),
+  ]);
+
+  return {
+    rows,
+    total,
+    page: safePage,
+    pageSize: DOCUMENTS_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / DOCUMENTS_PAGE_SIZE)),
+  };
+}
+
+export interface DocumentRegisterCounts {
+  /** Total artifacts for the company, ignoring the active filters. */
+  total: number;
+  final: number;
+  preview: number;
+  archived: number;
+  failed: number;
+  /** Documents created in the current calendar month, per category. */
+  monthByCategory: Record<DocumentCategory, number>;
+}
+
+const EMPTY_CATEGORY_COUNTS: Record<DocumentCategory, number> = {
+  CONTRACT: 0,
+  LEAVE: 0,
+  TERMINATION: 0,
+  WARNING: 0,
+  PAYROLL: 0,
+  OTHER: 0,
+};
+
+/**
+ * Company-wide totals, grouped in the database. The strip is a statement about
+ * the company, so it must not move when the register is filtered or paged.
+ */
+export async function getDocumentRegisterCounts(
+  companyId: string,
+  now = new Date(),
+): Promise<DocumentRegisterCounts> {
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const [byKind, archived, failed, byCategoryThisMonth, total] = await Promise.all([
+    prisma.documentGenerationArtifact.groupBy({
+      by: ["kind"],
+      where: { companyId },
+      _count: { _all: true },
+    }),
+    prisma.documentGenerationArtifact.count({ where: { companyId, isArchived: true } }),
+    prisma.documentGenerationArtifact.count({
+      where: { companyId, generationStatus: "FAILED" },
+    }),
+    prisma.documentGenerationArtifact.groupBy({
+      by: ["documentCategory"],
+      where: { companyId, createdAt: { gte: monthStart, lt: monthEnd } },
+      _count: { _all: true },
+    }),
+    prisma.documentGenerationArtifact.count({ where: { companyId } }),
+  ]);
+
+  const monthByCategory = { ...EMPTY_CATEGORY_COUNTS };
+  for (const row of byCategoryThisMonth) {
+    monthByCategory[row.documentCategory] = row._count._all;
+  }
+
+  return {
+    total,
+    final: byKind.find((r) => r.kind === "ARCHIVED_FINAL")?._count._all ?? 0,
+    preview: byKind.find((r) => r.kind === "PREVIEW")?._count._all ?? 0,
+    archived,
+    failed,
+    monthByCategory,
+  };
 }
 
 export async function getDocumentArtifactDetail(companyId: string, id: string) {
