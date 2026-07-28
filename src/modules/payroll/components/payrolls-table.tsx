@@ -204,7 +204,7 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
         ) : null}
         {row.status === "DRAFT" ? (
           <button type="button" className={BTN_SECONDARY} onClick={() => handlers.onRegenerate(row.id)}>
-            Ripëllogarit
+            Llogarit Pagat
           </button>
         ) : null}
         {row.status === "APPROVED" || row.status === "LOCKED" ? (
@@ -269,7 +269,7 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
             className="whitespace-nowrap text-[12.5px] font-semibold text-[#64748b] hover:text-[#334155] hover:underline"
             onClick={() => handlers.onRegenerate(row.id)}
           >
-            Ripëllogarit
+            Llogarit Pagat
           </button>
         ) : null}
         {row.status === "APPROVED" || row.status === "LOCKED" ? (
