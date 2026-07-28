@@ -392,6 +392,11 @@ model Company {
   defaultCurrency CurrencyCode @default(EUR)
   timezone        String       @default("Europe/Belgrade")
 
+  /// Entitlement for the badge time-clock module (kiosk + attendance → payroll hours).
+  /// Admin-console controlled: it lives here rather than on CompanyConfiguration, which
+  /// clients rewrite wholesale from Konfigurime.
+  timeClockEnabled Boolean @default(false)
+
   /// Registered / legal profile contact (distinct from letterhead line in CompanySetting)
   email     String?
   phone     String?
@@ -417,6 +422,9 @@ model Company {
   leaveBalances        LeaveBalance[]
   terminations         Termination[]
   disciplinaryWarnings DisciplinaryWarning[]
+  timeClockDevices     TimeClockDevice[]
+  timeClockPunches     TimeClockPunch[]
+  timeClockDays        TimeClockDay[]
   reportDefinitions    ReportDefinition[]
   reportJobs           ReportJob[]
   employeeTimelineEvents EmployeeTimelineEvent[]
@@ -581,6 +589,9 @@ model User {
   sessions          Session[]
   memberships       UserCompanyMembership[]
   linkedEmployees   Employee[]
+  timeClockDevicesCreated TimeClockDevice[] @relation("TimeClockDeviceCreatedBy")
+  timeClockPunchesCreated TimeClockPunch[]  @relation("TimeClockPunchCreatedBy")
+  timeClockPunchesVoided  TimeClockPunch[]  @relation("TimeClockPunchVoidedBy")
   lockedPayrolls    Payroll[]               @relation("PayrollLockedBy")
   reviewedPayrolls  Payroll[]               @relation("PayrollReviewedBy")
   approvedPayrolls  Payroll[]               @relation("PayrollApprovedBy")
@@ -757,6 +768,9 @@ model Employee {
   /// Kualifikimi: schooling / professional qualification (Neni 11.1.3), printed in the contract.
   qualification     String?
 
+  /// Badge / chip code scanned at the time clock. Unique per company when set.
+  badgeCode String? @db.VarChar(64)
+
   /// Orët kontraktuale javore (UI default 40)
   weeklyHours Decimal @default(40) @db.Decimal(6, 2)
 
@@ -815,6 +829,8 @@ model Employee {
   leaveBalances  LeaveBalance[]
   terminations   Termination[]
   disciplinaryWarnings DisciplinaryWarning[]
+  timeClockPunches     TimeClockPunch[]
+  timeClockDays        TimeClockDay[]
   employmentPeriods    EmploymentPeriod[]
   bankAccounts         EmployeeBankAccount[]
   emergencyContacts    EmployeeEmergencyContact[]
@@ -831,6 +847,7 @@ model Employee {
   authorizedRepresentatives   AuthorizedRepresentative[]
 
   @@unique([companyId, personalId])
+  @@unique([companyId, badgeCode])
   @@index([companyId, lastName, firstName])
   @@index([companyId])
   @@index([jobTitleId])
@@ -1239,6 +1256,11 @@ model PayrollEntry {
   weekendAmount   Decimal @default(0) @db.Decimal(14, 2)
   nightHours      Decimal @default(0) @db.Decimal(10, 2)
   nightAmount     Decimal @default(0) @db.Decimal(14, 2)
+  /// Hours whose base pay already sits in a higher premium bucket but which also qualify
+  /// for this one. They earn the uplift only — multiplier − 1 — so a Sunday 23:00 hour pays
+  /// 1.8× (weekend base + night uplift) rather than 2.8×.
+  nightStackHours    Decimal @default(0) @db.Decimal(10, 2)
+  overtimeStackHours Decimal @default(0) @db.Decimal(10, 2)
 
   hourlyRate Decimal @default(0) @db.Decimal(14, 6)
 
@@ -1777,6 +1799,152 @@ model DisciplinaryWarning {
   @@index([employeeId])
   @@index([companyId, status])
   @@map("disciplinary_warnings")
+}
+
+// -----------------------------------------------------------------------------
+// Time clock (Prezenca — badge kiosk → derived hours → payroll)
+// -----------------------------------------------------------------------------
+
+enum TimeClockDirection {
+  IN
+  OUT
+}
+
+enum TimeClockPunchSource {
+  /// Recorded by a paired kiosk device from a badge scan.
+  KIOSK
+  /// Entered or corrected by HR.
+  MANUAL
+}
+
+enum TimeClockDayStatus {
+  /// Punches paired cleanly; hours are payable.
+  OK
+  /// Unpaired punch (usually a missing clock-out) — contributes zero hours until resolved.
+  NEEDS_REVIEW
+}
+
+/// A paired kiosk terminal. Authenticates by bearer token, never by a user session:
+/// a door tablet must not carry someone's login.
+model TimeClockDevice {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  label    String  @db.VarChar(120)
+  location String? @db.VarChar(160)
+
+  /// sha256 of the device token; the token itself is shown once at pairing.
+  tokenHash String @unique
+
+  /// Single-use pairing code, cleared once redeemed.
+  pairingCode        String?   @unique @db.VarChar(32)
+  pairingCodeExpires DateTime?
+  pairedAt           DateTime?
+
+  isActive   Boolean   @default(true)
+  lastSeenAt DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("TimeClockDeviceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  punches TimeClockPunch[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@map("time_clock_devices")
+}
+
+/// Immutable punch record — the audit spine. Corrections are new rows or voids,
+/// never edits, because a labour inspection needs the original sequence.
+model TimeClockPunch {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  deviceId String?
+  device   TimeClockDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  /// Authoritative instant (UTC) the punch is attributed to.
+  occurredAt DateTime
+
+  /// Clock time reported by the device; differs from occurredAt for queued offline punches.
+  deviceReportedAt DateTime?
+
+  direction TimeClockDirection
+  source    TimeClockPunchSource @default(KIOSK)
+
+  /// Badge as scanned, kept even if the employee's badge is later reassigned.
+  badgeCodeUsed String? @db.VarChar(64)
+
+  note String? @db.Text
+
+  createdById String?
+  createdBy   User?   @relation("TimeClockPunchCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedBy     User?     @relation("TimeClockPunchVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+  voidedReason String?   @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, occurredAt])
+  @@index([employeeId, occurredAt])
+  @@index([companyId, employeeId, occurredAt])
+  @@map("time_clock_punches")
+}
+
+/// Derived per-employee day. Recomputed idempotently from punches — never hand-edited,
+/// so a re-run after a correction always converges on the same numbers.
+model TimeClockDay {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// Date the shift is attributed to (date-only, UTC). An overnight shift belongs to the day it started.
+  workDate DateTime @db.Date
+
+  status TimeClockDayStatus @default(OK)
+
+  /// Minutes, so the day never carries rounding error; hours are derived at payroll time.
+  workedMinutes   Int @default(0)
+  regularMinutes  Int @default(0)
+  overtimeMinutes Int @default(0)
+  weekendMinutes  Int @default(0)
+  holidayMinutes  Int @default(0)
+  /// Night minutes whose base pay sits in another bucket — these earn the night uplift only.
+  nightMinutes      Int @default(0)
+  nightStackMinutes Int @default(0)
+
+  firstInAt DateTime?
+  lastOutAt DateTime?
+
+  /// Why the day needs review, in Albanian, for the HR queue.
+  reviewReason String? @db.Text
+
+  /// Rules in force when the day was computed (night window, daily threshold, multipliers).
+  ruleSnapshot Json?
+
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([employeeId, workDate])
+  @@index([companyId, workDate])
+  @@index([companyId, status])
+  @@map("time_clock_days")
 }
 
 // -----------------------------------------------------------------------------

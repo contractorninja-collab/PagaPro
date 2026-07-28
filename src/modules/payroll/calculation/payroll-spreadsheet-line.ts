@@ -27,6 +27,12 @@ export interface SpreadsheetLineComputationInput {
   weekendHours: string;
   holidayHours: string;
   nightHours: string;
+  /**
+   * Hours already paid at a higher premium that also qualify for this one; they add
+   * the uplift only. Written by the time clock — hand-entered lines leave them at 0.
+   */
+  overtimeStackHours?: string;
+  nightStackHours?: string;
   bonuses: string;
   otherDeductions: string;
   salaryAdvanceDeduction: string;
@@ -120,6 +126,8 @@ export function computePayrollSpreadsheetLine(
     parseNonNegativeHours(line.weekendHours, "weekendHours"),
     parseNonNegativeHours(line.holidayHours, "holidayHours"),
     parseNonNegativeHours(line.nightHours, "nightHours"),
+    parseNonNegativeHours(line.overtimeStackHours ?? "0", "overtimeStackHours"),
+    parseNonNegativeHours(line.nightStackHours ?? "0", "nightStackHours"),
   ];
   for (const b of buckets) {
     if (!b.ok) issues.push(...b.issues);
@@ -134,6 +142,8 @@ export function computePayrollSpreadsheetLine(
   const weH = (buckets[5] as { ok: true; v: ReturnType<typeof D> }).v;
   const hoH = (buckets[6] as { ok: true; v: ReturnType<typeof D> }).v;
   const niH = (buckets[7] as { ok: true; v: ReturnType<typeof D> }).v;
+  const otStackH = (buckets[8] as { ok: true; v: ReturnType<typeof D> }).v;
+  const niStackH = (buckets[9] as { ok: true; v: ReturnType<typeof D> }).v;
 
   const bonuses = roundMoneyEUR(D(line.bonuses ?? "0"));
   const otherDed = roundMoneyEUR(D(line.otherDeductions ?? "0"));
@@ -208,7 +218,10 @@ export function computePayrollSpreadsheetLine(
 
   let prem;
   try {
-    prem = computePremiumPays(hourlyPrecise, snapshot.premiumRules, otH, hoH, weH, niH);
+    prem = computePremiumPays(hourlyPrecise, snapshot.premiumRules, otH, hoH, weH, niH, {
+      overtimeStackHours: otStackH,
+      nightStackHours: niStackH,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Shumëzues të pavlefshëm për premiumët (OT / festë / fundjavë / natë).";
     return {
@@ -309,6 +322,8 @@ export function computePayrollSpreadsheetLine(
       weekendHours: line.weekendHours,
       holidayHours: line.holidayHours,
       nightHours: line.nightHours,
+      overtimeStackHours: line.overtimeStackHours ?? "0",
+      nightStackHours: line.nightStackHours ?? "0",
     },
     sickLeavePayPercent,
     premiumRules: snapshot.premiumRules,
@@ -458,6 +473,8 @@ function buildZeroSalaryLine(params: {
       weekendHours: line.weekendHours,
       holidayHours: line.holidayHours,
       nightHours: line.nightHours,
+      overtimeStackHours: line.overtimeStackHours ?? "0",
+      nightStackHours: line.nightStackHours ?? "0",
     },
     sickLeavePayPercent,
     premiumRules: snapshot.premiumRules,

@@ -96,6 +96,11 @@ export function buildPayrollHrTransparency(params: {
 
     nightHours: string;
 
+    /** Uplift-only hours whose base is paid by a higher bucket (time-clock lines). */
+    overtimeStackHours?: string;
+
+    nightStackHours?: string;
+
   };
 
   sickLeavePayPercent: string;
