@@ -13,6 +13,11 @@ import {
   type PayslipPdfInput,
 } from "@/modules/payroll/pdf/payslip-pdf-builder";
 import { buildPayrollRegisterPdf } from "@/modules/payroll/pdf/payroll-register-pdf-builder";
+import { buildPayrollSignoffPdf } from "@/modules/payroll/pdf/payroll-signoff-pdf-builder";
+import {
+  getAnnualLeaveRemaining,
+  getPayrollYtdTotals,
+} from "@/modules/payroll/services/payroll-ytd-service";
 import { buildPayslipBundleFilename, buildPayslipFilename } from "@/modules/payroll/pdf/payslip-filename";
 import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
@@ -41,6 +46,46 @@ function resolveEmployeeBank(employee: Employee & { bankAccounts: EmployeeBankAc
     iban: primary?.iban ?? employee.bankAccountIban ?? null,
     accountHolder: primary?.accountHolderName ?? `${employee.firstName} ${employee.lastName}`,
     bicSwift: primary?.bicSwift ?? null,
+  };
+}
+
+const MONTH_ABBR_SQ = [
+  "JAN",
+  "SHK",
+  "MAR",
+  "PRI",
+  "MAJ",
+  "QER",
+  "KOR",
+  "GSH",
+  "SHT",
+  "TET",
+  "NËN",
+  "DHJ",
+] as const;
+
+/**
+ * Days from hours, using the entry's own working-time figures rather than a
+ * hardcoded 8 — part-timers and short months would both be wrong otherwise.
+ */
+function hoursPerDayFor(entry: PayrollEntryWithEmployee): number | null {
+  const days = entry.expectedWorkingDays ?? null;
+  const hours = entry.expectedRegularHours ? Number(decimalToPlain(entry.expectedRegularHours)) : null;
+  if (!days || !hours || days <= 0) return null;
+  return hours / days;
+}
+
+function buildAttendance(
+  entry: PayrollEntryWithEmployee,
+  leaveRemaining: string | undefined,
+): PayslipPdfInput["attendance"] {
+  const perDay = hoursPerDayFor(entry);
+  const worked = Number(decimalToPlain(entry.actualRegularHours));
+
+  return {
+    workingDaysInPeriod: entry.expectedWorkingDays ?? null,
+    daysWorked: perDay ? Math.round((worked / perDay) * 10) / 10 : null,
+    annualLeaveRemainingDays: leaveRemaining ?? null,
   };
 }
 
@@ -102,6 +147,12 @@ function buildPayslipInput(params: {
       otherDeductions: decimalToPlain(entry.otherDeductions),
       netPay: decimalToPlain(entry.netPay),
       pensionEmployer: decimalToPlain(entry.pensionEmployer),
+      overtimeHours: decimalToPlain(entry.overtimeHours),
+      weekendHours: decimalToPlain(entry.weekendHours),
+      holidayHours: decimalToPlain(entry.holidayHours),
+      nightHours: decimalToPlain(entry.nightHours),
+      paidLeaveHours: decimalToPlain(entry.paidLeaveHours),
+      sickLeaveHours: decimalToPlain(entry.sickLeaveHours),
     },
     documentRef,
   };
@@ -235,10 +286,13 @@ async function generatePayrollPdfArtifactsInner(params: {
     storageSuffix: "register_totals",
   });
 
-  const regSig = await buildPayrollRegisterPdf({
+  // The sign-off sheet is its own document, not a variant of the 13-column
+  // register: portrait, no names, and a ruled line per employee.
+  const regSig = await buildPayrollSignoffPdf({
     ...registerBase,
     withAmounts: false,
-    documentRef: `${prefix}-SIG-${monthSlug}`,
+    documentRef: `LP-${monthSlug}`,
+    approvalLabel: pay.approvedAt ? `Aprovuar · ${payDateLabel}` : null,
   });
   buffers.push({
     kind: "REGISTER_SIGNATURE_LIST",
@@ -248,6 +302,19 @@ async function generatePayrollPdfArtifactsInner(params: {
   });
 
   const payslipBodies: Uint8Array[] = [];
+
+  // Fetched once for the whole batch — a 200-employee month must not run 400
+  // queries while rendering 200 PDFs.
+  const employeeIds = pay.entries.map((e) => e.employeeId);
+  const [ytdByEmployee, leaveRemainingByEmployee] = await Promise.all([
+    getPayrollYtdTotals({
+      companyId: params.companyId,
+      year: pay.year,
+      throughMonth: pay.month,
+      employeeIds,
+    }),
+    getAnnualLeaveRemaining({ companyId: params.companyId, year: pay.year, employeeIds }),
+  ]);
 
   for (const [idx, e] of pay.entries.entries()) {
     const documentRef = `${prefix}-${monthSlug}-${String(idx + 1).padStart(3, "0")}`;
@@ -259,6 +326,16 @@ async function generatePayrollPdfArtifactsInner(params: {
       documentRef,
     });
     slipInput.logo = companyLogo;
+    slipInput.attendance = buildAttendance(e, leaveRemainingByEmployee.get(e.employeeId));
+
+    const ytd = ytdByEmployee.get(e.employeeId);
+    slipInput.ytd = ytd
+      ? {
+          grossSalary: ytd.grossSalary,
+          netPay: ytd.netPay,
+          rangeLabel: `${pay.year} (${MONTH_ABBR_SQ[ytd.firstMonth - 1]}–${MONTH_ABBR_SQ[pay.month - 1]})`,
+        }
+      : null;
     const slip = await buildProfessionalPayslipPdf(slipInput);
     payslipBodies.push(slip);
     buffers.push({

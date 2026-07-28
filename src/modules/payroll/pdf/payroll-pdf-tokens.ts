@@ -17,6 +17,10 @@ export const PP = {
   wash: rgb(0.957, 0.969, 0.984), // #F4F7FB
   blueWash: rgb(0.937, 0.957, 0.996), // #EFF4FE
   onNavy: rgb(0.561, 0.639, 0.784), // #8FA3C8
+  /** Blue tint legible on navy — the NETO column header on the sign-off sheet. */
+  blueOnNavy: rgb(0.576, 0.706, 0.992), // #93B4FD
+  /** Signature rules and other ruled writing lines. */
+  rule: rgb(0.796, 0.835, 0.882), // #CBD5E1
   white: rgb(1, 1, 1),
 } as const;
 
