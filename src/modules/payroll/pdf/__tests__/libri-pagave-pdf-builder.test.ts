@@ -86,6 +86,9 @@ describe("libri pagave PDF", () => {
     expect(Math.round(page.getHeight())).toBe(842);
   });
 
+  // Drawing 200 rows × 25 columns across several A3 sheets runs to a few
+  // seconds on its own and longer when the suite is loaded, so it gets a
+  // realistic budget rather than the 5s default.
   it("paginates a large payroll and repeats the table head", async () => {
     const rows = Array.from({ length: 200 }, (_, i) => row(i + 1));
     const buffer = await buildLibriPagavePdf(input(rows));
@@ -94,7 +97,7 @@ describe("libri pagave PDF", () => {
     for (const page of pdf.getPages()) {
       expect(Math.round(page.getWidth())).toBe(1191);
     }
-  });
+  }, 30_000);
 
   it("renders an empty payroll as a valid single page rather than throwing", async () => {
     const buffer = await buildLibriPagavePdf(input([]));

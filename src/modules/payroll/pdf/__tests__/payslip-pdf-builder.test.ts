@@ -4,7 +4,7 @@ import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { buildProfessionalPayslipPdf, type PayslipPdfInput } from "../payslip-pdf-builder";
-import { extractPdfStreamText, literalStrings } from "./pdf-text-probe";
+import { extractPdfText } from "./pdf-text-probe";
 
 /** Set to collect rendered PDFs for a visual check. */
 const OUT_DIR = process.env.PAYSLIP_PREVIEW_DIR;
@@ -141,7 +141,7 @@ describe("professional payslip PDF", () => {
 
   it("prints deductions as minus signs, not encoding fallbacks", async () => {
     const bytes = await buildProfessionalPayslipPdf(sampleInput);
-    const drawn = literalStrings(await extractPdfStreamText(bytes)).join(" ");
+    const drawn = await extractPdfText(bytes);
 
     // U+2212 is outside WinAnsi, so an unmapped minus used to reach the page as
     // "?46.39" — on a money column that is worse than being merely wrong.

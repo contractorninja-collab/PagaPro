@@ -48,6 +48,10 @@ export interface PayrollRegisterPdfInput {
   logo?: CompanyLogoAsset | null;
   approvalLabel?: string | null;
   generatedAtLabel?: string | null;
+  /** Printed under PËRGATITI — whoever prepared this payroll in the app. */
+  preparedBy?: { name: string; role?: string | null } | null;
+  /** Printed under APROVOI — the company's authorised representative. */
+  approvedBy?: { name: string; role?: string | null } | null;
 }
 
 interface ColumnSpec {

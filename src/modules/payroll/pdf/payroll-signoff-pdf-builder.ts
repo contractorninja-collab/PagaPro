@@ -366,9 +366,20 @@ const SIGNOFF_NOTE =
   "Me nënshkrim, çdo punëtor konfirmon marrjen e pagesës neto për periudhën e specifikuar. Lista pasqyron shumat e ngrira, të aprovuara nga financa.";
 
 /** Height the sign-off strip needs, so it is never orphaned onto its own page. */
-const SIGNOFF_H = 78;
+const SIGNOFF_H = 84;
 
-function drawSignOff(page: PDFPage, fonts: PayrollPdfFonts, top: number): void {
+/** Who prepared the payroll, and who signs for the company. */
+export interface SignoffParty {
+  name: string;
+  role?: string | null;
+}
+
+function drawSignOff(
+  page: PDFPage,
+  fonts: PayrollPdfFonts,
+  top: number,
+  parties: { preparedBy?: SignoffParty | null; approvedBy?: SignoffParty | null },
+): void {
   const gap = 20;
   const noteW = (CONTENT_W - gap * 2) * (1.6 / 3.6);
   const blockW = (CONTENT_W - gap * 2) * (1 / 3.6);
@@ -399,13 +410,34 @@ function drawSignOff(page: PDFPage, fonts: PayrollPdfFonts, top: number): void {
     sanitize: fonts.sanitize.mono,
   };
 
-  // Label and a blank rule, nothing else. The design mock shows a name and role
-  // beneath, but we do not know who will sign — printing "Emri · Pozita" would
-  // put a placeholder on a document that gets signed and filed.
-  const blocks = ["PËRGATITI", "APROVOI"];
-  for (const [index, label] of blocks.entries()) {
+  const nameStyle: TextStyle = {
+    font: fonts.sansBold,
+    size: 8,
+    color: PP.text,
+    sanitize: fonts.sanitize.sansBold,
+  };
+  const roleStyle: TextStyle = {
+    font: fonts.sans,
+    size: 7.5,
+    color: PP.muted,
+    sanitize: fonts.sanitize.sans,
+  };
+
+  /**
+   * PËRGATITI is the person who prepared the payroll in the app; APROVOI is the
+   * company's authorised representative from Konfigurimet. When either is
+   * unknown the rule is simply left blank — a printed placeholder on a document
+   * that gets signed and filed is worse than an empty line.
+   */
+  const blocks: Array<{ label: string; party?: SignoffParty | null }> = [
+    { label: "PËRGATITI", party: parties.preparedBy },
+    { label: "APROVOI", party: parties.approvedBy },
+  ];
+
+  for (const [index, block] of blocks.entries()) {
     const x = MARGIN + noteW + gap + index * (blockW + gap);
-    drawText(page, label, x, top - 10, eyebrow);
+    drawText(page, block.label, x, top - 10, eyebrow);
+
     const ruleY = top - 44;
     page.drawLine({
       start: { x, y: ruleY },
@@ -413,6 +445,12 @@ function drawSignOff(page: PDFPage, fonts: PayrollPdfFonts, top: number): void {
       thickness: RULE.thin,
       color: PP.rule,
     });
+
+    if (!block.party?.name) continue;
+    drawText(page, fitText(block.party.name, nameStyle, blockW), x, ruleY - 12, nameStyle);
+    if (block.party.role) {
+      drawText(page, fitText(block.party.role, roleStyle, blockW), x, ruleY - 22, roleStyle);
+    }
   }
 
   void y;
@@ -474,7 +512,10 @@ export async function buildPayrollSignoffPdf(input: PayrollRegisterPdfInput): Pr
 
     if (isLast) {
       y = drawTotalsRow(page, fonts, columns, input.rows, y);
-      drawSignOff(page, fonts, y - 16);
+      drawSignOff(page, fonts, y - 16, {
+        preparedBy: input.preparedBy,
+        approvedBy: input.approvedBy,
+      });
     }
 
     drawPagaproFooter(page, fonts, {

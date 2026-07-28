@@ -7,7 +7,7 @@ import {
   buildPayrollSignoffPdf,
   SIGNOFF_COLUMNS,
 } from "../payroll-signoff-pdf-builder";
-import { extractPdfStreamText, literalStrings } from "./pdf-text-probe";
+import { extractPdfText } from "./pdf-text-probe";
 import type { PayrollRegisterPdfInput } from "../payroll-register-pdf-builder";
 
 /** Set to collect rendered PDFs for a visual check. */
@@ -42,6 +42,8 @@ function input(count: number): PayrollRegisterPdfInput {
     withAmounts: false,
     rows,
     approvalLabel: "Aprovuar · 03.08.2026",
+    preparedBy: { name: "Blerta Hoxha", role: "Përgatiti pagat" },
+    approvedBy: { name: "Driton Berisha", role: "Drejtor" },
   };
 }
 
@@ -80,13 +82,35 @@ describe("salary sign-off sheet", () => {
 
   it("never draws an employee name", async () => {
     const bytes = await buildPayrollSignoffPdf(input(8));
-    const drawn = literalStrings(await extractPdfStreamText(bytes)).join(" ");
+    const drawn = await extractPdfText(bytes);
 
     // Sanity-check the probe itself: if it cannot see the ID it prints, its
     // silence about the name would mean nothing.
     expect(drawn).toContain("1001452201");
     expect(drawn).not.toContain(FORBIDDEN_NAME);
     expect(drawn).not.toContain("Krasniqi");
+  });
+
+  it("prints the preparer and the company's representative under the rules", async () => {
+    const bytes = await buildPayrollSignoffPdf(input(6));
+    const drawn = await extractPdfText(bytes);
+
+    expect(drawn).toContain("Blerta Hoxha");
+    expect(drawn).toContain("Driton Berisha");
+    expect(drawn).toContain("Drejtor");
+  });
+
+  it("leaves the rules blank rather than printing a placeholder", async () => {
+    const bytes = await buildPayrollSignoffPdf({
+      ...input(6),
+      preparedBy: null,
+      approvedBy: null,
+    });
+    const drawn = await extractPdfText(bytes);
+
+    // The labels stay; nothing invented sits on a line someone will sign.
+    expect(drawn).not.toContain("Emri");
+    expect(drawn).not.toContain("Pozita");
   });
 
   it("paginates a large payroll and numbers every page", async () => {

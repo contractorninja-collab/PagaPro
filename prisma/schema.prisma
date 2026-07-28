@@ -592,6 +592,7 @@ model User {
   timeClockDevicesCreated TimeClockDevice[] @relation("TimeClockDeviceCreatedBy")
   timeClockPunchesCreated TimeClockPunch[]  @relation("TimeClockPunchCreatedBy")
   timeClockPunchesVoided  TimeClockPunch[]  @relation("TimeClockPunchVoidedBy")
+  createdPayrolls   Payroll[]               @relation("PayrollCreatedBy")
   lockedPayrolls    Payroll[]               @relation("PayrollLockedBy")
   reviewedPayrolls  Payroll[]               @relation("PayrollReviewedBy")
   approvedPayrolls  Payroll[]               @relation("PayrollApprovedBy")
@@ -1131,6 +1132,10 @@ model Payroll {
 
   parameterSetId String?
   parameterSet   PayrollParameterSet? @relation(fields: [parameterSetId], references: [id], onDelete: SetNull)
+
+  /// Who prepared this payroll — printed as PËRGATITI on the sign-off sheet.
+  createdById String?
+  createdBy   User?    @relation("PayrollCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   lockedAt DateTime?
   lockedById String?

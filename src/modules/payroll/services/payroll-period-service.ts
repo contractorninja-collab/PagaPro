@@ -476,6 +476,7 @@ export async function createPayrollDraft(
         month,
         status: "DRAFT",
         parameterSetId,
+        createdById: actorUserId ?? undefined,
       },
     });
 

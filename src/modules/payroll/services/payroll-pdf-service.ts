@@ -187,6 +187,7 @@ async function generatePayrollPdfArtifactsInner(params: {
     where: { id: params.payrollId, companyId: params.companyId },
     include: {
       company: true,
+      createdBy: { select: { displayName: true, email: true } },
       entries: {
         include: {
           employee: {
@@ -208,6 +209,37 @@ async function generatePayrollPdfArtifactsInner(params: {
 
   const pay = payroll;
   const settings = await prisma.companySetting.findUnique({ where: { companyId: params.companyId } });
+
+  /**
+   * The two signatures on the sign-off sheet. PËRGATITI is the app user who
+   * prepared the payroll; APROVOI is the company's authorised representative
+   * from Konfigurimet — the same person who signs contracts — resolved the way
+   * the document context resolves `{{authorized_person}}`.
+   */
+  const primaryRepresentative = await prisma.authorizedRepresentative.findFirst({
+    where: { companyId: params.companyId },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { fullName: true, position: true },
+  });
+
+  const preparedBy = payroll.createdBy
+    ? {
+        name: payroll.createdBy.displayName?.trim() || payroll.createdBy.email,
+        role: "Përgatiti pagat",
+      }
+    : null;
+
+  const approverName =
+    primaryRepresentative?.fullName?.trim() || settings?.authorizedRepresentativeName?.trim() || null;
+  const approvedBy = approverName
+    ? {
+        name: approverName,
+        role:
+          primaryRepresentative?.position?.trim() ||
+          settings?.authorizedRepresentativePosition?.trim() ||
+          null,
+      }
+    : null;
   const cfg = await prisma.companyConfiguration.findUnique({ where: { companyId: params.companyId } });
   const prefix = (cfg?.payrollPdfPrefix ?? "PP").replace(/[^a-zA-Z0-9_-]/g, "") || "PP";
   const monthSlug = `${pay.year}-${String(pay.month).padStart(2, "0")}`;
@@ -293,6 +325,8 @@ async function generatePayrollPdfArtifactsInner(params: {
     withAmounts: false,
     documentRef: `LP-${monthSlug}`,
     approvalLabel: pay.approvedAt ? `Aprovuar · ${payDateLabel}` : null,
+    preparedBy,
+    approvedBy,
   });
   buffers.push({
     kind: "REGISTER_SIGNATURE_LIST",
