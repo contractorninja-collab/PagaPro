@@ -45,7 +45,10 @@ function emptySubjectsHint(category: DocumentCategory | ""): React.ReactNode {
     return (
       <>
         Nuk ka vërejtje të lëshuara. Zgjidhni punonjësit dhe lëshoni vërejtjen te{" "}
-        <Link href="/dokumentet#verejtje" className="font-semibold text-brand-blue hover:underline">
+        <Link
+          href="/dokumentet?tab=verejtje"
+          className="font-semibold text-brand-blue hover:underline"
+        >
           Dokumentet → «Lësho vërejtje»
         </Link>{" "}
         (ose te skeda «Vërejtjet» e punonjësit), pastaj kthehuni këtu për ta printuar.

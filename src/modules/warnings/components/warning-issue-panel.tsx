@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AlertTriangle, Printer, Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  docBtnPrimary,
+  docBtnSecondary,
   docBtnSecondaryDense,
   docCard,
   docInput,
@@ -231,9 +231,10 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Secondary: "Gjenero dokumente" in the page header is the one primary. */}
               <button
                 type="button"
-                className={docBtnPrimary}
+                className={docBtnSecondary}
                 disabled={saving || selected.size === 0}
                 onClick={() => void issue()}
               >

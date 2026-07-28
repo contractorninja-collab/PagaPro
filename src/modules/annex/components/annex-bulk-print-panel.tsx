@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Printer, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  docBtnPrimary,
+  docBtnSecondary,
   docBtnSecondaryDense,
   docCard,
   docInput,
@@ -103,8 +103,9 @@ export function AnnexBulkPrintPanel({ annexes }: { annexes: AnnexBulkPrintRow[] 
           <button type="button" className={docBtnSecondaryDense} onClick={toggleAllFiltered}>
             {allFilteredSelected ? "Hiq të gjitha" : "Zgjidh të gjitha"}
           </button>
+          {/* Secondary: the page header's "Gjenero dokumente" is the one primary. */}
           {selected.size > 0 ? (
-            <a href={printUrl} target="_blank" rel="noreferrer" className={docBtnPrimary}>
+            <a href={printUrl} target="_blank" rel="noreferrer" className={docBtnSecondary}>
               <Printer className="h-3.5 w-3.5" aria-hidden />
               Parapamje & printo ({selected.size})
             </a>

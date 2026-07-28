@@ -3,7 +3,10 @@ import Link from "next/link";
 import type { DocumentCategory } from "@prisma/client";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
-import { DocumentsDashboardClient } from "@/modules/documents/components/documents-dashboard-client";
+import {
+  DocumentsDashboardClient,
+  type DocumentsTab,
+} from "@/modules/documents/components/documents-dashboard-client";
 import { DocumentsListFilters } from "@/modules/documents/components/documents-list-filters";
 import {
   listArtifactAuthorsForFilter,
@@ -51,6 +54,9 @@ export default async function DokumentetPage({
   const archivedRaw = first(sp, "archived");
   const archived = archivedRaw === "yes" || archivedRaw === "no" ? archivedRaw : "all";
   const authorId = first(sp, "authorId");
+  const tabRaw = first(sp, "tab");
+  const tab: DocumentsTab =
+    tabRaw === "verejtje" || tabRaw === "anekset" ? tabRaw : "regjistri";
 
   let artifacts;
   let templates;
@@ -134,18 +140,11 @@ export default async function DokumentetPage({
           </>
         }
       />
-      {/* Issuing sits above the register: it is an action, and the register is a long list. */}
-      <div id="verejtje" className="mb-5 scroll-mt-24">
-        <WarningIssuePanel
-          employees={employees.map((e) => ({
-            id: e.id,
-            label: `${e.lastName} ${e.firstName}`.trim(),
-          }))}
-        />
-      </div>
       <DocumentsDashboardClient
         artifacts={artifactRows}
         templateSummary={templateSummary}
+        initialTab={tab}
+        annexCount={annexes.length}
         filtersSlot={
           <DocumentsListFilters
             defaults={{
@@ -160,10 +159,16 @@ export default async function DokumentetPage({
             authors={authorOptions}
           />
         }
+        warningsSlot={
+          <WarningIssuePanel
+            employees={employees.map((e) => ({
+              id: e.id,
+              label: `${e.lastName} ${e.firstName}`.trim(),
+            }))}
+          />
+        }
+        annexesSlot={<AnnexBulkPrintPanel annexes={annexes} />}
       />
-      <div id="anekset" className="mt-5 scroll-mt-24">
-        <AnnexBulkPrintPanel annexes={annexes} />
-      </div>
     </>
   );
 }

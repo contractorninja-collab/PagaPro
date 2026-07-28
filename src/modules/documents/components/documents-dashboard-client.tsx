@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { DocumentCategory } from "@prisma/client";
 import {
   AlertTriangle,
@@ -46,6 +46,8 @@ export interface SubjectOption {
   label: string;
 }
 
+export type DocumentsTab = "regjistri" | "verejtje" | "anekset";
+
 export interface DocumentsDashboardClientProps {
   artifacts: ArtifactRow[];
   templateSummary: {
@@ -54,8 +56,14 @@ export interface DocumentsDashboardClientProps {
     needsMapping: number;
     missingPublished: number;
   };
-  /** Filter toolbar (server-rendered form) slotted between the health strip and the register. */
+  /** Filter toolbar (server-rendered form); belongs to the register, which it filters. */
   filtersSlot?: ReactNode;
+  /** Issuing and bulk-print tools, each behind its own tab rather than stacked on the register. */
+  warningsSlot?: ReactNode;
+  annexesSlot?: ReactNode;
+  annexCount?: number;
+  /** Tab to open on load, e.g. when arriving from the generator's empty state. */
+  initialTab?: DocumentsTab;
 }
 
 const CATEGORY_CHIP_TONES: Record<DocumentCategory, DocChipTone> = {
@@ -88,17 +96,46 @@ const QUICK_START: Array<{
   icon: typeof FileSignature;
   tile: string;
   iconColor: string;
+  /**
+   * Warnings are cases, not templates: the generator lists warnings that already
+   * exist, so this tile opens the panel that issues one instead of a step that
+   * would be empty for anyone starting out.
+   */
+  opensTab?: DocumentsTab;
 }> = [
   { category: "CONTRACT", icon: FileSignature, tile: "bg-[#eff6ff]", iconColor: "text-brand-blue" },
   { category: "LEAVE", icon: CalendarDays, tile: "bg-[#ecfdf5]", iconColor: "text-[#15803d]" },
   { category: "TERMINATION", icon: UserMinus, tile: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
-  { category: "WARNING", icon: AlertTriangle, tile: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
+  {
+    category: "WARNING",
+    icon: AlertTriangle,
+    tile: "bg-[#fffbeb]",
+    iconColor: "text-[#b45309]",
+    opensTab: "verejtje",
+  },
 ];
 
+const TAB_BASE =
+  "inline-flex h-[34px] items-center gap-2 whitespace-nowrap rounded-[9px] px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
+  const [tab, setTab] = useState<DocumentsTab>(props.initialTab ?? "regjistri");
+
+  // Links that arrive with #verejtje / #anekset should land on that tab.
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash === "verejtje" || hash === "anekset") setTab(hash);
+  }, []);
+
   const finalCount = props.artifacts.filter((a) => a.kind === "ARCHIVED_FINAL").length;
   const previewCount = props.artifacts.filter((a) => a.kind === "PREVIEW").length;
   const archivedCount = props.artifacts.filter((a) => a.isArchived).length;
+
+  const tabs: Array<{ key: DocumentsTab; label: string; count?: number }> = [
+    { key: "regjistri", label: "Regjistri", count: props.artifacts.length },
+    { key: "verejtje", label: "Vërejtjet" },
+    { key: "anekset", label: "Anekset", count: props.annexCount },
+  ];
 
   const monthKey = new Date().toISOString().slice(0, 7);
   const monthCounts = new Map<DocumentCategory, number>();
@@ -111,37 +148,50 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
     <div className="space-y-5">
       {/* Quick-start category tiles (4a) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {QUICK_START.map(({ category, icon: Icon, tile, iconColor }) => (
-          <Link
-            key={category}
-            href={`/dokumentet/generate?category=${category}`}
-            className={cn(
-              docCard,
-              "group flex items-center gap-3.5 p-4 transition-colors hover:border-[#bfdbfe]",
-            )}
-          >
-            <span
-              className={cn(
-                "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]",
-                tile,
-              )}
+        {QUICK_START.map(({ category, icon: Icon, tile, iconColor, opensTab }) => {
+          const inner = (
+            <>
+              <span
+                className={cn(
+                  "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]",
+                  tile,
+                )}
+              >
+                <Icon className={cn("h-[18px] w-[18px]", iconColor)} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block text-[13.5px] font-semibold text-[#0f172a]">
+                  {DOCUMENT_CATEGORY_LABELS[category]}
+                </span>
+                <span className="block text-[12px] text-[#94a3b8]">
+                  {monthCounts.get(category) ?? 0} këtë muaj
+                </span>
+              </span>
+              <ArrowUpRight
+                className="h-4 w-4 shrink-0 text-[#cbd5e1] transition-colors group-hover:text-brand-blue"
+                aria-hidden
+              />
+            </>
+          );
+          const shell = cn(
+            docCard,
+            "group flex w-full items-center gap-3.5 p-4 transition-colors hover:border-[#bfdbfe]",
+          );
+
+          return opensTab ? (
+            <button key={category} type="button" className={shell} onClick={() => setTab(opensTab)}>
+              {inner}
+            </button>
+          ) : (
+            <Link
+              key={category}
+              href={`/dokumentet/generate?category=${category}`}
+              className={shell}
             >
-              <Icon className={cn("h-[18px] w-[18px]", iconColor)} aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-semibold text-[#0f172a]">
-                {DOCUMENT_CATEGORY_LABELS[category]}
-              </span>
-              <span className="block text-[12px] text-[#94a3b8]">
-                {monthCounts.get(category) ?? 0} këtë muaj
-              </span>
-            </span>
-            <ArrowUpRight
-              className="h-4 w-4 shrink-0 text-[#cbd5e1] transition-colors group-hover:text-brand-blue"
-              aria-hidden
-            />
-          </Link>
-        ))}
+              {inner}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Template-health strip */}
@@ -172,6 +222,44 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
         </Link>
       </div>
 
+      {/* One tool on screen at a time — the register stays the page's subject. */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-[11px] border border-[#e2e8f0] bg-[#f8fafc] p-1">
+        {tabs.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                TAB_BASE,
+                active
+                  ? "bg-white text-[#0f172a] shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                  : "text-[#64748b] hover:text-[#0f172a]",
+              )}
+            >
+              {t.label}
+              {typeof t.count === "number" ? (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+                    active ? "bg-[#eff6ff] text-brand-blue" : "bg-[#e2e8f0] text-[#64748b]",
+                  )}
+                >
+                  {t.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "verejtje" ? props.warningsSlot : null}
+      {tab === "anekset" ? props.annexesSlot : null}
+
+      {tab !== "regjistri" ? null : (
+        <>
       {props.filtersSlot}
 
       {/* Register — mobile cards */}
@@ -282,6 +370,8 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-40 md:hidden">
         <Link
