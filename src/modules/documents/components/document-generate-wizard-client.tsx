@@ -640,7 +640,7 @@ export function DocumentGenerateWizardClient(props: {
             </div>
             <div className="p-4">
               {previewRows.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center">
+                <div className="flex flex-col items-center gap-2 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center">
                   <FileText className="h-6 w-6 text-[#cbd5e1]" aria-hidden />
                   <p className="text-[12.5px] text-[#94a3b8]">
                     Shtypni «Kontrollo» për të parë vlerat e zgjidhura të shabllonit.

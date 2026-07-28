@@ -305,7 +305,7 @@ export function PayrollsTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-12 text-center text-sm text-[#64748b]">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white py-12 text-center text-sm text-[#64748b]">
         Nuk ka periudha pagë. Krijoni një payroll për të filluar.
       </div>
     );

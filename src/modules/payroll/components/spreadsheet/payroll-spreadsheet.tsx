@@ -314,7 +314,7 @@ export function PayrollSpreadsheet(props: {
 
   if (props.entries.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-6 py-14 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-6 py-14 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
         <p className="text-sm font-semibold text-[#0f172a]">Nuk ka rreshta në këtë payroll.</p>
         <p className="mx-auto mt-2 max-w-md text-[13px] text-[#64748b]">
           {editable

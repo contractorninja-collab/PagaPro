@@ -77,7 +77,7 @@ export function PayrollDocumentsTab(props: {
       </div>
 
       {!hasAny ? (
-        <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-6 py-12 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+        <div className="rounded-xl border border-[#e2e8f0] bg-white px-6 py-12 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
           <FileText className="mx-auto h-6 w-6 text-[#cbd5e1]" aria-hidden />
           <p className="mt-3 text-sm font-semibold text-[#0f172a]">Ende nuk janë gjeneruar PDF.</p>
           <p className="mx-auto mt-1.5 max-w-md text-[13px] text-[#64748b]">

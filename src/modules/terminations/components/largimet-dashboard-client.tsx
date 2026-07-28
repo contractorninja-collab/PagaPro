@@ -271,7 +271,7 @@ export function LargimetDashboardClient(props: {
         <LargimetFiltersClient filters={props.filters} employees={props.employees} />
 
         {rows.length === 0 ? (
-          <div className="rounded-[12px] border border-dashed border-[#e2e8f0] bg-white px-6 py-16 text-center">
+          <div className="rounded-[12px] border border-[#e2e8f0] bg-white px-6 py-16 text-center">
             <p className="text-sm font-semibold text-[#0f172a]">Nuk ka largime për këta filtra.</p>
             <p className="mt-1.5 text-[13px] text-[#64748b]">
               Ndryshoni kriteret e filtrimit ose krijoni një largim të ri.

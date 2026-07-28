@@ -147,7 +147,7 @@ export function TimeClockCard({
             </div>
 
             {devices.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              <p className="rounded-lg border border-border px-4 py-6 text-center text-sm text-muted-foreground">
                 Ende asnjë pajisje. Shtoni një dhe merrni kodin e lidhjes.
               </p>
             ) : (

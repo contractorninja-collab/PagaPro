@@ -24,7 +24,7 @@ export function LeaveRequestsMobileList(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#e2e8f0] bg-white px-4 py-10 text-center text-[13px] text-[#64748b] md:hidden">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-10 text-center text-[13px] text-[#64748b] md:hidden">
         Nuk ka të dhëna për këtë pamje.
       </div>
     );

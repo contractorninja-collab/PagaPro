@@ -71,7 +71,7 @@ export function AnnualLeaveBalancePanel({
 
   if (annual.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#e2e8f0] bg-white px-4 py-8 text-center text-[13px] text-[#64748b]">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-8 text-center text-[13px] text-[#64748b]">
         Nuk ka balanca të pushimit vjetor për vitin {year} — do të popullohet kur regjistrohen punonjës dhe
         pushime.
       </div>

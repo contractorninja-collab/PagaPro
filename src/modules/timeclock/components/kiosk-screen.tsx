@@ -297,7 +297,7 @@ export function KioskScreen() {
         {/* Scan target */}
         <section
           className={cn(
-            "flex flex-col items-center justify-center rounded-3xl border-2 border-dashed p-12 text-center transition-colors duration-300",
+            "flex flex-col items-center justify-center rounded-3xl border-2 p-12 text-center transition-colors duration-300",
             ok && ok.direction === "IN" && "border-emerald-400/60 bg-emerald-500/15",
             ok && ok.direction === "OUT" && "border-sky-400/60 bg-sky-500/15",
             flash?.kind === "error" && "border-rose-400/60 bg-rose-500/15",

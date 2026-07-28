@@ -197,7 +197,7 @@ export function EmployeesTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-6 py-16 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-6 py-16 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
         <p className="text-sm font-semibold text-[#0f172a]">Nuk ka punonjës për filtrat aktualë.</p>
         <p className="mt-2 text-[13px] text-[#64748b]">Shtoni punonjës të rinj ose ndryshoni kriteret e kërkimit.</p>
       </div>

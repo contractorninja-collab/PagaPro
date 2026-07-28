@@ -340,7 +340,7 @@ export function PushimetDetailClient(props: {
                 {payrollNarrative}
               </p>
             ) : (
-              <p className="mt-4 rounded-[10px] border border-dashed border-[#e2e8f0] p-3 text-[12px] leading-relaxed text-[#64748b]">
+              <p className="mt-4 rounded-[10px] border border-[#e2e8f0] p-3 text-[12px] leading-relaxed text-[#64748b]">
                 {payrollNarrative}
               </p>
             )}

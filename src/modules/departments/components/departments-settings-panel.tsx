@@ -155,7 +155,7 @@ export function DepartmentsSettingsPanel(props: {
           </div>
 
           {departments.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+            <p className="rounded-md border border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
               Nuk ka departamente. Shtoni të parin më sipër ose nga forma e punonjësit.
             </p>
           ) : (

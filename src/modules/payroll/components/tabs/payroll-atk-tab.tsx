@@ -86,7 +86,7 @@ export function PayrollAtkTab(props: {
               </div>
             </div>
           ) : (
-            <p className="rounded-lg border border-dashed border-[#cbd5e1] px-4 py-6 text-center text-[13px] text-[#64748b]">
+            <p className="rounded-lg border border-[#e2e8f0] px-4 py-6 text-center text-[13px] text-[#64748b]">
               Ende nuk ka eksport aktiv për këtë payroll.
             </p>
           )}

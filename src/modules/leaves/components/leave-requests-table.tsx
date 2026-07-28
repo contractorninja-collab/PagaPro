@@ -30,7 +30,7 @@ export function LeaveRequestsTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#e2e8f0] bg-white px-4 py-12 text-center text-[13px] text-[#64748b]">
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-12 text-center text-[13px] text-[#64748b]">
         Nuk u gjet asnjë kërkesë për filtrat e zgjedhur.
       </div>
     );
