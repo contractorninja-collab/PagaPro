@@ -5,6 +5,11 @@ import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import { decimalToPlain } from "@/modules/payroll/helpers/money-format";
 import { ATK_TEMPLATE_FILENAME } from "@/modules/payroll/atk/helpers/template-metadata";
 import { payrollAtkExportXlsxKey } from "@/modules/payroll/atk/helpers/atk-storage-keys";
+import {
+  ATK_BLOCK_MESSAGES,
+  atkGenerationBlock,
+  isAtkStatusEligible,
+} from "@/modules/payroll/atk/atk-export-eligibility";
 import { fillAtkOfficialTemplate } from "@/modules/payroll/atk/helpers/atk-workbook-fill";
 import {
   atkSnapshotCanonicalParts,
@@ -70,8 +75,8 @@ async function generatePayrollAtkExportInner(params: {
 
   if (!payroll) return { ok: false, error: "Payroll nuk u gjet." };
 
-  if (payroll.status !== "APPROVED" && payroll.status !== "LOCKED") {
-    return { ok: false, error: "Eksporti ATK lejohet vetëm për payroll APPROVED ose LOCKED." };
+  if (!isAtkStatusEligible(payroll.status)) {
+    return { ok: false, error: ATK_BLOCK_MESSAGES.STATUS };
   }
 
   const eligibleEntries = filterAtkEligibleRows(payroll.entries);
@@ -83,12 +88,11 @@ async function generatePayrollAtkExportInner(params: {
     where: { payrollId: payroll.id, companyId: params.companyId, isArchived: false },
   });
 
-  if (payroll.status === "LOCKED" && existingActive.length > 0) {
-    return {
-      ok: false,
-      error: "Payroll i kyçur: eksporti ATK gjenerohet një herë — përdorni shkarkimin nga historia.",
-    };
-  }
+  const block = atkGenerationBlock({
+    status: payroll.status,
+    hasActiveExport: existingActive.length > 0,
+  });
+  if (block) return { ok: false, error: ATK_BLOCK_MESSAGES[block] };
 
   const rows: AtkRowSource[] = eligibleEntries.map((e) => ({
     entryId: e.id,

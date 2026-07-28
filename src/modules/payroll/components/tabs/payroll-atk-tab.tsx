@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
 import { CARD, CARD_TITLE } from "@/modules/payroll/components/payroll-card";
+import {
+  isAtkStatusEligible,
+  isPayrollFrozen,
+} from "@/modules/payroll/atk/atk-export-eligibility";
 
 /**
  * One job: the official ATK workbook. The financial exports that used to share
@@ -25,7 +29,8 @@ export function PayrollAtkTab(props: {
 }) {
   const active = props.exports.find((x) => !x.isArchived);
   const previous = props.exports.filter((x) => x.id !== active?.id);
-  const statusEligible = props.status === "APPROVED" || props.status === "LOCKED";
+  const statusEligible = isAtkStatusEligible(props.status);
+  const frozen = isPayrollFrozen(props.status);
 
   return (
     <div className="space-y-4">
@@ -43,13 +48,12 @@ export function PayrollAtkTab(props: {
           {!statusEligible ? (
             <p className="flex items-start gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              Gjenerimi bëhet vetëm pasi payroll-i të jetë <strong>i miratuar</strong> ose{" "}
-              <strong>i kyçur</strong>.
+              Gjenerimi bëhet vetëm pasi payroll-i të jetë <strong>i miratuar</strong>.
             </p>
-          ) : props.status === "LOCKED" && active ? (
+          ) : frozen && active ? (
             <p className="flex items-start gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-xs text-[#475569]">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              Payroll i kyçur — eksporti gjenerohet një herë. Përdorni shkarkimin më poshtë.
+              Shumat janë të ngrira — eksporti gjenerohet një herë. Përdorni shkarkimin më poshtë.
             </p>
           ) : null}
 

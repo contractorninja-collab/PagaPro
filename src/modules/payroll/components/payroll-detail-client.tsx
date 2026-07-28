@@ -27,6 +27,7 @@ import { PayrollDocumentsTab } from "@/modules/payroll/components/tabs/payroll-d
 import { PayrollAtkTab } from "@/modules/payroll/components/tabs/payroll-atk-tab";
 import { PayrollHistoryTab } from "@/modules/payroll/components/tabs/payroll-history-tab";
 import { CARD, CARD_TITLE } from "@/modules/payroll/components/payroll-card";
+import { canGenerateAtkExport } from "@/modules/payroll/atk/atk-export-eligibility";
 import { cn } from "@/lib/utils";
 
 const SEG_TRIGGER =
@@ -148,9 +149,10 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   const [atkPending, startAtkTransition] = useTransition();
 
   const latestAtkExport = data.atkExports.find((x) => !x.isArchived);
-  const atkStatusEligible = payroll.status === "APPROVED" || payroll.status === "LOCKED";
-  const canGenerateAtk =
-    atkStatusEligible && (payroll.status === "LOCKED" ? latestAtkExport === undefined : true);
+  const canGenerateAtk = canGenerateAtkExport({
+    status: payroll.status,
+    hasActiveExport: latestAtkExport !== undefined,
+  });
 
   const [tab, setTab] = useState("spreadsheet");
 
