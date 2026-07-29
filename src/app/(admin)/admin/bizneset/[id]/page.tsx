@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCompanyDetailForAdmin } from "@/modules/admin/services/admin-service";
-import { listBrandGroupSiblings } from "@/modules/admin/services/company-brand-group-service";
+import {
+  backfillCompanyMembershipsFromGroup,
+  listBrandGroupSiblings,
+} from "@/modules/admin/services/company-brand-group-service";
 import { listTimeClockDevices } from "@/modules/timeclock/services/timeclock-device-service";
 import { BiznesDetailClient } from "./biznes-detail-client";
 
@@ -14,6 +17,16 @@ export const dynamic = "force-dynamic";
 
 export default async function BiznesDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  // Self-heal for grouped companies with zero users (created before sibling
+  // creation started copying memberships automatically) — a no-op otherwise.
+  // Runs before the detail fetch so the users table shows the healed state.
+  try {
+    await backfillCompanyMembershipsFromGroup(id);
+  } catch (err) {
+    console.error("[admin] membership backfill failed — page continues", err);
+  }
+
   const company = await getCompanyDetailForAdmin(id);
   if (!company) notFound();
 

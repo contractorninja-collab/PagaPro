@@ -112,6 +112,66 @@ export async function copyCompanyMemberships(
   return { ok: true, copied };
 }
 
+/**
+ * Heals every company in a brand group that has no users at all, copying the
+ * union of the group's ACTIVE memberships into it (first-seen role per user).
+ *
+ * Exists for companies created in the window before sibling creation started
+ * copying memberships automatically — they sit invisible to the customer,
+ * because the dashboard switcher only lists companies with a real membership
+ * row. Group-wide on purpose: the admin fixes the whole brand by opening any
+ * one of its companies, without knowing which sibling is the broken one.
+ *
+ * The zero-membership guard is what makes this safe to run on every admin
+ * page view: a company where an admin deliberately removed someone still has
+ * other members, so it never qualifies and the removal is never undone.
+ */
+export async function backfillCompanyMembershipsFromGroup(companyId: string): Promise<number> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { brandGroupId: true },
+  });
+  if (!company?.brandGroupId) return 0;
+
+  const groupCompanies = await prisma.company.findMany({
+    where: { brandGroupId: company.brandGroupId },
+    select: { id: true, _count: { select: { memberships: true } } },
+  });
+  const empty = groupCompanies.filter((c) => c._count.memberships === 0);
+  if (empty.length === 0) return 0;
+
+  const groupMemberships = await prisma.userCompanyMembership.findMany({
+    where: { isActive: true, company: { brandGroupId: company.brandGroupId } },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true, role: true },
+  });
+
+  const byUser = new Map<string, (typeof groupMemberships)[number]["role"]>();
+  for (const m of groupMemberships) {
+    if (!byUser.has(m.userId)) byUser.set(m.userId, m.role);
+  }
+  if (byUser.size === 0) return 0;
+
+  let copied = 0;
+  for (const target of empty) {
+    for (const [userId, role] of byUser) {
+      await prisma.userCompanyMembership.create({
+        data: {
+          userId,
+          companyId: target.id,
+          role,
+          isActive: true,
+          invitedAt: new Date(),
+          acceptedAt: new Date(),
+        },
+      });
+      copied += 1;
+    }
+  }
+
+  return copied;
+}
+
 export interface BrandGroupAttachOutcome {
   companyId: string;
   companyName: string;
