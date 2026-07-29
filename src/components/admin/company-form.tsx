@@ -18,6 +18,10 @@ export interface CompanyFormValues {
   addressLine: string;
   city: string;
   postalCode: string;
+  /** "" = ungrouped. */
+  brandGroupId: string;
+  /** Set instead of brandGroupId when the operator is creating a group inline. */
+  newBrandGroupName: string;
 }
 
 export const EMPTY_COMPANY_FORM: CompanyFormValues = {
@@ -33,10 +37,21 @@ export const EMPTY_COMPANY_FORM: CompanyFormValues = {
   addressLine: "",
   city: "",
   postalCode: "",
+  brandGroupId: "",
+  newBrandGroupName: "",
 };
+
+export interface BrandGroupOption {
+  id: string;
+  name: string;
+}
+
+const NEW_GROUP = "__new__";
 
 interface CompanyFormProps {
   initialValues?: CompanyFormValues;
+  /** Existing brand groups to pick from; omit to hide the grouping field entirely. */
+  brandGroups?: BrandGroupOption[];
   submitLabel: string;
   pendingLabel: string;
   isPending: boolean;
@@ -53,6 +68,7 @@ function FieldError({ errors }: { errors?: string[] }) {
 /** Business (customer) data form — used in both the create dialog and the detail edit card. */
 export function CompanyForm({
   initialValues = EMPTY_COMPANY_FORM,
+  brandGroups,
   submitLabel,
   pendingLabel,
   isPending,
@@ -64,6 +80,8 @@ export function CompanyForm({
 
   const set = (key: keyof CompanyFormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }));
+
+  const creatingGroup = values.brandGroupId === NEW_GROUP;
 
   return (
     <form
@@ -160,6 +178,46 @@ export function CompanyForm({
           <FieldError errors={fieldErrors.postalCode} />
         </div>
       </div>
+
+      {/* Grouping is opt-in: a company with no group behaves exactly as before. */}
+      {brandGroups ? (
+        <div className="space-y-2">
+          <Label htmlFor="brandGroupId">Grupi i kompanive</Label>
+          <select
+            id="brandGroupId"
+            value={values.brandGroupId}
+            onChange={(e) =>
+              setValues((v) => ({
+                ...v,
+                brandGroupId: e.target.value,
+                newBrandGroupName: e.target.value === NEW_GROUP ? v.newBrandGroupName : "",
+              }))
+            }
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="">— Pa grup —</option>
+            {brandGroups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+            <option value={NEW_GROUP}>+ Krijo grup të ri…</option>
+          </select>
+          {creatingGroup ? (
+            <Input
+              aria-label="Emri i grupit të ri"
+              placeholder="Emri i brendit, p.sh. Grupi ABC"
+              value={values.newBrandGroupName}
+              onChange={set("newBrandGroupName")}
+            />
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Për klientët me disa kompani nën një brend. Secila kompani mban NUI-n e vet dhe të
+            dhënat mbeten të ndara.
+          </p>
+          <FieldError errors={fieldErrors.brandGroupId} />
+        </div>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm font-medium text-destructive">

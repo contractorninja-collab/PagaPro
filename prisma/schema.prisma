@@ -389,6 +389,13 @@ model Company {
   fiscalNumber String? @unique // taxpayer / fiscal reference where applicable (NUI)
   status       CompanyStatus   @default(ACTIVE)
 
+  /// Optional brand grouping for customers who run several legal entities — each with its
+  /// own NUI/NRB — under one commercial brand. Purely an admin-console organising layer:
+  /// it does NOT widen the tenant boundary. Every query stays scoped to a single companyId,
+  /// and access still comes from UserCompanyMembership, one row per company.
+  brandGroupId String?
+  brandGroup   CompanyBrandGroup? @relation(fields: [brandGroupId], references: [id], onDelete: SetNull)
+
   defaultCurrency CurrencyCode @default(EUR)
   timezone        String       @default("Europe/Belgrade")
 
@@ -452,7 +459,25 @@ model Company {
   reportExportLogs            ReportExportLog[]
 
   @@index([status])
+  @@index([brandGroupId])
   @@map("companies")
+}
+
+/// A commercial brand that owns several legal entities (one Company per NUI/NRB).
+///
+/// Deliberately thin: it groups companies for the admin console and for "add this user to
+/// every company in the group" — it holds no operational data of its own, and nothing in
+/// the app resolves data through it. The tenant root is still Company.
+model CompanyBrandGroup {
+  id   String @id @default(cuid())
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies Company[]
+
+  @@map("company_brand_groups")
 }
 
 /// Company-wide operational defaults consumed by payroll, documents, and leave flows (tenant-isolated).

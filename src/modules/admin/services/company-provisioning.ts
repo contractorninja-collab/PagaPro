@@ -60,6 +60,7 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
         addressLine: input.addressLine ?? null,
         city: input.city ?? null,
         postalCode: input.postalCode ?? null,
+        brandGroupId: input.brandGroupId ?? null,
       },
       select: { id: true },
     });

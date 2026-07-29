@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, ChevronDown, Search, Settings2, Users } from "lucide-react";
+import { toast } from "sonner";
+import { Building2, Check, ChevronDown, Search, Settings2, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +16,13 @@ import {
 import { AlertsSheet } from "@/components/layout/alerts-sheet";
 import { SIDEBAR_MODULES } from "@/components/layout/nav-config";
 import { PagaProLogo, PagaProMark } from "@/components/branding/logo";
-import { logoutAction } from "@/modules/auth/actions/auth-actions";
+import { logoutAction, switchActiveCompanyAction } from "@/modules/auth/actions/auth-actions";
 import { cn } from "@/lib/utils";
+
+export interface TopNavCompanyOption {
+  id: string;
+  label: string;
+}
 
 /** Center tabs = the 7 workforce modules; Konfigurimet lives under the company pill. */
 const NAV_TABS = SIDEBAR_MODULES.filter((m) => m.href !== "/konfigurime");
@@ -36,11 +42,16 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppTopNav({
   activeCompanyLabel,
+  activeCompanyId,
+  companies = [],
   userLabel,
   userEmail,
   alertCount = 0,
 }: {
   activeCompanyLabel: string | null;
+  activeCompanyId?: string | null;
+  /** Every company this user can reach. One or none → no switcher is rendered. */
+  companies?: TopNavCompanyOption[];
   userLabel?: string | null;
   userEmail?: string | null;
   alertCount?: number;
@@ -48,11 +59,28 @@ export function AppTopNav({
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [switching, setSwitching] = useState(false);
   const tenantMissing = activeCompanyLabel == null;
+  /** Customers running several legal entities under one brand; everyone else sees no change. */
+  const canSwitch = companies.length > 1;
 
   async function onLogout() {
     await logoutAction();
     window.location.assign("/hyrje");
+  }
+
+  async function onSwitchCompany(companyId: string) {
+    if (switching || companyId === activeCompanyId) return;
+    setSwitching(true);
+    const res = await switchActiveCompanyAction(companyId);
+    if (!res.ok) {
+      toast.error(res.error);
+      setSwitching(false);
+      return;
+    }
+    // Full navigation, not router.push: every page reads the company from the cookie the
+    // action just rewrote, so the whole tree has to be re-fetched.
+    window.location.assign(res.redirectTo);
   }
 
   function onSearch(e: React.FormEvent) {
@@ -131,11 +159,42 @@ export function AppTopNav({
               <ChevronDown className="h-[14px] w-[14px] shrink-0 text-slate-500" aria-hidden />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="truncate">
-              {tenantMissing ? "Nuk ka kompani aktive" : activeCompanyLabel}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent align="end" className="w-64">
+            {canSwitch ? (
+              <>
+                <DropdownMenuLabel className="text-[11px] font-bold uppercase tracking-[0.04em] text-muted-foreground">
+                  Ndrysho kompaninë
+                </DropdownMenuLabel>
+                {companies.map((c) => {
+                  const current = c.id === activeCompanyId;
+                  return (
+                    <DropdownMenuItem
+                      key={c.id}
+                      disabled={switching}
+                      className="cursor-pointer"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        void onSwitchCompany(c.id);
+                      }}
+                    >
+                      <Check
+                        className={cn("mr-2 h-4 w-4 shrink-0", current ? "opacity-100" : "opacity-0")}
+                        aria-hidden
+                      />
+                      <span className="truncate">{c.label}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel className="truncate">
+                  {tenantMissing ? "Nuk ka kompani aktive" : activeCompanyLabel}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem asChild className="cursor-pointer">
               <Link href="/konfigurime">
                 <Settings2 className="mr-2 h-4 w-4" aria-hidden />

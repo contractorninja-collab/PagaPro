@@ -20,6 +20,8 @@ export interface AdminCompanyListItem {
   businessRegistrationNumber: string | null;
   email: string | null;
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  brandGroupId: string | null;
+  brandGroupName: string | null;
   userCount: number;
   createdAt: string;
 }
@@ -38,6 +40,8 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
       email: true,
       status: true,
       createdAt: true,
+      brandGroupId: true,
+      brandGroup: { select: { name: true } },
       _count: { select: { memberships: true } },
     },
   });
@@ -53,6 +57,8 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
     businessRegistrationNumber: r.businessRegistrationNumber,
     email: r.email,
     status: r.status,
+    brandGroupId: r.brandGroupId,
+    brandGroupName: r.brandGroup?.name ?? null,
     userCount: r._count.memberships,
     createdAt: r.createdAt.toISOString(),
   }));
@@ -88,6 +94,8 @@ export interface AdminCompanyDetail {
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
   /** Badge time-clock entitlement — admin-only, deliberately not on CompanyConfiguration. */
   timeClockEnabled: boolean;
+  brandGroupId: string | null;
+  brandGroupName: string | null;
   createdAt: string;
   users: AdminCompanyUser[];
 }
@@ -112,6 +120,8 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       status: true,
       timeClockEnabled: true,
       createdAt: true,
+      brandGroupId: true,
+      brandGroup: { select: { name: true } },
       memberships: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -146,6 +156,8 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
     postalCode: row.postalCode,
     status: row.status,
     timeClockEnabled: row.timeClockEnabled,
+    brandGroupId: row.brandGroupId,
+    brandGroupName: row.brandGroup?.name ?? null,
     createdAt: row.createdAt.toISOString(),
     users: row.memberships.map((m) => ({
       membershipId: m.id,
@@ -204,6 +216,7 @@ export async function updateCompanyForAdmin(
         addressLine: input.addressLine ?? null,
         city: input.city ?? null,
         postalCode: input.postalCode ?? null,
+        brandGroupId: input.brandGroupId ?? null,
       },
     });
     return { ok: true };

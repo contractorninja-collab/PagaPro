@@ -49,6 +49,8 @@ export const companyUpsertSchema = z.object({
   addressLine: z.preprocess(emptyToNull, z.string().max(500).nullable().optional()),
   city: z.preprocess(emptyToNull, z.string().max(120).nullable().optional()),
   postalCode: z.preprocess(emptyToNull, z.string().max(32).nullable().optional()),
+  /// Optional brand grouping — several legal entities under one commercial brand.
+  brandGroupId: z.preprocess(emptyToNull, z.string().nullable().optional()),
 });
 
 export type CompanyUpsertInput = z.infer<typeof companyUpsertSchema>;

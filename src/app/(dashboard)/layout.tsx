@@ -1,4 +1,4 @@
-import { AppTopNav } from "@/components/layout/app-top-nav";
+import { AppTopNav, type TopNavCompanyOption } from "@/components/layout/app-top-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyContextPage } from "@/server/company-context";
@@ -11,14 +11,32 @@ export default async function DashboardLayout({
   const { user, companyId } = await requireCompanyContextPage();
 
   let activeCompanyLabel: string | null = null;
+  /**
+   * Every company this user can reach. Customers who run several legal entities under one
+   * brand hold one membership per company; for everyone else this is a single row and the
+   * nav renders exactly as before.
+   */
+  let companies: TopNavCompanyOption[] = [];
   try {
-    const row = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { legalName: true, tradeName: true },
-    });
+    const [row, memberships] = await Promise.all([
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { legalName: true, tradeName: true },
+      }),
+      prisma.userCompanyMembership.findMany({
+        where: { userId: user.id, isActive: true, company: { status: "ACTIVE" } },
+        select: { company: { select: { id: true, legalName: true, tradeName: true } } },
+      }),
+    ]);
     if (row) {
       activeCompanyLabel = row.tradeName?.trim() || row.legalName || null;
     }
+    companies = memberships
+      .map((m) => ({
+        id: m.company.id,
+        label: m.company.tradeName?.trim() || m.company.legalName,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   } catch (err) {
     console.error("[pagapro] DashboardLayout: company lookup failed — UI continues without tenant label.", err);
   }
@@ -41,6 +59,8 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen flex-col bg-brand-canvas">
       <AppTopNav
         activeCompanyLabel={activeCompanyLabel}
+        activeCompanyId={companyId}
+        companies={companies}
         userLabel={user.displayName}
         userEmail={user.email}
         alertCount={alertCount}

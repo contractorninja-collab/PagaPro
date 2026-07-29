@@ -92,6 +92,49 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
   }
 }
 
+/**
+ * Switches which company the session is scoped to.
+ *
+ * Membership is re-checked here against the database — the submitted id is client input and
+ * is never trusted, exactly as `getCompanyContext()` treats the cookie. Hiding a company
+ * from the switcher menu is presentation, not access control.
+ *
+ * Returns a redirect target rather than revalidating in place: every page resolves its
+ * companyId from this cookie, so switching without a full navigation would leave the old
+ * company's data on screen while subsequent actions ran against the new one.
+ */
+export async function switchActiveCompanyAction(companyId: string): Promise<AuthActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, error: "Sesioni ka skaduar. Hyni përsëri." };
+
+    const id = typeof companyId === "string" ? companyId.trim() : "";
+    if (!id) return { ok: false, error: "Kompania nuk u specifikua." };
+
+    const membership = await prisma.userCompanyMembership.findUnique({
+      where: { userId_companyId: { userId: user.id, companyId: id } },
+      select: { isActive: true, company: { select: { status: true } } },
+    });
+
+    const allowed =
+      (membership?.isActive && membership.company.status === "ACTIVE") || user.isPlatformAdmin;
+    if (!allowed) return { ok: false, error: "Nuk keni qasje në këtë kompani." };
+
+    const jar = await cookies();
+    jar.set(ACTIVE_COMPANY_COOKIE, id, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+
+    return { ok: true, redirectTo: "/paneli" };
+  } catch (err) {
+    console.error("[switchActiveCompanyAction] unexpected:", err);
+    return { ok: false, error: "Ndërrimi i kompanisë dështoi." };
+  }
+}
+
 export async function logoutAction(): Promise<void> {
   try {
     await destroySession();

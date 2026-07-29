@@ -20,11 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
-import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { CompanyForm, type BrandGroupOption, type CompanyFormValues } from "@/components/admin/company-form";
 import { TimeClockCard } from "@/components/admin/time-clock-card";
 import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
 import {
+  addUserToBrandGroupCompaniesAction,
+  createBrandGroupAction,
   createCompanyUserAction,
   resetUserPasswordAction,
   setCompanyStatusAction,
@@ -32,6 +34,7 @@ import {
   updateCompanyAction,
 } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyDetail } from "@/modules/admin/services/admin-service";
+import type { BrandGroupSibling } from "@/modules/admin/services/company-brand-group-service";
 import { MEMBERSHIP_ROLES } from "@/modules/admin/validation/admin-schemas";
 
 const STATUS_LABELS: Record<AdminCompanyDetail["status"], { label: string; variant: "success" | "warning" | "secondary" }> = {
@@ -100,10 +103,15 @@ export function BiznesDetailClient({
   company,
   timeClockDevices,
   appOrigin,
+  brandGroups,
+  brandGroupSiblings,
 }: {
   company: AdminCompanyDetail;
   timeClockDevices: TimeClockDeviceRow[];
   appOrigin: string;
+  brandGroups: BrandGroupOption[];
+  /** Other companies sharing this company's brand — empty when ungrouped. */
+  brandGroupSiblings: BrandGroupSibling[];
 }) {
   const router = useRouter();
   const status = STATUS_LABELS[company.status];
@@ -121,6 +129,8 @@ export function BiznesDetailClient({
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<(typeof MEMBERSHIP_ROLES)[number]>("ADMIN");
+  /** The actual "enable multi-company for this customer" switch. */
+  const [addToWholeGroup, setAddToWholeGroup] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
   const [userFieldErrors, setUserFieldErrors] = useState<Record<string, string[]>>({});
   const [userPending, startUserTransition] = useTransition();
@@ -142,13 +152,29 @@ export function BiznesDetailClient({
     addressLine: company.addressLine ?? "",
     city: company.city ?? "",
     postalCode: company.postalCode ?? "",
+    brandGroupId: company.brandGroupId ?? "",
+    newBrandGroupName: "",
   };
 
   function onUpdate(values: CompanyFormValues) {
     setEditError(null);
     setEditFieldErrors({});
     startEditTransition(async () => {
-      const res = await updateCompanyAction({ companyId: company.id, payload: values });
+      // An inline "+ krijo grup" has to exist before the company can point at it.
+      let brandGroupId = values.brandGroupId;
+      if (values.newBrandGroupName.trim()) {
+        const g = await createBrandGroupAction({ name: values.newBrandGroupName });
+        if (!g.ok || !g.data) {
+          setEditError(g.ok ? "Krijimi i grupit dështoi." : g.error);
+          return;
+        }
+        brandGroupId = g.data.id;
+      }
+
+      const res = await updateCompanyAction({
+        companyId: company.id,
+        payload: { ...values, brandGroupId: brandGroupId || null },
+      });
       if (res.ok) {
         toast.success("Të dhënat e biznesit u ruajtën.");
         router.refresh();
@@ -176,15 +202,63 @@ export function BiznesDetailClient({
     e.preventDefault();
     setUserError(null);
     setUserFieldErrors({});
+    const payload = { email: newEmail, displayName: newName, role: newRole };
+    const email = newEmail.trim().toLowerCase();
+
     startUserTransition(async () => {
-      const res = await createCompanyUserAction({
-        companyId: company.id,
-        payload: { email: newEmail, displayName: newName, role: newRole },
-      });
+      if (addToWholeGroup && company.brandGroupId) {
+        const res = await addUserToBrandGroupCompaniesAction({
+          brandGroupId: company.brandGroupId,
+          payload,
+        });
+        if (!res.ok || !res.data) {
+          if (!res.ok) {
+            setUserError(res.error);
+            setUserFieldErrors(res.fieldErrors ?? {});
+          }
+          return;
+        }
+
+        setAddUserOpen(false);
+        if (res.data.tempPassword) {
+          setTempPassword({ email, tempPassword: res.data.tempPassword });
+        }
+
+        // Partial success is normal — a company that already has an OWNER, or where this
+        // person is already a member, is skipped rather than failing the whole operation.
+        const added = res.data.results.filter(
+          (r) => r.outcome === "created" || r.outcome === "attached",
+        ).length;
+        const skipped = res.data.results.filter(
+          (r) => r.outcome !== "created" && r.outcome !== "attached",
+        );
+        toast.success(`Përdoruesi u shtua në ${added} nga ${res.data.results.length} kompani të grupit.`);
+        for (const s of skipped) {
+          toast.warning(
+            `${s.companyName}: ${
+              s.outcome === "already_member"
+                ? "ishte tashmë anëtar"
+                : s.outcome === "duplicate_owner"
+                  ? "ka tashmë një pronar (OWNER)"
+                  : "shtimi dështoi"
+            }`,
+            { duration: 8000 },
+          );
+        }
+
+        setNewEmail("");
+        setNewName("");
+        setNewRole("ADMIN");
+        setAddToWholeGroup(false);
+        router.refresh();
+        return;
+      }
+
+      const res = await createCompanyUserAction({ companyId: company.id, payload });
       if (res.ok && res.data) {
         setAddUserOpen(false);
         if (res.data.tempPassword) {
-          setTempPassword({ email: newEmail.trim().toLowerCase(), tempPassword: res.data.tempPassword });
+          setTempPassword({ email, tempPassword: res.data.tempPassword });
         } else {
           toast.success("Përdoruesi ekzistues u lidh me këtë biznes — fjalëkalimi i tij mbetet i njëjtë.");
         }
@@ -276,6 +350,7 @@ export function BiznesDetailClient({
           <CardContent>
             <CompanyForm
               initialValues={initialFormValues}
+              brandGroups={brandGroups}
               submitLabel="Ruaj ndryshimet"
               pendingLabel="Duke ruajtur…"
               isPending={editPending}
@@ -360,6 +435,53 @@ export function BiznesDetailClient({
           </CardContent>
         </Card>
 
+        {brandGroupSiblings.length > 0 ? (
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Kompanitë e tjera në grupin {company.brandGroupName}</CardTitle>
+              <CardDescription>
+                I njëjti brend, entitete të ndara ligjërisht. Të dhënat e secilës mbeten të
+                izoluara — përdoruesit me qasje në më shumë se një kompani i ndërrojnë nga paneli.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kompania</TableHead>
+                    <TableHead>NUI</TableHead>
+                    <TableHead>Statusi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {brandGroupSiblings.map((s) => {
+                    const st = STATUS_LABELS[s.status];
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <Link
+                            href={adminPath(`bizneset/${s.id}`)}
+                            className="font-medium text-foreground hover:underline"
+                          >
+                            {s.legalName}
+                          </Link>
+                          {s.tradeName ? (
+                            <p className="text-xs text-muted-foreground">{s.tradeName}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{s.fiscalNumber ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={st.variant}>{st.label}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <TimeClockCard
           companyId={company.id}
           enabled={company.timeClockEnabled}
@@ -424,6 +546,27 @@ export function BiznesDetailClient({
                 <p className="text-xs font-medium text-destructive">{userFieldErrors.role[0]}</p>
               ) : null}
             </div>
+            {/* Only meaningful when this company actually belongs to a brand group. */}
+            {company.brandGroupId && brandGroupSiblings.length > 0 ? (
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border bg-muted/40 p-3">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-[#2563EB]"
+                  checked={addToWholeGroup}
+                  onChange={(e) => setAddToWholeGroup(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-foreground">
+                    Shto edhe në kompanitë e tjera të grupit
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {company.brandGroupName} — {brandGroupSiblings.length + 1} kompani gjithsej.
+                    Përdoruesi do të mund të ndërrojë mes tyre nga paneli.
+                  </span>
+                </span>
+              </label>
+            ) : null}
+
             {userError ? (
               <p role="alert" className="text-sm font-medium text-destructive">
                 {userError}

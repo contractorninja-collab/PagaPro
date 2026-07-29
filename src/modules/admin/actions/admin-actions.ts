@@ -14,6 +14,12 @@ import {
   updateCompanyForAdmin,
 } from "@/modules/admin/services/admin-service";
 import {
+  addUserToBrandGroupCompanies,
+  createBrandGroup,
+  setCompanyBrandGroup,
+  type BrandGroupAttachOutcome,
+} from "@/modules/admin/services/company-brand-group-service";
+import {
   createTimeClockDevice,
   regenerateTimeClockPairingCode,
   setTimeClockDeviceActive,
@@ -179,6 +185,101 @@ export async function setCompanyStatusAction(raw: unknown): Promise<AdminActionR
   } catch (err) {
     console.error("[setCompanyStatusAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi i statusit dështoi papritur." };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Brand groups — several legal entities under one commercial brand
+// ---------------------------------------------------------------------------
+
+const createBrandGroupSchema = z.object({
+  name: z.string().trim().min(2, "Emri i grupit duhet të ketë të paktën 2 karaktere.").max(160),
+});
+
+export async function createBrandGroupAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ id: string; name: string }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = createBrandGroupSchema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Emri i grupit është i detyrueshëm.",
+        fieldErrors: formatAdminFieldErrors(parsed.error),
+      };
+    }
+
+    const group = await createBrandGroup(parsed.data.name);
+    revalidateBizneset();
+    return { ok: true, data: group };
+  } catch (err) {
+    console.error("[createBrandGroupAction] unexpected:", err);
+    return { ok: false, error: "Krijimi i grupit dështoi." };
+  }
+}
+
+const setCompanyBrandGroupSchema = z.object({
+  companyId: z.string().min(1),
+  /** `null` ungroups the company. */
+  brandGroupId: z.string().min(1).nullable(),
+});
+
+export async function setCompanyBrandGroupAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = setCompanyBrandGroupSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const ok = await setCompanyBrandGroup(parsed.data.companyId, parsed.data.brandGroupId);
+    if (!ok) return { ok: false, error: "Biznesi nuk u gjet." };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setCompanyBrandGroupAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi i grupit dështoi." };
+  }
+}
+
+/**
+ * Gives one login access to every company in a brand group — this is the
+ * "enable multi-company for this customer" step. Per-company outcomes come back
+ * individually so the UI can report a partial success honestly.
+ */
+export async function addUserToBrandGroupCompaniesAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ tempPassword: string | null; results: BrandGroupAttachOutcome[] }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const body = raw as { brandGroupId?: string; payload?: unknown };
+    const brandGroupId = typeof body.brandGroupId === "string" ? body.brandGroupId : "";
+    if (!brandGroupId) return { ok: false, error: "Grupi i kompanive mungon." };
+
+    const parsed = createCompanyUserSchema.safeParse(body.payload ?? {});
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Ju lutem korrigjoni fushat e theksuara.",
+        fieldErrors: formatAdminFieldErrors(parsed.error),
+      };
+    }
+
+    const res = await addUserToBrandGroupCompanies(brandGroupId, parsed.data);
+    if (!res.ok) {
+      if (res.code === "GROUP_NOT_FOUND") return { ok: false, error: "Grupi nuk u gjet." };
+      return { ok: false, error: "Ky grup nuk ka ende kompani." };
+    }
+
+    revalidateBizneset();
+    for (const r of res.results) revalidateBizneset(r.companyId);
+    return { ok: true, data: { tempPassword: res.tempPassword, results: res.results } };
+  } catch (err) {
+    console.error("[addUserToBrandGroupCompaniesAction] unexpected:", err);
+    return { ok: false, error: "Shtimi i përdoruesit në grup dështoi." };
   }
 }
 
