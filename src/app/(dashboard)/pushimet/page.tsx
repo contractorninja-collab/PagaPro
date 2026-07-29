@@ -361,19 +361,6 @@ export default async function PushimetPage({
         actions={<NewLeaveRequestButton employees={employees} />}
       />
       <div className="space-y-6">
-      <PushimetFiltersForm
-        employees={employees}
-        departments={departments}
-        defaults={{
-          employeeId,
-          departmentId,
-          type: LEAVE_TYPES.has(typeRaw as LeaveType) ? typeRaw : "",
-          status: STATUSES.has(statusRaw as LeaveRequestStatus) ? statusRaw : "",
-          year: String(year),
-          month: allMonths ? "0" : String(month),
-        }}
-      />
-
       <Suspense fallback={<DashboardFallback />}>
         <PushimetDashboardClient
           stats={stats}
@@ -392,6 +379,20 @@ export default async function PushimetPage({
             total: listPage.total,
           }}
           health={{ payrollSyncSkips: syncSkips, lastAccrual }}
+          filtersSlot={
+            <PushimetFiltersForm
+              employees={employees}
+              departments={departments}
+              defaults={{
+                employeeId,
+                departmentId,
+                type: LEAVE_TYPES.has(typeRaw as LeaveType) ? typeRaw : "",
+                status: STATUSES.has(statusRaw as LeaveRequestStatus) ? statusRaw : "",
+                year: String(year),
+                month: allMonths ? "0" : String(month),
+              }}
+            />
+          }
         />
       </Suspense>
       </div>

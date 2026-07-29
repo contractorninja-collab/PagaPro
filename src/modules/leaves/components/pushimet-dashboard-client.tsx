@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  CalendarDays,
   CheckCircle2,
   Clock,
   FileText,
@@ -136,6 +135,8 @@ export function PushimetDashboardClient(props: {
     payrollSyncSkips: number;
     lastAccrual: { year: number; month: number } | null;
   };
+  /** Rendered right after the stat tiles — overview before controls. */
+  filtersSlot?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -339,7 +340,7 @@ export function PushimetDashboardClient(props: {
       {/* Company-wide, deliberately independent of the filters below — the
           label says so rather than letting the numbers look filtered. */}
       <section className="space-y-2">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             label="Në pritje"
             value={props.stats.pending}
@@ -354,7 +355,6 @@ export function PushimetDashboardClient(props: {
             tone="success"
             href={statusHref("APPROVED", true)}
           />
-          <StatCard label="Sot në pushim" value={todayOff.length} icon={CalendarDays} tone="info" />
           <StatCard
             label="Draft"
             value={props.stats.draft}
@@ -368,6 +368,8 @@ export function PushimetDashboardClient(props: {
           për ta filtruar listën.
         </p>
       </section>
+
+      {props.filtersSlot}
 
       {/* Health signals that were previously buried one request deep. */}
       {props.health.payrollSyncSkips > 0 ? (
@@ -540,8 +542,52 @@ export function PushimetDashboardClient(props: {
           />
         </div>
 
-        {/* Right rail — balances, other quotas, who's off today */}
+        {/* Right rail — who's off today, then balances and other quotas.
+            "Sot në pushim" used to also be a stat tile at the top of the page,
+            answering the same question twice with the count in one place and
+            the actual people far below it. One surface now, and it leads the
+            rail instead of trailing two other cards. */}
         <div className="min-w-0 space-y-6">
+          <div className={`overflow-hidden ${LEAVE_CARD}`}>
+            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
+              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">Sot në pushim</h2>
+              {todayOff.length > 0 ? (
+                <TonePill tone="info" size="sm">
+                  {todayOff.length}
+                </TonePill>
+              ) : null}
+            </div>
+            {todayOff.length === 0 ? (
+              <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">
+                Askush nuk është në pushim sot.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#f1f5f9]">
+                {todayOff.map((c) => {
+                  const tone = LEAVE_TYPE_TONES[c.type];
+                  return (
+                    <li key={c.id}>
+                      <Link
+                        href={`/pushimet/${c.id}`}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                      >
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-semibold text-[#0f172a]">
+                            {c.employeeName}
+                          </span>
+                          <span className="block truncate text-[11.5px] text-[#64748b]">
+                            {LEAVE_TYPE_LABELS_SQ[c.type]} · deri më {formatSqDate(c.endDateIso)}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
           <AnnualLeaveBalancePanel
             balances={props.balances}
             year={props.calendarYear}
@@ -624,46 +670,6 @@ export function PushimetDashboardClient(props: {
               </div>
             </div>
           ) : null}
-
-          <div className={`overflow-hidden ${LEAVE_CARD}`}>
-            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
-              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">Sot në pushim</h2>
-              {todayOff.length > 0 ? (
-                <TonePill tone="info" size="sm">
-                  {todayOff.length}
-                </TonePill>
-              ) : null}
-            </div>
-            {todayOff.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">
-                Askush nuk është në pushim sot.
-              </p>
-            ) : (
-              <ul className="divide-y divide-[#f1f5f9]">
-                {todayOff.map((c) => {
-                  const tone = LEAVE_TYPE_TONES[c.type];
-                  return (
-                    <li key={c.id}>
-                      <Link
-                        href={`/pushimet/${c.id}`}
-                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#f8fafc]"
-                      >
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-semibold text-[#0f172a]">
-                            {c.employeeName}
-                          </span>
-                          <span className="block truncate text-[11.5px] text-[#64748b]">
-                            {LEAVE_TYPE_LABELS_SQ[c.type]} · deri më {formatSqDate(c.endDateIso)}
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         </div>
       </section>
 
