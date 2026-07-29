@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { TerminationType } from "@prisma/client";
 import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
 import { renderTerminationDocument } from "@/modules/terminations/documents/render-termination-document";
+import { registerRenderedArtifact } from "@/modules/documents/services/register-rendered-artifact";
 import { TERMINATION_TEMPLATE_OPTIONS } from "@/modules/terminations/types";
 
 export const runtime = "nodejs";
@@ -16,10 +17,15 @@ function parseTemplate(value: string | null): TerminationType | undefined {
 /**
  * Streams a termination's decision document as a DOCX, rendered in-request.
  *
- * Persists nothing: the template comes from storage when seeded and otherwise
- * from the repo's bundled DOCX, and the rendered file streams straight back.
- * This is what makes "Shkarko" work on a serverless deployment without an object
- * store. `?inline=1` previews in the browser; otherwise it downloads.
+ * The template comes from storage when seeded and otherwise from the repo's
+ * bundled DOCX, which is what makes "Shkarko" work on a serverless deployment
+ * without an object store. `?inline=1` previews in the browser; otherwise it
+ * downloads.
+ *
+ * The download is also filed in the Dokumentet register, once per termination
+ * and letter type — downloading the same letter twice must not leave two rows.
+ * A bundle-rendered document cannot be filed (no template version to point at),
+ * so it streams as before.
  */
 export async function GET(
   request: Request,
@@ -37,6 +43,27 @@ export async function GET(
   const result = await renderTerminationDocument(companyId, id, templateType);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 404 });
+  }
+
+  if (result.templateId && result.templateVersionId) {
+    // Never let a bookkeeping failure block the download the user asked for.
+    try {
+      await registerRenderedArtifact({
+        companyId,
+        documentTemplateId: result.templateId,
+        templateVersionId: result.templateVersionId,
+        subjectKind: "TERMINATION",
+        subjectId: id,
+        documentCategory: "TERMINATION",
+        title: result.filename.replace(/\.docx$/i, "").replaceAll("_", " "),
+        displayFilename: result.filename,
+        buffer: result.buffer,
+        employeeId: result.employeeId,
+        createdByUserId: ctx.context.user.id,
+      });
+    } catch (err) {
+      console.error("[largimet] could not register the downloaded document", err);
+    }
   }
 
   return new NextResponse(new Uint8Array(result.buffer), {

@@ -18,6 +18,7 @@ import {
 } from "@/modules/annex/validators/annex-schemas";
 import { z } from "zod";
 import type { AnnexDiff } from "@/modules/annex/types";
+import { registerAnnexArtifact } from "@/modules/annex/documents/register-annex-artifact";
 
 export type AnnexActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -187,8 +188,18 @@ export async function createAnnexAction(
   );
   if (!res.ok) return res;
 
+  // Issuing the annex is the moment it becomes a document, so that is when it
+  // joins the register — not on every subsequent print.
+  await registerAnnexArtifact({
+    companyId,
+    annexId: res.id,
+    employeeId: parsed.data.employeeId,
+    actorUserId: user.id,
+  });
+
   try {
     revalidatePath(`/punonjesit/${parsed.data.employeeId}`);
+    revalidatePath("/dokumentet");
   } catch {
     /* ignore */
   }

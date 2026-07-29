@@ -13,7 +13,20 @@ const DOCX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export type RenderTerminationResult =
-  | { ok: true; buffer: Buffer; filename: string; contentType: string }
+  | {
+      ok: true;
+      buffer: Buffer;
+      filename: string;
+      contentType: string;
+      /**
+       * The template this was rendered from, when one is registered. Null when
+       * it fell back to the repo bundle, in which case the document cannot be
+       * filed in the register — an artifact must trace to a template version.
+       */
+      templateId: string | null;
+      templateVersionId: string | null;
+      employeeId: string;
+    }
   | { ok: false; error: string };
 
 function asciiSlug(value: string): string {
@@ -138,5 +151,13 @@ export async function renderTerminationDocument(
     term.employee.firstName,
   )}_${chosenType}.docx`;
 
-  return { ok: true, buffer: renderedBuffer, filename, contentType: DOCX_CONTENT_TYPE };
+  return {
+    ok: true,
+    buffer: renderedBuffer,
+    filename,
+    contentType: DOCX_CONTENT_TYPE,
+    templateId: template?.id ?? null,
+    templateVersionId: version?.id ?? null,
+    employeeId: term.employeeId,
+  };
 }

@@ -49,6 +49,7 @@ const SEEDERS = {
   leave: () => require("./seed-leave-templates.cjs").seedLeaveTemplates,
   termination: () => require("./seed-termination-templates.cjs").seedTerminationTemplates,
   warning: () => require("./seed-warning-templates.cjs").seedWarningTemplates,
+  annex: () => require("./seed-annex-templates.cjs").seedAnnexTemplates,
 };
 
 const which = (process.argv[2] || "all").toLowerCase();
@@ -56,7 +57,7 @@ const selected = which === "all" ? Object.keys(SEEDERS) : [which];
 
 for (const name of selected) {
   if (!SEEDERS[name]) {
-    console.error(`Unknown seeder "${name}". Use one of: contracts, leave, termination, warning, all.`);
+    console.error(`Unknown seeder "${name}". Use one of: contracts, leave, termination, warning, annex, all.`);
     process.exit(1);
   }
 }
