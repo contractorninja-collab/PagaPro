@@ -1,27 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import type { DocumentCategory } from "@prisma/client";
 import {
   AlertTriangle,
   ArrowUpRight,
-  CalendarDays,
   Download,
+  Eye,
+  File as FileIcon,
   FileSignature,
   FileText,
+  CalendarDays,
   Printer,
   UserMinus,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DOCUMENT_CATEGORY_LABELS,
   formatArtifactKind,
@@ -36,6 +34,7 @@ import {
   docTableHead,
 } from "@/modules/documents/components/doc-ui";
 import { openBulkPrintPreview } from "@/modules/documents/components/open-bulk-print-preview";
+import { DocumentPreviewSheet } from "@/modules/documents/components/document-preview-sheet";
 import type { DocumentRegisterCounts } from "@/modules/documents/services/document-queries";
 
 export interface ArtifactRow {
@@ -55,11 +54,6 @@ export interface ArtifactRow {
   hasPdf: boolean;
 }
 
-export interface SubjectOption {
-  id: string;
-  label: string;
-}
-
 export interface DocumentsDashboardClientProps {
   artifacts: ArtifactRow[];
   counts: DocumentRegisterCounts;
@@ -73,8 +67,6 @@ export interface DocumentsDashboardClientProps {
   };
   /** Filter toolbar (server-rendered GET form) — still works without JavaScript. */
   filtersSlot?: ReactNode;
-  /** Issuing vërejtje is an action, not a view, so it lives in a dialog. */
-  warningsSlot?: ReactNode;
 }
 
 /** Caps enforced by the bulk endpoints; the UI says so before the click. */
@@ -104,36 +96,43 @@ function KindChip({ kind }: { kind: string }) {
   );
 }
 
-const QUICK_START: Array<{
-  category: DocumentCategory;
-  icon: typeof FileSignature;
-  tile: string;
-  iconColor: string;
-  /**
-   * Warnings are cases, not templates: the generator lists warnings that already
-   * exist, so this tile opens the dialog that issues one instead of a step that
-   * would be empty for anyone starting out.
-   */
-  opensWarningDialog?: boolean;
-}> = [
-  { category: "CONTRACT", icon: FileSignature, tile: "bg-[#eff6ff]", iconColor: "text-brand-blue" },
-  { category: "LEAVE", icon: CalendarDays, tile: "bg-[#ecfdf5]", iconColor: "text-[#15803d]" },
-  { category: "TERMINATION", icon: UserMinus, tile: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
-  {
-    category: "WARNING",
-    icon: AlertTriangle,
-    tile: "bg-[#fffbeb]",
-    iconColor: "text-[#b45309]",
-    opensWarningDialog: true,
-  },
+/** Format identity at a glance — PDF vs DOCX, colored the way each is recognized elsewhere. */
+function FileFormatIcon({ hasPdf }: { hasPdf: boolean }) {
+  return (
+    <FileText
+      className={cn("h-4 w-4 shrink-0", hasPdf ? "text-[#dc2626]" : "text-brand-blue")}
+      aria-hidden
+    />
+  );
+}
+
+const CATEGORY_ORDER: DocumentCategory[] = [
+  "CONTRACT",
+  "LEAVE",
+  "TERMINATION",
+  "WARNING",
+  "PAYROLL",
+  "OTHER",
 ];
 
+const CATEGORY_TILE_META: Record<DocumentCategory, { icon: LucideIcon; tile: string; iconColor: string }> = {
+  CONTRACT: { icon: FileSignature, tile: "bg-[#eff6ff]", iconColor: "text-brand-blue" },
+  LEAVE: { icon: CalendarDays, tile: "bg-[#ecfdf5]", iconColor: "text-[#15803d]" },
+  TERMINATION: { icon: UserMinus, tile: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
+  WARNING: { icon: AlertTriangle, tile: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
+  PAYROLL: { icon: Wallet, tile: "bg-[#f5f3ff]", iconColor: "text-[#7c3aed]" },
+  OTHER: { icon: FileIcon, tile: "bg-[#f1f5f9]", iconColor: "text-[#64748b]" },
+};
+
 export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [warningOpen, setWarningOpen] = useState(false);
+  const [mobileSelectMode, setMobileSelectMode] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const ids = useMemo(() => props.artifacts.map((a) => a.id), [props.artifacts]);
   const allOnPageSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+  const previewArtifact = props.artifacts.find((a) => a.id === previewId) ?? null;
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -163,87 +162,90 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
     return `?${params.toString()}`;
   };
 
+  const activeCategory = searchParams.get("documentCategory") ?? "";
+
+  /** Clicking an already-active tile clears it — a filter toggle, not a one-way door. */
+  function categoryHref(category: DocumentCategory): string {
+    const params = new URLSearchParams(searchParams.toString());
+    if (activeCategory === category) params.delete("documentCategory");
+    else params.set("documentCategory", category);
+    params.delete("page");
+    const qs = params.toString();
+    return qs ? `/dokumentet?${qs}` : "/dokumentet";
+  }
+
+  const templateNeedsAttention =
+    props.templateSummary.needsMapping > 0 ||
+    props.templateSummary.missingPublished > 0 ||
+    props.counts.failed > 0;
+
   return (
     <div className="space-y-5">
-      {/* Quick-start category tiles — counts are company-wide for the month. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {QUICK_START.map(({ category, icon: Icon, tile, iconColor, opensWarningDialog }) => {
-          const inner = (
-            <>
+      {/* Category tiles — company-wide monthly counts, and also filters: click one
+          to see that category, click again to clear it. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {CATEGORY_ORDER.map((category) => {
+          const meta = CATEGORY_TILE_META[category];
+          const Icon = meta.icon;
+          const isActive = activeCategory === category;
+          return (
+            <Link
+              key={category}
+              href={categoryHref(category)}
+              className={cn(
+                docCard,
+                "flex items-center gap-2.5 p-3.5 transition-colors hover:border-[#bfdbfe]",
+                isActive && "border-brand-blue bg-[#f5f8ff] ring-1 ring-brand-blue",
+              )}
+            >
               <span
                 className={cn(
-                  "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]",
-                  tile,
+                  "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]",
+                  meta.tile,
                 )}
               >
-                <Icon className={cn("h-[18px] w-[18px]", iconColor)} aria-hidden />
+                <Icon className={cn("h-4 w-4", meta.iconColor)} aria-hidden />
               </span>
               <span className="min-w-0 flex-1 text-left">
-                <span className="block text-[13.5px] font-semibold text-[#0f172a]">
+                <span className="block truncate text-[12.5px] font-semibold text-[#0f172a]">
                   {DOCUMENT_CATEGORY_LABELS[category]}
                 </span>
-                <span className="block text-[12px] text-[#94a3b8]">
+                <span className="block text-[11px] text-[#94a3b8]">
                   {props.counts.monthByCategory[category]} këtë muaj
                 </span>
               </span>
-              {/* The arrow only appears where the tile actually navigates. */}
-              {opensWarningDialog ? null : (
-                <ArrowUpRight
-                  className="h-4 w-4 shrink-0 text-[#cbd5e1] transition-colors group-hover:text-brand-blue"
-                  aria-hidden
-                />
-              )}
-            </>
-          );
-          const shell = cn(
-            docCard,
-            "group flex w-full items-center gap-3.5 p-4 transition-colors hover:border-[#bfdbfe]",
-          );
-
-          return opensWarningDialog ? (
-            <button
-              key={category}
-              type="button"
-              className={shell}
-              onClick={() => setWarningOpen(true)}
-            >
-              {inner}
-            </button>
-          ) : (
-            <Link key={category} href={`/dokumentet/generate?category=${category}`} className={shell}>
-              {inner}
             </Link>
           );
         })}
       </div>
 
-      {/* Template health. The link to manage them lives in the sub-bar; this
-          strip reports state rather than offering a second door to it. */}
-      <div className={cn(docCard, "flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3")}>
-        <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">
-          Shabllonet ({props.templateSummary.total})
-        </p>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] font-medium text-[#334155]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#16a34a]" aria-hidden />
-            {props.templateSummary.ready} gati
+      {/* Template health — only shown when something actually needs attention. */}
+      {templateNeedsAttention ? (
+        <Link
+          href="/dokumentet/templates"
+          className={cn(
+            docCard,
+            "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[13px] transition-colors hover:border-[#fcd34d]",
+          )}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[#b45309]" aria-hidden />
+          <span className="font-semibold text-[#78350f]">Shabllonet kërkojnë vëmendje:</span>
+          <span className="text-[#92400e]">
+            {[
+              props.templateSummary.needsMapping > 0
+                ? `${props.templateSummary.needsMapping} pa mapim`
+                : null,
+              props.templateSummary.missingPublished > 0
+                ? `${props.templateSummary.missingPublished} pa publikim`
+                : null,
+              props.counts.failed > 0 ? `${props.counts.failed} gjenerime të dështuara` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#d97706]" aria-hidden />
-            {props.templateSummary.needsMapping} pa mapim
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#94a3b8]" aria-hidden />
-            {props.templateSummary.missingPublished} pa publikim
-          </span>
-        </div>
-        {props.counts.failed > 0 ? (
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#fef2f2] px-2.5 py-1 text-[12px] font-semibold text-[#b91c1c]">
-            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-            {props.counts.failed} gjenerime të dështuara
-          </span>
-        ) : null}
-      </div>
+          <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-[#b45309]" aria-hidden />
+        </Link>
+      ) : null}
 
       {props.filtersSlot}
 
@@ -323,30 +325,126 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
 
       {/* Register — mobile cards */}
       <div className="space-y-3 md:hidden">
+        {props.artifacts.length > 0 ? (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              className={cn(
+                docBtnSecondaryDense,
+                mobileSelectMode && "border-brand-blue text-brand-blue",
+              )}
+              onClick={() => {
+                setMobileSelectMode((v) => !v);
+                if (mobileSelectMode) setSelected(new Set());
+              }}
+            >
+              {mobileSelectMode ? "Anulo zgjedhjen" : "Zgjidh"}
+            </button>
+          </div>
+        ) : null}
+
         {props.artifacts.length === 0 ? (
           <EmptyRegister filtersActive={props.filtersActive} />
         ) : (
-          props.artifacts.map((a) => (
-            <Link key={a.id} href={`/dokumentet/${a.id}`} className={cn(docCard, "block p-4")}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-semibold text-[#0f172a]">{a.title}</p>
-                  <p className="mt-0.5 truncate text-[12px] text-[#94a3b8]">{a.displayFilename}</p>
+          props.artifacts.map((a) => {
+            const isSelected = selected.has(a.id);
+            return (
+              <div
+                key={a.id}
+                role={mobileSelectMode ? "button" : undefined}
+                tabIndex={mobileSelectMode ? 0 : undefined}
+                onClick={mobileSelectMode ? () => toggle(a.id) : undefined}
+                onKeyDown={
+                  mobileSelectMode
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggle(a.id);
+                        }
+                      }
+                    : undefined
+                }
+                className={cn(
+                  docCard,
+                  "p-4",
+                  mobileSelectMode && "cursor-pointer",
+                  isSelected && "border-brand-blue bg-[#f5f8ff]",
+                )}
+              >
+                <div className="flex items-start gap-2.5">
+                  {mobileSelectMode ? (
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#2563EB]"
+                      checked={isSelected}
+                      onChange={() => toggle(a.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Zgjidh ${a.title}`}
+                    />
+                  ) : (
+                    <FileFormatIcon hasPdf={a.hasPdf} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {mobileSelectMode ? (
+                      <p className="truncate text-[13.5px] font-semibold text-[#0f172a]">{a.title}</p>
+                    ) : (
+                      <Link
+                        href={`/dokumentet/${a.id}`}
+                        className="block truncate text-[13.5px] font-semibold text-[#0f172a]"
+                      >
+                        {a.title}
+                      </Link>
+                    )}
+                    <p className="mt-0.5 truncate text-[12px] text-[#94a3b8]">{a.displayFilename}</p>
+                  </div>
+                  <CategoryChip category={a.documentCategory} />
                 </div>
-                <CategoryChip category={a.documentCategory} />
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <KindChip kind={a.kind} />
+                  {a.generationStatus === "FAILED" ? (
+                    <DocChip tone="destructive">Dështoi</DocChip>
+                  ) : null}
+                  {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
+                  {a.employeeLabel ? (
+                    <span className="text-[12px] text-[#64748b]">{a.employeeLabel}</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#eef2f7] pt-3">
+                  <div className="min-w-0">
+                    <span className="block text-[11.5px] tabular-nums text-[#64748b]">
+                      {a.createdAtLabel}
+                    </span>
+                    {a.authorLabel ? (
+                      <span className="block text-[11px] text-[#94a3b8]">{a.authorLabel}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      className={docBtnSecondaryDense}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewId(a.id);
+                      }}
+                      aria-label={`Shiko ${a.title}`}
+                      title="Shiko"
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                    <a
+                      className={docBtnSecondaryDense}
+                      href={`/api/dokumentet/artifacts/${a.id}/${a.hasPdf ? "pdf" : "docx"}`}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Shkarko"
+                      title="Shkarko"
+                    >
+                      <Download className="h-3.5 w-3.5" aria-hidden />
+                    </a>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <KindChip kind={a.kind} />
-                {a.generationStatus === "FAILED" ? (
-                  <DocChip tone="destructive">Dështoi</DocChip>
-                ) : null}
-                {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
-                {a.employeeLabel ? (
-                  <span className="text-[12px] text-[#64748b]">{a.employeeLabel}</span>
-                ) : null}
-              </div>
-            </Link>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -360,7 +458,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left">
+          <table className="w-full min-w-[820px] border-collapse text-left">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
                 <th className={cn(docTableHead, "w-10")}>
@@ -374,8 +472,6 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                   />
                 </th>
                 <th className={docTableHead}>Dokumenti</th>
-                <th className={docTableHead}>Kategoria</th>
-                <th className={docTableHead}>Shablloni</th>
                 <th className={docTableHead}>Punonjësi</th>
                 <th className={docTableHead}>Gjeneruar</th>
                 <th className={cn(docTableHead, "text-right")}>Veprime</th>
@@ -384,78 +480,96 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
             <tbody>
               {props.artifacts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10">
+                  <td colSpan={5} className="px-4 py-10">
                     <EmptyRegister filtersActive={props.filtersActive} bare />
                   </td>
                 </tr>
               ) : (
-                props.artifacts.map((a) => (
-                  <tr
-                    key={a.id}
-                    className={cn(
-                      "border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]",
-                      selected.has(a.id) && "bg-[#f5f8ff]",
-                    )}
-                  >
-                    <td className={docTableCell}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-[#2563EB]"
-                        checked={selected.has(a.id)}
-                        onChange={() => toggle(a.id)}
-                        aria-label={`Zgjidh ${a.title}`}
-                      />
-                    </td>
-                    <td className={docTableCell}>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={`/dokumentet/${a.id}`}
-                            className="text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
-                          >
-                            {a.title}
-                          </Link>
-                          <KindChip kind={a.kind} />
-                          {a.generationStatus === "FAILED" ? (
-                            <DocChip tone="destructive">Dështoi</DocChip>
-                          ) : null}
-                          {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
+                props.artifacts.map((a) => {
+                  const templateDiffersFromTitle = a.templateName.trim() !== a.title.trim();
+                  return (
+                    <tr
+                      key={a.id}
+                      className={cn(
+                        "border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]",
+                        selected.has(a.id) && "bg-[#f5f8ff]",
+                      )}
+                    >
+                      <td className={docTableCell}>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-[#2563EB]"
+                          checked={selected.has(a.id)}
+                          onChange={() => toggle(a.id)}
+                          aria-label={`Zgjidh ${a.title}`}
+                        />
+                      </td>
+                      <td className={docTableCell}>
+                        <div className="flex items-start gap-2.5">
+                          <FileFormatIcon hasPdf={a.hasPdf} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Link
+                                href={`/dokumentet/${a.id}`}
+                                className="text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                              >
+                                {a.title}
+                              </Link>
+                              <CategoryChip category={a.documentCategory} />
+                              <KindChip kind={a.kind} />
+                              {a.generationStatus === "FAILED" ? (
+                                <DocChip tone="destructive">Dështoi</DocChip>
+                              ) : null}
+                              {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
+                            </div>
+                            <span className="block truncate text-[12px] text-[#94a3b8]">
+                              {a.displayFilename}
+                            </span>
+                            {templateDiffersFromTitle ? (
+                              <span className="block truncate text-[11px] text-[#cbd5e1]">
+                                Shablloni: {a.templateName}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                        <span className="text-[12px] text-[#94a3b8]">{a.displayFilename}</span>
-                      </div>
-                    </td>
-                    <td className={docTableCell}>
-                      <CategoryChip category={a.documentCategory} />
-                    </td>
-                    <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
-                      {a.templateName}
-                    </td>
-                    <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
-                      {a.employeeLabel ?? "—"}
-                    </td>
-                    <td className={cn(docTableCell, "whitespace-nowrap")}>
-                      <span className="block text-[12.5px] tabular-nums text-[#64748b]">
-                        {a.createdAtLabel}
-                      </span>
-                      {a.authorLabel ? (
-                        <span className="mt-0.5 block text-[11.5px] text-[#94a3b8]">
-                          {a.authorLabel}
+                      </td>
+                      <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
+                        {a.employeeLabel ?? "—"}
+                      </td>
+                      <td className={cn(docTableCell, "whitespace-nowrap")}>
+                        <span className="block text-[12.5px] tabular-nums text-[#64748b]">
+                          {a.createdAtLabel}
                         </span>
-                      ) : null}
-                    </td>
-                    <td className={cn(docTableCell, "text-right")}>
-                      {/* The title already opens the document; this is the download
-                          the list never offered, though hasPdf was always here. */}
-                      <a
-                        className={docBtnSecondaryDense}
-                        href={`/api/dokumentet/artifacts/${a.id}/${a.hasPdf ? "pdf" : "docx"}`}
-                      >
-                        <Download className="h-3.5 w-3.5" aria-hidden />
-                        {a.hasPdf ? "PDF" : "DOCX"}
-                      </a>
-                    </td>
-                  </tr>
-                ))
+                        {a.authorLabel ? (
+                          <span className="mt-0.5 block text-[11.5px] text-[#94a3b8]">
+                            {a.authorLabel}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className={cn(docTableCell, "text-right")}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            className={docBtnSecondaryDense}
+                            onClick={() => setPreviewId(a.id)}
+                            aria-label={`Shiko ${a.title}`}
+                            title="Shiko"
+                          >
+                            <Eye className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                          <a
+                            className={docBtnSecondaryDense}
+                            href={`/api/dokumentet/artifacts/${a.id}/${a.hasPdf ? "pdf" : "docx"}`}
+                            aria-label={`Shkarko ${a.hasPdf ? "PDF" : "DOCX"}`}
+                            title="Shkarko"
+                          >
+                            <Download className="h-3.5 w-3.5" aria-hidden />
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -492,17 +606,10 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
         ) : null}
       </div>
 
-      <Dialog open={warningOpen} onOpenChange={setWarningOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Lësho vërejtje</DialogTitle>
-            <DialogDescription>
-              Zgjidhni punonjësit, masën sipas nenit 85 dhe përshkrimin e shkeljes.
-            </DialogDescription>
-          </DialogHeader>
-          {props.warningsSlot}
-        </DialogContent>
-      </Dialog>
+      <DocumentPreviewSheet
+        artifact={previewArtifact}
+        onOpenChange={(o) => !o && setPreviewId(null)}
+      />
     </div>
   );
 }

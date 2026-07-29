@@ -5,6 +5,7 @@ import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
 import { DocumentsDashboardClient } from "@/modules/documents/components/documents-dashboard-client";
 import { DocumentsListFilters } from "@/modules/documents/components/documents-list-filters";
+import { WarningIssueTrigger } from "@/modules/documents/components/warning-issue-trigger";
 import {
   getDocumentRegisterCounts,
   listArtifactAuthorsForFilter,
@@ -138,6 +139,14 @@ export default async function DokumentetPage({
             <Button variant="secondary" size="sm" asChild>
               <Link href="/dokumentet/templates">Shabllonet</Link>
             </Button>
+            <WarningIssueTrigger>
+              <WarningIssuePanel
+                employees={employees.map((e) => ({
+                  id: e.id,
+                  label: `${e.lastName} ${e.firstName}`.trim(),
+                }))}
+              />
+            </WarningIssueTrigger>
             <Button asChild>
               <Link href="/dokumentet/generate">Gjenero dokumente</Link>
             </Button>
@@ -167,14 +176,6 @@ export default async function DokumentetPage({
             }}
             employees={employees}
             authors={authorOptions}
-          />
-        }
-        warningsSlot={
-          <WarningIssuePanel
-            employees={employees.map((e) => ({
-              id: e.id,
-              label: `${e.lastName} ${e.firstName}`.trim(),
-            }))}
           />
         }
       />
