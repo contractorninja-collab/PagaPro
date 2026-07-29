@@ -34,7 +34,10 @@ import {
   updateCompanyAction,
 } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyDetail } from "@/modules/admin/services/admin-service";
-import type { BrandGroupSibling } from "@/modules/admin/services/company-brand-group-service";
+import type {
+  BrandGroupSibling,
+  UngroupedCompanyOption,
+} from "@/modules/admin/services/company-brand-group-service";
 import { MEMBERSHIP_ROLES } from "@/modules/admin/validation/admin-schemas";
 
 const STATUS_LABELS: Record<AdminCompanyDetail["status"], { label: string; variant: "success" | "warning" | "secondary" }> = {
@@ -104,12 +107,15 @@ export function BiznesDetailClient({
   timeClockDevices,
   appOrigin,
   brandGroupSiblings,
+  ungroupedCompanies,
 }: {
   company: AdminCompanyDetail;
   timeClockDevices: TimeClockDeviceRow[];
   appOrigin: string;
   /** Other companies sharing this company's brand — empty when ungrouped. */
   brandGroupSiblings: BrandGroupSibling[];
+  /** Companies in no group yet — adoptable into this brand from the tab strip. */
+  ungroupedCompanies: UngroupedCompanyOption[];
 }) {
   const router = useRouter();
   const status = STATUS_LABELS[company.status];
@@ -331,6 +337,7 @@ export function BiznesDetailClient({
         brandGroupId={company.brandGroupId}
         brandGroupName={company.brandGroupName}
         siblings={brandGroupSiblings}
+        ungroupedCompanies={ungroupedCompanies}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

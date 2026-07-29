@@ -29,6 +29,30 @@ export async function setCompanyBrandGroup(
   return res.count > 0;
 }
 
+export interface UngroupedCompanyOption {
+  id: string;
+  legalName: string;
+  tradeName: string | null;
+}
+
+/**
+ * Companies that belong to no brand group yet — the candidates for "Shto
+ * ekzistuese" in the group tab strip. Exists because a company created before
+ * grouping (or through the plain "Shto Biznes" flow) would otherwise be
+ * permanently stranded outside its brand: the form-level group picker was
+ * removed on purpose, so adoption from the mother company's page is the only
+ * remaining door in.
+ */
+export async function listUngroupedCompaniesForAdmin(
+  excludeCompanyId: string,
+): Promise<UngroupedCompanyOption[]> {
+  return prisma.company.findMany({
+    where: { brandGroupId: null, id: { not: excludeCompanyId }, status: { not: "ARCHIVED" } },
+    orderBy: { legalName: "asc" },
+    select: { id: true, legalName: true, tradeName: true },
+  });
+}
+
 export interface BrandGroupSibling {
   id: string;
   legalName: string;

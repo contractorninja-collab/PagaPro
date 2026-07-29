@@ -5,6 +5,7 @@ import { getCompanyDetailForAdmin } from "@/modules/admin/services/admin-service
 import {
   backfillCompanyMembershipsFromGroup,
   listBrandGroupSiblings,
+  listUngroupedCompaniesForAdmin,
 } from "@/modules/admin/services/company-brand-group-service";
 import { listTimeClockDevices } from "@/modules/timeclock/services/timeclock-device-service";
 import { BiznesDetailClient } from "./biznes-detail-client";
@@ -30,9 +31,10 @@ export default async function BiznesDetailPage({ params }: { params: Promise<{ i
   const company = await getCompanyDetailForAdmin(id);
   if (!company) notFound();
 
-  const [devices, brandGroupSiblings] = await Promise.all([
+  const [devices, brandGroupSiblings, ungroupedCompanies] = await Promise.all([
     company.timeClockEnabled ? listTimeClockDevices(company.id) : Promise.resolve([]),
     listBrandGroupSiblings(company.id),
+    listUngroupedCompaniesForAdmin(company.id),
   ]);
 
   // The kiosk lives on the client's own tenant host when they have one, so the
@@ -48,6 +50,7 @@ export default async function BiznesDetailPage({ params }: { params: Promise<{ i
       timeClockDevices={devices}
       appOrigin={appOrigin}
       brandGroupSiblings={brandGroupSiblings}
+      ungroupedCompanies={ungroupedCompanies}
     />
   );
 }

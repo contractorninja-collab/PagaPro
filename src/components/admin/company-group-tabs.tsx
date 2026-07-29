@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { adminPath } from "@/lib/admin-path";
 import {
   copyCompanyMembershipsAction,
@@ -23,7 +24,10 @@ import {
   createCompanyAction,
   setCompanyBrandGroupAction,
 } from "@/modules/admin/actions/admin-actions";
-import type { BrandGroupSibling } from "@/modules/admin/services/company-brand-group-service";
+import type {
+  BrandGroupSibling,
+  UngroupedCompanyOption,
+} from "@/modules/admin/services/company-brand-group-service";
 
 /**
  * "Add another company like this one" — the primary way a multi-company brand
@@ -32,9 +36,14 @@ import type { BrandGroupSibling } from "@/modules/admin/services/company-brand-g
  * flow that made you leave the page, reopen "Shto Biznes" and hunt for the
  * right group in a dropdown for every company after the first.
  *
- * The company-detail page always renders this — even ungrouped, showing just
- * one pill — so "add a sibling" is discoverable without first knowing that
- * "grouping" is a concept.
+ * Two modes in one dialog: create a brand-new sibling, or adopt an existing
+ * ungrouped company into this brand. Adoption is the only remaining door in
+ * for a company created outside the group (the form-level group picker was
+ * removed on purpose) — without it, such a company is stranded as a top-level
+ * row forever.
+ *
+ * Either way the sibling inherits the current company's active users, so the
+ * customer's one login covers it immediately — no manual add-user step.
  */
 export function CompanyGroupTabs({
   currentCompanyId,
@@ -42,60 +51,105 @@ export function CompanyGroupTabs({
   brandGroupId,
   brandGroupName,
   siblings,
+  ungroupedCompanies,
 }: {
   currentCompanyId: string;
   currentCompanyLabel: string;
   brandGroupId: string | null;
   brandGroupName: string | null;
   siblings: BrandGroupSibling[];
+  ungroupedCompanies: UngroupedCompanyOption[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"create" | "attach">("create");
   const [newGroupName, setNewGroupName] = useState(brandGroupName ?? currentCompanyLabel);
   const [newCompanyName, setNewCompanyName] = useState("");
+  const [attachCompanyId, setAttachCompanyId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const canAttach = ungroupedCompanies.length > 0;
+
   function openDialog() {
     setError(null);
+    setMode("create");
     setNewGroupName(brandGroupName ?? currentCompanyLabel);
     setNewCompanyName("");
+    setAttachCompanyId(ungroupedCompanies[0]?.id ?? "");
     setOpen(true);
   }
 
-  function onCreateSibling(e: React.FormEvent) {
+  /** Group must exist before anything can point at it — created lazily on first use. */
+  async function ensureGroupId(): Promise<string | null> {
+    if (brandGroupId) return brandGroupId;
+    if (!newGroupName.trim()) {
+      setError("Emri i grupit është i detyrueshëm.");
+      return null;
+    }
+    const g = await createBrandGroupAction({ name: newGroupName });
+    if (!g.ok || !g.data) {
+      setError(g.ok ? "Krijimi i grupit dështoi." : g.error);
+      return null;
+    }
+    const link = await setCompanyBrandGroupAction({
+      companyId: currentCompanyId,
+      brandGroupId: g.data.id,
+    });
+    if (!link.ok) {
+      setError(link.error);
+      return null;
+    }
+    return g.data.id;
+  }
+
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!newCompanyName.trim()) {
+    if (mode === "create" && !newCompanyName.trim()) {
       setError("Emri i kompanisë së re është i detyrueshëm.");
+      return;
+    }
+    if (mode === "attach" && !attachCompanyId) {
+      setError("Zgjidhni kompaninë që do t'i bashkohet grupit.");
       return;
     }
 
     startTransition(async () => {
-      let groupId = brandGroupId;
+      const groupId = await ensureGroupId();
+      if (!groupId) return;
 
-      // First sibling ever: the group doesn't exist yet, and this company isn't in one.
-      if (!groupId) {
-        if (!newGroupName.trim()) {
-          setError("Emri i grupit është i detyrueshëm.");
-          return;
-        }
-        const g = await createBrandGroupAction({ name: newGroupName });
-        if (!g.ok || !g.data) {
-          setError(g.ok ? "Krijimi i grupit dështoi." : g.error);
-          return;
-        }
-        groupId = g.data.id;
-
+      if (mode === "attach") {
         const link = await setCompanyBrandGroupAction({
-          companyId: currentCompanyId,
+          companyId: attachCompanyId,
           brandGroupId: groupId,
         });
         if (!link.ok) {
           setError(link.error);
           return;
         }
+
+        // Same guarantee as creating a sibling: the customer's existing users
+        // extend onto the adopted company; users it already has are skipped.
+        const copy = await copyCompanyMembershipsAction({
+          fromCompanyId: currentCompanyId,
+          toCompanyId: attachCompanyId,
+        });
+        const label =
+          ungroupedCompanies.find((c) => c.id === attachCompanyId)?.tradeName?.trim() ||
+          ungroupedCompanies.find((c) => c.id === attachCompanyId)?.legalName ||
+          "Kompania";
+        toast.success(
+          copy.ok && copy.data && copy.data.copied > 0
+            ? `${label} iu bashkua grupit — ${copy.data.copied} përdorues morën qasje.`
+            : `${label} iu bashkua grupit.`,
+        );
+
+        setOpen(false);
+        // Stay here — the new pill appearing next to this company is the confirmation.
+        router.refresh();
+        return;
       }
 
       const res = await createCompanyAction({ legalName: newCompanyName, brandGroupId: groupId });
@@ -123,6 +177,24 @@ export function CompanyGroupTabs({
       router.push(adminPath(`bizneset/${res.data.id}`));
     });
   }
+
+  const modeTab = (value: "create" | "attach", label: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        setMode(value);
+        setError(null);
+      }}
+      className={cn(
+        "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        mode === value
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <>
@@ -152,15 +224,23 @@ export function CompanyGroupTabs({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Kompani e re {brandGroupId ? `në grupin ${brandGroupName}` : ""}
+              Kompani {brandGroupId ? `në grupin ${brandGroupName}` : `nën ${currentCompanyLabel}`}
             </DialogTitle>
             <DialogDescription>
               {brandGroupId
-                ? "Krijohet menjëherë me NUI dhe të dhëna të veta — plotësoni pjesën tjetër pasi të kaloni te faqja e saj."
-                : `${currentCompanyLabel} nuk është ende në një grup. Do të krijohet një grup i ri dhe kjo kompani do t'i bashkohet.`}
+                ? "Kompania do të shfaqet si skedë pranë të tjerave dhe përdoruesit aktualë marrin qasje automatikisht."
+                : "Do të krijohet grupi i brendit dhe të dyja kompanitë do t'i bashkohen — përdoruesit aktualë marrin qasje automatikisht."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={onCreateSibling} className="space-y-4" noValidate>
+
+          {canAttach ? (
+            <div className="flex gap-1 rounded-lg bg-muted p-1">
+              {modeTab("create", "Krijo të re")}
+              {modeTab("attach", "Shto ekzistuese")}
+            </div>
+          ) : null}
+
+          <form onSubmit={onSubmit} className="space-y-4" noValidate>
             {!brandGroupId ? (
               <div className="space-y-2">
                 <Label htmlFor="newGroupName">Emri i grupit / brendit</Label>
@@ -169,20 +249,41 @@ export function CompanyGroupTabs({
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
                   required
-                  autoFocus
                 />
               </div>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="newCompanyName">Emri i kompanisë së re</Label>
-              <Input
-                id="newCompanyName"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-                required
-                autoFocus={Boolean(brandGroupId)}
-              />
-            </div>
+
+            {mode === "create" ? (
+              <div className="space-y-2">
+                <Label htmlFor="newCompanyName">Emri i kompanisë së re</Label>
+                <Input
+                  id="newCompanyName"
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  required
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="attachCompanyId">Kompania ekzistuese</Label>
+                <select
+                  id="attachCompanyId"
+                  value={attachCompanyId}
+                  onChange={(e) => setAttachCompanyId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {ungroupedCompanies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.tradeName?.trim() || c.legalName}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Vetëm kompanitë që nuk janë ende në ndonjë grup.
+                </p>
+              </div>
+            )}
+
             {error ? (
               <p role="alert" className="text-sm font-medium text-destructive">
                 {error}
@@ -190,7 +291,11 @@ export function CompanyGroupTabs({
             ) : null}
             <DialogFooter>
               <Button type="submit" disabled={pending}>
-                {pending ? "Duke krijuar…" : "Krijo dhe vazhdo"}
+                {pending
+                  ? "Duke ruajtur…"
+                  : mode === "attach"
+                    ? "Shto në grup"
+                    : "Krijo dhe vazhdo"}
               </Button>
             </DialogFooter>
           </form>
