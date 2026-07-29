@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { RaportetDashboardClient } from "@/modules/reports/components/raportet-dashboard-client";
-import { listReportCatalog } from "@/modules/reports/services/report-registry";
+import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { RaportetChartsClient } from "@/modules/reports/components/raportet-charts-client";
+import { ReportYearSelect } from "@/modules/reports/components/report-year-select";
 import {
-  listGeneratedReports,
-  loadReportPickerContext,
-} from "@/modules/reports/services/report-query-service";
+  leavePressure,
+  payrollCostSeries,
+  reportingYears,
+  workforceShape,
+} from "@/modules/reports/services/report-analytics-service";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -25,37 +28,52 @@ export default async function RaportetPage({
   const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
-  const yearRaw = Number(first(sp, "year"));
-  const monthRaw = Number(first(sp, "month"));
+  const raw = Number(first(sp, "year"));
+  const defaultYear = new Date().getUTCFullYear();
+  // `Number("")` is 0 and 0 is finite — an absent year must not become year 0.
+  const requested =
+    Number.isInteger(raw) && raw >= 1970 && raw <= 2100 ? raw : defaultYear;
 
-  const catalog = listReportCatalog();
+  let years: number[];
+  let cost;
+  let workforce;
+  let leave;
 
-  let generated;
-  let picker;
   try {
-    generated = await listGeneratedReports(companyId, {
-      payrollId: first(sp, "payrollId") || undefined,
-      year: Number.isFinite(yearRaw) ? yearRaw : undefined,
-      month: Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : undefined,
-    });
-    picker = await loadReportPickerContext(companyId);
-  } catch (err) {
-    console.error("[pagapro] RaportetPage load failed", err);
+    years = await reportingYears(companyId, defaultYear);
+    const year = years.includes(requested) ? requested : (years[0] ?? defaultYear);
+
+    [cost, workforce, leave] = await Promise.all([
+      payrollCostSeries(companyId, year),
+      workforceShape(companyId, year),
+      leavePressure(companyId, year),
+    ]);
+
     return (
-      <div className="mx-auto max-w-xl py-12">
-        <p className="text-sm text-destructive">Nuk mund të ngarkohen raportet.</p>
-      </div>
+      <>
+        <AppSubBar
+          eyebrow="Analitika"
+          title="Raportet"
+          description="Kostoja e pagave, forma e fuqisë punëtore dhe presioni i pushimeve — të gjitha për vitin e zgjedhur."
+          actions={<ReportYearSelect year={year} years={years} />}
+        />
+        <RaportetChartsClient year={year} cost={cost} workforce={workforce} leave={leave} />
+      </>
+    );
+  } catch (err) {
+    console.error("[pagapro] RaportetPage: query failed", err);
+    return (
+      <>
+        <AppSubBar eyebrow="Analitika" title="Raportet" />
+        <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-5 py-6">
+          <p className="text-sm font-semibold text-[#7f1d1d]">
+            Të dhënat e raporteve nuk mund të lexohen për momentin.
+          </p>
+          <p className="mt-1 text-[13px] text-[#991b1b]">
+            Rifreskoni faqen. Nëse problemi vazhdon, njoftoni mbështetjen.
+          </p>
+        </div>
+      </>
     );
   }
-
-  const serializedGenerated = JSON.parse(JSON.stringify(generated)) as unknown;
-  const serializedPicker = JSON.parse(JSON.stringify(picker)) as unknown;
-
-  return (
-    <RaportetDashboardClient
-      catalog={catalog}
-      generated={serializedGenerated as never}
-      picker={serializedPicker as never}
-    />
-  );
 }
