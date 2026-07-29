@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { adminPath } from "@/lib/admin-path";
 import {
+  copyCompanyMembershipsAction,
   createBrandGroupAction,
   createCompanyAction,
   setCompanyBrandGroupAction,
@@ -103,7 +104,21 @@ export function CompanyGroupTabs({
         return;
       }
 
-      toast.success(`${newCompanyName} u krijua.`);
+      // Without this, a brand-new company sits with zero users — the customer who already
+      // manages the rest of the group wouldn't see it, and giving them access would look
+      // like creating a new login rather than extending the one they already have.
+      const copy = await copyCompanyMembershipsAction({
+        fromCompanyId: currentCompanyId,
+        toCompanyId: res.data.id,
+      });
+      if (copy.ok && copy.data && copy.data.copied > 0) {
+        toast.success(
+          `${newCompanyName} u krijua — ${copy.data.copied} përdorues morën qasje automatikisht.`,
+        );
+      } else {
+        toast.success(`${newCompanyName} u krijua.`);
+      }
+
       setOpen(false);
       router.push(adminPath(`bizneset/${res.data.id}`));
     });

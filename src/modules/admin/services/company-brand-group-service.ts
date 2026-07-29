@@ -10,20 +10,6 @@ import type { CreateCompanyUserInput } from "@/modules/admin/validation/admin-sc
  * comes from UserCompanyMembership — one row per company, never inherited from the group.
  */
 
-export interface AdminBrandGroupListItem {
-  id: string;
-  name: string;
-  companyCount: number;
-}
-
-export async function listBrandGroupsForAdmin(): Promise<AdminBrandGroupListItem[]> {
-  const rows = await prisma.companyBrandGroup.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, _count: { select: { companies: true } } },
-  });
-  return rows.map((r) => ({ id: r.id, name: r.name, companyCount: r._count.companies }));
-}
-
 export async function createBrandGroup(name: string): Promise<{ id: string; name: string }> {
   return prisma.companyBrandGroup.create({
     data: { name: name.trim() },
@@ -64,6 +50,66 @@ export async function listBrandGroupSiblings(companyId: string): Promise<BrandGr
     orderBy: { legalName: "asc" },
     select: { id: true, legalName: true, tradeName: true, fiscalNumber: true, status: true },
   });
+}
+
+export type CopyMembershipsResult =
+  | { ok: true; copied: number }
+  | { ok: false; code: "SOURCE_NOT_FOUND" | "NOT_SAME_GROUP" };
+
+/**
+ * Carries a company's current active users over to a brand-new sibling.
+ *
+ * This is what makes "+ Kompani e Re" a complete action: without it, a freshly
+ * created company would have zero memberships, so the customer who already
+ * manages the rest of the group couldn't see it — the dashboard switcher only
+ * ever lists companies the logged-in user has a membership row on, and nothing
+ * grants one automatically just because two companies share a brand group.
+ *
+ * Only ACTIVE memberships are copied (a disabled one shouldn't come back to
+ * life on a new company), and a user who somehow already has a row on the
+ * target is skipped rather than erroring — this only ever runs right after
+ * `provisionCompany`, so that shouldn't happen, but it costs nothing to be safe.
+ */
+export async function copyCompanyMemberships(
+  fromCompanyId: string,
+  toCompanyId: string,
+): Promise<CopyMembershipsResult> {
+  const [from, to] = await Promise.all([
+    prisma.company.findUnique({ where: { id: fromCompanyId }, select: { brandGroupId: true } }),
+    prisma.company.findUnique({ where: { id: toCompanyId }, select: { brandGroupId: true } }),
+  ]);
+  if (!from) return { ok: false, code: "SOURCE_NOT_FOUND" };
+  if (!from.brandGroupId || from.brandGroupId !== to?.brandGroupId) {
+    return { ok: false, code: "NOT_SAME_GROUP" };
+  }
+
+  const sourceMemberships = await prisma.userCompanyMembership.findMany({
+    where: { companyId: fromCompanyId, isActive: true },
+    select: { userId: true, role: true },
+  });
+
+  let copied = 0;
+  for (const m of sourceMemberships) {
+    const existing = await prisma.userCompanyMembership.findUnique({
+      where: { userId_companyId: { userId: m.userId, companyId: toCompanyId } },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    await prisma.userCompanyMembership.create({
+      data: {
+        userId: m.userId,
+        companyId: toCompanyId,
+        role: m.role,
+        isActive: true,
+        invitedAt: new Date(),
+        acceptedAt: new Date(),
+      },
+    });
+    copied += 1;
+  }
+
+  return { ok: true, copied };
 }
 
 export interface BrandGroupAttachOutcome {

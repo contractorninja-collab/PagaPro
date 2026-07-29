@@ -19,9 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { PageHeader } from "@/components/patterns/page-header";
-import { CompanyForm, type BrandGroupOption, type CompanyFormValues } from "@/components/admin/company-form";
+import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
 import { adminPath } from "@/lib/admin-path";
-import { createBrandGroupAction, createCompanyAction } from "@/modules/admin/actions/admin-actions";
+import { createCompanyAction } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyListItem } from "@/modules/admin/services/admin-service";
 
 const STATUS_LABELS: Record<AdminCompanyListItem["status"], { label: string; variant: "success" | "warning" | "secondary" }> = {
@@ -30,13 +30,7 @@ const STATUS_LABELS: Record<AdminCompanyListItem["status"], { label: string; var
   ARCHIVED: { label: "I arkivuar", variant: "secondary" },
 };
 
-export function BiznesetClient({
-  companies,
-  brandGroups,
-}: {
-  companies: AdminCompanyListItem[];
-  brandGroups: BrandGroupOption[];
-}) {
+export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -58,18 +52,9 @@ export function BiznesetClient({
     setError(null);
     setFieldErrors({});
     startTransition(async () => {
-      // An inline "+ krijo grup" has to exist before the company can point at it.
-      let brandGroupId = values.brandGroupId;
-      if (values.newBrandGroupName.trim()) {
-        const g = await createBrandGroupAction({ name: values.newBrandGroupName });
-        if (!g.ok || !g.data) {
-          setError(g.ok ? "Krijimi i grupit dështoi." : g.error);
-          return;
-        }
-        brandGroupId = g.data.id;
-      }
-
-      const res = await createCompanyAction({ ...values, brandGroupId: brandGroupId || null });
+      // Always ungrouped from here — to add this company to (or start) a brand
+      // group, use "+ Kompani e Re" from an existing member's own page.
+      const res = await createCompanyAction(values);
       if (res.ok && res.data) {
         toast.success(
           `Biznesi u krijua. U instaluan ${res.data.templatesSeeded} shabllone dokumentesh.`,
@@ -116,7 +101,6 @@ export function BiznesetClient({
                 </DialogDescription>
               </DialogHeader>
               <CompanyForm
-                brandGroups={brandGroups}
                 submitLabel="Krijo biznesin"
                 pendingLabel="Duke krijuar…"
                 isPending={isPending}

@@ -20,14 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
-import { CompanyForm, type BrandGroupOption, type CompanyFormValues } from "@/components/admin/company-form";
+import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
 import { CompanyGroupTabs } from "@/components/admin/company-group-tabs";
 import { TimeClockCard } from "@/components/admin/time-clock-card";
 import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
 import {
   addUserToBrandGroupCompaniesAction,
-  createBrandGroupAction,
   createCompanyUserAction,
   resetUserPasswordAction,
   setCompanyStatusAction,
@@ -104,13 +103,11 @@ export function BiznesDetailClient({
   company,
   timeClockDevices,
   appOrigin,
-  brandGroups,
   brandGroupSiblings,
 }: {
   company: AdminCompanyDetail;
   timeClockDevices: TimeClockDeviceRow[];
   appOrigin: string;
-  brandGroups: BrandGroupOption[];
   /** Other companies sharing this company's brand — empty when ungrouped. */
   brandGroupSiblings: BrandGroupSibling[];
 }) {
@@ -153,29 +150,15 @@ export function BiznesDetailClient({
     addressLine: company.addressLine ?? "",
     city: company.city ?? "",
     postalCode: company.postalCode ?? "",
-    brandGroupId: company.brandGroupId ?? "",
-    newBrandGroupName: "",
   };
 
   function onUpdate(values: CompanyFormValues) {
     setEditError(null);
     setEditFieldErrors({});
     startEditTransition(async () => {
-      // An inline "+ krijo grup" has to exist before the company can point at it.
-      let brandGroupId = values.brandGroupId;
-      if (values.newBrandGroupName.trim()) {
-        const g = await createBrandGroupAction({ name: values.newBrandGroupName });
-        if (!g.ok || !g.data) {
-          setEditError(g.ok ? "Krijimi i grupit dështoi." : g.error);
-          return;
-        }
-        brandGroupId = g.data.id;
-      }
-
-      const res = await updateCompanyAction({
-        companyId: company.id,
-        payload: { ...values, brandGroupId: brandGroupId || null },
-      });
+      // Grouping isn't part of this form — updateCompanyForAdmin leaves the
+      // company's existing brandGroupId untouched when the payload omits it.
+      const res = await updateCompanyAction({ companyId: company.id, payload: values });
       if (res.ok) {
         toast.success("Të dhënat e biznesit u ruajtën.");
         router.refresh();
@@ -359,7 +342,6 @@ export function BiznesDetailClient({
           <CardContent>
             <CompanyForm
               initialValues={initialFormValues}
-              brandGroups={brandGroups}
               submitLabel="Ruaj ndryshimet"
               pendingLabel="Duke ruajtur…"
               isPending={editPending}

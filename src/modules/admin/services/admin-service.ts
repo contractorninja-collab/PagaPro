@@ -216,7 +216,10 @@ export async function updateCompanyForAdmin(
         addressLine: input.addressLine ?? null,
         city: input.city ?? null,
         postalCode: input.postalCode ?? null,
-        brandGroupId: input.brandGroupId ?? null,
+        // The edit form no longer carries brandGroupId — grouping lives entirely in
+        // CompanyGroupTabs now — so an absent key must leave the existing group alone
+        // rather than reading as "clear it". `null` (an explicit ungroup) still applies.
+        ...(input.brandGroupId !== undefined ? { brandGroupId: input.brandGroupId } : {}),
       },
     });
     return { ok: true };

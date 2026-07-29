@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCompanyDetailForAdmin } from "@/modules/admin/services/admin-service";
-import {
-  listBrandGroupsForAdmin,
-  listBrandGroupSiblings,
-} from "@/modules/admin/services/company-brand-group-service";
+import { listBrandGroupSiblings } from "@/modules/admin/services/company-brand-group-service";
 import { listTimeClockDevices } from "@/modules/timeclock/services/timeclock-device-service";
 import { BiznesDetailClient } from "./biznes-detail-client";
 
@@ -20,9 +17,8 @@ export default async function BiznesDetailPage({ params }: { params: Promise<{ i
   const company = await getCompanyDetailForAdmin(id);
   if (!company) notFound();
 
-  const [devices, brandGroups, brandGroupSiblings] = await Promise.all([
+  const [devices, brandGroupSiblings] = await Promise.all([
     company.timeClockEnabled ? listTimeClockDevices(company.id) : Promise.resolve([]),
-    listBrandGroupsForAdmin(),
     listBrandGroupSiblings(company.id),
   ]);
 
@@ -38,7 +34,6 @@ export default async function BiznesDetailPage({ params }: { params: Promise<{ i
       company={company}
       timeClockDevices={devices}
       appOrigin={appOrigin}
-      brandGroups={brandGroups}
       brandGroupSiblings={brandGroupSiblings}
     />
   );

@@ -15,6 +15,7 @@ import {
 } from "@/modules/admin/services/admin-service";
 import {
   addUserToBrandGroupCompanies,
+  copyCompanyMemberships,
   createBrandGroup,
   setCompanyBrandGroup,
   type BrandGroupAttachOutcome,
@@ -280,6 +281,38 @@ export async function addUserToBrandGroupCompaniesAction(
   } catch (err) {
     console.error("[addUserToBrandGroupCompaniesAction] unexpected:", err);
     return { ok: false, error: "Shtimi i përdoruesit në grup dështoi." };
+  }
+}
+
+const copyMembershipsSchema = z.object({
+  fromCompanyId: z.string().min(1),
+  toCompanyId: z.string().min(1),
+});
+
+/**
+ * Carries a company's current users over to a sibling just created for the
+ * same brand — called right after creating that sibling, so a fresh company
+ * never sits with zero memberships. Without this, the customer who already
+ * manages the rest of the group wouldn't see the new one on their dashboard,
+ * and adding it back would look like creating a brand new user.
+ */
+export async function copyCompanyMembershipsAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ copied: number }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = copyMembershipsSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const res = await copyCompanyMemberships(parsed.data.fromCompanyId, parsed.data.toCompanyId);
+    if (!res.ok) return { ok: false, error: "Kopjimi i qasjeve dështoi." };
+
+    revalidateBizneset(parsed.data.toCompanyId);
+    return { ok: true, data: { copied: res.copied } };
+  } catch (err) {
+    console.error("[copyCompanyMembershipsAction] unexpected:", err);
+    return { ok: false, error: "Kopjimi i qasjeve dështoi papritur." };
   }
 }
 
