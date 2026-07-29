@@ -13,7 +13,12 @@ import {
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import { payrollImpactLabel } from "@/modules/leaves/helpers/payroll-impact-label";
-import { LEAVE_CARD, LEAVE_TYPE_TONES } from "@/modules/leaves/components/leave-ui";
+import {
+  LEAVE_CARD,
+  LEAVE_TYPE_TONES,
+  LeaveFlagPills,
+  type LeaveConflictFlag,
+} from "@/modules/leaves/components/leave-ui";
 import type { PushimetLeaveRowDto } from "@/modules/leaves/types/pushimet";
 
 const TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
@@ -21,12 +26,16 @@ const TD = "px-4 py-3 align-middle";
 
 export function LeaveRequestsTable(props: {
   rows: PushimetLeaveRowDto[];
+  /** Decision-support warnings, rendered on the row itself. */
+  flagsFor?: (row: PushimetLeaveRowDto) => LeaveConflictFlag[];
+  /** The row currently running a mutation — blocks a second click. */
+  busyId?: string | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCancel: (id: string) => void;
   onGenerate: (id: string) => void;
 }) {
-  const { rows, onApprove, onReject, onCancel, onGenerate } = props;
+  const { rows, flagsFor, busyId, onApprove, onReject, onCancel, onGenerate } = props;
 
   if (rows.length === 0) {
     return (
@@ -56,6 +65,8 @@ export function LeaveRequestsTable(props: {
           <tbody>
             {rows.map((row) => {
               const tone = LEAVE_TYPE_TONES[row.type];
+              const flags = flagsFor?.(row) ?? [];
+              const busy = busyId === row.id;
               return (
                 <tr
                   key={row.id}
@@ -67,6 +78,7 @@ export function LeaveRequestsTable(props: {
                       {row.departmentName ? (
                         <span className="text-xs text-[#64748b]">{row.departmentName}</span>
                       ) : null}
+                      <LeaveFlagPills flags={flags} className="mt-1.5" />
                     </div>
                   </td>
                   <td className={TD}>
@@ -110,12 +122,16 @@ export function LeaveRequestsTable(props: {
                         <DropdownMenuSeparator />
                         {row.status === "PENDING" ? (
                           <>
-                            <DropdownMenuItem onClick={() => onApprove(row.id)}>Mirato</DropdownMenuItem>
+                            <DropdownMenuItem disabled={busy} onClick={() => onApprove(row.id)}>
+                              Mirato
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onReject(row.id)}>Refuzo…</DropdownMenuItem>
                           </>
                         ) : null}
                         {row.status === "DRAFT" || row.status === "PENDING" ? (
-                          <DropdownMenuItem onClick={() => onCancel(row.id)}>Anulo</DropdownMenuItem>
+                          <DropdownMenuItem disabled={busy} onClick={() => onCancel(row.id)}>
+                            Anulo kërkesën
+                          </DropdownMenuItem>
                         ) : null}
                         {row.status === "APPROVED" ? (
                           <DropdownMenuItem onClick={() => onGenerate(row.id)}>

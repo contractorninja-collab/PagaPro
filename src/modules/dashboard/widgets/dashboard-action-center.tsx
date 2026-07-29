@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,10 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
-import {
-  approveLeaveRequestAction,
-  rejectLeaveRequestAction,
-} from "@/modules/leaves/actions/leave-actions";
+import { approveLeaveRequestAction } from "@/modules/leaves/actions/leave-actions";
+import { LeaveRejectDialog } from "@/modules/leaves/components/leave-reject-dialog";
 import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
 import type {
   ContractExpiryRow,
@@ -164,15 +162,23 @@ export function DashboardActionCenter(props: {
 }) {
   const router = useRouter();
 
-  async function decideLeave(id: string, mode: "approve" | "reject") {
-    const fn = mode === "approve" ? approveLeaveRequestAction : rejectLeaveRequestAction;
-    const r = await fn(id);
-    if (!r.ok) {
-      toast.error(r.error);
-      return;
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function approveLeave(id: string) {
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const r = await approveLeaveRequestAction(id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Pushimi u miratua.");
+      router.refresh();
+    } finally {
+      setBusyId(null);
     }
-    toast.success(mode === "approve" ? "Pushimi u miratua." : "Pushimi u refuzua.");
-    router.refresh();
   }
 
   const items: QueueItem[] = [];
@@ -254,10 +260,15 @@ export function DashboardActionCenter(props: {
       anchorId: idx === 0 ? "leave-requests" : undefined,
       action: (
         <>
-          <button type="button" className={BTN_APPROVE} onClick={() => void decideLeave(row.id, "approve")}>
+          <button
+            type="button"
+            className={BTN_APPROVE}
+            disabled={busyId === row.id}
+            onClick={() => void approveLeave(row.id)}
+          >
             Mirato
           </button>
-          <button type="button" className={BTN_REJECT} onClick={() => void decideLeave(row.id, "reject")}>
+          <button type="button" className={BTN_REJECT} onClick={() => setRejectId(row.id)}>
             Refuzo
           </button>
         </>
@@ -322,6 +333,12 @@ export function DashboardActionCenter(props: {
           ))}
         </ul>
       )}
+
+      <LeaveRejectDialog
+        leaveId={rejectId}
+        onOpenChange={(o) => !o && setRejectId(null)}
+        onRejected={() => router.refresh()}
+      />
     </section>
   );
 }

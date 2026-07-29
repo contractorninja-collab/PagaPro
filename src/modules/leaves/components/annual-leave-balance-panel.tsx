@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { PushimetBalanceRowDto } from "@/modules/leaves/types/pushimet";
 import { LEAVE_CARD, MICRO_LABEL, TonePill } from "@/modules/leaves/components/leave-ui";
 
@@ -28,9 +28,12 @@ function daysUntil(iso: string | null): number | null {
 export function AnnualLeaveBalancePanel({
   balances,
   year,
+  action,
 }: {
   balances: PushimetBalanceRowDto[];
   year: number;
+  /** Header slot — carries the explicit "Rifresko balancat" control. */
+  action?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
 
@@ -72,21 +75,27 @@ export function AnnualLeaveBalancePanel({
   if (annual.length === 0) {
     return (
       <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-8 text-center text-[13px] text-[#64748b]">
-        Nuk ka balanca të pushimit vjetor për vitin {year} — do të popullohet kur regjistrohen punonjës dhe
-        pushime.
+        <p>
+          Nuk ka balanca të pushimit vjetor për vitin {year} — do të popullohet kur regjistrohen
+          punonjës dhe pushime.
+        </p>
+        {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
       </div>
     );
   }
 
   return (
     <div className={`overflow-hidden ${LEAVE_CARD}`}>
-      <div className="border-b border-[#eef2f7] px-4 py-3.5">
-        <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
-          Pushimi vjetor — bilanci {year}
-        </h2>
-        <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#94a3b8]">
-          {totals.count} punonjës · mbetja e ulët në të verdhë, negative në të kuqe
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
+        <div className="min-w-0">
+          <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+            Pushimi vjetor — bilanci {year}
+          </h2>
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#94a3b8]">
+            {totals.count} punonjës · mbetja e ulët në të verdhë, negative në të kuqe
+          </p>
+        </div>
+        {action}
       </div>
 
       <div className="grid grid-cols-2 gap-px border-b border-[#eef2f7] bg-[#eef2f7]">
@@ -211,6 +220,14 @@ export function AnnualLeaveBalancePanel({
                       <TonePill tone="warning" size="sm">Pritja tejkalon bilancin</TonePill>
                     ) : null}
                   </div>
+                ) : null}
+
+                {b.warnings.length > 0 ? (
+                  <ul className="mt-2 space-y-1 border-l-2 border-[#fcd34d] pl-2.5 text-[11px] leading-relaxed text-[#92400e]">
+                    {b.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
                 ) : null}
               </li>
             );

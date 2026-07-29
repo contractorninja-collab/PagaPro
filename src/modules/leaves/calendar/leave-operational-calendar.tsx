@@ -37,10 +37,17 @@ export function LeaveOperationalCalendar(props: {
   year: number;
   month: number;
   chips: PushimetCalendarChipDto[];
+  /**
+   * `YYYY-MM-DD` public holidays. The day-counting maths has always excluded
+   * these, but the calendar drew them as ordinary working days — so a month
+   * could show fewer leave days than the eye counted, with no explanation.
+   */
+  holidayIsoDates?: string[];
   prevHref?: string;
   nextHref?: string;
 }) {
   const { year, month, chips } = props;
+  const holidays = new Set(props.holidayIsoDates ?? []);
   const first = new Date(Date.UTC(year, month - 1, 1));
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const lead = (first.getUTCDay() + 6) % 7;
@@ -95,21 +102,34 @@ export function LeaveOperationalCalendar(props: {
             }
             const isToday = day === todayDay;
             const dayUtc = new Date(Date.UTC(year, month - 1, day));
+            const isHoliday = holidays.has(dayUtc.toISOString().slice(0, 10));
             const dayChips = chips.filter((c) => overlapsDay(dayUtc, c));
             return (
               <div
                 key={day}
                 className={`flex min-h-[88px] flex-col gap-1 p-1.5 align-top max-md:min-h-[64px] ${
-                  weekend ? "bg-[#fbfcfe]" : "bg-white"
+                  isHoliday ? "bg-[#fffbeb]" : weekend ? "bg-[#fbfcfe]" : "bg-white"
                 } ${isToday ? "ring-2 ring-inset ring-brand-blue" : ""}`}
               >
-                {isToday ? (
-                  <span className="inline-flex h-5 w-5 items-center justify-center self-start rounded-full bg-brand-blue text-[10.5px] font-bold tabular-nums text-white">
-                    {day}
-                  </span>
-                ) : (
-                  <span className="tabular-nums text-[#94a3b8]">{day}</span>
-                )}
+                <span className="flex items-center justify-between gap-1">
+                  {isToday ? (
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-blue text-[10.5px] font-bold tabular-nums text-white">
+                      {day}
+                    </span>
+                  ) : (
+                    <span className={`tabular-nums ${isHoliday ? "text-[#b45309]" : "text-[#94a3b8]"}`}>
+                      {day}
+                    </span>
+                  )}
+                  {isHoliday ? (
+                    <span
+                      className="rounded bg-[#fef3c7] px-1 text-[9px] font-bold uppercase tracking-wide text-[#b45309]"
+                      title="Festë publike — nuk numërohet si ditë pune"
+                    >
+                      Festë
+                    </span>
+                  ) : null}
+                </span>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
                   {dayChips.slice(0, 3).map((c) => {
                     const tone = LEAVE_TYPE_TONES[c.type];
@@ -156,6 +176,12 @@ export function LeaveOperationalCalendar(props: {
             <span className="h-2 w-2 rounded-[3px] border border-dashed border-[#94a3b8] bg-white" aria-hidden />
             Në pritje (e vijëzuar)
           </span>
+          {holidays.size > 0 ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-[3px] bg-[#fef3c7]" aria-hidden />
+              Festë publike
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

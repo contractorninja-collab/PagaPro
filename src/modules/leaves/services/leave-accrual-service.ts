@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
+import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 
 function monthEndUtc(year: number, month: number): Date {
   return new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
@@ -89,6 +90,16 @@ export async function runMonthlyLeaveAccrualForCompany(params: {
     });
     if (r === "created") created++;
     else skipped++;
+  }
+
+  /**
+   * Posting accrual moves every employee's entitlement, so the balances have to
+   * be recomputed from it. The Pushimet page used to do this on every render as
+   * a safety net; now that it does not, the job that changes the numbers is the
+   * one that has to refresh them.
+   */
+  if (created > 0) {
+    await syncLeaveBalancesForCompanyYear(params.companyId, params.periodYear);
   }
 
   return { created, skipped };

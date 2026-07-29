@@ -10,17 +10,23 @@ import {
   BTN_PRIMARY_DENSE,
   BTN_SECONDARY_DENSE,
   LEAVE_CARD,
+  LeaveFlagPills,
+  type LeaveConflictFlag,
 } from "@/modules/leaves/components/leave-ui";
 import type { PushimetLeaveRowDto } from "@/modules/leaves/types/pushimet";
 
 export function LeaveRequestsMobileList(props: {
   rows: PushimetLeaveRowDto[];
+  /** Decision-support warnings — the same set the table and the queue show. */
+  flagsFor?: (row: PushimetLeaveRowDto) => LeaveConflictFlag[];
+  /** The row currently running a mutation — blocks a second tap. */
+  busyId?: string | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCancel: (id: string) => void;
   onGenerate: (id: string) => void;
 }) {
-  const { rows, onApprove, onReject, onCancel, onGenerate } = props;
+  const { rows, flagsFor, busyId, onApprove, onReject, onCancel, onGenerate } = props;
 
   if (rows.length === 0) {
     return (
@@ -32,7 +38,10 @@ export function LeaveRequestsMobileList(props: {
 
   return (
     <div className="flex flex-col gap-3 md:hidden">
-      {rows.map((row) => (
+      {rows.map((row) => {
+        const flags = flagsFor?.(row) ?? [];
+        const busy = busyId === row.id;
+        return (
         <div key={row.id} className={`overflow-hidden p-4 ${LEAVE_CARD}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -43,6 +52,7 @@ export function LeaveRequestsMobileList(props: {
             </div>
             <LeaveStatusBadge status={row.status} />
           </div>
+          <LeaveFlagPills flags={flags} className="mt-2.5" />
           <div className="my-3 border-t border-[#eef2f7]" />
           <dl className="grid grid-cols-2 gap-x-2 gap-y-2 text-xs">
             <div>
@@ -74,11 +84,16 @@ export function LeaveRequestsMobileList(props: {
           </dl>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eef2f7] pt-4">
             <Link href={`/pushimet/${row.id}`} className={BTN_SECONDARY_DENSE}>
-              Detaje
+              Shiko detajet
             </Link>
             {row.status === "PENDING" ? (
               <>
-                <button type="button" className={BTN_PRIMARY_DENSE} onClick={() => onApprove(row.id)}>
+                <button
+                  type="button"
+                  className={BTN_PRIMARY_DENSE}
+                  disabled={busy}
+                  onClick={() => onApprove(row.id)}
+                >
                   Mirato
                 </button>
                 <button type="button" className={BTN_DESTRUCTIVE_DENSE} onClick={() => onReject(row.id)}>
@@ -87,18 +102,24 @@ export function LeaveRequestsMobileList(props: {
               </>
             ) : null}
             {row.status === "DRAFT" || row.status === "PENDING" ? (
-              <button type="button" className={BTN_SECONDARY_DENSE} onClick={() => onCancel(row.id)}>
-                Anulo
+              <button
+                type="button"
+                className={BTN_SECONDARY_DENSE}
+                disabled={busy}
+                onClick={() => onCancel(row.id)}
+              >
+                Anulo kërkesën
               </button>
             ) : null}
             {row.status === "APPROVED" ? (
               <button type="button" className={BTN_SECONDARY_DENSE} onClick={() => onGenerate(row.id)}>
-                Dokument
+                Gjenero dokument…
               </button>
             ) : null}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

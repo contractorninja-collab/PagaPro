@@ -64,6 +64,36 @@ export function TonePill({
   );
 }
 
+/**
+ * A decision-support warning attached to one leave request — negative balance,
+ * a request larger than what is left, payroll impact.
+ *
+ * It lives here rather than in the dashboard because the same warnings have to
+ * reach every surface that can approve: the table, the mobile list and the
+ * pinned queue. They used to render in the queue only, so approving from the
+ * table happened blind.
+ */
+export type LeaveConflictFlag = { key: string; label: string; tone: SemanticTone };
+
+export function LeaveFlagPills({
+  flags,
+  className,
+}: {
+  flags: LeaveConflictFlag[];
+  className?: string;
+}) {
+  if (flags.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className ?? ""}`}>
+      {flags.map((f) => (
+        <TonePill key={f.key} tone={f.tone} size="sm">
+          {f.label}
+        </TonePill>
+      ))}
+    </div>
+  );
+}
+
 /** Calendar / legend color coding per leave TYPE (5b spec). */
 export const LEAVE_TYPE_TONES: Record<
   LeaveType,

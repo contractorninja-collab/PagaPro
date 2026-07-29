@@ -4,7 +4,16 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CalendarDays, CheckCircle2, Clock, FileText, Plus, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Info,
+  RefreshCw,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,38 +27,32 @@ import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operat
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
+import { LeaveRejectDialog } from "@/modules/leaves/components/leave-reject-dialog";
 import {
   BTN_DESTRUCTIVE_DENSE,
-  BTN_PRIMARY,
   BTN_PRIMARY_DENSE,
+  BTN_SECONDARY_DENSE,
   InitialsAvatar,
   LEAVE_CARD,
   LEAVE_TYPE_TONES,
+  LeaveFlagPills,
   LeaveTypePill,
   MICRO_LABEL,
   TonePill,
+  type LeaveConflictFlag,
   type SemanticTone,
 } from "@/modules/leaves/components/leave-ui";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
-import type { LeaveSubtype } from "@prisma/client";
 import {
   approveLeaveRequestAction,
   cancelLeaveRequestAction,
-  createLeaveRequestAction,
   generateLeaveDocumentAction,
-  rejectLeaveRequestAction,
+  refreshLeaveBalancesAction,
 } from "@/modules/leaves/actions/leave-actions";
-import {
-  LEAVE_TYPE_HELP_SQ,
-  LEAVE_TYPE_LABELS_SQ,
-  LEAVE_SUBTYPE_LABELS_SQ,
-  medicalLeaveSubtypeLabel,
-  subtypesForLeaveType,
-} from "@/modules/leaves/helpers/leave-type-metadata";
+import { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import type {
   PushimetBalanceRowDto,
   PushimetCalendarChipDto,
-  PushimetEmployeeOptionDto,
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
@@ -57,11 +60,6 @@ import type {
 function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
   const d = new Date(Date.UTC(year, month - 1 + delta, 1));
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
-}
-
-function utcDayStartMs(iso: string): number {
-  const d = new Date(iso);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 const STAT_TONES: Record<SemanticTone, string> = {
@@ -72,19 +70,26 @@ const STAT_TONES: Record<SemanticTone, string> = {
   neutral: "bg-[#f1f5f9] text-[#64748b]",
 };
 
+/**
+ * A company-wide count. When `href` is given the whole tile filters the list
+ * below — the numbers used to be unclickable, so seeing "7 në pritje" and then
+ * finding them meant re-entering the same thing in the filter form.
+ */
 function StatCard({
   label,
   value,
   icon: Icon,
   tone,
+  href,
 }: {
   label: string;
   value: number;
   icon: LucideIcon;
   tone: SemanticTone;
+  href?: string;
 }) {
-  return (
-    <div className={`flex items-center gap-3.5 p-4 ${LEAVE_CARD}`}>
+  const body = (
+    <>
       <span
         className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] ${STAT_TONES[tone]}`}
       >
@@ -96,42 +101,55 @@ function StatCard({
           {value}
         </p>
       </div>
-    </div>
+    </>
+  );
+
+  if (!href) {
+    return <div className={`flex items-center gap-3.5 p-4 ${LEAVE_CARD}`}>{body}</div>;
+  }
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-3.5 p-4 transition-colors hover:bg-[#f8fafc] ${LEAVE_CARD}`}
+    >
+      {body}
+    </Link>
   );
 }
 
-type ConflictFlag = { key: string; label: string; tone: SemanticTone };
-
 export function PushimetDashboardClient(props: {
   stats: { pending: number; approvedThisUtcMonth: number; draft: number };
+  /** Everything that is not pending, paged. */
   rows: PushimetLeaveRowDto[];
+  /** Pinned to the top and never paged — see listLeaveRequestsPage. */
   pendingRows: PushimetLeaveRowDto[];
+  /** Computed from today on the server, not from the month being viewed. */
+  onLeaveToday: PushimetLeaveRowDto[];
   chips: PushimetCalendarChipDto[];
+  holidayIsoDates: string[];
   calendarYear: number;
   calendarMonth: number;
   balances: PushimetBalanceRowDto[];
-  employees: PushimetEmployeeOptionDto[];
   templates: PushimetTemplateOptionDto[];
+  page: { page: number; pageCount: number; total: number };
+  health: {
+    payrollSyncSkips: number;
+    lastAccrual: { year: number; month: number } | null;
+  };
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pendingUi, startTransition] = useTransition();
 
   const [rejectId, setRejectId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
   const [genId, setGenId] = useState<string | null>(null);
   const [genTemplateId, setGenTemplateId] = useState(props.templates[0]?.id ?? "");
 
-  const [newOpen, setNewOpen] = useState(false);
-  const [newForm, setNewForm] = useState({
-    employeeId: "",
-    type: "PUSHIM_VJETOR" as PushimetLeaveRowDto["type"],
-    subtype: "NONE" as LeaveSubtype,
-    startDateIso: "",
-    endDateIso: "",
-    reason: "",
-  });
+  /** The request currently mutating — `Mirato` had no pending state, so a
+   *  double-click fired the action twice. */
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const prevHref = useMemo(() => {
     const { year, month } = shiftMonth(props.calendarYear, props.calendarMonth, -1);
@@ -149,21 +167,19 @@ export function PushimetDashboardClient(props: {
     return `/pushimet?${p.toString()}`;
   }, [props.calendarMonth, props.calendarYear, searchParams]);
 
-  /** Approved chips overlapping today (UTC), deduplicated by employee — "Sot në pushim". */
+  /**
+   * Who is off today, deduplicated by employee. This used to be filtered out of
+   * the calendar's chips, so paging to another month answered a question about
+   * today with that month's absences.
+   */
   const todayOff = useMemo(() => {
-    const now = new Date();
-    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const seen = new Set<string>();
-    const list: PushimetCalendarChipDto[] = [];
-    for (const c of props.chips) {
-      if (c.status !== "APPROVED") continue;
-      if (today < utcDayStartMs(c.startDateIso) || today > utcDayStartMs(c.endDateIso)) continue;
-      if (seen.has(c.employeeId)) continue;
-      seen.add(c.employeeId);
-      list.push(c);
-    }
-    return list;
-  }, [props.chips]);
+    return props.onLeaveToday.filter((r) => {
+      if (seen.has(r.employeeId)) return false;
+      seen.add(r.employeeId);
+      return true;
+    });
+  }, [props.onLeaveToday]);
 
   const balanceIndex = useMemo(() => {
     const m = new Map<string, PushimetBalanceRowDto>();
@@ -171,8 +187,8 @@ export function PushimetDashboardClient(props: {
     return m;
   }, [props.balances]);
 
-  function conflictFlags(row: PushimetLeaveRowDto): ConflictFlag[] {
-    const flags: ConflictFlag[] = [];
+  function conflictFlags(row: PushimetLeaveRowDto): LeaveConflictFlag[] {
+    const flags: LeaveConflictFlag[] = [];
     if (row.affectsPayroll) flags.push({ key: "payroll", label: "Ndikon në pagë", tone: "info" });
     const bal = balanceIndex.get(`${row.employeeId}:${row.type}`);
     if (bal) {
@@ -202,44 +218,75 @@ export function PushimetDashboardClient(props: {
     [props.balances],
   );
 
+  /**
+   * The accrual job has no scheduler, so "posted a while ago" is the only
+   * signal that nobody has run it. Two months of silence is worth a line.
+   */
+  const accrualStale = useMemo(() => {
+    const last = props.health.lastAccrual;
+    if (!last) return true;
+    const now = new Date();
+    const monthsBehind =
+      (now.getUTCFullYear() - last.year) * 12 + (now.getUTCMonth() + 1 - last.month);
+    return monthsBehind >= 2;
+  }, [props.health.lastAccrual]);
+
+  /**
+   * A stat tile's filter link. Status filters are company-wide questions, so
+   * they clear the employee/department/type narrowing rather than compounding
+   * with it — otherwise the tile's number and the resulting list disagree.
+   */
+  const statusHref = (status: string, monthScoped: boolean) => {
+    const now = new Date();
+    const p = new URLSearchParams();
+    p.set("status", status);
+    p.set("year", String(now.getUTCFullYear()));
+    // `0` = the whole year, so the list matches the tile instead of showing
+    // only the slice that happens to fall in the month on screen.
+    p.set("month", monthScoped ? String(now.getUTCMonth() + 1) : "0");
+    return `/pushimet?${p.toString()}`;
+  };
+
+  const pageHref = (page: number) => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("page", String(Math.max(1, page)));
+    return `/pushimet?${p.toString()}`;
+  };
+
   function refresh() {
     startTransition(() => router.refresh());
   }
 
   async function runApprove(id: string) {
-    const r = await approveLeaveRequestAction(id);
-    if (!r.ok) {
-      toast.error(r.error);
-      return;
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const r = await approveLeaveRequestAction(id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Pushimi u miratua.");
+      refresh();
+    } finally {
+      setBusyId(null);
     }
-    toast.success("Pushimi u miratua.");
-    refresh();
   }
 
   async function runCancel(id: string) {
-    const r = await cancelLeaveRequestAction(id);
-    if (!r.ok) {
-      toast.error(r.error);
-      return;
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const r = await cancelLeaveRequestAction(id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Kërkesa u anulua.");
+      refresh();
+    } finally {
+      setBusyId(null);
     }
-    toast.success("Kërkesa u anulua.");
-    refresh();
-  }
-
-  async function confirmReject() {
-    if (!rejectId) return;
-    const r = await rejectLeaveRequestAction({
-      leaveId: rejectId,
-      rejectionReason: rejectReason.trim() || undefined,
-    });
-    if (!r.ok) {
-      toast.error(r.error);
-      return;
-    }
-    toast.success("Pushimi u refuzua.");
-    setRejectId(null);
-    setRejectReason("");
-    refresh();
   }
 
   async function confirmGenerate() {
@@ -260,27 +307,20 @@ export function PushimetDashboardClient(props: {
     refresh();
   }
 
-  async function submitNewLeave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newForm.employeeId || !newForm.startDateIso || !newForm.endDateIso) {
-      toast.error("Plotësoni punonjësin dhe datat.");
-      return;
+  async function runRefreshBalances() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const r = await refreshLeaveBalancesAction(props.calendarYear);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(`Balancat u rifreskuan për ${props.calendarYear}.`);
+      refresh();
+    } finally {
+      setRefreshing(false);
     }
-    const r = await createLeaveRequestAction({
-      employeeId: newForm.employeeId,
-      type: newForm.type,
-      subtype: newForm.subtype,
-      startDateIso: newForm.startDateIso,
-      endDateIso: newForm.endDateIso,
-      reason: newForm.reason.trim() || null,
-    });
-    if (!r.ok || !r.data?.id) {
-      toast.error(!r.ok ? r.error : "Ruajtja dështoi.");
-      return;
-    }
-    toast.success("Kërkesa u dërgua për miratim.");
-    setNewOpen(false);
-    refresh();
   }
 
   function openGenerate(id: string) {
@@ -296,51 +336,85 @@ export function PushimetDashboardClient(props: {
         </div>
       ) : null}
 
-      {/* 5a — 4-stat strip */}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Në pritje" value={props.stats.pending} icon={Clock} tone="warning" />
-        <StatCard
-          label="Miratuar këtë muaj"
-          value={props.stats.approvedThisUtcMonth}
-          icon={CheckCircle2}
-          tone="success"
-        />
-        <StatCard label="Sot në pushim" value={todayOff.length} icon={CalendarDays} tone="info" />
-        <StatCard label="Draft" value={props.stats.draft} icon={FileText} tone="neutral" />
+      {/* Company-wide, deliberately independent of the filters below — the
+          label says so rather than letting the numbers look filtered. */}
+      <section className="space-y-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Në pritje"
+            value={props.stats.pending}
+            icon={Clock}
+            tone="warning"
+            href={statusHref("PENDING", false)}
+          />
+          <StatCard
+            label="Miratuar këtë muaj"
+            value={props.stats.approvedThisUtcMonth}
+            icon={CheckCircle2}
+            tone="success"
+            href={statusHref("APPROVED", true)}
+          />
+          <StatCard label="Sot në pushim" value={todayOff.length} icon={CalendarDays} tone="info" />
+          <StatCard
+            label="Draft"
+            value={props.stats.draft}
+            icon={FileText}
+            tone="neutral"
+            href={statusHref("DRAFT", false)}
+          />
+        </div>
+        <p className="text-[11.5px] text-[#94a3b8]">
+          Shifrat janë për gjithë kompaninë dhe nuk ndikohen nga filtrat më poshtë. Klikoni një kuti
+          për ta filtruar listën.
+        </p>
       </section>
 
+      {/* Health signals that were previously buried one request deep. */}
+      {props.health.payrollSyncSkips > 0 ? (
+        <div className="flex flex-wrap items-start gap-2.5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" aria-hidden />
+          <div className="min-w-0 text-[13px] leading-relaxed text-[#92400e]">
+            <p className="font-semibold text-[#78350f]">
+              {props.health.payrollSyncSkips} ndryshime pushimi nuk arritën te payroll-i
+            </p>
+            <p>
+              Orët e pushimit në ato payroll-e mund të jenë të vjetruara. Kthejini në DRAFT dhe
+              rifreskoni, ose ndryshojini manualisht në spreadsheet.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {accrualStale ? (
+        <div className="flex flex-wrap items-start gap-2.5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#64748b]" aria-hidden />
+          <p className="min-w-0 text-[13px] leading-relaxed text-[#475569]">
+            {props.health.lastAccrual
+              ? `Akumulimi mujor i pushimeve është postuar së fundi për ${String(props.health.lastAccrual.month).padStart(2, "0")}/${props.health.lastAccrual.year}.`
+              : "Akumulimi mujor i pushimeve nuk është postuar asnjëherë."}{" "}
+            Postimi bëhet manualisht te Konfigurimet.
+          </p>
+        </div>
+      ) : null}
+
       <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Left column — approvals queue, operative list, calendar */}
+        {/* Left column — one list (pending pinned), then the calendar */}
         <div className="min-w-0 space-y-6">
-          <div className={`overflow-hidden ${LEAVE_CARD}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-4">
-              <div className="min-w-0">
-                <h2 className="flex items-center gap-2 text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
-                  Miratimet në pritje
-                  {props.pendingRows.length > 0 ? (
+          {props.pendingRows.length > 0 ? (
+            <div className={`overflow-hidden ${LEAVE_CARD}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-4">
+                <div className="min-w-0">
+                  <h2 className="flex items-center gap-2 text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+                    Presin miratim
                     <TonePill tone="warning" size="sm">
                       {props.pendingRows.length}
                     </TonePill>
-                  ) : null}
-                </h2>
-                <p className="mt-0.5 text-[12px] text-[#64748b]">
-                  Operacion HR — reflektohet menjëherë në payroll pas miratimit.
-                </p>
+                  </h2>
+                  <p className="mt-0.5 text-[12px] text-[#64748b]">
+                    Reflektohet menjëherë në payroll pas miratimit.
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                className={`hidden md:inline-flex ${BTN_PRIMARY}`}
-                onClick={() => setNewOpen(true)}
-              >
-                <Plus className="h-4 w-4" aria-hidden />
-                Kërkesë e re
-              </button>
-            </div>
-            {props.pendingRows.length === 0 ? (
-              <p className="px-5 py-8 text-center text-[13px] text-[#64748b]">
-                Nuk ka kërkesa në pritje.
-              </p>
-            ) : (
               <ul className="divide-y divide-[#f1f5f9]">
                 {props.pendingRows.map((row) => {
                   const flags = conflictFlags(row);
@@ -368,21 +442,14 @@ export function PushimetDashboardClient(props: {
                               : ""}
                             {row.departmentName ? ` · ${row.departmentName}` : ""}
                           </p>
-                          {flags.length > 0 ? (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              {flags.map((f) => (
-                                <TonePill key={f.key} tone={f.tone} size="sm">
-                                  {f.label}
-                                </TonePill>
-                              ))}
-                            </div>
-                          ) : null}
+                          <LeaveFlagPills flags={flags} className="mt-1.5" />
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                         <button
                           type="button"
                           className={BTN_PRIMARY_DENSE}
+                          disabled={busyId === row.id}
                           onClick={() => void runApprove(row.id)}
                         >
                           Mirato
@@ -394,29 +461,34 @@ export function PushimetDashboardClient(props: {
                         >
                           Refuzo
                         </button>
+                        {/* One label for "open this request", everywhere. */}
                         <Link
                           href={`/pushimet/${row.id}`}
                           className="text-[12.5px] font-semibold text-[#64748b] transition-colors hover:text-brand-blue"
                         >
-                          Hape
+                          Shiko detajet
                         </Link>
                       </div>
                     </li>
                   );
                 })}
               </ul>
-            )}
-          </div>
+            </div>
+          ) : null}
 
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
-                Lista operative
+                {props.pendingRows.length > 0 ? "Të vendosura" : "Kërkesat"}
               </h2>
-              <p className="text-[12px] text-[#94a3b8]">Filtrimi aplikon për tabelë dhe kalendar.</p>
+              <p className="text-[12px] text-[#94a3b8]">
+                {props.page.total} kërkesa · filtrimi aplikon edhe për kalendarin
+              </p>
             </div>
             <LeaveRequestsTable
               rows={props.rows}
+              flagsFor={conflictFlags}
+              busyId={busyId}
               onApprove={(id) => void runApprove(id)}
               onReject={(id) => setRejectId(id)}
               onCancel={(id) => void runCancel(id)}
@@ -424,11 +496,37 @@ export function PushimetDashboardClient(props: {
             />
             <LeaveRequestsMobileList
               rows={props.rows}
+              flagsFor={conflictFlags}
+              busyId={busyId}
               onApprove={(id) => void runApprove(id)}
               onReject={(id) => setRejectId(id)}
               onCancel={(id) => void runCancel(id)}
               onGenerate={(id) => openGenerate(id)}
             />
+
+            {props.page.pageCount > 1 ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[12px] text-[#94a3b8]">
+                  Faqja {props.page.page} nga {props.page.pageCount}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={pageHref(props.page.page - 1)}
+                    aria-disabled={props.page.page <= 1}
+                    className={`${BTN_SECONDARY_DENSE} ${props.page.page <= 1 ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    E mëparshmja
+                  </Link>
+                  <Link
+                    href={pageHref(props.page.page + 1)}
+                    aria-disabled={props.page.page >= props.page.pageCount}
+                    className={`${BTN_SECONDARY_DENSE} ${props.page.page >= props.page.pageCount ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    Tjetra
+                  </Link>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* 5b — month calendar */}
@@ -436,6 +534,7 @@ export function PushimetDashboardClient(props: {
             year={props.calendarYear}
             month={props.calendarMonth}
             chips={props.chips.filter((c) => c.status === "APPROVED" || c.status === "PENDING")}
+            holidayIsoDates={props.holidayIsoDates}
             prevHref={prevHref}
             nextHref={nextHref}
           />
@@ -443,7 +542,25 @@ export function PushimetDashboardClient(props: {
 
         {/* Right rail — balances, other quotas, who's off today */}
         <div className="min-w-0 space-y-6">
-          <AnnualLeaveBalancePanel balances={props.balances} year={props.calendarYear} />
+          <AnnualLeaveBalancePanel
+            balances={props.balances}
+            year={props.calendarYear}
+            action={
+              <button
+                type="button"
+                className={BTN_SECONDARY_DENSE}
+                disabled={refreshing}
+                onClick={() => void runRefreshBalances()}
+                title="Rillogarit kuotat dhe mbetjet nga akumulimi dhe pushimet e miratuara"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                  aria-hidden
+                />
+                Rifresko balancat
+              </button>
+            }
+          />
 
           {otherTypeBalances.length > 0 ? (
             <div className={`overflow-hidden ${LEAVE_CARD}`}>
@@ -550,29 +667,11 @@ export function PushimetDashboardClient(props: {
         </div>
       </section>
 
-      <Dialog open={rejectId != null} onOpenChange={(o) => !o && setRejectId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Refuzo kërkesën</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">Mesazhi përfshihet në audit dhe në kronologjinë e punonjësit.</p>
-          <textarea
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            rows={4}
-            placeholder="Arsyeja e refuzimit…"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="ghost" onClick={() => setRejectId(null)}>
-              Anulo
-            </Button>
-            <Button type="button" onClick={() => void confirmReject()}>
-              Konfirmo refuzimin
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LeaveRejectDialog
+        leaveId={rejectId}
+        onOpenChange={(o) => !o && setRejectId(null)}
+        onRejected={refresh}
+      />
 
       <Dialog open={genId != null} onOpenChange={(o) => !o && setGenId(null)}>
         <DialogContent>
@@ -613,129 +712,6 @@ export function PushimetDashboardClient(props: {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={newOpen} onOpenChange={setNewOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Kërkesë e re për pushim</DialogTitle>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={(e) => void submitNewLeave(e)}>
-            <div className="space-y-1">
-              <label htmlFor="nl-emp" className="text-xs font-medium text-muted-foreground">
-                Punonjësi
-              </label>
-              <select
-                id="nl-emp"
-                required
-                value={newForm.employeeId}
-                onChange={(e) => setNewForm((s) => ({ ...s, employeeId: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Zgjidh…</option>
-                {props.employees.map((em) => (
-                  <option key={em.id} value={em.id}>
-                    {em.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="nl-type" className="text-xs font-medium text-muted-foreground">
-                Lloji
-              </label>
-              <select
-                id="nl-type"
-                value={newForm.type}
-                onChange={(e) =>
-                  setNewForm((s) => ({
-                    ...s,
-                    type: e.target.value as PushimetLeaveRowDto["type"],
-                    subtype: "NONE",
-                  }))
-                }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {(Object.keys(LEAVE_TYPE_LABELS_SQ) as PushimetLeaveRowDto["type"][]).map((k) => (
-                  <option key={k} value={k}>
-                    {LEAVE_TYPE_LABELS_SQ[k]}
-                  </option>
-                ))}
-              </select>
-              {newForm.type === "PUSHIM_MJEKESOR" && LEAVE_TYPE_HELP_SQ.PUSHIM_MJEKESOR ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">{LEAVE_TYPE_HELP_SQ.PUSHIM_MJEKESOR}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="nl-subtype" className="text-xs font-medium text-muted-foreground">
-                {newForm.type === "PUSHIM_MJEKESOR" ? "Nën-lloji mjekësor" : "Nën-lloji (Art 39 / Atersi / Lehonie)"}
-              </label>
-              <select
-                id="nl-subtype"
-                value={newForm.subtype}
-                onChange={(e) => setNewForm((s) => ({ ...s, subtype: e.target.value as LeaveSubtype }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {subtypesForLeaveType(newForm.type).map((k) => (
-                  <option key={k} value={k}>
-                    {newForm.type === "PUSHIM_MJEKESOR" ? medicalLeaveSubtypeLabel(k) : LEAVE_SUBTYPE_LABELS_SQ[k]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label htmlFor="nl-start" className="text-xs font-medium text-muted-foreground">
-                  Fillimi
-                </label>
-                <input
-                  id="nl-start"
-                  required
-                  type="date"
-                  value={newForm.startDateIso}
-                  onChange={(e) => setNewForm((s) => ({ ...s, startDateIso: e.target.value }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="nl-end" className="text-xs font-medium text-muted-foreground">
-                  Mbarimi
-                </label>
-                <input
-                  id="nl-end"
-                  required
-                  type="date"
-                  value={newForm.endDateIso}
-                  onChange={(e) => setNewForm((s) => ({ ...s, endDateIso: e.target.value }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="nl-reason" className="text-xs font-medium text-muted-foreground">
-                Arsyeja / shënim
-              </label>
-              <textarea
-                id="nl-reason"
-                rows={3}
-                value={newForm.reason}
-                onChange={(e) => setNewForm((s) => ({ ...s, reason: e.target.value }))}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="ghost" onClick={() => setNewOpen(false)}>
-                Anulo
-              </Button>
-              <Button type="submit">Dërgo për miratim</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <div className="fixed bottom-24 right-4 z-40 md:hidden">
-        <Button type="button" size="lg" className="shadow-lg" onClick={() => setNewOpen(true)}>
-          + Pushim
-        </Button>
-      </div>
     </div>
   );
 }

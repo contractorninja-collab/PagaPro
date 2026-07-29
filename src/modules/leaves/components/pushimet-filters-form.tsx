@@ -154,6 +154,8 @@ export function PushimetFiltersForm(props: {
           Muaji
         </label>
         <select id="pf-month" name="month" defaultValue={defaults.month} className={FIELD_CONTROL}>
+          {/* The list can span the whole year; the calendar still draws one month. */}
+          <option value="0">Të gjithë</option>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
             <option key={m} value={String(m)}>
               {m}

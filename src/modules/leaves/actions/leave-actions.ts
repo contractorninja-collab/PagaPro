@@ -12,6 +12,7 @@ import {
   submitLeaveRequest,
 } from "@/modules/leaves/services/leave-workflow-service";
 import { generateLeavePdfArtifact } from "@/modules/leaves/services/leave-document-service";
+import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 import {
   leaveGenerateDocSchema,
   leaveInterruptLinkSchema,
@@ -214,5 +215,34 @@ export async function generateLeaveDocumentAction(
     return { ok: true, data: { artifactId } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gjenerimi dështoi." };
+  }
+}
+
+/**
+ * Recompute every leave balance for one year on demand.
+ *
+ * The Pushimet page used to run this on every render — a serial per-employee
+ * loop before any markup was produced. The write paths already keep balances
+ * correct, so it is now an explicit action for the cases they cannot cover
+ * (a policy change applied outside the app, a restored backup).
+ */
+export async function refreshLeaveBalancesAction(
+  year: number,
+): Promise<LeaveModuleActionResult<{ synced: number }>> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId } = ctx.context;
+
+  const y = Number(year);
+  if (!Number.isInteger(y) || y < 1970 || y > 2100) {
+    return { ok: false, error: "Vit i pavlefshëm." };
+  }
+
+  try {
+    const synced = await syncLeaveBalancesForCompanyYear(companyId, y);
+    safeRev("/pushimet");
+    return { ok: true, data: { synced } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Rifreskimi dështoi." };
   }
 }

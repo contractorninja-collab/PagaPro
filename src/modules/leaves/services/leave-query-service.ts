@@ -10,7 +10,7 @@ export type LeaveListFilters = {
   month?: number;
 };
 
-export async function listLeaveRequestsFiltered(companyId: string, filters: LeaveListFilters) {
+function leaveWhere(companyId: string, filters: LeaveListFilters): Prisma.LeaveRequestWhereInput {
   const where: Prisma.LeaveRequestWhereInput = { companyId };
 
   if (filters.employeeId) where.employeeId = filters.employeeId;
@@ -29,26 +29,150 @@ export async function listLeaveRequestsFiltered(companyId: string, filters: Leav
     where.AND = [{ startDate: { lte: end } }, { endDate: { gte: start } }];
   }
 
+  return where;
+}
+
+const LEAVE_ROW_INCLUDE = {
+  employee: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      jobTitle: true,
+      departmentId: true,
+      department: { select: { name: true } },
+    },
+  },
+  decidedByMembership: {
+    select: { user: { select: { displayName: true, email: true } } },
+  },
+} as const;
+
+export const LEAVE_PAGE_SIZE = 50;
+
+export async function listLeaveRequestsFiltered(companyId: string, filters: LeaveListFilters) {
   return prisma.leaveRequest.findMany({
-    where,
+    where: leaveWhere(companyId, filters),
     orderBy: [{ startDate: "desc" }],
     take: 400,
-    include: {
-      employee: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          jobTitle: true,
-          departmentId: true,
-          department: { select: { name: true } },
-        },
-      },
-      decidedByMembership: {
-        select: { user: { select: { displayName: true, email: true } } },
-      },
+    include: LEAVE_ROW_INCLUDE,
+  });
+}
+
+/**
+ * The filtered list, split into what needs a decision and what does not.
+ *
+ * Pending requests are returned whole and are *not* part of the pagination —
+ * pinning something to the top only to have page 2 hide it would defeat the
+ * point. Sorting by status in the database would not work either: Postgres
+ * orders an enum by declaration order, which puts DRAFT above PENDING.
+ *
+ * Everything else is paged, oldest decision last.
+ */
+export async function listLeaveRequestsPage(
+  companyId: string,
+  filters: LeaveListFilters,
+  page = 1,
+) {
+  const where = leaveWhere(companyId, filters);
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+
+  const restWhere: Prisma.LeaveRequestWhereInput = {
+    ...where,
+    status: filters.status ?? { not: "PENDING" },
+  };
+  // An explicit PENDING filter means the user asked for exactly that list, so
+  // the pinned block carries it and the paged remainder is empty.
+  const pendingOnly = filters.status === "PENDING";
+
+  const [pending, total, rows] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: { ...where, status: "PENDING" },
+      orderBy: [{ startDate: "asc" }],
+      take: 200,
+      include: LEAVE_ROW_INCLUDE,
+    }),
+    pendingOnly ? Promise.resolve(0) : prisma.leaveRequest.count({ where: restWhere }),
+    pendingOnly
+      ? Promise.resolve([])
+      : prisma.leaveRequest.findMany({
+          where: restWhere,
+          orderBy: [{ startDate: "desc" }],
+          skip: (safePage - 1) * LEAVE_PAGE_SIZE,
+          take: LEAVE_PAGE_SIZE,
+          include: LEAVE_ROW_INCLUDE,
+        }),
+  ]);
+
+  return {
+    pending,
+    rows,
+    total,
+    page: safePage,
+    pageSize: LEAVE_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / LEAVE_PAGE_SIZE)),
+  };
+}
+
+/**
+ * Who is actually off right now.
+ *
+ * This used to be derived client-side from whichever month the calendar was
+ * showing, so paging to August answered "who is off today" with August's
+ * absences. It is a question about today and nothing else.
+ */
+export async function listOnLeaveToday(companyId: string, now = new Date()) {
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  return prisma.leaveRequest.findMany({
+    where: {
+      companyId,
+      status: "APPROVED",
+      startDate: { lte: dayEnd },
+      endDate: { gte: dayStart },
+    },
+    orderBy: [{ endDate: "asc" }],
+    take: 100,
+    include: LEAVE_ROW_INCLUDE,
+  });
+}
+
+/**
+ * Approved leave whose payroll hours never landed. Stale payroll is otherwise
+ * only discoverable by opening one request's timeline and reading it.
+ */
+export async function countPayrollSyncSkips(companyId: string, sinceDays = 60): Promise<number> {
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+  return prisma.employeeTimelineEvent.count({
+    where: {
+      companyId,
+      eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+      occurredAt: { gte: since },
     },
   });
+}
+
+/**
+ * The last month the accrual job posted for. It has no scheduler — the only
+ * trigger is a person clicking a button in Konfigurime — so silence is
+ * indistinguishable from success unless this is on screen.
+ */
+export async function latestAccrualPeriod(
+  companyId: string,
+): Promise<{ year: number; month: number } | null> {
+  const row = await prisma.leaveAccrualLedger.findFirst({
+    where: { companyId },
+    orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }],
+    select: { periodYear: true, periodMonth: true },
+  });
+  return row ? { year: row.periodYear, month: row.periodMonth } : null;
+}
+
+/** True when the year has no balance rows at all — a company's first visit. */
+export async function hasLeaveBalancesForYear(companyId: string, year: number): Promise<boolean> {
+  const count = await prisma.leaveBalance.count({ where: { companyId, year } });
+  return count > 0;
 }
 
 export async function getLeaveRequestDetail(companyId: string, leaveId: string) {
