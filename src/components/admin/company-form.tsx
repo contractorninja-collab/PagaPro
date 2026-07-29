@@ -212,8 +212,9 @@ export function CompanyForm({
             />
           ) : null}
           <p className="text-xs text-muted-foreground">
-            Për klientët me disa kompani nën një brend. Secila kompani mban NUI-n e vet dhe të
-            dhënat mbeten të ndara.
+            Për të bashkuar këtë kompani me një grup ekzistues, ose për ta shkëputur. Për të
+            shtuar një kompani të re në një grup, përdorni butonin &quot;Kompani e Re&quot; te
+            faqja e kompanisë.
           </p>
           <FieldError errors={fieldErrors.brandGroupId} />
         </div>

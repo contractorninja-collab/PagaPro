@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { CompanyForm, type BrandGroupOption, type CompanyFormValues } from "@/components/admin/company-form";
+import { CompanyGroupTabs } from "@/components/admin/company-group-tabs";
 import { TimeClockCard } from "@/components/admin/time-clock-card";
 import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
@@ -341,6 +342,14 @@ export function BiznesDetailClient({
         </div>
       </div>
 
+      <CompanyGroupTabs
+        currentCompanyId={company.id}
+        currentCompanyLabel={company.tradeName?.trim() || company.legalName}
+        brandGroupId={company.brandGroupId}
+        brandGroupName={company.brandGroupName}
+        siblings={brandGroupSiblings}
+      />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -434,53 +443,6 @@ export function BiznesDetailClient({
             )}
           </CardContent>
         </Card>
-
-        {brandGroupSiblings.length > 0 ? (
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle>Kompanitë e tjera në grupin {company.brandGroupName}</CardTitle>
-              <CardDescription>
-                I njëjti brend, entitete të ndara ligjërisht. Të dhënat e secilës mbeten të
-                izoluara — përdoruesit me qasje në më shumë se një kompani i ndërrojnë nga paneli.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kompania</TableHead>
-                    <TableHead>NUI</TableHead>
-                    <TableHead>Statusi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brandGroupSiblings.map((s) => {
-                    const st = STATUS_LABELS[s.status];
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>
-                          <Link
-                            href={adminPath(`bizneset/${s.id}`)}
-                            className="font-medium text-foreground hover:underline"
-                          >
-                            {s.legalName}
-                          </Link>
-                          {s.tradeName ? (
-                            <p className="text-xs text-muted-foreground">{s.tradeName}</p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{s.fiscalNumber ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={st.variant}>{st.label}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : null}
 
         <TimeClockCard
           companyId={company.id}
