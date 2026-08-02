@@ -209,13 +209,14 @@ export async function listLeaveRequestsForGeneration(companyId: string) {
     where: { companyId },
     select: {
       id: true,
+      employeeId: true,
       status: true,
       type: true,
       startDate: true,
       endDate: true,
       employee: { select: { firstName: true, lastName: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { startDate: "desc" },
     take: 200,
   });
 }

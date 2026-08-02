@@ -77,6 +77,9 @@ export interface GenerateTemplateOption {
 export interface GenerateSubjectOption {
   id: string;
   label: string;
+  /** Shown but unselectable — e.g. an employee with no leave case to print. */
+  disabled?: boolean;
+  disabledHint?: string;
 }
 
 interface PreviewRow {
@@ -206,10 +209,15 @@ export function DocumentGenerateWizardClient(props: {
     });
   }
 
+  const selectableSubjects = useMemo(
+    () => subjectOptions.filter((s) => !s.disabled),
+    [subjectOptions],
+  );
+
   function toggleAllSubjects() {
     setSelectedIds((prev) => {
-      if (prev.size === subjectOptions.length) return new Set();
-      return new Set(subjectOptions.map((s) => s.id));
+      if (prev.size === selectableSubjects.length) return new Set();
+      return new Set(selectableSubjects.map((s) => s.id));
     });
   }
 
@@ -500,7 +508,9 @@ export function DocumentGenerateWizardClient(props: {
                     />
                   </div>
                   <button type="button" className={docBtnSecondaryDense} onClick={toggleAllSubjects}>
-                    {selectedIds.size === subjectOptions.length ? "Hiq të gjitha" : "Zgjidh të gjitha"}
+                    {selectedIds.size === selectableSubjects.length && selectableSubjects.length > 0
+                      ? "Hiq të gjitha"
+                      : "Zgjidh të gjitha"}
                   </button>
                 </div>
 
@@ -518,22 +528,36 @@ export function DocumentGenerateWizardClient(props: {
                             <li key={s.id}>
                               <label
                                 className={cn(
-                                  "flex cursor-pointer items-center gap-3 px-3 py-2.5 text-[13px] transition-colors",
-                                  checked ? "bg-[#eff6ff]/60" : "hover:bg-[#f8fafc]",
+                                  "flex items-center gap-3 px-3 py-2.5 text-[13px] transition-colors",
+                                  s.disabled
+                                    ? "cursor-not-allowed opacity-60"
+                                    : checked
+                                      ? "cursor-pointer bg-[#eff6ff]/60"
+                                      : "cursor-pointer hover:bg-[#f8fafc]",
                                 )}
                               >
                                 <input
                                   type="checkbox"
                                   className="h-4 w-4 accent-[#2563EB]"
                                   checked={checked}
+                                  disabled={s.disabled}
                                   onChange={() => toggleSubject(s.id)}
                                 />
                                 <span
                                   className={cn(
-                                    checked ? "font-semibold text-[#0f172a]" : "font-medium text-[#334155]",
+                                    s.disabled
+                                      ? "font-medium text-[#94a3b8]"
+                                      : checked
+                                        ? "font-semibold text-[#0f172a]"
+                                        : "font-medium text-[#334155]",
                                   )}
                                 >
                                   {s.label}
+                                  {s.disabled && s.disabledHint ? (
+                                    <span className="ml-2 text-[12px] font-normal text-[#94a3b8]">
+                                      — {s.disabledHint}
+                                    </span>
+                                  ) : null}
                                 </span>
                               </label>
                             </li>
