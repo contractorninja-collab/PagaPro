@@ -15,6 +15,7 @@ import {
   loadCompanyHolidaysAction,
   seedKosovoOfficialFixedHolidaysAction,
   toggleCompanyHolidayActiveAction,
+  updateCompanyHolidayAction,
 } from "@/modules/konfigurime/actions/company-holiday-actions";
 
 const CATEGORY_LABELS: Record<CompanyHolidayCategory, string> = {
@@ -65,11 +66,30 @@ export function HolidaySettingsPanel({
         toast.error(res.error);
         return;
       }
-      toast.success(`U përditësuan ${res.upserted} festa zyrtare fikse për vitin ${year}.`);
+      toast.success(`U përditësuan ${res.upserted} festa zyrtare për vitin ${year}.`);
+      if (res.movableWithoutDate.length > 0) {
+        toast.warning(
+          `Pa datë të njohur për ${year} (vendosini me kalendarin te rreshti): ${res.movableWithoutDate.join(", ")}.`,
+          { duration: 12000 },
+        );
+      }
       await refresh(year);
     } finally {
       setBusy(false);
     }
+  };
+
+  /** The yearly refresh path for Bajramet/Pashkët: pick the new date straight on the row. */
+  const handleDateChange = async (id: string, observedOnIso: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(observedOnIso)) return;
+    const res = await updateCompanyHolidayAction({ id, observedOnIso });
+    if (!res.ok) {
+      toast.error(res.error);
+      await refresh(year);
+      return;
+    }
+    toast.success("Data e festës u përditësua.");
+    await refresh(year);
   };
 
   const handleToggle = async (id: string, isActive: boolean) => {
@@ -138,7 +158,7 @@ export function HolidaySettingsPanel({
             Ringarko
           </Button>
           <Button type="button" disabled={busy} onClick={() => void handleSeed()}>
-            Importo festat fikse zyrtare (XK)
+            Importo festat zyrtare (XK)
           </Button>
         </div>
       </CardHeader>
@@ -164,7 +184,22 @@ export function HolidaySettingsPanel({
               ) : (
                 holidays.map((h) => (
                   <tr key={h.id} className="border-b border-border last:border-0">
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{h.observedOn}</td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Input
+                        type="date"
+                        className="h-9 w-[150px] font-mono text-xs"
+                        value={h.observedOn}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setHolidays((prev) =>
+                            prev.map((x) => (x.id === h.id ? { ...x, observedOn: v } : x)),
+                          );
+                          void handleDateChange(h.id, v);
+                        }}
+                        aria-label={`Data e festës ${h.name}`}
+                      />
+                    </td>
                     <td className="px-3 py-2">{h.name}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{CATEGORY_LABELS[h.category]}</td>
                     <td className="px-3 py-2">

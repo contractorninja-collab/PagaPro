@@ -45,7 +45,9 @@ const KOSOVO_OFFICIAL_FIXED_SEED = [
   { sourceCode: "XK_NEW_YEAR", month: 1, day: 1, name: "Viti i Ri" },
   { sourceCode: "XK_ORTHODOX_CHRISTMAS", month: 1, day: 7, name: "Krishtlindjet ortodokse" },
   { sourceCode: "XK_INDEPENDENCE_DAY", month: 2, day: 17, name: "Dita e Pavarësisë" },
+  { sourceCode: "XK_CONSTITUTION_DAY", month: 4, day: 9, name: "Dita e Kushtetutës" },
   { sourceCode: "XK_LABOUR_DAY", month: 5, day: 1, name: "Dita Ndërkombëtare e Punës" },
+  { sourceCode: "XK_EUROPE_DAY", month: 5, day: 9, name: "Dita e Evropës" },
   { sourceCode: "XK_CATHOLIC_CHRISTMAS", month: 12, day: 25, name: "Krishtlindjet katolike" },
 ];
 

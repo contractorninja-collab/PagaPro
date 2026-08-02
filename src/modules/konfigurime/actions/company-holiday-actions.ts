@@ -8,7 +8,7 @@ import {
   createCompanyHoliday,
   deleteCompanyHoliday,
   listCompanyHolidaysDto,
-  seedKosovoOfficialFixedHolidaysForYear,
+  seedKosovoOfficialHolidaysForYear,
   setCompanyHolidayActive,
   updateCompanyHoliday,
 } from "@/modules/payroll/services/company-holiday-service";
@@ -39,16 +39,21 @@ export async function loadCompanyHolidaysAction(
 
 export async function seedKosovoOfficialFixedHolidaysAction(
   rawYear: unknown,
-): Promise<{ ok: true; upserted: number } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; upserted: number; movableWithoutDate: string[] } | { ok: false; error: string }
+> {
   const company = await companyIdOrError();
   if (!company.ok) return company;
 
   const yearParsed = yearSchema.safeParse(rawYear);
   if (!yearParsed.success) return { ok: false, error: "Viti jo valid." };
 
-  const { upserted } = await seedKosovoOfficialFixedHolidaysForYear(company.companyId, yearParsed.data);
+  const { upserted, movableWithoutDate } = await seedKosovoOfficialHolidaysForYear(
+    company.companyId,
+    yearParsed.data,
+  );
   revalidatePath("/konfigurime");
-  return { ok: true, upserted };
+  return { ok: true, upserted, movableWithoutDate };
 }
 
 const createSchema = z.object({

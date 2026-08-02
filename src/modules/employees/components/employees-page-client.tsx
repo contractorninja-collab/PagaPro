@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
@@ -117,6 +117,19 @@ export function EmployeesPageClient(props: {
     setDetail(null);
     setSheetOpen(true);
   };
+
+  // `?shto=1` opens the new-employee wizard on arrival — deep-linked from the
+  // Konfigurimet onboarding dead-ends ("+ Shto Punonjës" under Përfaqësuesit).
+  const searchParams = useSearchParams();
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current) return;
+    if (searchParams.get("shto") === "1") {
+      autoOpened.current = true;
+      openCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openEdit = async (row: EmployeeListRowDto) => {
     if (row.status === "TERMINATED") {

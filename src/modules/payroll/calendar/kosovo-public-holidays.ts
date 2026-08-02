@@ -28,8 +28,45 @@ export const KOSOVO_OFFICIAL_FIXED_HOLIDAY_DEFINITIONS: readonly KosovoOfficialF
   { sourceCode: "XK_NEW_YEAR", month: 1, day: 1, defaultNameSq: "Viti i Ri" },
   { sourceCode: "XK_ORTHODOX_CHRISTMAS", month: 1, day: 7, defaultNameSq: "Krishtlindjet ortodokse" },
   { sourceCode: "XK_INDEPENDENCE_DAY", month: 2, day: 17, defaultNameSq: "Dita e Pavarësisë" },
+  { sourceCode: "XK_CONSTITUTION_DAY", month: 4, day: 9, defaultNameSq: "Dita e Kushtetutës" },
   { sourceCode: "XK_LABOUR_DAY", month: 5, day: 1, defaultNameSq: "Dita Ndërkombëtare e Punës" },
+  { sourceCode: "XK_EUROPE_DAY", month: 5, day: 9, defaultNameSq: "Dita e Evropës" },
   { sourceCode: "XK_CATHOLIC_CHRISTMAS", month: 12, day: 25, defaultNameSq: "Krishtlindjet katolike" },
+] as const;
+
+export interface KosovoOfficialMovableHolidayDefinition {
+  sourceCode: string;
+  defaultNameSq: string;
+  /**
+   * Known observed dates per calendar year. Movable feasts (Bajramet, Pashkët)
+   * shift every year — HR refreshes the date from the Festat panel for years
+   * not listed here; the import pre-fills the years we know.
+   */
+  datesByYear: Readonly<Record<number, { month: number; day: number }>>;
+}
+
+/** Official movable holidays (Ligji Nr. 03/L-064). 2026 dates confirmed by the client. */
+export const KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS: readonly KosovoOfficialMovableHolidayDefinition[] = [
+  {
+    sourceCode: "XK_BAJRAM_I_MADH",
+    defaultNameSq: "Bajrami i Madh (Fitër Bajrami)",
+    datesByYear: { 2026: { month: 3, day: 20 } },
+  },
+  {
+    sourceCode: "XK_CATHOLIC_EASTER",
+    defaultNameSq: "Pashkët Katolike",
+    datesByYear: { 2026: { month: 4, day: 5 } },
+  },
+  {
+    sourceCode: "XK_ORTHODOX_EASTER",
+    defaultNameSq: "Pashkët Ortodokse",
+    datesByYear: { 2026: { month: 4, day: 12 } },
+  },
+  {
+    sourceCode: "XK_BAJRAM_I_VOGEL",
+    defaultNameSq: "Bajrami i Vogël (Kurban Bajrami)",
+    datesByYear: { 2026: { month: 5, day: 27 } },
+  },
 ] as const;
 
 function pad2(n: number): string {

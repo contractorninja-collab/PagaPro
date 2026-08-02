@@ -11,6 +11,7 @@ import type { DepartmentWithEmployeeCountDto } from "@/modules/departments/servi
 import { listJobTitlesForCompany, type JobTitleDto } from "@/modules/job-titles/services/job-title-service";
 import { syncPayrollSettingsFromKonfigurime } from "@/modules/payroll/services/payroll-settings-service";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
+import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 
 export interface KonfigurimeRepresentativeDto {
   id?: string;
@@ -64,6 +65,12 @@ export interface KonfigurimePageDto {
   holidaySettings: {
     defaultYear: number;
     holidays: CompanyHolidayDto[];
+  };
+  /** Politika e pushimit vjetor (LeavePolicyParameterSet) — bonusi i përvojës sipas Nenit 37. */
+  leavePolicy: {
+    enableTenureBonus: boolean;
+    tenureBonusEveryYears: number;
+    tenureBonusDaysPerBlock: string;
   };
   departments: DepartmentWithEmployeeCountDto[];
   jobTitles: JobTitleDto[];
@@ -128,7 +135,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
   const cfg = row.configuration;
 
   const defaultHolidayYear = new Date().getUTCFullYear();
-  const [holidays, departments, jobTitles, employeeRows] = await Promise.all([
+  const [holidays, departments, jobTitles, employeeRows, leavePolicyRow] = await Promise.all([
     listCompanyHolidaysDto(row.id, defaultHolidayYear),
     listDepartmentsWithEmployeeCounts(row.id),
     listJobTitlesForCompany(row.id),
@@ -137,6 +144,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
       select: { id: true, firstName: true, lastName: true, jobTitle: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
+    resolveLeavePolicyParameterSet(row.id, new Date()),
   ]);
 
   const employees: KonfigurimeEmployeeOptionDto[] = employeeRows.map((e) => ({
@@ -186,6 +194,11 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
     holidaySettings: {
       defaultYear: defaultHolidayYear,
       holidays,
+    },
+    leavePolicy: {
+      enableTenureBonus: leavePolicyRow.enableTenureBonus,
+      tenureBonusEveryYears: leavePolicyRow.tenureBonusEveryYears,
+      tenureBonusDaysPerBlock: leavePolicyRow.tenureBonusDaysPerBlock.toString(),
     },
     departments,
     jobTitles,

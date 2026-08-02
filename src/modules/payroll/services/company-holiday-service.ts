@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   isoDateUtc,
   KOSOVO_OFFICIAL_FIXED_HOLIDAY_DEFINITIONS,
+  KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS,
 } from "@/modules/payroll/calendar/kosovo-public-holidays";
 
 export interface CompanyHolidayDto {
@@ -143,6 +144,65 @@ export async function seedKosovoOfficialFixedHolidaysForYear(
     upserted++;
   }
   return { upserted };
+}
+
+/**
+ * Full official import: fixed holidays plus the movable ones (Bajramet, Pashkët)
+ * whenever their date for the year is known. Movable rows are matched by
+ * sourceCode — an HR-corrected date is refreshed in place, never duplicated.
+ * Returns how many movable feasts had no known date (HR fills those by hand).
+ */
+export async function seedKosovoOfficialHolidaysForYear(
+  companyId: string,
+  calendarYear: number,
+): Promise<{ upserted: number; movableWithoutDate: string[] }> {
+  const { upserted: fixedUpserted } = await seedKosovoOfficialFixedHolidaysForYear(
+    companyId,
+    calendarYear,
+  );
+  let upserted = fixedUpserted;
+  const movableWithoutDate: string[] = [];
+
+  for (const def of KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS) {
+    const known = def.datesByYear[calendarYear];
+
+    const existing = await prisma.companyHoliday.findFirst({
+      where: { companyId, calendarYear, sourceCode: def.sourceCode },
+      select: { id: true },
+    });
+    if (existing) {
+      // Already imported for this year (possibly with an HR-corrected date) — leave it.
+      continue;
+    }
+    if (!known) {
+      movableWithoutDate.push(def.defaultNameSq);
+      continue;
+    }
+
+    const observedOn = utcDateOnly(calendarYear, known.month, known.day);
+    await prisma.companyHoliday.upsert({
+      where: {
+        companyId_calendarYear_observedOn: { companyId, calendarYear, observedOn },
+      },
+      create: {
+        companyId,
+        calendarYear,
+        observedOn,
+        name: def.defaultNameSq,
+        category: "KOSOVO_OFFICIAL_MOVABLE",
+        isActive: true,
+        sourceCode: def.sourceCode,
+      },
+      update: {
+        name: def.defaultNameSq,
+        category: "KOSOVO_OFFICIAL_MOVABLE",
+        sourceCode: def.sourceCode,
+      },
+    });
+    upserted++;
+  }
+
+  return { upserted, movableWithoutDate };
 }
 
 export async function createCompanyHoliday(params: {

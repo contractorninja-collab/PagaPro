@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, randomClientId } from "@/lib/utils";
 import { useKonfigurimeSave } from "@/modules/konfigurime/hooks/use-konfigurime-save";
+import { setLeaveTenureBonusAction } from "@/modules/konfigurime/actions/leave-policy-actions";
 import type { KonfigurimePageDto, KonfigurimeRepresentativeDto } from "@/modules/konfigurime/services/konfigurime-service";
 
 const fieldGrid = "grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start";
@@ -514,13 +515,15 @@ export function KonfigurimeConfigurator({
                             </select>
                             {initial.employees.length === 0 ? (
                               <p className="mt-2 text-xs text-muted-foreground">
-                                Nuk ka punonjës aktivë — regjistroni një punonjës te{" "}
-                                <Link href="/punonjesit" className="text-primary underline-offset-4 hover:underline">
-                                  Punonjësit
-                                </Link>
-                                .
+                                Nuk ka punonjës aktivë ende — shtojeni direkt me hapësirën më poshtë.
                               </p>
                             ) : null}
+                            <Link
+                              href="/punonjesit?shto=1"
+                              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                            >
+                              + Shto Punonjës
+                            </Link>
                           </FormField>
                           <FormField label="Pozita" hint="Plotësohet automatikisht nga pozita e punonjësit.">
                             <Input
@@ -535,6 +538,12 @@ export function KonfigurimeConfigurator({
                                 Ky punonjës nuk ka pozitë. Vendosni pozitën te profili i punonjësit.
                               </p>
                             ) : null}
+                            <Link
+                              href="/konfigurime?tab=pozitat"
+                              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                            >
+                              + Shto Pozitë
+                            </Link>
                           </FormField>
                         </div>
                       );
@@ -577,32 +586,9 @@ export function KonfigurimeConfigurator({
                       </span>
                     </div>
                   </FormField>
-                  <FormField
-                    label="Paga minimale nga 1 Korrik"
-                    hint="Euro — për planifikim / kujtesë ligjore."
-                    error={fieldErrors["configuration.minimumSalaryFromJuly1"]}
-                  >
-                    <div className="relative">
-                      <Input
-                        id="pay-min-july"
-                        className={cn(
-                          "pr-10 tabular-nums",
-                          fieldErrors["configuration.minimumSalaryFromJuly1"] && "border-destructive ring-1 ring-destructive/35",
-                        )}
-                        aria-invalid={Boolean(fieldErrors["configuration.minimumSalaryFromJuly1"]) || undefined}
-                        value={cfg.minimumSalaryFromJuly1 ?? ""}
-                        onChange={(e) => {
-                          clearFieldErrorKey("configuration.minimumSalaryFromJuly1");
-                          setCfg((c) => ({ ...c, minimumSalaryFromJuly1: e.target.value || null }));
-                        }}
-                        inputMode="decimal"
-                        disabled={pending}
-                      />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                        €
-                      </span>
-                    </div>
-                  </FormField>
+                  {/* "Paga minimale nga 1 Korrik" u hoq nga UI (2026-08): €500 është
+                      aktive që nga 1 korriku dhe jetohet te "Paga minimale aktuale".
+                      Vlera e ruajtur në databazë vazhdon të dërgohet e paprekur. */}
                   <FormField
                     label="Përqindja e Trustit"
                     hint="E njëjta për punonjës dhe punëdhënës (% në bruto; p.sh. 5 për 5% secili)."
@@ -746,62 +732,9 @@ export function KonfigurimeConfigurator({
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-              <CardHeader>
-                <CardTitle>Dokumentet — prefikset</CardTitle>
-                <CardDescription>Përdoren nga motori i gjenerimit të dokumenteve dhe eksporteve PDF.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FormStack className="max-w-2xl gap-6">
-                  <FormField label="Prefix për kontrata" hint="p.sh. KON-" error={fieldErrors["configuration.contractReferencePrefix"]}>
-                    <Input
-                      id="prefix-contract"
-                      className={cn(fieldErrors["configuration.contractReferencePrefix"] && "border-destructive ring-1 ring-destructive/35")}
-                      aria-invalid={Boolean(fieldErrors["configuration.contractReferencePrefix"]) || undefined}
-                      value={cfg.contractReferencePrefix ?? ""}
-                      onChange={(e) => {
-                        clearFieldErrorKey("configuration.contractReferencePrefix");
-                        setCfg((c) => ({ ...c, contractReferencePrefix: e.target.value || null }));
-                      }}
-                      placeholder="KON-"
-                      disabled={pending}
-                    />
-                  </FormField>
-                  <FormField label="Prefix për payroll PDF" hint="p.sh. PAY-" error={fieldErrors["configuration.payrollPdfPrefix"]}>
-                    <Input
-                      id="prefix-payroll"
-                      className={cn(fieldErrors["configuration.payrollPdfPrefix"] && "border-destructive ring-1 ring-destructive/35")}
-                      aria-invalid={Boolean(fieldErrors["configuration.payrollPdfPrefix"]) || undefined}
-                      value={cfg.payrollPdfPrefix ?? ""}
-                      onChange={(e) => {
-                        clearFieldErrorKey("configuration.payrollPdfPrefix");
-                        setCfg((c) => ({ ...c, payrollPdfPrefix: e.target.value || null }));
-                      }}
-                      placeholder="PAY-"
-                      disabled={pending}
-                    />
-                  </FormField>
-                  <FormField
-                    label="Prefix për dokumente të përgjithshme"
-                    hint="p.sh. DOC-"
-                    error={fieldErrors["configuration.generalDocumentPrefix"]}
-                  >
-                    <Input
-                      id="prefix-doc"
-                      className={cn(fieldErrors["configuration.generalDocumentPrefix"] && "border-destructive ring-1 ring-destructive/35")}
-                      aria-invalid={Boolean(fieldErrors["configuration.generalDocumentPrefix"]) || undefined}
-                      value={cfg.generalDocumentPrefix ?? ""}
-                      onChange={(e) => {
-                        clearFieldErrorKey("configuration.generalDocumentPrefix");
-                        setCfg((c) => ({ ...c, generalDocumentPrefix: e.target.value || null }));
-                      }}
-                      placeholder="DOC-"
-                      disabled={pending}
-                    />
-                  </FormField>
-                </FormStack>
-              </CardContent>
-              </Card>
+              {/* Karta "Dokumentet — prefikset" u hoq nga UI (2026-08) me kërkesë:
+                  vetëm logoja e kompanisë mbetet këtu. Vlerat e ruajtura të prefiksave
+                  vazhdojnë të dërgohen të paprekura që motori i dokumenteve të mos prishet. */}
             </div>
           </TabsContent>
 
@@ -917,6 +850,11 @@ export function KonfigurimeConfigurator({
                   </div>
                 </CardContent>
               </Card>
+              <TenureBonusCard
+                initialEnabled={initial.leavePolicy.enableTenureBonus}
+                everyYears={initial.leavePolicy.tenureBonusEveryYears}
+                daysPerBlock={initial.leavePolicy.tenureBonusDaysPerBlock}
+              />
               <LeaveMonthlyAccrualPanel />
             </div>
           </TabsContent>
@@ -976,5 +914,63 @@ export function KonfigurimeConfigurator({
         </Button>
       </div>
     </>
+  );
+}
+
+/**
+ * Neni 37.2 i Ligjit të Punës: +1 ditë pushimi vjetor për çdo 5 vjet të plota
+ * përvojë pune. Motori e llogarit vetë nga data e punësimit — ky çelës vetëm
+ * e ndez/fik për kompaninë dhe rillogarit balancat menjëherë.
+ */
+function TenureBonusCard(props: {
+  initialEnabled: boolean;
+  everyYears: number;
+  daysPerBlock: string;
+}) {
+  const [enabled, setEnabled] = useState(props.initialEnabled);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setEnabled(next);
+    try {
+      const res = await setLeaveTenureBonusAction({ enabled: next });
+      if (!res.ok) {
+        setEnabled(!next);
+        toast.error(res.error);
+        return;
+      }
+      toast.success(
+        next
+          ? "Ditët shtesë sipas përvojës u aktivizuan — balancat u rillogaritën."
+          : "Ditët shtesë sipas përvojës u çaktivizuan — balancat u rillogaritën.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
+        <div className="space-y-1.5">
+          <CardTitle>Ditët shtesë sipas përvojës (Neni 37)</CardTitle>
+          <CardDescription>
+            Ligji i Punës Nr. 03/L-212, Neni 37.2: punëmarrësi fiton{" "}
+            <strong className="text-foreground">
+              +{props.daysPerBlock} ditë pushimi vjetor për çdo {props.everyYears} vjet
+            </strong>{" "}
+            të plota përvojë pune. Kur është aktiv, sistemi e llogarit automatikisht nga data e
+            punësimit dhe e përfshin në kuotën e akumuluar të secilit punonjës.
+          </CardDescription>
+        </div>
+        <Switch
+          checked={enabled}
+          disabled={busy}
+          onCheckedChange={(v) => void toggle(v)}
+          aria-label="Aktivizo ditët shtesë sipas përvojës"
+        />
+      </CardHeader>
+    </Card>
   );
 }
