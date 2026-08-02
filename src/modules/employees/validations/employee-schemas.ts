@@ -16,6 +16,7 @@ export const employmentStatusFieldSchema = z.enum([
   "TERMINATED",
 ]);
 export const workArrangementFieldSchema = z.enum(["ON_SITE", "REMOTE", "HYBRID"]);
+export const employerPrimacyFieldSchema = z.enum(["PRIMARY", "SECONDARY"]);
 export const genderFieldSchema = z.enum(["MALE", "FEMALE", "OTHER", "UNSPECIFIED"]);
 
 function parseOptionalDate(v: unknown): Date | null | undefined {
@@ -76,6 +77,10 @@ export const employeeUpsertSchema = z
     bankAccountIban: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
     applyTrust: z.boolean(),
     applyTax: z.boolean(),
+
+    /// A punonjësi këtu kompaninë kryesore apo dytësore? Sekondar = tatim me normë fikse
+    /// (Ligji mbi TAP). Punonjësi vetë mban përgjegjësinë t'ia deklarojë punëdhënësit të vet.
+    employerPrimacy: employerPrimacyFieldSchema.default("PRIMARY"),
 
     /// Shtetas i huaj (qëndrim i përkohshëm) — the form auto-sets applyTrust=false.
     isForeignNational: z.boolean().default(false),

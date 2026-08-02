@@ -248,6 +248,10 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
             <Row label="Numri i llogarisë" value={e.bankAccountIban ?? "—"} className="font-mono text-xs" />
             <Row label="Apliko Trustin" value={e.applyTrust ? "Po" : "Jo"} />
             <Row label="Apliko tatimin" value={e.applyTax ? "Po" : "Jo"} />
+            <Row
+              label="Punësim"
+              value={e.employerPrimacy === "SECONDARY" ? "Sekondar" : "Primar"}
+            />
             <Row label="Shtetas i huaj" value={e.isForeignNational ? "Po" : "Jo"} />
             {e.isForeignNational ? (
               <Row

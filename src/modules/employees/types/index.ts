@@ -1,6 +1,7 @@
 import type {
   CompensationBasis,
   EmployeeHistoryEventKind,
+  EmployerPrimacy,
   EmploymentStatus,
   EmploymentType,
   Gender,
@@ -9,6 +10,7 @@ import type {
 
 export type {
   EmployeeHistoryEventKind,
+  EmployerPrimacy,
   EmploymentStatus,
   EmploymentType,
   Gender,
@@ -71,6 +73,9 @@ export interface EmployeeDetailDto {
   bankAccountIban: string | null;
   applyTrust: boolean;
   applyTax: boolean;
+  /// Kush e mban si punë kryesore, sipas Ligjit mbi Tatimin në të Ardhurat Personale —
+  /// PRIMARY tatohet me shkallët progresive, SECONDARY me normë fikse te punëdhënësi dytësor.
+  employerPrimacy: EmployerPrimacy;
   isForeignNational: boolean;
   residencePermitExpiryDate: string | null;
   workplace: string | null;

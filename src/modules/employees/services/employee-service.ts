@@ -208,6 +208,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     bankAccountIban: iban,
     applyTrust: e.applyTrust,
     applyTax: e.applyTax,
+    employerPrimacy: e.employerPrimacy,
     isForeignNational: e.isForeignNational,
     residencePermitExpiryDate: e.residencePermitExpiryDate
       ? e.residencePermitExpiryDate.toISOString()
@@ -413,6 +414,7 @@ export async function createEmployee(
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
+          employerPrimacy: input.employerPrimacy,
           isForeignNational: input.isForeignNational,
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? undefined,
           workplace: input.workplace ?? undefined,
@@ -546,6 +548,7 @@ export async function updateEmployee(
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
+          employerPrimacy: input.employerPrimacy,
           isForeignNational: input.isForeignNational,
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? null,
           workplace: input.workplace ?? null,

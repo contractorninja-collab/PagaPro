@@ -66,6 +66,7 @@ export interface EmployeeFormValues {
   bankAccountIban: string;
   applyTrust: boolean;
   applyTax: boolean;
+  employerPrimacy: "PRIMARY" | "SECONDARY";
   isForeignNational: boolean;
   residencePermitExpiryDate: string;
   workplace: string;
@@ -104,6 +105,7 @@ function defaults(): EmployeeFormValues {
     bankAccountIban: "",
     applyTrust: true,
     applyTax: true,
+    employerPrimacy: "PRIMARY",
     isForeignNational: false,
     residencePermitExpiryDate: "",
     workplace: "",
@@ -147,6 +149,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     bankAccountIban: e.bankAccountIban ?? "",
     applyTrust: e.applyTrust,
     applyTax: e.applyTax,
+    employerPrimacy: e.employerPrimacy,
     isForeignNational: e.isForeignNational,
     residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
     workplace: e.workplace ?? "",
@@ -196,6 +199,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     bankAccountIban: v.bankAccountIban || null,
     applyTrust: v.applyTrust,
     applyTax: v.applyTax,
+    employerPrimacy: v.employerPrimacy,
     isForeignNational: v.isForeignNational,
     residencePermitExpiryDate: v.residencePermitExpiryDate || null,
     workplace: v.workplace,
@@ -838,6 +842,30 @@ export function EmployeeFormSheet(props: {
                     disabled={pending || contractorLocks}
                     onCheckedChange={(v) => setValues((s) => ({ ...s, applyTax: v }))}
                   />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="employer-primacy">Punësim</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Sekondar = tatim me normë fikse te ky punëdhënës (Ligji mbi TAP). Vetë
+                      punonjësi mban përgjegjësinë ta deklarojë saktë.
+                    </p>
+                  </div>
+                  <select
+                    id="employer-primacy"
+                    className="flex h-9 w-40 shrink-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={values.employerPrimacy}
+                    disabled={pending}
+                    onChange={(e) =>
+                      setValues((s) => ({
+                        ...s,
+                        employerPrimacy: e.target.value as EmployeeFormValues["employerPrimacy"],
+                      }))
+                    }
+                  >
+                    <option value="PRIMARY">Primar</option>
+                    <option value="SECONDARY">Sekondar</option>
+                  </select>
                 </div>
               </div>
             </div>
