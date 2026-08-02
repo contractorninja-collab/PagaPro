@@ -421,6 +421,22 @@ model Company {
   /// Admin-console controlled, same reasoning as timeClockEnabled.
   contractorPayrollEnabled Boolean @default(false)
 
+  /// Platform billing (admin-console only — tenants never see these).
+  billingPlanId String?
+  billingPlan   BillingPlan? @relation(fields: [billingPlanId], references: [id], onDelete: SetNull)
+  billingCycle  BillingCycle @default(MONTHLY)
+  /// Negotiated price for the chosen cycle; when set it replaces the plan's price.
+  billingPriceOverrideEur Decimal? @db.Decimal(10, 2)
+  billingPaid      Boolean   @default(false)
+  billingPaidUntil DateTime?
+  /// Kur fillon abonimi (data e kontratës / pas muajit falas).
+  billingStartDate DateTime?
+  /// Kur mbaron abonimi — bosh = pa afat, rinovohet sipas ciklit.
+  billingEndDate   DateTime?
+  /// Ditë tolerance pas skadimit të pagesës para se klienti të shënohet vonesë.
+  billingGraceDays Int       @default(7)
+  billingNotes     String?
+
   /// Registered / legal profile contact (distinct from letterhead line in CompanySetting)
   email     String?
   phone     String?
@@ -490,12 +506,45 @@ model CompanyBrandGroup {
   id   String @id @default(cuid())
   name String
 
+  /// Manual group discount, applied once to the group's summed billing total.
+  /// Either a percentage or a fixed € amount (or both); admin-console only.
+  discountPercent   Decimal? @db.Decimal(5, 2)
+  discountAmountEur Decimal? @db.Decimal(10, 2)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   companies Company[]
 
   @@map("company_brand_groups")
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+/// Platform billing catalog (Paketat) — admin-console only, invisible to tenants.
+/// A company points at one plan and picks a cycle; a negotiated deal overrides the price.
+model BillingPlan {
+  id   String @id @default(cuid())
+  name String @unique
+
+  monthlyPriceEur Decimal @db.Decimal(10, 2)
+  annualPriceEur  Decimal @db.Decimal(10, 2)
+
+  /// Soft cap shown next to the live active-employee count — never blocks the client.
+  maxActiveEmployees Int?
+
+  isActive Boolean @default(true)
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies Company[]
+
+  @@map("billing_plans")
 }
 
 /// Company-wide operational defaults consumed by payroll, documents, and leave flows (tenant-isolated).

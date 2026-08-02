@@ -4,6 +4,7 @@ import { generateTempPassword, hashPassword } from "@/modules/auth/services/pass
 import { destroyAllSessionsForUser } from "@/modules/auth/services/session";
 import type { CompanyUpsertInput, CreateCompanyUserInput } from "@/modules/admin/validation/admin-schemas";
 import { tenantUrlForCompany } from "@/server/tenant-domain";
+import { derivePaymentState, type BillingPaymentState } from "@/modules/admin/services/admin-billing-service";
 
 // ---------------------------------------------------------------------------
 // Companies
@@ -23,6 +24,11 @@ export interface AdminCompanyListItem {
   brandGroupId: string | null;
   brandGroupName: string | null;
   userCount: number;
+  /** Live count of employees with status ACTIVE — the plan-usage signal, never a blocker. */
+  activeEmployees: number;
+  planName: string | null;
+  planMaxActiveEmployees: number | null;
+  paymentState: BillingPaymentState;
   createdAt: string;
 }
 
@@ -42,7 +48,17 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
       createdAt: true,
       brandGroupId: true,
       brandGroup: { select: { name: true } },
-      _count: { select: { memberships: true } },
+      billingPlanId: true,
+      billingPlan: { select: { name: true, maxActiveEmployees: true } },
+      billingPaid: true,
+      billingPaidUntil: true,
+      billingGraceDays: true,
+      _count: {
+        select: {
+          memberships: true,
+          employees: { where: { status: "ACTIVE" } },
+        },
+      },
     },
   });
 
@@ -60,6 +76,15 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
     brandGroupId: r.brandGroupId,
     brandGroupName: r.brandGroup?.name ?? null,
     userCount: r._count.memberships,
+    activeEmployees: r._count.employees,
+    planName: r.billingPlan?.name ?? null,
+    planMaxActiveEmployees: r.billingPlan?.maxActiveEmployees ?? null,
+    paymentState: derivePaymentState({
+      hasPlan: r.billingPlanId != null,
+      billingPaid: r.billingPaid,
+      billingPaidUntil: r.billingPaidUntil,
+      billingGraceDays: r.billingGraceDays,
+    }),
     createdAt: r.createdAt.toISOString(),
   }));
 }

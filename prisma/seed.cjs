@@ -292,9 +292,25 @@ async function maybeSeedPlatformAdmin() {
   console.log(`Login at /hyrje, console at ${adminPath}.\n`);
 }
 
+/** Official PagaPRO price list (Çmimet 2026) — upserted by name, safe to re-run. */
+const BILLING_PLAN_SEED = [
+  { name: "Basic", monthlyPriceEur: 10, annualPriceEur: 100, maxActiveEmployees: 9, notes: "4–9 punonjës" },
+  { name: "Pro", monthlyPriceEur: 20, annualPriceEur: 200, maxActiveEmployees: 20, notes: "10–20 punonjës" },
+  { name: "BusinessPRO", monthlyPriceEur: 45, annualPriceEur: 450, maxActiveEmployees: 50, notes: "21–50 punonjës" },
+  { name: "BusinessPRO+", monthlyPriceEur: 85, annualPriceEur: 850, maxActiveEmployees: 100, notes: "51–100 punonjës" },
+];
+
+async function seedBillingPlans() {
+  for (const plan of BILLING_PLAN_SEED) {
+    await prisma.billingPlan.upsert({ where: { name: plan.name }, create: plan, update: plan });
+  }
+  console.log(`Billing plans ensured (${BILLING_PLAN_SEED.length}).`);
+}
+
 async function main() {
   await seedPlaceholderRegistryIfNeeded();
   await maybeSeedPlatformAdmin();
+  await seedBillingPlans();
 
   let companyCreated = false;
   let company = await prisma.company.findFirst({ orderBy: { createdAt: "asc" } });

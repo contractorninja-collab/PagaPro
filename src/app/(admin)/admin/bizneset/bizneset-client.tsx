@@ -30,6 +30,38 @@ const STATUS_LABELS: Record<AdminCompanyListItem["status"], { label: string; var
   ARCHIVED: { label: "I arkivuar", variant: "secondary" },
 };
 
+const PAYMENT_LABELS: Record<
+  AdminCompanyListItem["paymentState"],
+  { label: string; variant: "success" | "warning" | "secondary" | "destructive" }
+> = {
+  PAID: { label: "I paguar", variant: "success" },
+  GRACE: { label: "Në tolerancë", variant: "warning" },
+  OVERDUE: { label: "Vonesë", variant: "destructive" },
+  UNPAID: { label: "I papaguar", variant: "destructive" },
+  NO_PLAN: { label: "Pa paketë", variant: "secondary" },
+};
+
+/** X / cap with a colour that warns as the client approaches or exceeds the plan cap. */
+function EmployeeUsage({ active, cap }: { active: number; cap: number | null }) {
+  const over = cap != null && active > cap;
+  const near = cap != null && !over && active >= cap * 0.8;
+  return (
+    <span
+      className={
+        over
+          ? "font-semibold text-destructive"
+          : near
+            ? "font-semibold text-amber-600"
+            : "text-muted-foreground"
+      }
+      title={cap != null ? `Plani lejon deri në ${cap} punonjës aktivë` : "Pa kufi plani"}
+    >
+      {active}
+      {cap != null ? ` / ${cap}` : ""}
+    </span>
+  );
+}
+
 /**
  * One customer, one cluster: the mother company (the group's oldest) carries
  * the row, and its group companies nest beneath it. A brand with five legal
@@ -161,9 +193,19 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
           </div>
         </TableCell>
         <TableCell className="text-muted-foreground">{c.fiscalNumber ?? "—"}</TableCell>
-        <TableCell className="text-muted-foreground">{c.businessRegistrationNumber ?? "—"}</TableCell>
         <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
         <TableCell className="text-center">{c.userCount}</TableCell>
+        <TableCell className="text-center tabular-nums">
+          <EmployeeUsage active={c.activeEmployees} cap={c.planMaxActiveEmployees} />
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1">
+            <p className="text-sm text-foreground">{c.planName ?? "—"}</p>
+            <Badge variant={PAYMENT_LABELS[c.paymentState].variant} className="font-normal">
+              {PAYMENT_LABELS[c.paymentState].label}
+            </Badge>
+          </div>
+        </TableCell>
         <TableCell>
           <Badge variant={status.variant}>{status.label}</Badge>
         </TableCell>
@@ -240,9 +282,10 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
             <TableRow>
               <TableHead>Emri i Biznesit</TableHead>
               <TableHead>NUI</TableHead>
-              <TableHead>NRB</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Përdorues</TableHead>
+              <TableHead className="text-center">Punonjës aktivë</TableHead>
+              <TableHead>Paketa / Pagesa</TableHead>
               <TableHead>Statusi</TableHead>
             </TableRow>
           </TableHeader>

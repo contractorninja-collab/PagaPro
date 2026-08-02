@@ -24,6 +24,8 @@ import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-
 import { CompanyGroupTabs } from "@/components/admin/company-group-tabs";
 import { TimeClockCard } from "@/components/admin/time-clock-card";
 import { ContractorPayrollCard } from "@/components/admin/contractor-payroll-card";
+import { BillingCard } from "@/components/admin/billing-card";
+import type { BillingPlanDto, CompanyBillingDto } from "@/modules/admin/services/admin-billing-service";
 import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
 import {
@@ -109,6 +111,9 @@ export function BiznesDetailClient({
   appOrigin,
   brandGroupSiblings,
   ungroupedCompanies,
+  billing,
+  billingPlans,
+  brandGroupBilling,
 }: {
   company: AdminCompanyDetail;
   timeClockDevices: TimeClockDeviceRow[];
@@ -117,6 +122,14 @@ export function BiznesDetailClient({
   brandGroupSiblings: BrandGroupSibling[];
   /** Companies in no group yet — adoptable into this brand from the tab strip. */
   ungroupedCompanies: UngroupedCompanyOption[];
+  billing: CompanyBillingDto | null;
+  billingPlans: BillingPlanDto[];
+  brandGroupBilling: {
+    id: string;
+    name: string;
+    discountPercent: string | null;
+    discountAmountEur: string | null;
+  } | null;
 }) {
   const router = useRouter();
   const status = STATUS_LABELS[company.status];
@@ -433,6 +446,15 @@ export function BiznesDetailClient({
             )}
           </CardContent>
         </Card>
+
+        {billing ? (
+          <BillingCard
+            companyId={company.id}
+            billing={billing}
+            plans={billingPlans}
+            brandGroup={brandGroupBilling}
+          />
+        ) : null}
 
         <TimeClockCard
           companyId={company.id}

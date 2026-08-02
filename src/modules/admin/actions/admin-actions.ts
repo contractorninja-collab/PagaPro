@@ -27,6 +27,11 @@ import {
   setTimeClockDeviceActive,
 } from "@/modules/timeclock/services/timeclock-device-service";
 import {
+  setBrandGroupDiscountForAdmin,
+  setCompanyBillingForAdmin,
+  upsertBillingPlanForAdmin,
+} from "@/modules/admin/services/admin-billing-service";
+import {
   companyStatusSchema,
   companyUpsertSchema,
   createCompanyUserSchema,
@@ -341,6 +346,154 @@ export async function setCompanyTimeClockEnabledAction(raw: unknown): Promise<Ad
   } catch (err) {
     console.error("[setCompanyTimeClockEnabledAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi dështoi papritur." };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Platform billing (Paketat, pagesa, zbritjet e grupit)
+// ---------------------------------------------------------------------------
+
+const moneyField = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : v),
+  z.coerce.number().min(0).nullable(),
+);
+
+const dateField = z.preprocess((v) => {
+  if (v === "" || v === null || v === undefined) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "string") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}, z.date().nullable());
+
+const upsertBillingPlanSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().trim().min(1, "Emri i paketës është i detyrueshëm").max(80),
+  monthlyPriceEur: z.coerce.number().min(0),
+  annualPriceEur: z.coerce.number().min(0),
+  maxActiveEmployees: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.coerce.number().int().min(1).nullable(),
+  ),
+  isActive: z.boolean().default(true),
+  notes: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z.string().max(500).nullable().optional(),
+  ),
+});
+
+export async function upsertBillingPlanAction(raw: unknown): Promise<AdminActionResult<{ id: string }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+    const parsed = upsertBillingPlanSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { ok: false, error: "Ju lutem korrigjoni fushat.", fieldErrors: formatAdminFieldErrors(parsed.error) };
+    }
+    const res = await upsertBillingPlanForAdmin({
+      id: parsed.data.id,
+      name: parsed.data.name,
+      monthlyPriceEur: parsed.data.monthlyPriceEur,
+      annualPriceEur: parsed.data.annualPriceEur,
+      maxActiveEmployees: parsed.data.maxActiveEmployees,
+      isActive: parsed.data.isActive,
+      notes: parsed.data.notes ?? null,
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: res.code === "DUPLICATE_NAME" ? "Ekziston tashmë një paketë me këtë emër." : "Ruajtja dështoi.",
+      };
+    }
+    try {
+      revalidatePath(adminPath("financat"));
+    } catch {}
+    revalidateBizneset();
+    return { ok: true, data: { id: res.id } };
+  } catch (err) {
+    console.error("[upsertBillingPlanAction] unexpected:", err);
+    return { ok: false, error: "Ruajtja dështoi papritur." };
+  }
+}
+
+const setCompanyBillingSchema = z.object({
+  companyId: z.string().min(1),
+  billingPlanId: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.string().nullable(),
+  ),
+  billingCycle: z.enum(["MONTHLY", "ANNUAL"]),
+  billingPriceOverrideEur: moneyField,
+  billingPaid: z.boolean(),
+  billingPaidUntil: dateField,
+  billingStartDate: dateField,
+  billingEndDate: dateField,
+  billingGraceDays: z.coerce.number().int().min(0).max(90).default(7),
+  billingNotes: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z.string().max(2000).nullable().optional(),
+  ),
+});
+
+export async function setCompanyBillingAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+    const parsed = setCompanyBillingSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { ok: false, error: "Ju lutem korrigjoni fushat.", fieldErrors: formatAdminFieldErrors(parsed.error) };
+    }
+    const ok = await setCompanyBillingForAdmin(parsed.data.companyId, {
+      billingPlanId: parsed.data.billingPlanId,
+      billingCycle: parsed.data.billingCycle,
+      billingPriceOverrideEur: parsed.data.billingPriceOverrideEur,
+      billingPaid: parsed.data.billingPaid,
+      billingPaidUntil: parsed.data.billingPaidUntil,
+      billingStartDate: parsed.data.billingStartDate,
+      billingEndDate: parsed.data.billingEndDate,
+      billingGraceDays: parsed.data.billingGraceDays,
+      billingNotes: parsed.data.billingNotes ?? null,
+    });
+    if (!ok) return { ok: false, error: "Biznesi nuk u gjet." };
+    try {
+      revalidatePath(adminPath("financat"));
+    } catch {}
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setCompanyBillingAction] unexpected:", err);
+    return { ok: false, error: "Ruajtja dështoi papritur." };
+  }
+}
+
+const setBrandGroupDiscountSchema = z.object({
+  brandGroupId: z.string().min(1),
+  discountPercent: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.coerce.number().min(0).max(100).nullable(),
+  ),
+  discountAmountEur: moneyField,
+});
+
+export async function setBrandGroupDiscountAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+    const parsed = setBrandGroupDiscountSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+    const ok = await setBrandGroupDiscountForAdmin(
+      parsed.data.brandGroupId,
+      parsed.data.discountPercent,
+      parsed.data.discountAmountEur,
+    );
+    if (!ok) return { ok: false, error: "Grupi nuk u gjet." };
+    try {
+      revalidatePath(adminPath("financat"));
+    } catch {}
+    revalidateBizneset();
+    return { ok: true };
+  } catch (err) {
+    console.error("[setBrandGroupDiscountAction] unexpected:", err);
+    return { ok: false, error: "Ruajtja dështoi papritur." };
   }
 }
 

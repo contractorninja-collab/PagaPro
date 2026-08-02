@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, type LucideIcon } from "lucide-react";
+import { Building2, Wallet, type LucideIcon } from "lucide-react";
 import { PagaProLogo, PagaProMark } from "@/components/branding/logo";
 import { sidebarItemClass } from "@/components/layout/sidebar-styles";
 import { adminPath } from "@/lib/admin-path";
@@ -13,7 +13,10 @@ interface AdminNavItem {
   icon: LucideIcon;
 }
 
-const ADMIN_NAV: AdminNavItem[] = [{ href: adminPath("bizneset"), label: "Bizneset", icon: Building2 }];
+const ADMIN_NAV: AdminNavItem[] = [
+  { href: adminPath("bizneset"), label: "Bizneset", icon: Building2 },
+  { href: adminPath("financat"), label: "Financat", icon: Wallet },
+];
 
 export function AdminSidebar() {
   const pathname = usePathname();
