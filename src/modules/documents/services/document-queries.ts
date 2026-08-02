@@ -226,6 +226,7 @@ export async function listTerminationsForGeneration(companyId: string) {
     where: { companyId },
     select: {
       id: true,
+      employeeId: true,
       status: true,
       lastWorkingDay: true,
       employee: { select: { firstName: true, lastName: true } },
@@ -240,6 +241,7 @@ export async function listWarningsForGeneration(companyId: string) {
     where: { companyId },
     select: {
       id: true,
+      employeeId: true,
       status: true,
       issuedAt: true,
       summary: true,

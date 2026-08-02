@@ -18,6 +18,20 @@ const LEAVE_STATUS_LABELS_SQ: Record<string, string> = {
   CANCELLED: "Anuluar",
 };
 
+const TERMINATION_STATUS_LABELS_SQ: Record<string, string> = {
+  DRAFT: "Draft",
+  PENDING_REVIEW: "Në shqyrtim",
+  APPROVED: "Miratuar",
+  COMPLETED: "Përfunduar",
+  CANCELLED: "Anuluar",
+};
+
+const WARNING_STATUS_LABELS_SQ: Record<string, string> = {
+  DRAFT: "Draft",
+  ISSUED: "E lëshuar",
+  VOID: "E anuluar",
+};
+
 function sqDate(d: Date): string {
   return d.toLocaleDateString("sq-AL", { timeZone: "UTC" });
 }
@@ -96,14 +110,38 @@ export default async function DokumentetGeneratePage({
             disabledHint: "pa kërkesë pushimi — regjistrojeni te Pushimet",
           })),
       ]}
-      terminations={terminations.map((r) => ({
-        id: r.id,
-        label: `${r.employee.firstName} ${r.employee.lastName} — ${r.status}`,
-      }))}
-      warnings={warnings.map((r) => ({
-        id: r.id,
-        label: `${r.employee.firstName} ${r.employee.lastName} — ${r.summary.slice(0, 56)}`,
-      }))}
+      terminations={[
+        ...terminations.map((r) => ({
+          id: r.id,
+          label: `${r.employee.lastName} ${r.employee.firstName} — dita e fundit ${sqDate(
+            r.lastWorkingDay,
+          )} (${TERMINATION_STATUS_LABELS_SQ[r.status] ?? r.status})`,
+        })),
+        ...employees
+          .filter((e) => !terminations.some((r) => r.employeeId === e.id))
+          .map((e) => ({
+            id: `no-termination-${e.id}`,
+            label: `${e.lastName} ${e.firstName}`.trim(),
+            disabled: true,
+            disabledHint: "pa largim të regjistruar — hapeni te Largimet",
+          })),
+      ]}
+      warnings={[
+        ...warnings.map((r) => ({
+          id: r.id,
+          label: `${r.employee.lastName} ${r.employee.firstName} — ${r.summary.slice(0, 56)} · ${sqDate(
+            r.issuedAt,
+          )} (${WARNING_STATUS_LABELS_SQ[r.status] ?? r.status})`,
+        })),
+        ...employees
+          .filter((e) => !warnings.some((r) => r.employeeId === e.id))
+          .map((e) => ({
+            id: `no-warning-${e.id}`,
+            label: `${e.lastName} ${e.firstName}`.trim(),
+            disabled: true,
+            disabledHint: "pa vërejtje — lëshojeni te «Lësho vërejtje»",
+          })),
+      ]}
       initialEmployeeId={initialEmployeeId || undefined}
       initialCategory={initialCategory || undefined}
     />
