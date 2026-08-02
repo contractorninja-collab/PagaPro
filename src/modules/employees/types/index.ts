@@ -82,6 +82,8 @@ export interface EmployeeDetailDto {
   residencePermitExpiryDate: string | null;
   workplace: string | null;
   qualification: string | null;
+  /// Vite përvojë pune para kësaj kompanie — vetëm bonusi i Nenit 37.2 e lexon.
+  priorWorkExperienceYears: number;
   badgeCode: string | null;
   emergencyContact: EmployeeEmergencyContactDto | null;
   internalNotes: string | null;

@@ -221,6 +221,7 @@ export async function syncLeaveBalancesForEmployeeYear(
     select: {
       hireDate: true,
       leaveTenureAnchorDate: true,
+      priorWorkExperienceYears: true,
       terminationDate: true,
       isHazardousPosition: true,
       isSingleParent: true,
@@ -240,7 +241,11 @@ export async function syncLeaveBalancesForEmployeeYear(
       ? employee.terminationDate
       : yearEnd;
   const uninterruptedMonths = uninterruptedCalendarMonthsUtc(serviceAnchor, clipEnd);
-  const fullYears = fullYearsOfServiceUtc(serviceAnchor, clipEnd);
+  // Neni 37.2 counts TOTAL work experience for the tenure bonus, so verified
+  // years from previous employers are added on top — while accrual and the
+  // 6-month first-year gate stay anchored to this employment.
+  const fullYears =
+    fullYearsOfServiceUtc(serviceAnchor, clipEnd) + (employee.priorWorkExperienceYears ?? 0);
 
   // Day-level service fractions of the calendar year — the deterministic basis for
   // entitlement-scaled accrual ("to date" = available now, "to year-end" = projection).

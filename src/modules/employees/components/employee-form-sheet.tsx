@@ -72,6 +72,7 @@ export interface EmployeeFormValues {
   residencePermitExpiryDate: string;
   workplace: string;
   qualification: string;
+  priorWorkExperienceYears: string;
   badgeCode: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
@@ -112,6 +113,7 @@ function defaults(): EmployeeFormValues {
     residencePermitExpiryDate: "",
     workplace: "",
     qualification: "",
+    priorWorkExperienceYears: "0",
     badgeCode: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
@@ -157,6 +159,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     residencePermitExpiryDate: isoDateInput(e.residencePermitExpiryDate),
     workplace: e.workplace ?? "",
     qualification: e.qualification ?? "",
+    priorWorkExperienceYears: String(e.priorWorkExperienceYears ?? 0),
     badgeCode: e.badgeCode ?? "",
     emergencyContactName: ec?.fullName ?? "",
     emergencyContactPhone: ec?.phone ?? "",
@@ -208,6 +211,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     residencePermitExpiryDate: v.residencePermitExpiryDate || null,
     workplace: v.workplace,
     qualification: v.qualification,
+    priorWorkExperienceYears: v.priorWorkExperienceYears === "" ? 0 : Number(v.priorWorkExperienceYears),
     badgeCode: v.badgeCode,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
@@ -709,6 +713,22 @@ export function EmployeeFormSheet(props: {
                   onChange={(e) => {
                     clearKey("qualification");
                     setValues((s) => ({ ...s, qualification: e.target.value }));
+                  }}
+                  disabled={pending}
+                />
+              </FormField>
+              <FormField
+                label="Përvoja para kësaj kompanie (vite)"
+                hint="Neni 37.2: +1 ditë pushimi vjetor për çdo 5 vjet përvojë totale pune. Vërtetohet me vërtetim përvoje ose Trust."
+                error={fieldErrors.priorWorkExperienceYears}
+              >
+                <Input
+                  className={cn("tabular-nums", errClass("priorWorkExperienceYears"))}
+                  inputMode="numeric"
+                  value={values.priorWorkExperienceYears}
+                  onChange={(e) => {
+                    clearKey("priorWorkExperienceYears");
+                    setValues((s) => ({ ...s, priorWorkExperienceYears: e.target.value }));
                   }}
                   disabled={pending}
                 />

@@ -915,6 +915,12 @@ model Employee {
   /// Optional anchor when legal tenure ≠ hireDate (collective agreements / transfers)
   leaveTenureAnchorDate DateTime?
 
+  /// Vite të plota përvojë pune PARA kësaj kompanie (Neni 37.2 numëron përvojën
+  /// totale për ditët shtesë: +1 ditë / 5 vjet). Vetëm bonusi i përvojës e lexon —
+  /// akruali dhe pragu 6-mujor mbeten të lidhur me hireDate. HR e vërteton me
+  /// vërtetim përvoje / regjistrat e Trustit.
+  priorWorkExperienceYears Int @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

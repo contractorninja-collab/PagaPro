@@ -103,6 +103,17 @@ export const employeeUpsertSchema = z
     /// Kualifikimi (Neni 11.1.3) — shkollimi/përgatitja profesionale, printohet në kontratë.
     qualification: z.preprocess(emptyToNull, z.string().trim().max(200).nullable().optional()),
 
+    /// Vite të plota përvojë pune para kësaj kompanie (Neni 37.2: +1 ditë pushimi / 5 vjet
+    /// përvojë totale). Vërtetohet me vërtetim përvoje ose regjistrat e Trustit.
+    priorWorkExperienceYears: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? 0 : v),
+      z.coerce
+        .number({ message: "Përvoja duhet të jetë numër" })
+        .int("Përvoja shënohet në vite të plota")
+        .min(0, "Përvoja nuk mund të jetë negative")
+        .max(50, "Maksimumi 50 vjet"),
+    ).default(0),
+
     /// Kodi i kartelës së skanimit — unik brenda kompanisë, vetëm kur ora e punës është aktive.
     badgeCode: z.preprocess(emptyToNull, z.string().trim().max(64).nullable().optional()),
 

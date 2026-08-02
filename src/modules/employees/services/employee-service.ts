@@ -216,6 +216,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
       : null,
     workplace: e.workplace,
     qualification: e.qualification,
+    priorWorkExperienceYears: e.priorWorkExperienceYears,
     badgeCode: e.badgeCode,
     emergencyContact: ec
       ? {
@@ -421,6 +422,7 @@ export async function createEmployee(
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? undefined,
           workplace: input.workplace ?? undefined,
           qualification: input.qualification ?? undefined,
+          priorWorkExperienceYears: input.priorWorkExperienceYears,
           badgeCode: input.badgeCode ?? undefined,
           bankName: input.bankName ?? undefined,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || undefined,
@@ -556,6 +558,7 @@ export async function updateEmployee(
           residencePermitExpiryDate: input.residencePermitExpiryDate ?? null,
           workplace: input.workplace ?? null,
           qualification: input.qualification ?? null,
+          priorWorkExperienceYears: input.priorWorkExperienceYears,
           badgeCode: input.badgeCode ?? null,
           bankName: input.bankName ?? null,
           bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || null,

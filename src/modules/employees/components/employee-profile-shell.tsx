@@ -326,6 +326,12 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
             <Row label="Vendi i punës" value={e.workplace ?? "Selia e kompanisë"} />
             {timeClockEnabled ? <Row label="Kodi i kartelës" value={e.badgeCode ?? "—"} /> : null}
             <Row label="Kualifikimi" value={e.qualification ?? "—"} />
+            {/* The Neni 37 bonus itself is computed by the engine from total
+                experience (prior + this employment) — no arithmetic here. */}
+            <Row
+              label="Përvoja para kompanisë"
+              value={e.priorWorkExperienceYears > 0 ? `${e.priorWorkExperienceYears} vjet` : "—"}
+            />
             <Row
               label="Muaj pune praktike"
               value={e.probationMonths && e.probationMonths > 0 ? `${e.probationMonths}` : "—"}
