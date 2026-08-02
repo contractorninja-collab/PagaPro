@@ -2265,6 +2265,11 @@ model LeaveRequest {
   reason           String? @db.Text
   rejectionReason String? @db.Text
 
+  /// Kush e aprovoi tejkalimin e bilancit (tekst i lirë — emri/pozita e menaxherit).
+  /// Kur është vendosur, kërkesa lejohet të kalojë bilancin e akumuluar: bilanci
+  /// shkon në minus (borxh ditësh) dhe rimbushet me akumulimin e muajve në vijim.
+  balanceOverrideApprovedBy String? @db.VarChar(200)
+
   /// Art 34.2 sick-during-annual — linked interruption request (future workflow consumes).
   interruptedByLeaveRequestId String?
   interruptedBy               LeaveRequest? @relation("LeaveInterruption", fields: [interruptedByLeaveRequestId], references: [id], onDelete: SetNull)

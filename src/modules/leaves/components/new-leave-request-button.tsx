@@ -47,11 +47,25 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
     endDateIso: "",
     reason: "",
   });
+  // The balance gate is the one block management may overrule in writing: when
+  // the server says INSUFFICIENT_BALANCE, the dialog opens the override panel
+  // instead of dead-ending — days go into debt and refill as months accrue.
+  const [overridePanel, setOverridePanel] = useState<{ message: string } | null>(null);
+  const [overrideApprovedBy, setOverrideApprovedBy] = useState("");
+
+  function resetOverride() {
+    setOverridePanel(null);
+    setOverrideApprovedBy("");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.employeeId || !form.startDateIso || !form.endDateIso) {
       toast.error("Plotësoni punonjësin dhe datat.");
+      return;
+    }
+    if (overridePanel && overrideApprovedBy.trim().length < 3) {
+      toast.error("Shkruani kush e aprovoi tejkalimin e bilancit.");
       return;
     }
     setSaving(true);
@@ -63,14 +77,28 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
         startDateIso: form.startDateIso,
         endDateIso: form.endDateIso,
         reason: form.reason.trim() || null,
+        balanceOverrideApprovedBy: overridePanel ? overrideApprovedBy.trim() : null,
       });
-      if (!r.ok || !r.data?.id) {
-        toast.error(!r.ok ? r.error : "Ruajtja dështoi.");
+      if (!r.ok) {
+        if (r.code === "INSUFFICIENT_BALANCE") {
+          setOverridePanel({ message: r.error });
+          return;
+        }
+        toast.error(r.error);
         return;
       }
-      toast.success("Kërkesa u dërgua për miratim.");
+      if (!r.data?.id) {
+        toast.error("Ruajtja dështoi.");
+        return;
+      }
+      toast.success(
+        overridePanel
+          ? "Kërkesa u dërgua — bilanci tejkalohet me aprovimin e regjistruar."
+          : "Kërkesa u dërgua për miratim.",
+      );
       setOpen(false);
       setForm((s) => ({ ...s, startDateIso: "", endDateIso: "", reason: "" }));
+      resetOverride();
       router.refresh();
     } finally {
       setSaving(false);
@@ -98,7 +126,10 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                 id="nl-emp"
                 required
                 value={form.employeeId}
-                onChange={(e) => setForm((s) => ({ ...s, employeeId: e.target.value }))}
+                onChange={(e) => {
+                  resetOverride();
+                  setForm((s) => ({ ...s, employeeId: e.target.value }));
+                }}
                 className={FIELD}
               >
                 <option value="">Zgjidh…</option>
@@ -116,9 +147,10 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
               <select
                 id="nl-type"
                 value={form.type}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, type: e.target.value as LeaveType, subtype: "NONE" }))
-                }
+                onChange={(e) => {
+                  resetOverride();
+                  setForm((s) => ({ ...s, type: e.target.value as LeaveType, subtype: "NONE" }));
+                }}
                 className={FIELD}
               >
                 {(Object.keys(LEAVE_TYPE_LABELS_SQ) as LeaveType[]).map((k) => (
@@ -164,7 +196,10 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                   required
                   type="date"
                   value={form.startDateIso}
-                  onChange={(e) => setForm((s) => ({ ...s, startDateIso: e.target.value }))}
+                  onChange={(e) => {
+                    resetOverride();
+                    setForm((s) => ({ ...s, startDateIso: e.target.value }));
+                  }}
                   className={FIELD}
                 />
               </div>
@@ -177,7 +212,10 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                   required
                   type="date"
                   value={form.endDateIso}
-                  onChange={(e) => setForm((s) => ({ ...s, endDateIso: e.target.value }))}
+                  onChange={(e) => {
+                    resetOverride();
+                    setForm((s) => ({ ...s, endDateIso: e.target.value }));
+                  }}
                   className={FIELD}
                 />
               </div>
@@ -194,12 +232,44 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
+            {overridePanel ? (
+              <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[13px] font-semibold text-amber-900">
+                  Nuk ka ditë të mjaftueshme të akumuluara
+                </p>
+                <p className="text-xs leading-relaxed text-amber-900">{overridePanel.message}</p>
+                <p className="text-xs leading-relaxed text-amber-800">
+                  Menaxhmenti mund ta aprovojë megjithatë: bilanci shkon në minus (borxh ditësh)
+                  dhe rimbushet me akumulimin e muajve në vijim. Aprovimi regjistrohet me shkrim
+                  në kërkesë dhe në historik.
+                </p>
+                <div className="space-y-1">
+                  <label htmlFor="nl-override-by" className="text-xs font-medium text-amber-900">
+                    Kush e aprovoi tejkalimin? (emri / pozita) *
+                  </label>
+                  <input
+                    id="nl-override-by"
+                    value={overrideApprovedBy}
+                    onChange={(e) => setOverrideApprovedBy(e.target.value)}
+                    placeholder="p.sh. Ilir Krasniqi, Drejtor"
+                    className={FIELD}
+                  />
+                </div>
+              </div>
+            ) : null}
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setOpen(false);
+                  resetOverride();
+                }}
+              >
                 Mbyll
               </Button>
               <Button type="submit" disabled={saving}>
-                Dërgo për miratim
+                {overridePanel ? "Dërgo me tejkalim bilanci" : "Dërgo për miratim"}
               </Button>
             </DialogFooter>
           </form>

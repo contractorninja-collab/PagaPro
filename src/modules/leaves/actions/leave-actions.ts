@@ -7,6 +7,7 @@ import {
   approveLeaveRequest,
   cancelLeaveRequest,
   createDraftLeaveRequest,
+  InsufficientLeaveBalanceError,
   rejectLeaveRequest,
   revokeApprovedLeaveRequest,
   submitLeaveRequest,
@@ -25,7 +26,12 @@ import { linkApprovedSickInterruptingAnnualLeave } from "@/modules/leaves/servic
 
 export type LeaveModuleActionResult<T = undefined> =
   | { ok: true; data?: T }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      /** Set when the only obstacle is the accumulated balance — the UI offers the written override. */
+      code?: "INSUFFICIENT_BALANCE";
+    };
 
 function safeRev(path: string) {
   try {
@@ -81,23 +87,31 @@ export async function createLeaveRequestAction(
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     return { ok: false, error: "Datat nuk janë valide." };
   }
+  const { id } = await createDraftLeaveRequest({
+    companyId,
+    employeeId: parsed.data.employeeId,
+    type: parsed.data.type,
+    subtype: parsed.data.subtype ?? undefined,
+    startDate: start,
+    endDate: end,
+    reason: parsed.data.reason,
+    createdByUserId: user.id,
+    balanceOverrideApprovedBy: parsed.data.balanceOverrideApprovedBy ?? null,
+  });
   try {
-    const { id } = await createDraftLeaveRequest({
-      companyId,
-      employeeId: parsed.data.employeeId,
-      type: parsed.data.type,
-      subtype: parsed.data.subtype ?? undefined,
-      startDate: start,
-      endDate: end,
-      reason: parsed.data.reason,
-      createdByUserId: user.id,
-    });
     await submitLeaveRequest({ companyId, leaveId: id });
     safeRev("/pushimet");
     safeRev("/paneli");
     return { ok: true, data: { id } };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Dështoi ruajtja." };
+    // The draft was created only to be submitted — a blocked submit would
+    // otherwise leave a stray DRAFT behind on every retry of the dialog.
+    await prisma.leaveRequest.deleteMany({ where: { id, companyId, status: "DRAFT" } });
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Dështoi ruajtja.",
+      ...(e instanceof InsufficientLeaveBalanceError ? { code: "INSUFFICIENT_BALANCE" as const } : {}),
+    };
   }
 }
 

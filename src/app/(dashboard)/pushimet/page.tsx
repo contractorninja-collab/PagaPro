@@ -69,6 +69,7 @@ function serializeLeaveRow(
     affectsPayroll: boolean;
     reason: string | null;
     rejectionReason: string | null;
+    balanceOverrideApprovedBy: string | null;
     decidedAt: Date | null;
     employee: {
       firstName: string;
@@ -100,6 +101,7 @@ function serializeLeaveRow(
     affectsPayroll: lr.affectsPayroll,
     reason: lr.reason,
     rejectionReason: lr.rejectionReason,
+    balanceOverrideApprovedBy: lr.balanceOverrideApprovedBy,
     decidedAtIso: lr.decidedAt?.toISOString() ?? null,
     decidedByLabel:
       lr.decidedByMembership?.user.displayName?.trim() ||

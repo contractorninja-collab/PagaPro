@@ -18,6 +18,8 @@ export type PushimetLeaveRowDto = {
   affectsPayroll: boolean;
   reason: string | null;
   rejectionReason: string | null;
+  /** Kush e aprovoi tejkalimin e bilancit (borxh ditësh) — null kur s'ka tejkalim. */
+  balanceOverrideApprovedBy: string | null;
   decidedAtIso: string | null;
   decidedByLabel: string | null;
 };

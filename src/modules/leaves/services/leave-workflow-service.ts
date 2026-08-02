@@ -12,6 +12,47 @@ import {
   payrollLockedOverlapBlock,
   validateLeaveRequestForWorkflow,
 } from "@/modules/leaves/services/leave-validation-service";
+import {
+  LeaveValidationCode,
+  type LeaveValidationResult,
+} from "@/modules/leaves/engine/validation-result";
+
+/**
+ * Thrown when the ONLY thing stopping a request is the accumulated balance —
+ * the one block management may overrule in writing. The UI catches this to
+ * offer the override path instead of a dead end.
+ */
+export class InsufficientLeaveBalanceError extends Error {}
+
+/**
+ * Management may approve leave beyond the accumulated days ("borxh ditësh"):
+ * the balance goes negative and refills as months accrue. The overrule must be
+ * in writing — balanceOverrideApprovedBy — and only ever bypasses the balance
+ * gate; payroll locks, date conflicts etc. still block.
+ */
+function applyBalanceOverride(
+  validation: LeaveValidationResult,
+  balanceOverrideApprovedBy: string | null,
+): LeaveValidationResult {
+  if (!balanceOverrideApprovedBy?.trim()) return validation;
+  const demoted = validation.blocks.filter(
+    (b) => b.code === LeaveValidationCode.INSUFFICIENT_BALANCE_BLOCK,
+  );
+  if (demoted.length === 0) return validation;
+  return {
+    blocks: validation.blocks.filter(
+      (b) => b.code !== LeaveValidationCode.INSUFFICIENT_BALANCE_BLOCK,
+    ),
+    warnings: [
+      ...validation.warnings,
+      ...demoted.map((b) => ({
+        code: LeaveValidationCode.INSUFFICIENT_BALANCE_WARN,
+        message: `${b.message} Tejkaluar me aprovim me shkrim nga: ${balanceOverrideApprovedBy.trim()}.`,
+        metadata: b.metadata,
+      })),
+    ],
+  };
+}
 import { syncDraftPayrollsForLeaveChange } from "@/modules/payroll/services/payroll-leave-sync-service";
 
 /**
@@ -131,6 +172,8 @@ export async function createDraftLeaveRequest(params: {
   endDate: Date;
   reason?: string | null;
   createdByUserId?: string | null;
+  /** Written management approval to exceed the accumulated balance (name/role). */
+  balanceOverrideApprovedBy?: string | null;
 }): Promise<{ id: string }> {
   const flags = defaultPaidAndPayrollFlags(params.type, params.subtype ?? "NONE");
   const metrics = await computeLeaveMetrics(
@@ -156,6 +199,7 @@ export async function createDraftLeaveRequest(params: {
       isPaid: flags.isPaid,
       affectsPayroll: false,
       reason: params.reason?.trim() || null,
+      balanceOverrideApprovedBy: params.balanceOverrideApprovedBy?.trim() || null,
       createdByUserId: params.createdByUserId ?? undefined,
     },
   });
@@ -186,7 +230,7 @@ export async function submitLeaveRequest(params: { companyId: string; leaveId: s
   if (lr.status !== "DRAFT") throw new Error("Vetëm draft-et mund të dërgohen.");
   if (lr.endDate.getTime() < lr.startDate.getTime()) throw new Error("Data e mbarimit është para fillimit.");
 
-  const validation = await validateLeaveRequestForWorkflow({
+  const rawValidation = await validateLeaveRequestForWorkflow({
     companyId: params.companyId,
     employeeId: lr.employeeId,
     leaveType: lr.type,
@@ -195,6 +239,8 @@ export async function submitLeaveRequest(params: { companyId: string; leaveId: s
     excludeLeaveId: lr.id,
     metricsRuleVersion: lr.metricsRuleVersion,
   });
+  const validation = applyBalanceOverride(rawValidation, lr.balanceOverrideApprovedBy);
+  const overrideApplied = validation.blocks.length < rawValidation.blocks.length;
   if (validation.blocks.length > 0) {
     await appendLeaveTimeline({
       companyId: params.companyId,
@@ -214,7 +260,23 @@ export async function submitLeaveRequest(params: { companyId: string; leaveId: s
         JSON.stringify({ blocks: validation.blocks, warnings: validation.warnings }),
       ) as Prisma.InputJsonValue,
     });
-    throw new Error(validation.blocks[0]?.message ?? "Validimi dështoi.");
+    const message = validation.blocks[0]?.message ?? "Validimi dështoi.";
+    const balanceOnly = validation.blocks.every(
+      (b) => b.code === LeaveValidationCode.INSUFFICIENT_BALANCE_BLOCK,
+    );
+    throw balanceOnly ? new InsufficientLeaveBalanceError(message) : new Error(message);
+  }
+
+  if (overrideApplied) {
+    await appendLeaveTimeline({
+      companyId: params.companyId,
+      employeeId: lr.employeeId,
+      leaveId: lr.id,
+      eventType: "LEAVE_BALANCE_OVERRIDE",
+      title: "Bilanci u tejkalua me aprovim të menaxhmentit",
+      body: `Aprovoi tejkalimin: ${lr.balanceOverrideApprovedBy}. Bilanci shkon në minus dhe rimbushet me akumulimin e muajve në vijim.`,
+      severity: TimelineEventSeverity.WARNING,
+    });
   }
 
   await prisma.$transaction(async (tx) => {
@@ -290,15 +352,18 @@ export async function approveLeaveRequest(params: {
   if (!lr) throw new Error("Kërkesa nuk u gjet.");
   if (lr.status !== "PENDING") throw new Error("Vetëm kërkesat në pritje mund të miratohen.");
 
-  const validation = await validateLeaveRequestForWorkflow({
-    companyId: params.companyId,
-    employeeId: lr.employeeId,
-    leaveType: lr.type,
-    startDate: lr.startDate,
-    endDate: lr.endDate,
-    excludeLeaveId: lr.id,
-    metricsRuleVersion: lr.metricsRuleVersion,
-  });
+  const validation = applyBalanceOverride(
+    await validateLeaveRequestForWorkflow({
+      companyId: params.companyId,
+      employeeId: lr.employeeId,
+      leaveType: lr.type,
+      startDate: lr.startDate,
+      endDate: lr.endDate,
+      excludeLeaveId: lr.id,
+      metricsRuleVersion: lr.metricsRuleVersion,
+    }),
+    lr.balanceOverrideApprovedBy,
+  );
   if (validation.blocks.length > 0) {
     throw new Error(validation.blocks[0]?.message ?? "Miratimi u bllokua nga validimi.");
   }

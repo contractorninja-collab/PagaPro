@@ -293,6 +293,15 @@ export function PushimetDetailClient(props: {
                   <dd className="whitespace-pre-wrap text-[13px] text-[#dc2626]">{row.rejectionReason}</dd>
                 </div>
               ) : null}
+              {row.balanceOverrideApprovedBy ? (
+                <div className="sm:col-span-2">
+                  <dt className={DT}>Tejkalim bilanci (borxh ditësh)</dt>
+                  <dd className="text-[13px] text-amber-700">
+                    Aprovuar me shkrim nga: {row.balanceOverrideApprovedBy}. Bilanci shkon në minus
+                    dhe rimbushet me akumulimin e muajve në vijim.
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt className={DT}>Vendimi</dt>
                 <dd className={DD_MUTED}>

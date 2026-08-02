@@ -19,6 +19,12 @@ export const leaveRequestCreateSchema = z.object({
   startDateIso: z.string().min(1),
   endDateIso: z.string().min(1),
   reason: z.string().optional().nullable(),
+  /// Aprovimi me shkrim i menaxhmentit për tejkalim bilanci (emri/pozita) —
+  /// vetëm kur kërkesa kalon ditët e akumuluara.
+  balanceOverrideApprovedBy: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z.string().trim().min(3, "Shkruani kush e aprovoi tejkalimin.").max(200).nullable().optional(),
+  ),
 });
 export const leaveRequestIdSchema = z.object({
   leaveId: z.string().min(1),
