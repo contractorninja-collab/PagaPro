@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import type { DocumentCategory } from "@prisma/client";
 import {
@@ -126,9 +126,22 @@ const CATEGORY_TILE_META: Record<DocumentCategory, { icon: LucideIcon; tile: str
 
 export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mobileSelectMode, setMobileSelectMode] = useState(false);
-  const [previewId, setPreviewId] = useState<string | null>(null);
+  // `?shiko=<id>` opens the preview sheet on arrival — the generate wizard lands
+  // here with it set, so a fresh document opens straight into its PDF.
+  const [previewId, setPreviewId] = useState<string | null>(() => searchParams.get("shiko"));
+
+  function closePreview() {
+    setPreviewId(null);
+    if (searchParams.get("shiko")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("shiko");
+      const qs = params.toString();
+      router.replace(qs ? `/dokumentet?${qs}` : "/dokumentet", { scroll: false });
+    }
+  }
 
   const ids = useMemo(() => props.artifacts.map((a) => a.id), [props.artifacts]);
   const allOnPageSelected = ids.length > 0 && ids.every((id) => selected.has(id));
@@ -608,7 +621,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
 
       <DocumentPreviewSheet
         artifact={previewArtifact}
-        onOpenChange={(o) => !o && setPreviewId(null)}
+        onOpenChange={(o) => !o && closePreview()}
       />
     </div>
   );

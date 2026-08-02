@@ -299,7 +299,12 @@ export function DocumentGenerateWizardClient(props: {
       setArtifactIds(data.artifactIds);
       setFailures(data.failed);
       toast.success(`U gjeneruan ${data.generated} dokument(e).`);
-      if (data.artifactId) router.push(`/dokumentet/${data.artifactId}`);
+      // Straight back to the register with the PDF preview already open — the
+      // placeholder-snapshot detail page is an audit view, not a workflow step.
+      // On partial failure stay here so the failure list is readable.
+      if (data.failed.length === 0 && data.artifactId) {
+        router.push(`/dokumentet?shiko=${data.artifactId}`);
+      }
       router.refresh();
     });
   }
