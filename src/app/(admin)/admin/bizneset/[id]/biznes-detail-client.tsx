@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/patterns/empty-state";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
 import { CompanyGroupTabs } from "@/components/admin/company-group-tabs";
 import { TimeClockCard } from "@/components/admin/time-clock-card";
+import { ContractorPayrollCard } from "@/components/admin/contractor-payroll-card";
 import type { TimeClockDeviceRow } from "@/modules/timeclock/services/timeclock-device-service";
 import { adminPath } from "@/lib/admin-path";
 import {
@@ -439,6 +440,8 @@ export function BiznesDetailClient({
           devices={timeClockDevices}
           appOrigin={appOrigin}
         />
+
+        <ContractorPayrollCard companyId={company.id} enabled={company.contractorPayrollEnabled} />
       </div>
 
       <Dialog

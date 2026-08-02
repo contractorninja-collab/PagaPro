@@ -27,6 +27,7 @@ import {
   reviewPayrollAction,
 } from "@/modules/payroll/actions/payroll-actions";
 import { PayrollsTable, type PayrollListRow } from "@/modules/payroll/components/payrolls-table";
+import { PayrollModeSwitch } from "@/modules/payroll/contractor/components/payroll-mode-switch";
 import { payrollMonthNameSq } from "@/modules/payroll/helpers/month-label";
 
 async function toastPayrollAction(
@@ -43,7 +44,11 @@ async function toastPayrollAction(
   router.refresh();
 }
 
-export function PayrollsPageClient(props: { initialRows: PayrollListRow[]; initialYear: number }) {
+export function PayrollsPageClient(props: {
+  initialRows: PayrollListRow[];
+  initialYear: number;
+  contractorEnabled?: boolean;
+}) {
   const router = useRouter();
   const [yearFilter, setYearFilter] = useState(props.initialYear);
   const [createOpen, setCreateOpen] = useState(false);
@@ -179,6 +184,7 @@ export function PayrollsPageClient(props: { initialRows: PayrollListRow[]; initi
       />
 
       <div>
+        {props.contractorEnabled ? <PayrollModeSwitch mode="regular" /> : null}
         <PayrollsTable
           rows={rows}
           onRegenerate={(id) => void toastPayrollAction(router, "Payroll u ripëllogarit.", regeneratePayrollAction(id))}

@@ -237,10 +237,21 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
       <div className="grid gap-4">
         <SectionCard title="Pagat & banka">
           <div className="mb-4 rounded-[10px] bg-[#f8fafc] px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto mujore</p>
-            <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
-              <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
-            </p>
+            {e.employmentType === "CONTRACTOR" ? (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Tarifa orare</p>
+                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+                  <MaskedAmount value={e.hourlyRate ? `${formatEur(e.hourlyRate)}/orë` : "—"} />
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto mujore</p>
+                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+                  <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
+                </p>
+              </>
+            )}
           </div>
           <div className="grid gap-2.5">
             <Row label="Orët javore" value={e.weeklyHours} className="tabular-nums" />

@@ -68,6 +68,8 @@ export interface EmployeeDetailDto {
   employmentType: EmploymentType;
   workArrangement: WorkArrangement;
   baseSalaryMonthly: string;
+  /// Tarifa orare — pagesa reale për kontraktorët (paguhen orë × tarifë, jo pagë mujore).
+  hourlyRate: string | null;
   weeklyHours: string;
   bankName: string | null;
   bankAccountIban: string | null;

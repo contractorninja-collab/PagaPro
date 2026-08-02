@@ -61,6 +61,7 @@ export interface EmployeeFormValues {
   employmentType: "EMPLOYEE" | "CONTRACTOR";
   workArrangement: "ON_SITE" | "REMOTE" | "HYBRID";
   baseSalaryMonthly: string;
+  hourlyRate: string;
   weeklyHours: string;
   bankName: string;
   bankAccountIban: string;
@@ -100,6 +101,7 @@ function defaults(): EmployeeFormValues {
     employmentType: "EMPLOYEE",
     workArrangement: "ON_SITE",
     baseSalaryMonthly: "",
+    hourlyRate: "",
     weeklyHours: "40",
     bankName: "",
     bankAccountIban: "",
@@ -144,6 +146,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     employmentType: e.employmentType,
     workArrangement: e.workArrangement,
     baseSalaryMonthly: e.baseSalaryMonthly,
+    hourlyRate: e.hourlyRate ?? "",
     weeklyHours: e.weeklyHours,
     bankName: e.bankName ?? "",
     bankAccountIban: e.bankAccountIban ?? "",
@@ -194,6 +197,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     employmentType: v.employmentType,
     workArrangement: v.workArrangement,
     baseSalaryMonthly: v.baseSalaryMonthly === "" ? 0 : Number(v.baseSalaryMonthly.replace(",", ".")),
+    hourlyRate: v.hourlyRate === "" ? null : Number(v.hourlyRate.replace(",", ".")),
     weeklyHours: v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", ".")),
     bankName: v.bankName || null,
     bankAccountIban: v.bankAccountIban || null,
@@ -729,18 +733,38 @@ export function EmployeeFormSheet(props: {
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Pagat & banka</h3>
             <div className={fieldGrid}>
-              <FormField label="Paga bruto (€)" required error={fieldErrors.baseSalaryMonthly}>
-                <Input
-                  className={cn("tabular-nums", errClass("baseSalaryMonthly"))}
-                  inputMode="decimal"
-                  value={values.baseSalaryMonthly}
-                  onChange={(e) => {
-                    clearKey("baseSalaryMonthly");
-                    setValues((s) => ({ ...s, baseSalaryMonthly: e.target.value }));
-                  }}
-                  disabled={pending}
-                />
-              </FormField>
+              {values.employmentType === "CONTRACTOR" ? (
+                <FormField
+                  label="Tarifa orare (€/orë)"
+                  required
+                  error={fieldErrors.hourlyRate}
+                  hint="Kontraktorët paguhen orë × tarifë — pa pagë mujore fikse."
+                >
+                  <Input
+                    className={cn("tabular-nums", errClass("hourlyRate"))}
+                    inputMode="decimal"
+                    value={values.hourlyRate}
+                    onChange={(e) => {
+                      clearKey("hourlyRate");
+                      setValues((s) => ({ ...s, hourlyRate: e.target.value }));
+                    }}
+                    disabled={pending}
+                  />
+                </FormField>
+              ) : (
+                <FormField label="Paga bruto (€)" required error={fieldErrors.baseSalaryMonthly}>
+                  <Input
+                    className={cn("tabular-nums", errClass("baseSalaryMonthly"))}
+                    inputMode="decimal"
+                    value={values.baseSalaryMonthly}
+                    onChange={(e) => {
+                      clearKey("baseSalaryMonthly");
+                      setValues((s) => ({ ...s, baseSalaryMonthly: e.target.value }));
+                    }}
+                    disabled={pending}
+                  />
+                </FormField>
+              )}
               <FormField label="Orët javore" required error={fieldErrors.weeklyHours}>
                 <Input
                   className={cn("tabular-nums", errClass("weeklyHours"))}

@@ -94,6 +94,8 @@ export interface AdminCompanyDetail {
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
   /** Badge time-clock entitlement — admin-only, deliberately not on CompanyConfiguration. */
   timeClockEnabled: boolean;
+  /** Hourly contractor-payroll entitlement (Pagat → Kontraktor) — same admin-only reasoning. */
+  contractorPayrollEnabled: boolean;
   brandGroupId: string | null;
   brandGroupName: string | null;
   createdAt: string;
@@ -119,6 +121,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       postalCode: true,
       status: true,
       timeClockEnabled: true,
+      contractorPayrollEnabled: true,
       createdAt: true,
       brandGroupId: true,
       brandGroup: { select: { name: true } },
@@ -156,6 +159,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
     postalCode: row.postalCode,
     status: row.status,
     timeClockEnabled: row.timeClockEnabled,
+    contractorPayrollEnabled: row.contractorPayrollEnabled,
     brandGroupId: row.brandGroupId,
     brandGroupName: row.brandGroup?.name ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -258,6 +262,18 @@ export async function setCompanyTimeClockEnabledForAdmin(
   const res = await prisma.company.updateMany({
     where: { id: companyId },
     data: { timeClockEnabled: enabled },
+  });
+  return res.count > 0;
+}
+
+/** Hourly contractor-payroll entitlement — same admin-only placement as timeClockEnabled. */
+export async function setCompanyContractorPayrollEnabledForAdmin(
+  companyId: string,
+  enabled: boolean,
+): Promise<boolean> {
+  const res = await prisma.company.updateMany({
+    where: { id: companyId },
+    data: { contractorPayrollEnabled: enabled },
   });
   return res.count > 0;
 }

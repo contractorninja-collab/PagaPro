@@ -94,6 +94,19 @@ enum CompensationBasis {
   TARGET_NET_MONTHLY
 }
 
+enum ContractorPayrollStatus {
+  DRAFT
+  LOCKED
+  ARCHIVED
+}
+
+enum ContractorHoursSource {
+  /// Hours typed in by HR — the default.
+  MANUAL
+  /// Hours pre-filled from aggregated time-clock days; still editable afterwards.
+  TIMECLOCK
+}
+
 /// Kosovo Labour Law (Ligji Nr. 03/L-212, Neni 10) contract-duration categories.
 enum ContractTermType {
   INDEFINITE
@@ -404,6 +417,10 @@ model Company {
   /// clients rewrite wholesale from Konfigurime.
   timeClockEnabled Boolean @default(false)
 
+  /// Entitlement for the separate hourly contractor payroll flow (Pagat → Kontraktor).
+  /// Admin-console controlled, same reasoning as timeClockEnabled.
+  contractorPayrollEnabled Boolean @default(false)
+
   /// Registered / legal profile contact (distinct from letterhead line in CompanySetting)
   email     String?
   phone     String?
@@ -432,6 +449,7 @@ model Company {
   timeClockDevices     TimeClockDevice[]
   timeClockPunches     TimeClockPunch[]
   timeClockDays        TimeClockDay[]
+  contractorPayrollPeriods ContractorPayrollPeriod[]
   reportDefinitions    ReportDefinition[]
   reportJobs           ReportJob[]
   employeeTimelineEvents EmployeeTimelineEvent[]
@@ -622,6 +640,8 @@ model User {
   reviewedPayrolls  Payroll[]               @relation("PayrollReviewedBy")
   approvedPayrolls  Payroll[]               @relation("PayrollApprovedBy")
   archivedPayrolls  Payroll[]               @relation("PayrollArchivedBy")
+  createdContractorPayrolls ContractorPayrollPeriod[] @relation("ContractorPayrollCreatedBy")
+  lockedContractorPayrolls  ContractorPayrollPeriod[] @relation("ContractorPayrollLockedBy")
   payrollCorrectionsCreated PayrollCorrection[] @relation("PayrollCorrectionCreatedBy")
   payrollSnapshotsCaptured PayrollSnapshot[] @relation("PayrollSnapshotCapturedBy")
   payrollDocumentsGenerated PayrollGeneratedDocument[] @relation("PayrollDocumentGeneratedBy")
@@ -850,6 +870,7 @@ model Employee {
   updatedAt DateTime @updatedAt
 
   payrollEntries PayrollEntry[]
+  contractorPayrollEntries ContractorPayrollEntry[]
   contracts      Contract[]
   leaveRequests  LeaveRequest[]
   leaveBalances  LeaveBalance[]
@@ -1199,6 +1220,77 @@ model Payroll {
   @@map("payrolls")
 }
 
+/// A parallel, deliberately simpler payroll for hourly-paid contractors (gross-out: no
+/// PIT, no pension — those are forced off for CONTRACTOR employees by construction).
+/// Separate from Payroll so the regular monthly cycle keeps its one-period-per-month
+/// constraint and its ATK/Libri i Pagave surface untouched.
+model ContractorPayrollPeriod {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  year  Int
+  month Int // 1-12
+
+  status ContractorPayrollStatus @default(DRAFT)
+
+  createdById String?
+  createdBy   User?   @relation("ContractorPayrollCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  lockedAt   DateTime?
+  lockedById String?
+  lockedBy   User?     @relation("ContractorPayrollLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries ContractorPayrollEntry[]
+
+  @@unique([companyId, year, month])
+  @@index([companyId, status])
+  @@map("contractor_payroll_periods")
+}
+
+model ContractorPayrollEntry {
+  id String @id @default(cuid())
+
+  periodId String
+  period   ContractorPayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// Frozen from Employee.hourlyRate when the entry is (re)generated.
+  hourlyRateSnapshot Decimal @db.Decimal(14, 4)
+
+  regularHours  Decimal @default(0) @db.Decimal(10, 2)
+  overtimeHours Decimal @default(0) @db.Decimal(10, 2)
+  weekendHours  Decimal @default(0) @db.Decimal(10, 2)
+  holidayHours  Decimal @default(0) @db.Decimal(10, 2)
+  nightHours    Decimal @default(0) @db.Decimal(10, 2)
+
+  /// Provenance only — TIMECLOCK means the buckets were pre-filled from aggregated
+  /// time-clock days; every field stays hand-editable either way.
+  hoursSource ContractorHoursSource @default(MANUAL)
+
+  /// Final figure — net = gross, contractors carry no withholding here.
+  grossPay Decimal @default(0) @db.Decimal(14, 2)
+
+  calculationBreakdown Json?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId, employeeId])
+  @@index([employeeId])
+  @@map("contractor_payroll_entries")
+}
+
 model PayrollIncludedEmployee {
   payrollId String
   payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
@@ -1391,6 +1483,12 @@ model PayrollSettings {
 
   /// Për transparency HR (default dritare tipike natë)
   nightWorkPeriodDescription String @default("22:00–06:00") @db.VarChar(96)
+
+  /// Dritarja e natës si orë reale (0–23) që klasifikuesi i orës së punës mund t'i lexojë —
+  /// nightWorkPeriodDescription mbetet vetëm tekst shpjegues. Dritarja kalon mesnatën
+  /// kur nightStartHour > nightEndHour (p.sh. 22 → 6).
+  nightStartHour Int @default(22)
+  nightEndHour   Int @default(6)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

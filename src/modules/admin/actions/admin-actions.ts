@@ -8,6 +8,7 @@ import { provisionCompany } from "@/modules/admin/services/company-provisioning"
 import {
   createCompanyUserForAdmin,
   resetUserPasswordForAdmin,
+  setCompanyContractorPayrollEnabledForAdmin,
   setCompanyStatusForAdmin,
   setCompanyTimeClockEnabledForAdmin,
   setMembershipActiveForAdmin,
@@ -339,6 +340,29 @@ export async function setCompanyTimeClockEnabledAction(raw: unknown): Promise<Ad
     return { ok: true };
   } catch (err) {
     console.error("[setCompanyTimeClockEnabledAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi dështoi papritur." };
+  }
+}
+
+export async function setCompanyContractorPayrollEnabledAction(
+  raw: unknown,
+): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = setTimeClockSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const ok = await setCompanyContractorPayrollEnabledForAdmin(
+      parsed.data.companyId,
+      parsed.data.enabled,
+    );
+    if (!ok) return { ok: false, error: "Biznesi nuk u gjet." };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setCompanyContractorPayrollEnabledAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi dështoi papritur." };
   }
 }

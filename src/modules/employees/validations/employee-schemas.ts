@@ -71,6 +71,17 @@ export const employeeUpsertSchema = z
     workArrangement: workArrangementFieldSchema,
 
     baseSalaryMonthly: z.coerce.number({ message: "Paga bruto duhet të jetë numër" }).nonnegative("Paga bruto nuk mund të jetë negative"),
+
+    /// Tarifa orare — e detyrueshme praktikisht vetëm për kontraktorët (payroll-i i tyre
+    /// llogaritet orë × tarifë); për punonjësit e rregullt mbetet bosh.
+    hourlyRate: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? null : v),
+      z.coerce
+        .number({ message: "Tarifa orare duhet të jetë numër" })
+        .nonnegative("Tarifa orare nuk mund të jetë negative")
+        .nullable()
+        .optional(),
+    ),
     weeklyHours: z.coerce.number({ message: "Orët javore duhet të jenë numër" }).min(0).max(168).default(40),
 
     bankName: z.preprocess(emptyToNull, z.string().max(120).nullable().optional()),

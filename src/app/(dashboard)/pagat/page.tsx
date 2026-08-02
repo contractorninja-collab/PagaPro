@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
 import { PayrollsPageClient } from "@/modules/payroll/components/payrolls-page-client";
 import { listPayrollsForCompany } from "@/modules/payroll/services/payroll-period-service";
 import { requireCompanyContextPage } from "@/server/company-context";
@@ -12,8 +13,20 @@ export default async function PagatPage() {
 
   const initialYear = new Date().getFullYear();
   try {
-    const rows = await listPayrollsForCompany(companyId);
-    return <PayrollsPageClient initialRows={rows} initialYear={initialYear} />;
+    const [rows, company] = await Promise.all([
+      listPayrollsForCompany(companyId),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { contractorPayrollEnabled: true },
+      }),
+    ]);
+    return (
+      <PayrollsPageClient
+        initialRows={rows}
+        initialYear={initialYear}
+        contractorEnabled={company?.contractorPayrollEnabled ?? false}
+      />
+    );
   } catch (err) {
     console.error("[pagapro] PagatPage: listPayrollsForCompany failed", err);
     return (
