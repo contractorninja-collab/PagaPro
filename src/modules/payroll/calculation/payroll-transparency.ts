@@ -68,7 +68,7 @@ export function buildPayrollHrTransparency(params: {
 
   employerPrimacy: EmployerPrimacy;
 
-  compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY";
+  compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY" | "HOURLY_GROSS";
 
   baseSalaryMonthly?: string;
 

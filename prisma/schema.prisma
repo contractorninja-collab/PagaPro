@@ -92,6 +92,9 @@ enum PayrollPeriodStatus {
 enum CompensationBasis {
   GROSS_MONTHLY
   TARGET_NET_MONTHLY
+  /// Paga bruto e dhënë si €/orë (punëtorë fabrike etj.) — spreadsheet-i përdor
+  /// Employee.hourlyRate direkt në vend që ta nxjerrë normën nga paga mujore.
+  HOURLY_GROSS
 }
 
 enum ContractorPayrollStatus {

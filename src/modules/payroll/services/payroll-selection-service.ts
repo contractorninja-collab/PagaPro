@@ -18,7 +18,7 @@ export async function listEmployeesEligibleForPayrollSelection(
     jobTitle: string | null;
     employmentType: EmploymentType;
     status: EmploymentStatus;
-    compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY";
+    compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY" | "HOURLY_GROSS";
     baseSalaryMonthly: string;
     targetNetMonthly: string | null;
   }>

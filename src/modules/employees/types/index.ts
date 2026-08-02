@@ -68,8 +68,10 @@ export interface EmployeeDetailDto {
   employmentType: EmploymentType;
   workArrangement: WorkArrangement;
   baseSalaryMonthly: string;
-  /// Tarifa orare — pagesa reale për kontraktorët (paguhen orë × tarifë, jo pagë mujore).
+  /// Tarifa orare — paga reale kur punonjësi paguhet me orë (HOURLY_GROSS) ose kontraktor.
   hourlyRate: string | null;
+  /// GROSS_MONTHLY | TARGET_NET_MONTHLY | HOURLY_GROSS — si jepet paga bruto.
+  compensationBasis: CompensationBasis;
   weeklyHours: string;
   bankName: string | null;
   bankAccountIban: string | null;

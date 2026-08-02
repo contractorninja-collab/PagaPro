@@ -55,6 +55,74 @@ const employeeGross1000 = {
   applyTax: true,
 };
 
+describe("computePayrollSpreadsheetLine — HOURLY_GROSS (rate is the contract, not derived)", () => {
+  const hourlyEmployee = {
+    ...employeeGross1000,
+    compensationBasis: "HOURLY_GROSS" as const,
+    hourlyRate: "5",
+    // Reference monthly for display surfaces — the engine must ignore it.
+    baseSalaryMonthly: "9999",
+  };
+
+  it("pays exactly hours × stored rate (5 €/orë × 160h = 800.00), ignoring baseSalaryMonthly", () => {
+    const r = computePayrollSpreadsheetLine(
+      hourlyEmployee,
+      lineInput({ actualRegularHours: "160" }),
+      snapshot,
+      "1",
+      calendarBase,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.hourlyRate).toMatch(/^5\.00000/);
+    expect(r.value.regularPay).toBe("800.00");
+    expect(r.value.grossSalary).toBe("800.00");
+  });
+
+  it("does not enforce the MONTHLY minimum for hourly staff (short month is lawful)", () => {
+    // 5 €/h × 40h = 200 € gross — far below the monthly minimum, but legal for
+    // an hourly worker; the line must compute, not raise BELOW_MINIMUM_GROSS.
+    const r = computePayrollSpreadsheetLine(
+      hourlyEmployee,
+      lineInput({ actualRegularHours: "40" }),
+      snapshot,
+      "1",
+      calendarBase,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.grossSalary).toBe("200.00");
+  });
+
+  it("applies the same premium multipliers on the stored rate (weekend 1.5×)", () => {
+    const r = computePayrollSpreadsheetLine(
+      hourlyEmployee,
+      lineInput({ actualRegularHours: "160", weekendHours: "8" }),
+      kosovo2026AtkDefaults({ premiumRules: { weekendHourMultiplier: "1.5" } }),
+      "1",
+      calendarBase,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 8h × 5 € × 1.5 = 60.00 on top of 800.00
+    expect(r.value.weekendAmount).toBe("60.00");
+    expect(r.value.grossSalary).toBe("860.00");
+  });
+
+  it("rejects an hourly employee with no valid rate", () => {
+    const r = computePayrollSpreadsheetLine(
+      { ...hourlyEmployee, hourlyRate: null },
+      lineInput(),
+      snapshot,
+      "1",
+      calendarBase,
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues[0]?.code).toBe("HOURLY_RATE");
+  });
+});
+
 describe("computePayrollSpreadsheetLine — hourly × hours (full-precision rate)", () => {
   it("preserves contractual monthly gross when actual regular hours equal expected (1000 ÷ 176 × 176)", () => {
     const r = computePayrollSpreadsheetLine(

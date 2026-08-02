@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   createEmployeeAction,
+  previewNetHourlyRateAction,
   updateEmployeeAction,
   type EmployeeActionResult,
 } from "@/modules/employees/actions/employee-actions";
@@ -61,6 +62,7 @@ export interface EmployeeFormValues {
   employmentType: "EMPLOYEE" | "CONTRACTOR";
   workArrangement: "ON_SITE" | "REMOTE" | "HYBRID";
   baseSalaryMonthly: string;
+  salaryBasis: "MONTHLY" | "HOURLY";
   hourlyRate: string;
   weeklyHours: string;
   bankName: string;
@@ -102,6 +104,7 @@ function defaults(): EmployeeFormValues {
     employmentType: "EMPLOYEE",
     workArrangement: "ON_SITE",
     baseSalaryMonthly: "",
+    salaryBasis: "MONTHLY",
     hourlyRate: "",
     weeklyHours: "40",
     bankName: "",
@@ -148,6 +151,7 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
     employmentType: e.employmentType,
     workArrangement: e.workArrangement,
     baseSalaryMonthly: e.baseSalaryMonthly,
+    salaryBasis: e.compensationBasis === "HOURLY_GROSS" ? "HOURLY" : "MONTHLY",
     hourlyRate: e.hourlyRate ?? "",
     weeklyHours: e.weeklyHours,
     bankName: e.bankName ?? "",
@@ -199,7 +203,19 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     status: v.status,
     employmentType: v.employmentType,
     workArrangement: v.workArrangement,
-    baseSalaryMonthly: v.baseSalaryMonthly === "" ? 0 : Number(v.baseSalaryMonthly.replace(",", ".")),
+    // Për pagë orare, mujorja e ruajtur është vetëm referencë për listat/kontratat:
+    // tarifa × orët standarde mujore (javore × 52 ÷ 12). Motori s'e përdor kurrë.
+    baseSalaryMonthly:
+      v.salaryBasis === "HOURLY" && v.employmentType === "EMPLOYEE"
+        ? Math.round(
+            (v.hourlyRate === "" ? 0 : Number(v.hourlyRate.replace(",", "."))) *
+              ((v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", "."))) * 52 / 12) *
+              100,
+          ) / 100
+        : v.baseSalaryMonthly === ""
+          ? 0
+          : Number(v.baseSalaryMonthly.replace(",", ".")),
+    salaryBasis: v.employmentType === "EMPLOYEE" ? v.salaryBasis : "MONTHLY",
     hourlyRate: v.hourlyRate === "" ? null : Number(v.hourlyRate.replace(",", ".")),
     weeklyHours: v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", ".")),
     bankName: v.bankName || null,
@@ -248,6 +264,44 @@ export function EmployeeFormSheet(props: {
   const [pending, setPending] = useState(false);
   const [values, setValues] = useState<EmployeeFormValues>(defaults);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // "≈ neto/orë" nën kutinë e pagës orare — llogaritet nga motori real në server.
+  const [netHourlyHint, setNetHourlyHint] = useState<{
+    netHourly: string;
+    netMonthly: string;
+    monthlyHours: string;
+  } | null>(null);
+
+  const hourlyEmployee = values.employmentType === "EMPLOYEE" && values.salaryBasis === "HOURLY";
+  useEffect(() => {
+    if (!hourlyEmployee) {
+      setNetHourlyHint(null);
+      return;
+    }
+    const rate = Number(values.hourlyRate.replace(",", "."));
+    if (!Number.isFinite(rate) || rate <= 0) {
+      setNetHourlyHint(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void previewNetHourlyRateAction({
+        hourlyRate: rate,
+        weeklyHours: values.weeklyHours === "" ? 40 : Number(values.weeklyHours.replace(",", ".")),
+        applyTrust: values.applyTrust,
+        applyTax: values.applyTax,
+        employerPrimacy: values.employerPrimacy,
+      }).then((res) => {
+        setNetHourlyHint(res.ok && res.data ? res.data : null);
+      });
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [
+    hourlyEmployee,
+    values.hourlyRate,
+    values.weeklyHours,
+    values.applyTrust,
+    values.applyTax,
+    values.employerPrimacy,
+  ]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOptionDto[]>(departments);
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
@@ -772,17 +826,73 @@ export function EmployeeFormSheet(props: {
                   />
                 </FormField>
               ) : (
-                <FormField label="Paga bruto (€)" required error={fieldErrors.baseSalaryMonthly}>
-                  <Input
-                    className={cn("tabular-nums", errClass("baseSalaryMonthly"))}
-                    inputMode="decimal"
-                    value={values.baseSalaryMonthly}
-                    onChange={(e) => {
-                      clearKey("baseSalaryMonthly");
-                      setValues((s) => ({ ...s, baseSalaryMonthly: e.target.value }));
-                    }}
-                    disabled={pending}
-                  />
+                <FormField
+                  label={values.salaryBasis === "HOURLY" ? "Paga bruto (€/orë)" : "Paga bruto (€)"}
+                  required
+                  error={
+                    values.salaryBasis === "HOURLY"
+                      ? fieldErrors.hourlyRate
+                      : fieldErrors.baseSalaryMonthly
+                  }
+                >
+                  <div className="mb-2 inline-flex items-center gap-0.5 rounded-[8px] border border-input bg-muted/40 p-0.5">
+                    {(
+                      [
+                        { key: "MONTHLY" as const, label: "Mujore" },
+                        { key: "HOURLY" as const, label: "Orë" },
+                      ]
+                    ).map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          clearKey("baseSalaryMonthly");
+                          clearKey("hourlyRate");
+                          setValues((s) => ({ ...s, salaryBasis: opt.key }));
+                        }}
+                        className={cn(
+                          "rounded-[6px] px-3 py-1 text-xs font-semibold transition-colors",
+                          values.salaryBasis === opt.key
+                            ? "bg-brand-blue text-white"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {values.salaryBasis === "HOURLY" ? (
+                    <>
+                      <Input
+                        className={cn("tabular-nums", errClass("hourlyRate"))}
+                        inputMode="decimal"
+                        placeholder="p.sh. 4.50"
+                        value={values.hourlyRate}
+                        onChange={(e) => {
+                          clearKey("hourlyRate");
+                          setValues((s) => ({ ...s, hourlyRate: e.target.value }));
+                        }}
+                        disabled={pending}
+                      />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {netHourlyHint
+                          ? `≈ ${netHourlyHint.netHourly} € neto/orë (≈ ${netHourlyHint.netMonthly} € neto/muaj me ${netHourlyHint.monthlyHours} orë)`
+                          : "Paga mujore del nga orët e punuara × tarifa në payroll."}
+                      </p>
+                    </>
+                  ) : (
+                    <Input
+                      className={cn("tabular-nums", errClass("baseSalaryMonthly"))}
+                      inputMode="decimal"
+                      value={values.baseSalaryMonthly}
+                      onChange={(e) => {
+                        clearKey("baseSalaryMonthly");
+                        setValues((s) => ({ ...s, baseSalaryMonthly: e.target.value }));
+                      }}
+                      disabled={pending}
+                    />
+                  )}
                 </FormField>
               )}
               <FormField label="Orët javore" required error={fieldErrors.weeklyHours}>

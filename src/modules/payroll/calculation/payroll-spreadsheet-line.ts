@@ -44,8 +44,10 @@ export interface SpreadsheetEmployeeInput {
   employmentType: EmploymentType;
   employerPrimacy: EmployerPrimacy;
   baseSalaryMonthly: string;
-  compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY";
+  compensationBasis: "GROSS_MONTHLY" | "TARGET_NET_MONTHLY" | "HOURLY_GROSS";
   targetNetMonthly: string | null;
+  /** Gross €/orë — the literal contractual wage when compensationBasis is HOURLY_GROSS. */
+  hourlyRate?: string | null;
   exemptFromMinimumSalary: boolean;
   applyTrust: boolean;
   applyTax: boolean;
@@ -173,7 +175,37 @@ export function computePayrollSpreadsheetLine(
   /** Full-precision quotient (classic sheet col 6 implicit rate) — do not round before × hours. */
   let hourlyPrecise: ReturnType<typeof D>;
 
-  if (employee.compensationBasis === "TARGET_NET_MONTHLY" && employee.targetNetMonthly != null) {
+  if (employee.compensationBasis === "HOURLY_GROSS") {
+    // Punëtorë me pagë orare (fabrika etj.): norma është vetë paga kontraktuale —
+    // asnjë derivim nga paga mujore; bruto = orë × normë si gjithkund më poshtë.
+    hourlyPrecise = D(employee.hourlyRate ?? "0");
+    if (!hourlyPrecise.isFinite() || hourlyPrecise.lte(0)) {
+      return {
+        ok: false,
+        issues: [
+          {
+            code: "HOURLY_RATE",
+            message: "Punonjësi është me pagë orare por s'ka tarifë orare të vlefshme në profil.",
+          },
+        ],
+      };
+    }
+    if (
+      snapshot.minimumHourlyWage &&
+      D(snapshot.minimumHourlyWage).isFinite() &&
+      hourlyPrecise.lt(D(snapshot.minimumHourlyWage))
+    ) {
+      return {
+        ok: false,
+        issues: [
+          {
+            code: "BELOW_MINIMUM_HOURLY",
+            message: `Tarifa orare ${hourlyPrecise.toFixed(2)} € është nën minimumin orar ${D(snapshot.minimumHourlyWage).toFixed(2)} €.`,
+          },
+        ],
+      };
+    }
+  } else if (employee.compensationBasis === "TARGET_NET_MONTHLY" && employee.targetNetMonthly != null) {
     const solved = solveEquivalentMonthlyGrossForTargetNet({
       targetNet: employee.targetNetMonthly,
       snapshot,
@@ -208,7 +240,13 @@ export function computePayrollSpreadsheetLine(
    */
   const partialPeriod =
     calendarReg.isFinite() && calendarReg.gt(0) && expectedReg.gt(0) && expectedReg.lt(calendarReg);
-  const enforceMonthlyMinimum = !employee.exemptFromMinimumSalary && !partialPeriod;
+  // Hourly-paid staff have no fixed monthly wage — their monthly gross legitimately
+  // varies with hours worked, so the MONTHLY floor would reject lawful short months.
+  // The hourly minimum was already enforced against the rate itself above.
+  const enforceMonthlyMinimum =
+    !employee.exemptFromMinimumSalary &&
+    !partialPeriod &&
+    employee.compensationBasis !== "HOURLY_GROSS";
 
   const sickPct = D(sickLeavePayPercent);
   const regularPay = roundMoneyEUR(hourlyPrecise.mul(actualReg));

@@ -204,6 +204,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     workArrangement: e.workArrangement,
     baseSalaryMonthly: moneyToString(e.baseSalaryMonthly),
     hourlyRate: e.hourlyRate ? moneyToString(e.hourlyRate) : null,
+    compensationBasis: e.compensationBasis,
     weeklyHours: moneyToString(e.weeklyHours),
     bankName,
     bankAccountIban: iban,
@@ -414,6 +415,7 @@ export async function createEmployee(
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
           baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
           hourlyRate: input.hourlyRate != null ? new Prisma.Decimal(String(input.hourlyRate)) : undefined,
+          compensationBasis: input.salaryBasis === "HOURLY" ? "HOURLY_GROSS" : "GROSS_MONTHLY",
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
@@ -550,6 +552,14 @@ export async function updateEmployee(
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
           baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
           hourlyRate: input.hourlyRate != null ? new Prisma.Decimal(String(input.hourlyRate)) : null,
+          // HOURLY always wins; MONTHLY only reverts an hourly employee — a
+          // TARGET_NET basis set by the salary tools is never clobbered here.
+          compensationBasis:
+            input.salaryBasis === "HOURLY"
+              ? "HOURLY_GROSS"
+              : existing.compensationBasis === "HOURLY_GROSS"
+                ? "GROSS_MONTHLY"
+                : undefined,
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,

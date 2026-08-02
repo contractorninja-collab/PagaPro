@@ -18,10 +18,77 @@ import {
   terminateEmployeeSchema,
 } from "@/modules/employees/validations/employee-schemas";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { z } from "zod";
+import { calculateEmployeeLine } from "@/modules/payroll/calculation/payroll-calculator";
+import { loadPayrollLegislationContext } from "@/modules/payroll/services/payroll-settings-service";
+import { D } from "@/modules/payroll/calculation/money/decimal";
 
 export type EmployeeActionResult<T = undefined> =
   | { ok: true; data?: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+const netHourlyPreviewSchema = z.object({
+  hourlyRate: z.coerce.number().positive(),
+  weeklyHours: z.coerce.number().min(1).max(168).default(40),
+  applyTrust: z.boolean().default(true),
+  applyTax: z.boolean().default(true),
+  employerPrimacy: z.enum(["PRIMARY", "SECONDARY"]).default("PRIMARY"),
+});
+
+/**
+ * "≈ neto/orë" hint under the hourly-pay box. PIT is monthly-progressive, so a
+ * per-hour net only exists relative to a month: we assume a standard month at
+ * the contractual weekly hours (weekly × 52 ÷ 12), run the real engine with the
+ * company's live parameters, and divide the monthly net back into hours.
+ */
+export async function previewNetHourlyRateAction(raw: unknown): Promise<
+  EmployeeActionResult<{ netHourly: string; netMonthly: string; monthlyHours: string }>
+> {
+  try {
+    const result = await getCompanyContext();
+    if (!result.ok) {
+      return { ok: false, error: companyContextErrorMessage(result.reason) };
+    }
+    const { companyId } = result.context;
+
+    const parsed = netHourlyPreviewSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Vlera jo valide." };
+
+    const now = new Date();
+    const ctx = await loadPayrollLegislationContext(companyId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+    if (!ctx) return { ok: false, error: "Mungojnë parametrat e pagës për kompaninë." };
+
+    const monthlyHours = D(parsed.data.weeklyHours).mul(52).div(12).toDecimalPlaces(2);
+    const line = calculateEmployeeLine(
+      {
+        employmentType: "EMPLOYEE",
+        employerPrimacy: parsed.data.employerPrimacy,
+        hours: { regularHours: monthlyHours.toFixed(2) },
+        rates: { hourlyRate: String(parsed.data.hourlyRate) },
+        enforceMinimumGross: false,
+        applyTrust: parsed.data.applyTrust,
+        applyTax: parsed.data.applyTax,
+      },
+      ctx.snapshot,
+    );
+    if (!line.ok) {
+      return { ok: false, error: line.issues[0]?.message ?? "Llogaritja dështoi." };
+    }
+
+    const netMonthly = D(line.value.netPay);
+    return {
+      ok: true,
+      data: {
+        netHourly: netMonthly.div(monthlyHours).toDecimalPlaces(2).toFixed(2),
+        netMonthly: netMonthly.toFixed(2),
+        monthlyHours: monthlyHours.toFixed(2),
+      },
+    };
+  } catch (err) {
+    console.error("[previewNetHourlyRateAction] failed:", err);
+    return { ok: false, error: "Llogaritja dështoi papritur." };
+  }
+}
 
 export async function createEmployeeAction(raw: unknown): Promise<EmployeeActionResult<{ id: string }>> {
   try {

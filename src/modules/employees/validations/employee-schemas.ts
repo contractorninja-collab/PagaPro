@@ -72,6 +72,10 @@ export const employeeUpsertSchema = z
 
     baseSalaryMonthly: z.coerce.number({ message: "Paga bruto duhet të jetë numër" }).nonnegative("Paga bruto nuk mund të jetë negative"),
 
+    /// Si jepet paga bruto e punonjësit: MONTHLY = shumë mujore fikse (administrata),
+    /// HOURLY = €/orë (punëtorë fabrike) — payroll-i pastaj paguan orë × tarifë.
+    salaryBasis: z.enum(["MONTHLY", "HOURLY"]).default("MONTHLY"),
+
     /// Tarifa orare — e detyrueshme praktikisht vetëm për kontraktorët (payroll-i i tyre
     /// llogaritet orë × tarifë); për punonjësit e rregullt mbetet bosh.
     hourlyRate: z.preprocess(
@@ -125,6 +129,15 @@ export const employeeUpsertSchema = z
     documentsMissing: z.boolean(),
     terminationDate: z.preprocess(parseOptionalDate, z.date().nullable().optional()),
     terminationReason: z.preprocess(emptyToNull, z.string().max(5000).nullable().optional()),
+  })
+  .superRefine((data, ctx) => {
+    if (data.salaryBasis === "HOURLY" && (data.hourlyRate == null || data.hourlyRate <= 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hourlyRate"],
+        message: "Vendosni tarifën orare bruto (€/orë).",
+      });
+    }
   })
   .transform((data) => {
     if (data.employmentType === "CONTRACTOR") {
