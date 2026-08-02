@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { DashboardOperationalPage } from "@/modules/dashboard/components/dashboard-operational-page";
+import { PAYROLL_HERO_COOKIE } from "@/modules/dashboard/helpers/dashboard-cookies";
 import { loadDashboardOperationalData } from "@/modules/dashboard/services/dashboard-data-service";
 import { parseDashboardFilters } from "@/modules/dashboard/helpers/dashboard-time";
 import { listDepartmentsForCompany } from "@/modules/employees/services/employee-service";
@@ -17,6 +19,9 @@ export default async function PaneliPage({ searchParams }: Props) {
   const { companyId, user } = await requireCompanyContextPage();
   const sp = await searchParams;
   const filters = parseDashboardFilters(sp);
+  // Presentation preference only — never trusted for anything, so an absent or
+  // junk value simply means "expanded".
+  const payrollHeroCollapsed = (await cookies()).get(PAYROLL_HERO_COOKIE)?.value === "1";
 
   try {
     const [departments, data] = await Promise.all([
@@ -28,6 +33,7 @@ export default async function PaneliPage({ searchParams }: Props) {
         data={data}
         departments={departments}
         userDisplayName={user.displayName}
+        payrollHeroCollapsed={payrollHeroCollapsed}
       />
     );
   } catch (err) {

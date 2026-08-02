@@ -8,6 +8,7 @@ import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import type { DashboardPayrollSlice } from "../types/dashboard-types";
 import type { DashboardCostMetrics } from "../services/dashboard-metrics-service";
 import type { AtkDeadlineItem } from "./dashboard-action-center";
+import { PayrollHeroFoldToggle } from "./payroll-hero-fold";
 import { PAYROLL_STATUS_LABELS_SQ } from "../helpers/dashboard-labels";
 
 /** Status pill tones tuned for the navy hero background. */
@@ -20,6 +21,75 @@ const DARK_PILL: Record<PayrollPeriodStatus, { chip: string; dot: string }> = {
 };
 
 const STAGE_ORDER: PayrollPeriodStatus[] = ["DRAFT", "REVIEWED", "APPROVED", "LOCKED"];
+
+/** Shared by the full hero and the folded strip, so the two never disagree. */
+function StatusPill({ status }: { status: PayrollPeriodStatus | null }) {
+  const pill = status ? DARK_PILL[status] : null;
+  if (!status || !pill) {
+    return (
+      <span className="inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-2.5 text-[11.5px] font-semibold text-[#cbd5e1]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" aria-hidden />
+        Pa payroll
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11.5px] font-semibold",
+        pill.chip,
+      )}
+    >
+      {status === "LOCKED" ? (
+        <Lock className="h-[11px] w-[11px]" strokeWidth={2.5} aria-hidden />
+      ) : (
+        <span className={cn("h-1.5 w-1.5 rounded-full", pill.dot)} aria-hidden />
+      )}
+      {PAYROLL_STATUS_LABELS_SQ[status]}
+    </span>
+  );
+}
+
+function continueLabel(status: PayrollPeriodStatus | null): string {
+  return status === "LOCKED" || status === "ARCHIVED" ? "Shiko payroll-in" : "Vazhdo ciklin";
+}
+
+/**
+ * The hero folded down to a strip: month, stage and the gross total. Enough to
+ * know where the run stands without giving it a third of the screen — and still
+ * server-rendered, so the figure is formatted exactly as everywhere else.
+ */
+export function DashboardPayrollCollapsedBar({ payroll }: { payroll: DashboardPayrollSlice }) {
+  const hasPayroll = payroll.payrollId != null && payroll.status != null;
+  return (
+    <section
+      aria-labelledby="dashboard-payroll-hero-title"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-brand-navy px-[18px] py-3 text-[#e8edf5] shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+    >
+      <h2
+        id="dashboard-payroll-hero-title"
+        className="text-[12px] font-semibold uppercase tracking-[0.05em] text-[#8b95a7]"
+      >
+        Cikli i pagës · {payrollMonthLabel(payroll.year, payroll.month)}
+      </h2>
+      <StatusPill status={payroll.status} />
+      <p className="text-[15px] font-bold text-white tabular-nums">
+        <MaskedAmount value={formatEur(payroll.totals.grossSalary)} />
+        <span className="ml-1.5 text-[11.5px] font-normal text-[#8b95a7]">bruto</span>
+      </p>
+      <div className="ml-auto flex items-center gap-2">
+        <Link
+          href={hasPayroll ? `/pagat/${payroll.payrollId}` : "/pagat"}
+          className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#8b95a7] transition-colors hover:text-white"
+        >
+          {continueLabel(payroll.status)}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+        <PayrollHeroFoldToggle />
+      </div>
+    </section>
+  );
+}
 
 function shortDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -89,7 +159,6 @@ export function DashboardPayrollPanel({
 }) {
   const label = payrollMonthLabel(payroll.year, payroll.month);
   const hasPayroll = payroll.payrollId != null && payroll.status != null;
-  const pill = payroll.status ? DARK_PILL[payroll.status] : null;
   const employeesOutsideCycle = Math.max(0, activeEmployeeCount - payroll.employeeCount);
 
   const reachedIndex = payroll.status ? STAGE_ORDER.indexOf(payroll.status) : -1;
@@ -118,29 +187,13 @@ export function DashboardPayrollPanel({
         >
           Cikli i pagës · {label}
         </h2>
-        {payroll.status && pill ? (
-          <span
-            className={cn(
-              "inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11.5px] font-semibold",
-              pill.chip,
-            )}
-          >
-            {payroll.status === "LOCKED" ? (
-              <Lock className="h-[11px] w-[11px]" strokeWidth={2.5} aria-hidden />
-            ) : (
-              <span className={cn("h-1.5 w-1.5 rounded-full", pill.dot)} aria-hidden />
-            )}
-            {PAYROLL_STATUS_LABELS_SQ[payroll.status]}
-          </span>
-        ) : (
-          <span className="inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-2.5 text-[11.5px] font-semibold text-[#cbd5e1]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" aria-hidden />
-            Pa payroll
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <StatusPill status={payroll.status} />
+          <PayrollHeroFoldToggle />
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+      <div id="dashboard-payroll-hero-body" className="flex flex-wrap items-end gap-x-6 gap-y-2">
         <p className="text-[34px] font-extrabold leading-none tracking-[-0.03em] text-white tabular-nums">
           <MaskedAmount value={formatEur(payroll.totals.grossSalary)} />
         </p>

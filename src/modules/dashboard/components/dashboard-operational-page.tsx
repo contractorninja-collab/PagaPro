@@ -12,7 +12,12 @@ import { ActivityLogCard } from "../widgets/activity-log-card";
 import { DashboardBrutoTrendCard } from "../widgets/dashboard-trend-card";
 import { DashboardEmployeeDistribution } from "../widgets/dashboard-employee-distribution";
 import { DashboardFiltersBar } from "../widgets/dashboard-filters-bar";
-import { DashboardPayrollPanel, DashboardPayrollPrompt } from "../widgets/dashboard-payroll-panel";
+import {
+  DashboardPayrollCollapsedBar,
+  DashboardPayrollPanel,
+  DashboardPayrollPrompt,
+} from "../widgets/dashboard-payroll-panel";
+import { PayrollHeroFoldProvider, PayrollHeroFoldSwitch } from "../widgets/payroll-hero-fold";
 import { DashboardQuickActions } from "../widgets/dashboard-quick-actions";
 import { DashboardKpiCards } from "../widgets/dashboard-summary-cards";
 import { DashboardTodayPanel } from "../widgets/dashboard-today-panel";
@@ -90,6 +95,8 @@ export function DashboardOperationalPage(props: {
   data: DashboardOperationalPayload;
   departments: DepartmentOptionDto[];
   userDisplayName?: string | null;
+  /** Remembered hero fold, read from the cookie so the first paint is right. */
+  payrollHeroCollapsed?: boolean;
 }) {
   const { data, departments } = props;
 
@@ -98,6 +105,26 @@ export function DashboardOperationalPage(props: {
   const greeting = greetingForKosovoTime(now);
   const atkDeadline = buildAtkDeadline(data, now);
   const hasPayroll = data.payroll.payrollId != null && data.payroll.status != null;
+
+  // Rendered once each and placed into whichever arrangement is showing — the
+  // only difference is how many columns they get.
+  const kpiCards = (
+    <DashboardKpiCards
+      summary={data.summary}
+      metrics={data.costMetrics}
+      movement={data.movement}
+      month={data.filters.month}
+    />
+  );
+  const kpiCardsWide = (
+    <DashboardKpiCards
+      summary={data.summary}
+      metrics={data.costMetrics}
+      movement={data.movement}
+      month={data.filters.month}
+      layout="wide"
+    />
+  );
 
   return (
     <SalaryVisibilityProvider>
@@ -115,23 +142,33 @@ export function DashboardOperationalPage(props: {
 
       <div className="space-y-7 pb-24 md:pb-8">
         {/* 1 — the run, with the numbers that qualify it. Until a payroll exists
-            there is nothing to report, so the hero gives way to a one-line prompt
-            and the indicators take the full width instead. */}
+            there is nothing to report, so the hero gives way to a one-line prompt;
+            once it does, it can still be folded down to a strip on demand. Folded
+            or absent, the indicators spread to the full width rather than staying
+            stacked in a rail beside nothing. Both arrangements are rendered here,
+            on the server; the client only chooses between them. */}
         {hasPayroll ? (
-          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-            <DashboardPayrollPanel
-              payroll={data.payroll}
-              metrics={data.costMetrics}
-              activeEmployeeCount={data.summary.activeEmployees}
-              atkDeadline={atkDeadline}
+          <PayrollHeroFoldProvider defaultCollapsed={props.payrollHeroCollapsed ?? false}>
+            <PayrollHeroFoldSwitch
+              expanded={
+                <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+                  <DashboardPayrollPanel
+                    payroll={data.payroll}
+                    metrics={data.costMetrics}
+                    activeEmployeeCount={data.summary.activeEmployees}
+                    atkDeadline={atkDeadline}
+                  />
+                  {kpiCards}
+                </div>
+              }
+              collapsed={
+                <div className="space-y-5">
+                  <DashboardPayrollCollapsedBar payroll={data.payroll} />
+                  {kpiCardsWide}
+                </div>
+              }
             />
-            <DashboardKpiCards
-              summary={data.summary}
-              metrics={data.costMetrics}
-              movement={data.movement}
-              month={data.filters.month}
-            />
-          </div>
+          </PayrollHeroFoldProvider>
         ) : (
           <div className="space-y-5">
             <DashboardPayrollPrompt
@@ -139,13 +176,7 @@ export function DashboardOperationalPage(props: {
               month={data.filters.month}
               atkDeadline={atkDeadline}
             />
-            <DashboardKpiCards
-              summary={data.summary}
-              metrics={data.costMetrics}
-              movement={data.movement}
-              month={data.filters.month}
-              layout="wide"
-            />
+            {kpiCardsWide}
           </div>
         )}
 
