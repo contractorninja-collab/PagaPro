@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type {
   ContractKind,
   EmploymentStatus,
@@ -22,7 +23,10 @@ import {
   collapseDashboardActivity,
   type DashboardActivityCandidate,
 } from "./dashboard-activity-service";
-import { buildRecommendedActions } from "./dashboard-recommended-actions-service";
+import { loadDashboardToday } from "./dashboard-today-service";
+import { loadDashboardCostMetrics } from "./dashboard-metrics-service";
+import { workforceShape } from "@/modules/reports/services/report-analytics-service";
+import { listContractorPayrollsForCompany } from "@/modules/payroll/contractor/contractor-payroll-service";
 
 function decStr(v: null | undefined | { toString(): string }): string {
   if (v == null) return "0";
@@ -79,7 +83,34 @@ function auditActionLabel(action: string): string {
   return labels[operation] ?? action.replaceAll("_", " ").toLocaleLowerCase("sq-AL");
 }
 
-export async function loadDashboardOperationalData(
+/**
+ * Request-deduplicated entry point. `cache()` compares arguments by identity, so
+ * the memo is keyed on the filter *primitives* — callers build a fresh filters
+ * object each time and an object key would never hit.
+ */
+const loadDashboardOperationalDataCached = cache(
+  async (
+    companyId: string,
+    year: number,
+    month: number,
+    departmentId: string | null,
+  ): Promise<DashboardOperationalPayload> =>
+    loadDashboardOperationalDataUncached(companyId, { year, month, departmentId }),
+);
+
+export function loadDashboardOperationalData(
+  companyId: string,
+  filters: DashboardFilters,
+): Promise<DashboardOperationalPayload> {
+  return loadDashboardOperationalDataCached(
+    companyId,
+    filters.year,
+    filters.month,
+    filters.departmentId,
+  );
+}
+
+async function loadDashboardOperationalDataUncached(
   companyId: string,
   filters: DashboardFilters,
 ): Promise<DashboardOperationalPayload> {
@@ -132,10 +163,9 @@ export async function loadDashboardOperationalData(
     employmentTypeGroups,
     deptGroups,
     departments,
+    documentsMissingCount,
     documentsMissingRows,
     correctionsOpen,
-    payrollHistoryPeriods,
-    payrollHistoryGrossGroups,
   ] = await Promise.all([
     prisma.employee.count({ where: { ...empBase, status: "ACTIVE" } }),
     prisma.contract.count({
@@ -146,6 +176,9 @@ export async function loadDashboardOperationalData(
         ...contractDeptNested,
       },
     }),
+    // A payroll period belongs to the company, not to a department, so this one
+    // stays company-wide even when a department filter is on — the widget that
+    // shows it says so, rather than silently mixing scopes.
     prisma.payroll.count({ where: { companyId, status: "DRAFT" } }),
     prisma.leaveRequest.count({
       where: { companyId, status: "PENDING", ...leaveDeptNested },
@@ -294,6 +327,11 @@ export async function loadDashboardOperationalData(
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.employee.count({
+      where: { companyId, documentsMissing: true, status: { not: "TERMINATED" } },
+    }),
+    // Only a sample: the alert prints a total and links either to the single
+    // employee or to the filtered list, so loading the whole set was waste.
     prisma.employee.findMany({
       where: {
         companyId,
@@ -302,38 +340,13 @@ export async function loadDashboardOperationalData(
       },
       select: { id: true, firstName: true, lastName: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      take: 2,
     }),
     prisma.payrollCorrection.count({
       where: {
         companyId,
         payroll: { status: { notIn: ["LOCKED", "ARCHIVED"] } },
       },
-    }),
-    prisma.payroll.findMany({
-      where: {
-        companyId,
-        OR: [
-          { year: { lt: filters.year } },
-          { year: filters.year, month: { lte: filters.month } },
-        ],
-      },
-      orderBy: [{ year: "desc" }, { month: "desc" }],
-      take: 6,
-      select: { id: true, year: true, month: true },
-    }),
-    prisma.payrollEntry.groupBy({
-      by: ["payrollId"],
-      where: {
-        payroll: {
-          companyId,
-          OR: [
-            { year: { lt: filters.year } },
-            { year: filters.year, month: { lte: filters.month } },
-          ],
-        },
-        ...payrollEntryEmpFilter,
-      },
-      _sum: { grossSalary: true },
     }),
   ]);
 
@@ -473,19 +486,6 @@ export async function loadDashboardOperationalData(
       netPay: decStr(payrollEntryAgg._sum.netPay),
       employerTotalCost: decStr(payrollEntryAgg._sum.employerTotalCost),
     },
-    grossHistory: payrollHistoryPeriods
-      .map((period) => {
-        const totals = payrollHistoryGrossGroups.find((group) => group.payrollId === period.id);
-        return totals
-          ? {
-              year: period.year,
-              month: period.month,
-              grossSalary: decStr(totals._sum.grossSalary),
-            }
-          : null;
-      })
-      .filter((period): period is NonNullable<typeof period> => period != null)
-      .reverse(),
     reviewedAtIso: payrollRow?.reviewedAt?.toISOString() ?? null,
     approvedAtIso: payrollRow?.approvedAt?.toISOString() ?? null,
     lockedAtIso: payrollRow?.lockedAt?.toISOString() ?? null,
@@ -608,7 +608,25 @@ export async function loadDashboardOperationalData(
     byDepartment: byDepartment.sort((a, b) => b.count - a.count),
   };
 
-  const payloadWithoutAlerts: Omit<DashboardOperationalPayload, "alerts" | "recommendedActions"> = {
+  // The three sections the 1b dashboard never had: who is here today, how the
+  // headcount moved, and the hourly contractor cycle.
+  const [todaySlice, shape, companyFlags, costMetrics] = await Promise.all([
+    loadDashboardToday(companyId),
+    workforceShape(companyId, filters.year),
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { contractorPayrollEnabled: true },
+    }),
+    loadDashboardCostMetrics(companyId, filters.year, filters.month),
+  ]);
+
+  const contractorEnabled = companyFlags?.contractorPayrollEnabled ?? false;
+  const contractorPeriods = contractorEnabled
+    ? await listContractorPayrollsForCompany(companyId)
+    : [];
+  const latestContractor = contractorPeriods[0] ?? null;
+
+  const payloadWithoutAlerts: Omit<DashboardOperationalPayload, "alerts"> = {
     filters,
     summary,
     payroll,
@@ -617,6 +635,28 @@ export async function loadDashboardOperationalData(
     leaveToday: { approved: leaveApprovedToday, rejected: leaveRejectedToday },
     timeline,
     distribution,
+    costMetrics,
+    today: todaySlice,
+    movement: shape.movement.map((m) => ({
+      key: m.key,
+      label: m.label,
+      joiners: m.joiners,
+      leavers: m.leavers,
+      net: m.net,
+    })),
+    contractor: {
+      enabled: contractorEnabled,
+      latest: latestContractor
+        ? {
+            id: latestContractor.id,
+            year: latestContractor.year,
+            month: latestContractor.month,
+            status: latestContractor.status,
+            entryCount: latestContractor.entryCount,
+            totalGross: latestContractor.totalGross,
+          }
+        : null,
+    },
   };
 
   const documentsMissingEmployees = documentsMissingRows.map((e) => ({
@@ -645,6 +685,7 @@ export async function loadDashboardOperationalData(
     ...payloadWithoutAlerts,
     payrollSettingsPresent: settingsRow != null,
     belowMinimumEmployees: belowMin,
+    documentsMissingCount,
     documentsMissingEmployees,
     openPayrollCorrections: correctionsOpen,
     expiringContractsTotal: contractsExpiringWithin30Days,
@@ -654,12 +695,5 @@ export async function loadDashboardOperationalData(
     registerPdfGenerated,
   });
 
-  const recommendedActions = buildRecommendedActions({
-    ...payloadWithoutAlerts,
-    payrollRowExists: payrollRow != null,
-    documentsMissingEmployees,
-    registerPdfGenerated,
-  });
-
-  return { ...payloadWithoutAlerts, alerts, recommendedActions };
+  return { ...payloadWithoutAlerts, alerts };
 }

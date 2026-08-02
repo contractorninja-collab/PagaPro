@@ -3,7 +3,10 @@ import { buildOperationalAlerts } from "../dashboard-alerts-service";
 import type { AlertBuilderInput } from "../dashboard-alerts-service";
 import type { DashboardOperationalPayload } from "../../types/dashboard-types";
 
-const basePayload: Omit<DashboardOperationalPayload, "alerts" | "recommendedActions"> = {
+const basePayload: Pick<
+  DashboardOperationalPayload,
+  "filters" | "summary" | "payroll" | "contractExpiries"
+> = {
   filters: { year: 2026, month: 6, departmentId: null },
   summary: {
     activeEmployees: 3,
@@ -20,21 +23,17 @@ const basePayload: Omit<DashboardOperationalPayload, "alerts" | "recommendedActi
     status: "LOCKED",
     employeeCount: 3,
     totals: { grossSalary: "0", netPay: "0", employerTotalCost: "0" },
-    grossHistory: [],
     reviewedAtIso: null,
     approvedAtIso: null,
     lockedAtIso: null,
   },
   contractExpiries: [],
-  leavePending: [],
-  leaveToday: { approved: 0, rejected: 0 },
-  timeline: [],
-  distribution: { byStatus: {}, byEmploymentType: {}, byDepartment: [] },
 };
 
 const alertExtras: Omit<AlertBuilderInput, keyof typeof basePayload> = {
   payrollSettingsPresent: true,
   belowMinimumEmployees: 0,
+  documentsMissingCount: 0,
   documentsMissingEmployees: [],
   openPayrollCorrections: 0,
   expiringContractsTotal: 0,
@@ -49,6 +48,7 @@ describe("buildOperationalAlerts missing docs routing", () => {
     const alerts = buildOperationalAlerts({
       ...basePayload,
       ...alertExtras,
+      documentsMissingCount: 1,
       documentsMissingEmployees: [{ id: "emp-1", fullName: "Arben Krasniqi" }],
     });
 
@@ -62,6 +62,7 @@ describe("buildOperationalAlerts missing docs routing", () => {
     const alerts = buildOperationalAlerts({
       ...basePayload,
       ...alertExtras,
+      documentsMissingCount: 2,
       documentsMissingEmployees: [
         { id: "emp-1", fullName: "Arben Krasniqi" },
         { id: "emp-2", fullName: "Blerta Hoxha" },
@@ -72,6 +73,24 @@ describe("buildOperationalAlerts missing docs routing", () => {
     expect(alert?.title).toBe("2 punonjës kanë dokumentacion të paplotë");
     expect(alert?.href).toBe("/punonjesit?documentsMissing=1");
     expect(alert?.actionLabel).toBe("Rishiko punonjësit");
+  });
+
+  it("reports the true total even though only a sample of employees is loaded", () => {
+    // The dashboard fetches at most two rows; the count comes from a separate
+    // COUNT, so a company with 40 flagged employees must not read as "2".
+    const alerts = buildOperationalAlerts({
+      ...basePayload,
+      ...alertExtras,
+      documentsMissingCount: 40,
+      documentsMissingEmployees: [
+        { id: "emp-1", fullName: "Arben Krasniqi" },
+        { id: "emp-2", fullName: "Blerta Hoxha" },
+      ],
+    });
+
+    const alert = alerts.find((a) => a.id === "documents-missing-flag");
+    expect(alert?.title).toBe("40 punonjës kanë dokumentacion të paplotë");
+    expect(alert?.href).toBe("/punonjesit?documentsMissing=1");
   });
 });
 

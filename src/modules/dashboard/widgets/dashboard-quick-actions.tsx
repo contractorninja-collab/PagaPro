@@ -28,7 +28,10 @@ const DASHBOARD_ACTIONS = [
     icon: FileText,
   },
   {
-    href: "#leave-requests",
+    // Not the "#leave-requests" anchor: that id only exists when the queue
+    // happens to hold a pending request, so the menu item led nowhere on a
+    // quiet day. Pushimet lists them in every state.
+    href: "/pushimet?status=PENDING&month=0",
     label: "Aprovo pushime",
     icon: Palmtree,
   },

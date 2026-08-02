@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import type { TimelineEntryDto } from "../types/dashboard-types";
@@ -34,13 +33,21 @@ const CATEGORY_STYLES: Record<Exclude<ActivityFilter, "all">, string> = {
   audit: "bg-[#f1f5f9] text-[#475569]",
 };
 
-const VISIBLE_ENTRY_LIMIT = 9;
+/**
+ * The service collapses and returns thirty entries; showing nine of them meant
+ * two thirds of the payload was fetched and dropped on every load. Fourteen is
+ * what fits the card beside the other bands without turning it into a log file.
+ */
+const VISIBLE_ENTRY_LIMIT = 14;
 
 export function ActivityLogCard({ entries }: { entries: TimelineEntryDto[] }) {
   const [filter, setFilter] = useState<ActivityFilter>("all");
-  const filteredEntries = entries
-    .filter((entry) => filter === "all" || SOURCE_CATEGORY[entry.source] === filter)
-    .slice(0, VISIBLE_ENTRY_LIMIT);
+  const matching = entries.filter(
+    (entry) => filter === "all" || SOURCE_CATEGORY[entry.source] === filter,
+  );
+  const matchingCount = matching.length;
+  const filteredEntries = matching.slice(0, VISIBLE_ENTRY_LIMIT);
+  const hiddenCount = matchingCount - filteredEntries.length;
 
   return (
     <section
@@ -133,15 +140,11 @@ export function ActivityLogCard({ entries }: { entries: TimelineEntryDto[] }) {
         </ul>
       )}
 
-      <div className="border-t border-[#f1f5f9] px-5 py-3 text-right">
-        {/* TODO: Replace this stub when a dedicated company activity-history route exists. */}
-        <Link
-          href="/paneli/aktiviteti"
-          className="text-[12px] font-semibold text-brand-blue hover:underline"
-        >
-          Shiko historikun e plotë
-        </Link>
-      </div>
+      {hiddenCount > 0 ? (
+        <p className="border-t border-[#f1f5f9] px-5 py-3 text-[12px] text-[#94a3b8]">
+          Po shfaqen {filteredEntries.length} nga {matchingCount} veprimet e fundit.
+        </p>
+      ) : null}
     </section>
   );
 }

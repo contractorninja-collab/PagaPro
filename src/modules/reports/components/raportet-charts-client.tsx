@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { ChartFrame, ChartSkeleton } from "@/components/patterns/chart-frame";
 import type {
   LeavePressure,
   PayrollCostPoint,
@@ -24,20 +25,6 @@ import type {
 
 const CARD = "rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
 const MICRO = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
-
-function ChartSkeleton({ height }: { height: number }) {
-  return (
-    <div
-      className="flex animate-pulse items-end gap-2 rounded-lg bg-[#f8fafc] p-4"
-      style={{ height }}
-      aria-hidden
-    >
-      {[45, 70, 35, 85, 55, 75, 40].map((h, i) => (
-        <div key={i} className="flex-1 rounded-t bg-[#e2e8f0]" style={{ height: `${h}%` }} />
-      ))}
-    </div>
-  );
-}
 
 const PayrollCostChart = dynamic(
   () => import("./charts/report-charts").then((m) => m.PayrollCostChart),
@@ -170,27 +157,6 @@ function DistributionBars({
  * A chart plus the sentence a screen reader (or a phone) gets instead.
  * `summary` is the finding, not a description of the axes.
  */
-function ChartFrame({
-  summary,
-  fallback,
-  children,
-}: {
-  summary: string;
-  fallback: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`overflow-hidden p-4 ${CARD}`}>
-      <div role="img" aria-label={summary} className="min-w-0">
-        {children}
-      </div>
-      <p className="mt-2 border-t border-[#eef2f7] pt-2.5 text-[12.5px] leading-relaxed text-[#64748b]">
-        {fallback}
-      </p>
-    </div>
-  );
-}
-
 function EmptySection({ message, cta }: { message: string; cta?: { href: string; label: string } }) {
   return (
     <div className={`px-4 py-10 text-center ${CARD}`}>

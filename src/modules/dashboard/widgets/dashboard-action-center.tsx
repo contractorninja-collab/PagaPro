@@ -62,6 +62,9 @@ const TONE_STYLES: Record<QueueTone, { rail: string; tile: string; chip: string 
 
 const TONE_RANK: Record<QueueTone, number> = { critical: 0, warning: 1, info: 2, neutral: 3 };
 
+/** Enough to be a to-do list, few enough to still read as one. */
+const VISIBLE_QUEUE_ITEMS = 6;
+
 const ALERT_CHIP_LABELS: Record<OperationalAlert["severity"], string> = {
   critical: "Kritike",
   warning: "Vëmendje",
@@ -298,6 +301,11 @@ export function DashboardActionCenter(props: {
 
   items.sort((a, b) => TONE_RANK[a.tone] - TONE_RANK[b.tone]);
 
+  // A queue that scrolls for two screens stops being a queue. The most urgent
+  // handful stay inline; the rest are reachable, and the count never lies.
+  const visible = items.slice(0, VISIBLE_QUEUE_ITEMS);
+  const hidden = items.length - visible.length;
+
   return (
     <section aria-label="Qendra e veprimeve">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -307,10 +315,14 @@ export function DashboardActionCenter(props: {
         <p className="text-[12.5px] text-[#64748b]">
           Renditur sipas urgjencës ·{" "}
           <span className="font-semibold text-[#0f172a]">{items.length} gjithsej</span>
-          <span className="mx-1.5 text-[#cbd5e1]" aria-hidden>
-            ·
-          </span>
-          Sot: {props.today.approved} miratuar · {props.today.rejected} refuzuar
+          {props.today.approved + props.today.rejected > 0 ? (
+            <>
+              <span className="mx-1.5 text-[#cbd5e1]" aria-hidden>
+                ·
+              </span>
+              Vendime sot: {props.today.approved} miratuar · {props.today.rejected} refuzuar
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -327,11 +339,26 @@ export function DashboardActionCenter(props: {
           </div>
         </div>
       ) : (
-        <ul className="flex flex-col gap-[11px]">
-          {items.map((item) => (
-            <QueueRow key={item.key} item={item} />
-          ))}
-        </ul>
+        <>
+          <ul className="flex flex-col gap-[11px]">
+            {visible.map((item) => (
+              <QueueRow key={item.key} item={item} />
+            ))}
+          </ul>
+          {hidden > 0 ? (
+            <p className="mt-3 text-[12.5px] text-[#64748b]">
+              edhe {hidden} çështje të tjera me përparësi më të ulët —{" "}
+              <Link href="/pushimet" className="font-semibold text-brand-blue hover:underline">
+                Pushimet
+              </Link>{" "}
+              dhe{" "}
+              <Link href="/punonjesit" className="font-semibold text-brand-blue hover:underline">
+                Punonjësit
+              </Link>{" "}
+              i listojnë të plota.
+            </p>
+          ) : null}
+        </>
       )}
 
       <LeaveRejectDialog

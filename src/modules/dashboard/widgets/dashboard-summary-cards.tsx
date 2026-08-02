@@ -2,103 +2,76 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DashboardSummaryCards } from "../types/dashboard-types";
+import { formatEur } from "@/modules/employees/components/employees-labels";
+import { MaskedAmount } from "@/modules/employees/components/salary-visibility";
+import type { DashboardSummaryCards, WorkforceMovementPointDto } from "../types/dashboard-types";
+import type { DashboardCostMetrics } from "../services/dashboard-metrics-service";
 
-type SummaryKey = keyof DashboardSummaryCards;
-type SummaryDomain = "workforce" | "payroll" | "hr";
+/**
+ * The four figures a payroll owner checks first — each shown with the comparison
+ * that makes it mean something.
+ *
+ * The previous version printed six bare counts and repeated the pending-leave and
+ * expiring-contract numbers that the action queue already lists, so the same work
+ * appeared twice on one screen. Those two live in the queue now; this row answers
+ * "how are we doing", not "what must I click".
+ */
 
-type SummaryItem = {
-  key: SummaryKey;
+type Tone = "neutral" | "up" | "down";
+
+function Delta({ text, tone }: { text: string; tone: Tone }) {
+  return (
+    <p
+      className={cn(
+        "mt-1 text-[11.5px] font-medium",
+        tone === "up" ? "text-[#b45309]" : tone === "down" ? "text-[#15803d]" : "text-[#94a3b8]",
+      )}
+    >
+      {text}
+    </p>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  delta,
+  href,
+  hint,
+}: {
   label: string;
-  hint: string;
-  href: string;
-  cta: string;
-  domain: SummaryDomain;
-  actionWhenPositive?: boolean;
-  actionPriority?: number;
-};
+  value: React.ReactNode;
+  delta?: { text: string; tone: Tone };
+  href?: string;
+  hint?: string;
+}) {
+  const body = (
+    <>
+      <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{label}</p>
+      <p className="mt-1.5 text-[22px] font-extrabold leading-none tracking-[-0.02em] text-brand-navy tabular-nums">
+        {value}
+      </p>
+      {delta ? <Delta text={delta.text} tone={delta.tone} /> : null}
+      {hint ? <p className="mt-1 text-[11.5px] text-[#94a3b8]">{hint}</p> : null}
+    </>
+  );
 
-const DOMAIN_LABELS: Array<{ key: SummaryDomain; label: string }> = [
-  { key: "workforce", label: "Workforce" },
-  { key: "payroll", label: "Payroll / Compliance" },
-  { key: "hr", label: "HR events" },
-];
+  const base =
+    "flex min-h-[104px] flex-col justify-center rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
 
-const ITEMS: SummaryItem[] = [
-  {
-    key: "activeEmployees",
-    label: "Aktiv punonjës",
-    hint: "Statusi ACTIVE",
-    href: "/punonjesit?status=ACTIVE",
-    cta: "Shiko listën",
-    domain: "workforce",
-  },
-  {
-    key: "contractsExpiringWithin30Days",
-    label: "Kontrata afër skadimit",
-    hint: "Brenda 30 ditëve",
-    href: "#contracts-expiry",
-    cta: "Shiko kontratat",
-    domain: "workforce",
-    actionWhenPositive: true,
-    actionPriority: 3,
-  },
-  {
-    key: "payrollsInDraft",
-    label: "Payroll në draft",
-    hint: "Të gjitha periudhat",
-    href: "/pagat?status=DRAFT",
-    cta: "Hap pagat",
-    domain: "payroll",
-    actionWhenPositive: true,
-    actionPriority: 1,
-  },
-  {
-    key: "documentsGeneratedThisMonth",
-    label: "Dokumente të gjeneruara",
-    hint: "Final, muaji i filtrit",
-    href: "/dokumentet",
-    cta: "Shiko dokumentet",
-    domain: "payroll",
-  },
-  {
-    key: "leaveRequestsPending",
-    label: "Pushime në pritje",
-    hint: "Status PENDING",
-    href: "#leave-requests",
-    cta: "Aprovo tani",
-    domain: "hr",
-    actionWhenPositive: true,
-    actionPriority: 2,
-  },
-  {
-    key: "employeesTerminatedThisMonth",
-    label: "Të larguar këtë muaj",
-    hint: "Sipas datës së largimit",
-    href: "/punonjesit?status=TERMINATED",
-    cta: "Shiko listën",
-    domain: "hr",
-  },
-];
+  if (!href) return <div className={base}>{body}</div>;
 
-function ActionCard({ item, value }: { item: SummaryItem; value: number }) {
   return (
     <Link
-      href={item.href}
-      className="group flex min-h-[104px] flex-col justify-between rounded-lg border border-[#fed7aa] border-l-4 border-l-[#f59e0b] bg-[#fffbeb] px-4 py-3.5 transition-colors hover:bg-[#fff7d6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={`${item.label}: ${value}. ${item.cta}`}
+      href={href}
+      className={cn(
+        base,
+        "group transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[12px] font-bold text-[#78350f]">{item.label}</p>
-          <p className="mt-0.5 text-[10.5px] text-[#a16207]">{item.hint}</p>
-        </div>
-        <span className="text-[27px] font-extrabold leading-none text-[#b45309] tabular-nums">
-          {value}
-        </span>
-      </div>
-      <span className="mt-3 inline-flex items-center text-[11px] font-semibold text-[#92400e]">
-        {item.cta}
+      {body}
+      <span className="mt-2 inline-flex items-center text-[11px] font-semibold text-brand-blue">
+        Hap
         <ArrowRight
           className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-0.5"
           aria-hidden
@@ -108,111 +81,110 @@ function ActionCard({ item, value }: { item: SummaryItem; value: number }) {
   );
 }
 
-function DomainMetric({ item, value }: { item: SummaryItem; value: number }) {
-  const isZero = value === 0;
+export function DashboardKpiCards({
+  summary,
+  metrics,
+  movement,
+  month,
+  layout = "rail",
+}: {
+  summary: DashboardSummaryCards;
+  metrics: DashboardCostMetrics;
+  movement: WorkforceMovementPointDto[];
+  month: number;
+  /** "rail" sits beside the payroll hero; "wide" spans the page when the hero is collapsed. */
+  layout?: "rail" | "wide";
+}) {
+  const mom = metrics.momEmployerCostPct;
+  const employerCost = metrics.current?.employerCost ?? null;
+  // `movement` is the twelve months of the filtered year, zero-filled and in order.
+  const thisMonthMovement = movement[month - 1] ?? null;
 
   return (
-    <Link
-      href={item.href}
-      className={cn(
-        "group flex min-h-11 items-center justify-between gap-3 border-b border-[#f1f5f9] px-1 py-2.5 last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isZero ? "text-[#94a3b8]" : "text-[#334155]",
-      )}
-      aria-label={`${item.label}: ${value}. ${item.cta}`}
+    // Two across in the rail: it is ~360px wide, and four columns there turns
+    // every label into a three-line wrap.
+    <section
+      aria-label="Treguesit kryesorë"
+      className={cn("grid gap-3", layout === "wide" ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2")}
     >
-      <div className="min-w-0">
-        <p className={cn("truncate text-[11.5px] font-semibold", isZero && "font-medium")}>
-          {item.label}
-        </p>
-        <p className="truncate text-[10px] text-[#94a3b8]">{item.hint}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <span
-          className={cn(
-            "text-[17px] font-bold tabular-nums",
-            isZero && "text-[14px] font-semibold",
-          )}
-        >
-          {value}
-        </span>
-        <ArrowRight
-          className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100"
-          aria-hidden
-        />
-      </div>
-    </Link>
-  );
-}
+      <Tile
+        label="Kosto e punëdhënësit"
+        value={
+          employerCost != null ? (
+            <MaskedAmount value={formatEur(employerCost)} />
+          ) : (
+            <span className="text-[#cbd5e1]">—</span>
+          )
+        }
+        delta={
+          mom != null
+            ? {
+                text:
+                  mom === 0
+                    ? "Pa ndryshim kundrejt muajit të kaluar"
+                    : `${mom > 0 ? "+" : ""}${mom.toFixed(1)}% kundrejt muajit të kaluar`,
+                tone: mom > 0 ? "up" : mom < 0 ? "down" : "neutral",
+              }
+            : { text: "Pa muaj krahasues ende", tone: "neutral" }
+        }
+      />
 
-export function DashboardKpiCards({ summary }: { summary: DashboardSummaryCards }) {
-  const actionItems = ITEMS.filter(
-    (item) => item.actionWhenPositive && summary[item.key] > 0,
-  ).sort((a, b) => (a.actionPriority ?? 99) - (b.actionPriority ?? 99));
-  const actionKeys = new Set(actionItems.map((item) => item.key));
+      <Tile
+        label="Punonjës aktivë"
+        value={summary.activeEmployees}
+        delta={
+          thisMonthMovement && (thisMonthMovement.joiners > 0 || thisMonthMovement.leavers > 0)
+            ? {
+                text: `+${thisMonthMovement.joiners} të rinj · −${thisMonthMovement.leavers} largime këtë muaj`,
+                tone: thisMonthMovement.net < 0 ? "up" : "neutral",
+              }
+            : { text: "Pa lëvizje këtë muaj", tone: "neutral" }
+        }
+        href="/punonjesit?status=ACTIVE"
+      />
 
-  return (
-    <section aria-label="Përmbledhje operative" className="space-y-4">
-      {actionItems.length > 0 ? (
-        <div>
-          <p className="mb-2 text-[10.5px] font-bold uppercase text-[#b45309]">Kërkon veprim</p>
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            {actionItems.map((item) => (
-              <ActionCard key={item.key} item={item} value={summary[item.key]} />
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <Tile
+        label="Kosto mesatare / punonjës"
+        value={
+          metrics.averageEmployerCostPerEmployee != null ? (
+            <MaskedAmount value={formatEur(metrics.averageEmployerCostPerEmployee)} />
+          ) : (
+            <span className="text-[#cbd5e1]">—</span>
+          )
+        }
+        hint={
+          metrics.current != null
+            ? `${metrics.current.employees} punonjës në pagë`
+            : "Pa pagë për këtë muaj"
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-3 lg:grid-cols-1">
-        {DOMAIN_LABELS.map((domain) => {
-          const domainItems = ITEMS.filter(
-            (item) => item.domain === domain.key && !actionKeys.has(item.key),
-          );
-          if (domainItems.length === 0) return null;
-
-          return (
-            <section key={domain.key} aria-labelledby={`dashboard-domain-${domain.key}`}>
-              <h3
-                id={`dashboard-domain-${domain.key}`}
-                className="border-b border-[#e2e8f0] pb-1.5 text-[10.5px] font-bold uppercase text-[#64748b]"
-              >
-                {domain.label}
-              </h3>
-              <div>
-                {domainItems.map((item) => (
-                  <DomainMetric key={item.key} item={item} value={summary[item.key]} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      <Tile
+        label="Kosto vjetore deri tani"
+        value={
+          metrics.ytd.months > 0 ? (
+            <MaskedAmount value={formatEur(metrics.ytd.employerCost)} />
+          ) : (
+            <span className="text-[#cbd5e1]">—</span>
+          )
+        }
+        hint={
+          metrics.ytd.months > 0
+            ? `${metrics.ytd.months} muaj të finalizuar`
+            : "Asnjë muaj i finalizuar"
+        }
+        href="/raportet"
+      />
     </section>
   );
 }
 
 export function DashboardKpiCardsSkeleton() {
   return (
-    <div className="space-y-4" aria-hidden>
-      <div>
-        <Skeleton className="mb-2 h-3 w-24" />
-        <Skeleton className="h-[104px] w-full rounded-lg" />
-      </div>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i}>
-          <Skeleton className="mb-2 h-3 w-28" />
-          <Skeleton className="h-11 w-full" />
-          <Skeleton className="mt-1 h-11 w-full" />
-        </div>
+    <div className="grid grid-cols-2 gap-3" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-[104px] w-full rounded-xl" />
       ))}
     </div>
   );
-}
-
-export function DashboardSummaryCardsGrid({ summary }: { summary: DashboardSummaryCards }) {
-  return <DashboardKpiCards summary={summary} />;
-}
-
-export function DashboardSummaryCardsSkeleton() {
-  return <DashboardKpiCardsSkeleton />;
 }

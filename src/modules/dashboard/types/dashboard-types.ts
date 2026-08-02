@@ -6,6 +6,7 @@ import type {
   LeaveType,
   PayrollPeriodStatus,
 } from "@prisma/client";
+import type { DashboardCostMetrics } from "../services/dashboard-metrics-service";
 
 /** URL/query-driven dashboard scope (multi-company via cookie elsewhere). */
 export interface DashboardFilters {
@@ -35,11 +36,6 @@ export interface DashboardPayrollSlice {
     netPay: string;
     employerTotalCost: string;
   };
-  grossHistory: Array<{
-    year: number;
-    month: number;
-    grossSalary: string;
-  }>;
   reviewedAtIso: string | null;
   approvedAtIso: string | null;
   lockedAtIso: string | null;
@@ -102,10 +98,46 @@ export interface OperationalAlert {
   actionLabel?: string;
 }
 
-export interface RecommendedAction {
-  id: string;
+/** Who is out, who is in, and what's next — the "is today normal?" slice. */
+export interface DashboardTodaySlice {
+  onLeave: Array<{
+    leaveId: string;
+    employeeId: string;
+    employeeName: string;
+    typeLabel: string;
+    endDateIso: string;
+  }>;
+  onLeaveTotal: number;
+  /** Null when the badge time clock is not part of the company's plan. */
+  timeClock: {
+    enabled: true;
+    clockedIn: number;
+    punchesToday: number;
+    needsReview: number;
+  } | null;
+  nextHoliday: { dateIso: string; name: string } | null;
+}
+
+/** Null-ish when the hourly contractor payroll is not enabled for the company. */
+export interface DashboardContractorSlice {
+  enabled: boolean;
+  latest: {
+    id: string;
+    year: number;
+    month: number;
+    status: "DRAFT" | "LOCKED" | "ARCHIVED";
+    entryCount: number;
+    totalGross: string;
+  } | null;
+}
+
+/** Joiners and leavers per month — the headcount story behind the cost story. */
+export interface WorkforceMovementPointDto {
+  key: string;
   label: string;
-  href: string;
+  joiners: number;
+  leavers: number;
+  net: number;
 }
 
 export interface DashboardOperationalPayload {
@@ -118,5 +150,9 @@ export interface DashboardOperationalPayload {
   timeline: TimelineEntryDto[];
   distribution: EmployeeDistributionSlice;
   alerts: OperationalAlert[];
-  recommendedActions: RecommendedAction[];
+  today: DashboardTodaySlice;
+  contractor: DashboardContractorSlice;
+  movement: WorkforceMovementPointDto[];
+  /** Cost trend plus the month-over-month / year-to-date comparisons. */
+  costMetrics: DashboardCostMetrics;
 }

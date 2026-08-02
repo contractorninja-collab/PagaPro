@@ -41,16 +41,17 @@ export default async function DashboardLayout({
     console.error("[pagapro] DashboardLayout: company lookup failed — UI continues without tenant label.", err);
   }
 
+  /**
+   * Only the bell's number — deliberately not the whole dashboard payload, which
+   * this layout used to load on every page of the app (Punonjësit, Pagat,
+   * Dokumentet…) to read one integer off it.
+   */
   let alertCount = 0;
   try {
-    const { loadDashboardOperationalData } = await import(
-      "@/modules/dashboard/services/dashboard-data-service"
+    const { countOperationalAlerts } = await import(
+      "@/modules/dashboard/services/dashboard-alert-count-service"
     );
-    const { parseDashboardFilters } = await import(
-      "@/modules/dashboard/helpers/dashboard-time"
-    );
-    const dashData = await loadDashboardOperationalData(companyId, parseDashboardFilters({}));
-    alertCount = dashData.alerts?.length ?? 0;
+    alertCount = await countOperationalAlerts(companyId);
   } catch {
     alertCount = 0;
   }

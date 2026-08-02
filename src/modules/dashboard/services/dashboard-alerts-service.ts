@@ -1,9 +1,23 @@
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import type { DashboardOperationalPayload, DocumentsMissingEmployeeRef, OperationalAlert } from "../types/dashboard-types";
 import { missingDocsHref } from "./dashboard-missing-docs-routing";
-export type AlertBuilderInput = Omit<DashboardOperationalPayload, "alerts" | "recommendedActions"> & {
+/**
+ * Only the four payload slices the rules actually branch on — narrowing this
+ * keeps new dashboard sections from having to be invented by every caller that
+ * just wants a count.
+ */
+export type AlertBuilderInput = Pick<
+  DashboardOperationalPayload,
+  "filters" | "summary" | "payroll" | "contractExpiries"
+> & {
   payrollSettingsPresent: boolean;
   belowMinimumEmployees: number;
+  /**
+   * How many employees have incomplete paperwork. Separate from the sample below
+   * because the list is only fetched a couple of rows deep — the wording needs
+   * the true total, the link only needs to know whether it is exactly one.
+   */
+  documentsMissingCount: number;
   documentsMissingEmployees: DocumentsMissingEmployeeRef[];
   openPayrollCorrections: number;
   expiringContractsTotal: number;
@@ -140,10 +154,10 @@ export function buildOperationalAlerts(input: AlertBuilderInput): OperationalAle
     });
   }
 
-  if (input.documentsMissingEmployees.length > 0) {
+  if (input.documentsMissingCount > 0) {
     const employees = input.documentsMissingEmployees;
-    const n = employees.length;
-    const single = n === 1 ? employees[0]! : null;
+    const n = input.documentsMissingCount;
+    const single = n === 1 ? (employees[0] ?? null) : null;
     alerts.push({
       id: "documents-missing-flag",
       severity: "warning",

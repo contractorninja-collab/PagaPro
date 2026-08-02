@@ -1,117 +1,118 @@
-import Link from "next/link";
+"use client";
+
+import dynamic from "next/dynamic";
+import type { EmploymentStatus, EmploymentType } from "@prisma/client";
+import { ChartFrame, ChartSkeleton } from "@/components/patterns/chart-frame";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
 } from "@/modules/employees/components/employees-labels";
-import { employeeDepartmentHref } from "@/modules/employees/filters/department-filter";
-import type { EmploymentStatus, EmploymentType } from "@prisma/client";
-import type { EmployeeDistributionSlice } from "../types/dashboard-types";
+import type { EmployeeDistributionSlice, WorkforceMovementPointDto } from "../types/dashboard-types";
 
-/** Segment palette from the 1b handoff — navy, accent, then slate steps. */
-const SEGMENT_COLORS = ["#0B1220", "#2563EB", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0"];
+/**
+ * Who the workforce is, and how it moved.
+ *
+ * The department bars used to be normalised to the *largest department*, so a
+ * full-width bar meant "biggest team" rather than "most of the company" — a
+ * chart that answered a question nobody asked. Real counts against a real axis
+ * fix that, and the joiners/leavers series (already computed for Raportet, never
+ * shown here) gives the headcount figure in the KPI row its context.
+ */
+
+const DepartmentChart = dynamic(
+  () => import("@/modules/reports/components/charts/report-charts").then((m) => m.DepartmentChart),
+  { ssr: false, loading: () => <ChartSkeleton height={200} /> },
+);
+const MovementChart = dynamic(
+  () => import("@/modules/reports/components/charts/report-charts").then((m) => m.MovementChart),
+  { ssr: false, loading: () => <ChartSkeleton height={260} /> },
+);
+
+const EMPTY_CARD =
+  "rounded-xl border border-[#e2e8f0] bg-white px-4 py-10 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+
+function MiniList({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{title}</h4>
+      <dl className="mt-2 space-y-1.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-baseline justify-between gap-3">
+            <dt className="truncate text-[12.5px] text-[#334155]">{r.label}</dt>
+            <dd className="text-[13px] font-semibold tabular-nums text-[#0f172a]">{r.count}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 
 export function DashboardEmployeeDistribution({
   distribution,
+  movement,
+  year,
 }: {
   distribution: EmployeeDistributionSlice;
+  movement: WorkforceMovementPointDto[];
+  year: number;
 }) {
-  const statusEntries = (Object.entries(distribution.byStatus) as [EmploymentStatus, number][]).filter(
-    ([, n]) => n > 0,
-  );
-  const typeEntries = (
-    Object.entries(distribution.byEmploymentType) as [EmploymentType, number][]
-  ).filter(([, n]) => n > 0);
-  const total = distribution.byDepartment.reduce((sum, d) => sum + d.count, 0);
+  const departmentData = distribution.byDepartment.map((d) => ({
+    key: d.departmentId ?? "none",
+    label: d.departmentName,
+    count: d.count,
+  }));
+  const total = departmentData.reduce((sum, d) => sum + d.count, 0);
 
-  const largestDepartment = Math.max(...distribution.byDepartment.map((d) => d.count), 1);
+  const statusRows = (Object.entries(distribution.byStatus) as [EmploymentStatus, number][])
+    .filter(([, n]) => n > 0)
+    .map(([key, count]) => ({ label: EMPLOYMENT_STATUS_LABELS[key] ?? key, count }));
+  const typeRows = (Object.entries(distribution.byEmploymentType) as [EmploymentType, number][])
+    .filter(([, n]) => n > 0)
+    .map(([key, count]) => ({ label: EMPLOYMENT_TYPE_LABELS[key] ?? key, count }));
+
+  const joiners = movement.reduce((s, m) => s + m.joiners, 0);
+  const leavers = movement.reduce((s, m) => s + m.leavers, 0);
+  const hasMovement = joiners > 0 || leavers > 0;
+  const net = joiners - leavers;
 
   return (
-    <section className="rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-      <h3 className="text-[14.5px] font-bold text-[#0f172a]">
-        Fuqia punëtore · <span className="tabular-nums">{total}</span>
-      </h3>
-      <p className="mt-0.5 text-[12px] text-[#94a3b8]">Sipas departamentit, statusit dhe llojit</p>
+    <section className="space-y-4">
+      <h3 className="text-[15px] font-bold text-[#0f172a]">Fuqia punëtore</h3>
 
-      {distribution.byDepartment.length === 0 ? (
-        <p className="mt-4 text-sm text-[#64748b]">Nuk ka departamente.</p>
-      ) : (
-        <ul className="mt-4 space-y-3" aria-label="Punonjësit sipas departamentit">
-          {distribution.byDepartment.map((d, i) => (
-            <li
-              key={d.departmentId ?? "none"}
-            >
-              <Link
-                href={employeeDepartmentHref(d.departmentId)}
-                aria-label={`Shiko ${d.count} punonjës në ${d.departmentName}`}
-                className="group -mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 rounded-md px-2 py-1 text-[12.5px] transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 sm:grid-cols-[minmax(120px,180px)_minmax(0,1fr)_32px]"
-              >
-                <span className="flex min-w-0 items-center gap-2 font-medium text-[#334155]">
-                  <span
-                    className="h-[9px] w-[9px] flex-none rounded-[3px]"
-                    style={{ background: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }}
-                    aria-hidden
-                  />
-                  <span className="truncate group-hover:text-brand-blue">
-                    {d.departmentName}
-                  </span>
-                </span>
-                <span
-                  className="col-span-2 h-2 overflow-hidden rounded bg-[#f1f5f9] sm:col-span-1"
-                  role="img"
-                  aria-label={`${d.departmentName}: ${d.count} nga ${total} punonjës`}
-                >
-                  <span
-                    className="block h-full rounded"
-                    style={{
-                      width: `${(d.count / largestDepartment) * 100}%`,
-                      background: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
-                    }}
-                  />
-                </span>
-                <span className="row-start-1 text-right font-bold tabular-nums text-[#0f172a] sm:col-start-3">
-                  {d.count}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {departmentData.length > 0 ? (
+          <ChartFrame
+            summary={`Punonjësit sipas departamentit, gjithsej ${total}.`}
+            fallback={departmentData.map((d) => `${d.label}: ${d.count}`).join(" · ")}
+          >
+            <DepartmentChart data={departmentData} />
+          </ChartFrame>
+        ) : (
+          <div className={EMPTY_CARD}>
+            <p className="text-[13px] text-[#64748b]">Ende asnjë punonjës i regjistruar.</p>
+          </div>
+        )}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 border-t border-[#f1f5f9] pt-4 sm:grid-cols-2">
-        <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
-            Statusi
-          </p>
-          {statusEntries.length === 0 ? (
-            <p className="text-[12.5px] text-[#64748b]">Nuk ka të dhëna.</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {statusEntries.map(([k, n]) => (
-                <li key={k} className="flex items-center justify-between gap-3 text-[12.5px]">
-                  <span className="text-[#334155]">{EMPLOYMENT_STATUS_LABELS[k]}</span>
-                  <span className="font-bold tabular-nums text-[#0f172a]">{n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
-            Lloji i punësimit
-          </p>
-          {typeEntries.length === 0 ? (
-            <p className="text-[12.5px] text-[#64748b]">Nuk ka të dhëna.</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {typeEntries.map(([k, n]) => (
-                <li key={k} className="flex items-center justify-between gap-3 text-[12.5px]">
-                  <span className="text-[#334155]">{EMPLOYMENT_TYPE_LABELS[k]}</span>
-                  <span className="font-bold tabular-nums text-[#0f172a]">{n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {hasMovement ? (
+          <ChartFrame
+            summary={`Punësime dhe largime sipas muajit për ${year}.`}
+            fallback={`Gjatë ${year}: ${joiners} punësime dhe ${leavers} largime — bilanc ${net >= 0 ? "+" : ""}${net}.`}
+          >
+            <MovementChart data={movement} />
+          </ChartFrame>
+        ) : (
+          <div className={EMPTY_CARD}>
+            <p className="text-[13px] text-[#64748b]">
+              Pa punësime apo largime të regjistruara në {year}.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-x-8 gap-y-4 rounded-xl border border-[#e2e8f0] bg-white px-[18px] py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)] sm:grid-cols-2">
+        <MiniList title="Sipas statusit" rows={statusRows} />
+        <MiniList title="Sipas llojit të punësimit" rows={typeRows} />
       </div>
     </section>
   );
