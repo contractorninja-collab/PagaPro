@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, Download, Lock, LockOpen, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ const HOUR_FIELDS = [
 ] as const;
 
 type HourKey = (typeof HOUR_FIELDS)[number]["key"];
-type RowDraft = Record<HourKey, string>;
+type RowDraft = Record<HourKey, string> & { monthlyFlatAmount: string };
 
 function formatEuro(raw: string): string {
   const n = Number(raw);
@@ -58,6 +59,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
           weekendHours: e.weekendHours,
           holidayHours: e.holidayHours,
           nightHours: e.nightHours,
+          monthlyFlatAmount: e.monthlyFlatAmount,
         },
       ]),
     ),
@@ -65,7 +67,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [busyGlobal, setBusyGlobal] = useState(false);
 
-  function setDraft(entryId: string, key: HourKey, value: string) {
+  function setDraft(entryId: string, key: keyof RowDraft, value: string) {
     setDrafts((prev) => ({
       ...prev,
       [entryId]: { ...prev[entryId]!, [key]: value },
@@ -76,12 +78,17 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
     const entry = detail.entries.find((e) => e.id === entryId);
     const draft = drafts[entryId];
     if (!entry || !draft) return false;
+    if (entry.payBasis === "MONTHLY_FLAT") {
+      return Number(draft.monthlyFlatAmount) !== Number(entry.monthlyFlatAmount);
+    }
     return HOUR_FIELDS.some((f) => Number(draft[f.key]) !== Number(entry[f.key]));
   }
 
   async function saveRow(entryId: string) {
     const draft = drafts[entryId];
-    if (!draft) return;
+    const entry = detail.entries.find((e) => e.id === entryId);
+    if (!draft || !entry) return;
+    const flat = entry.payBasis === "MONTHLY_FLAT";
     setBusyRow(entryId);
     const r = await updateContractorEntryHoursAction({
       periodId: detail.id,
@@ -91,13 +98,21 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
       weekendHours: draft.weekendHours === "" ? 0 : draft.weekendHours.replace(",", "."),
       holidayHours: draft.holidayHours === "" ? 0 : draft.holidayHours.replace(",", "."),
       nightHours: draft.nightHours === "" ? 0 : draft.nightHours.replace(",", "."),
+      ...(flat
+        ? {
+            monthlyFlatAmount:
+              draft.monthlyFlatAmount === "" ? 0 : draft.monthlyFlatAmount.replace(",", "."),
+          }
+        : {}),
     });
     setBusyRow(null);
     if (!r.ok) {
       toast.error(r.error);
       return;
     }
-    toast.success(`Orët u ruajtën — bruto ${formatEuro(r.data?.grossPay ?? "0")}.`);
+    toast.success(
+      `${flat ? "Paga u ruajt" : "Orët u ruajtën"} — ${formatEuro(r.data?.grossPay ?? "0")}.`,
+    );
     router.refresh();
   }
 
@@ -137,7 +152,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
       <AppSubBar
         eyebrow="Payroll — Kontraktor"
         title={payrollMonthLabel(detail.year, detail.month)}
-        description="Orë × tarifë orare me premium (shtesë, vikend, festë, natë). Bruto = neto — pa tatim, pa Trust."
+        description="Pagë mujore fikse ose orë × tarifë me premium (shtesë, vikend, festë, natë). Shuma është neto — pa tatim, pa Trust."
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <a
@@ -231,14 +246,15 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
             <thead>
               <tr className="border-b border-[#e2e8f0] text-left text-[12px] uppercase tracking-wide text-[#94a3b8]">
                 <th className="px-4 py-3 font-semibold">Kontraktori</th>
-                <th className="px-3 py-3 text-right font-semibold">Tarifa €/orë</th>
+                <th className="px-3 py-3 text-left font-semibold">Baza</th>
+                <th className="px-3 py-3 text-right font-semibold">Tarifa / Paga</th>
                 {HOUR_FIELDS.map((f) => (
                   <th key={f.key} className="px-2 py-3 text-right font-semibold">
                     {f.label}
                   </th>
                 ))}
                 <th className="px-3 py-3 text-center font-semibold">Burimi</th>
-                <th className="px-3 py-3 text-right font-semibold">Bruto</th>
+                <th className="px-3 py-3 text-right font-semibold">Pagesa neto</th>
                 {editable ? <th className="px-3 py-3 text-right font-semibold">Veprime</th> : null}
               </tr>
             </thead>
@@ -246,6 +262,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
               {detail.entries.map((e) => {
                 const draft = drafts[e.id];
                 const busy = busyRow === e.id;
+                const flat = e.payBasis === "MONTHLY_FLAT";
                 return (
                   <tr key={e.id} className="border-b border-[#f1f5f9] last:border-0">
                     <td className="px-4 py-2.5">
@@ -254,8 +271,31 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                       </p>
                       <p className="text-xs text-muted-foreground">{e.personalId}</p>
                     </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          flat ? "bg-[#eef2ff] text-[#4338ca]" : "bg-[#f1f5f9] text-[#475569]",
+                        )}
+                      >
+                        {flat ? "Mujore fikse" : "Orë"}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-right tabular-nums">
-                      {Number(e.hourlyRate) > 0 ? (
+                      {flat ? (
+                        editable ? (
+                          <Input
+                            className="h-8 w-[96px] text-right tabular-nums"
+                            inputMode="decimal"
+                            value={draft?.monthlyFlatAmount ?? ""}
+                            onChange={(ev) => setDraft(e.id, "monthlyFlatAmount", ev.target.value)}
+                            disabled={busy}
+                            aria-label={`Paga mujore — ${e.firstName} ${e.lastName}`}
+                          />
+                        ) : (
+                          <span>{e.monthlyFlatAmount}</span>
+                        )
+                      ) : Number(e.hourlyRate) > 0 ? (
                         e.hourlyRate
                       ) : (
                         <span className="font-semibold text-destructive">mungon</span>
@@ -263,7 +303,13 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                     </td>
                     {HOUR_FIELDS.map((f) => (
                       <td key={f.key} className="px-2 py-2.5 text-right">
-                        {editable ? (
+                        {/* Hours are recorded for attendance on a flat fee but never
+                            priced — an editable box here would imply otherwise. */}
+                        {flat ? (
+                          <span className="tabular-nums text-[#cbd5e1]" title="Nuk ndikon në pagesë">
+                            —
+                          </span>
+                        ) : editable ? (
                           <Input
                             className="h-8 w-[72px] text-right tabular-nums"
                             inputMode="decimal"
@@ -279,7 +325,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                     ))}
                     <td className="px-3 py-2.5 text-center">
                       <span className="text-[11px] font-semibold uppercase text-muted-foreground">
-                        {e.hoursSource === "TIMECLOCK" ? "Ora e punës" : "Manual"}
+                        {flat ? "—" : e.hoursSource === "TIMECLOCK" ? "Ora e punës" : "Manual"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold tabular-nums">
@@ -288,18 +334,22 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                     {editable ? (
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            className="h-8 gap-1 px-2.5 text-xs"
-                            disabled={busy}
-                            onClick={() => void syncRow(e.id)}
-                            title="Plotëso orët nga skanimet e orës së punës"
-                          >
-                            <Clock3 className="h-3.5 w-3.5" aria-hidden />
-                            Nga ora
-                          </Button>
+                          {/* Filling hours cannot move a flat fee, so the action
+                              is absent rather than present-and-useless. */}
+                          {flat ? null : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 gap-1 px-2.5 text-xs"
+                              disabled={busy}
+                              onClick={() => void syncRow(e.id)}
+                              title="Plotëso orët nga skanimet e orës së punës"
+                            >
+                              <Clock3 className="h-3.5 w-3.5" aria-hidden />
+                              Nga ora
+                            </Button>
+                          )}
                           <Button
                             type="button"
                             size="sm"
@@ -322,9 +372,15 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                   Totali
                 </td>
                 <td />
+                <td />
                 {HOUR_FIELDS.map((f) => (
                   <td key={f.key} className="px-2 py-3 text-right font-semibold tabular-nums">
-                    {detail.entries.reduce((s, e) => s + Number(e[f.key]), 0).toFixed(2)}
+                    {/* Only hourly rows contribute hours; a flat row's hours are
+                        never priced, so counting them here would mislead. */}
+                    {detail.entries
+                      .filter((e) => e.payBasis === "HOURLY")
+                      .reduce((s, e) => s + Number(e[f.key]), 0)
+                      .toFixed(2)}
                   </td>
                 ))}
                 <td />
@@ -338,9 +394,11 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
         </div>
 
         <p className="text-xs text-muted-foreground">
-          &quot;Nga ora&quot; rillogarit ditët nga skanimet reale të kartelave dhe i mbush orët automatikisht;
-          çdo fushë mbetet e redaktueshme pas plotësimit. Ditët me skanime të papërputhura nuk llogariten
-          derisa të rregullohen.
+          Kontraktorët me pagë mujore fikse paguhen njësoj sa herë — orët nuk ndikojnë; shuma mbetet e
+          redaktueshme këtu për muajt e pjesshëm. Për ata me tarifë orare, &quot;Nga ora&quot; rillogarit
+          ditët nga skanimet reale të kartelave dhe i mbush orët automatikisht; çdo fushë mbetet e
+          redaktueshme pas plotësimit. Ditët me skanime të papërputhura nuk llogariten derisa të
+          rregullohen.
         </p>
       </div>
     </>

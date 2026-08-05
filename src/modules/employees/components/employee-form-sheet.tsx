@@ -205,8 +205,9 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
     workArrangement: v.workArrangement,
     // Për pagë orare, mujorja e ruajtur është vetëm referencë për listat/kontratat:
     // tarifa × orët standarde mujore (javore × 52 ÷ 12). Motori s'e përdor kurrë.
+    // Vlen njësoj për kontraktorët me tarifë orare.
     baseSalaryMonthly:
-      v.salaryBasis === "HOURLY" && v.employmentType === "EMPLOYEE"
+      v.salaryBasis === "HOURLY"
         ? Math.round(
             (v.hourlyRate === "" ? 0 : Number(v.hourlyRate.replace(",", "."))) *
               ((v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", "."))) * 52 / 12) *
@@ -215,7 +216,8 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
         : v.baseSalaryMonthly === ""
           ? 0
           : Number(v.baseSalaryMonthly.replace(",", ".")),
-    salaryBasis: v.employmentType === "EMPLOYEE" ? v.salaryBasis : "MONTHLY",
+    // Kontraktorët zgjedhin vetë bazën: mujore fikse ose orë (të dyja neto).
+    salaryBasis: v.salaryBasis,
     hourlyRate: v.hourlyRate === "" ? null : Number(v.hourlyRate.replace(",", ".")),
     weeklyHours: v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", ".")),
     bankName: v.bankName || null,
@@ -809,21 +811,81 @@ export function EmployeeFormSheet(props: {
             <div className={fieldGrid}>
               {values.employmentType === "CONTRACTOR" ? (
                 <FormField
-                  label="Tarifa orare (€/orë)"
+                  label={
+                    values.salaryBasis === "HOURLY"
+                      ? "Tarifa neto (€/orë)"
+                      : "Paga neto mujore (€)"
+                  }
                   required
-                  error={fieldErrors.hourlyRate}
-                  hint="Kontraktorët paguhen orë × tarifë — pa pagë mujore fikse."
+                  error={
+                    values.salaryBasis === "HOURLY"
+                      ? fieldErrors.hourlyRate
+                      : fieldErrors.baseSalaryMonthly
+                  }
+                  hint="Kontraktorët nuk kanë tatim as Trust — shuma e vendosur është ajo që paguhet."
                 >
-                  <Input
-                    className={cn("tabular-nums", errClass("hourlyRate"))}
-                    inputMode="decimal"
-                    value={values.hourlyRate}
-                    onChange={(e) => {
-                      clearKey("hourlyRate");
-                      setValues((s) => ({ ...s, hourlyRate: e.target.value }));
-                    }}
-                    disabled={pending}
-                  />
+                  <div className="mb-2 inline-flex items-center gap-0.5 rounded-[8px] border border-input bg-muted/40 p-0.5">
+                    {(
+                      [
+                        { key: "MONTHLY" as const, label: "Mujore" },
+                        { key: "HOURLY" as const, label: "Orë" },
+                      ]
+                    ).map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          clearKey("baseSalaryMonthly");
+                          clearKey("hourlyRate");
+                          setValues((s) => ({ ...s, salaryBasis: opt.key }));
+                        }}
+                        className={cn(
+                          "rounded-[6px] px-3 py-1 text-xs font-semibold transition-colors",
+                          values.salaryBasis === opt.key
+                            ? "bg-brand-blue text-white"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {values.salaryBasis === "HOURLY" ? (
+                    <>
+                      <Input
+                        className={cn("tabular-nums", errClass("hourlyRate"))}
+                        inputMode="decimal"
+                        placeholder="p.sh. 4.50"
+                        value={values.hourlyRate}
+                        onChange={(e) => {
+                          clearKey("hourlyRate");
+                          setValues((s) => ({ ...s, hourlyRate: e.target.value }));
+                        }}
+                        disabled={pending}
+                      />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Paguhet orë × tarifë (+ premium) te payroll-i i kontraktorëve.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        className={cn("tabular-nums", errClass("baseSalaryMonthly"))}
+                        inputMode="decimal"
+                        placeholder="p.sh. 350"
+                        value={values.baseSalaryMonthly}
+                        onChange={(e) => {
+                          clearKey("baseSalaryMonthly");
+                          setValues((s) => ({ ...s, baseSalaryMonthly: e.target.value }));
+                        }}
+                        disabled={pending}
+                      />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Shumë fikse çdo muaj — orët e punuara nuk e ndryshojnë pagesën.
+                      </p>
+                    </>
+                  )}
                 </FormField>
               ) : (
                 <FormField
@@ -997,19 +1059,28 @@ export function EmployeeFormSheet(props: {
                     onCheckedChange={(v) => setValues((s) => ({ ...s, applyTax: v }))}
                   />
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div
+                  className={cn(
+                    "flex items-center justify-between gap-4",
+                    // Primacy only ever picks a PIT rate, and a contractor never
+                    // reaches the tax step — leaving it live would invite a choice
+                    // that changes nothing.
+                    contractorLocks && "opacity-55",
+                  )}
+                >
                   <div className="space-y-1">
                     <Label htmlFor="employer-primacy">Punësim</Label>
                     <p className="text-xs text-muted-foreground">
-                      Sekondar = tatim me normë fikse te ky punëdhënës (Ligji mbi TAP). Vetë
-                      punonjësi mban përgjegjësinë ta deklarojë saktë.
+                      {contractorLocks
+                        ? "Nuk aplikohet për kontraktorët — pa tatim, pa normë primare a sekondare."
+                        : "Sekondar = tatim me normë fikse te ky punëdhënës (Ligji mbi TAP). Vetë punonjësi mban përgjegjësinë ta deklarojë saktë."}
                     </p>
                   </div>
                   <select
                     id="employer-primacy"
-                    className="flex h-9 w-40 shrink-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-9 w-40 shrink-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
                     value={values.employerPrimacy}
-                    disabled={pending}
+                    disabled={pending || contractorLocks}
                     onChange={(e) =>
                       setValues((s) => ({
                         ...s,

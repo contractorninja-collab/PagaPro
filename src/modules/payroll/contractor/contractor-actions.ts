@@ -30,6 +30,8 @@ const CODE_MESSAGES: Record<string, string> = {
   NO_CONTRACTORS:
     "Nuk ka kontraktorë aktivë për këtë muaj. Shtoni punonjës me tip punësimi 'Kontraktor' te moduli Punonjësit.",
   NO_HOURLY_RATE: "Kontraktorit i mungon tarifa orare.",
+  NOT_HOURLY:
+    "Ky kontraktor paguhet me pagë mujore fikse — orët nuk ndikojnë në pagesë, prandaj plotësimi nga ora e punës nuk aplikohet.",
   ERROR: "Ndodhi një gabim i papritur. Provoni përsëri.",
 };
 
@@ -93,6 +95,10 @@ export async function updateContractorEntryHoursAction(
       holidayHours: String(parsed.data.holidayHours),
       nightHours: String(parsed.data.nightHours),
     },
+    monthlyFlatAmount:
+      parsed.data.monthlyFlatAmount === undefined
+        ? undefined
+        : String(parsed.data.monthlyFlatAmount),
     notes: parsed.data.notes,
   });
   if (!result.ok) return { ok: false, error: codeMessage(result.code) };

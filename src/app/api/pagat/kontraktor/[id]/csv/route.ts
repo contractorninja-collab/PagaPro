@@ -7,14 +7,17 @@ import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
 const COLUMNS: ReportColumnDef[] = [
   { key: "fullName", headerSq: "Kontraktori" },
   { key: "personalId", headerSq: "Numri personal" },
+  { key: "payBasis", headerSq: "Baza e pagesës" },
   { key: "hourlyRate", headerSq: "Tarifa €/orë" },
+  { key: "monthlyFlatAmount", headerSq: "Pagë mujore fikse (€)" },
   { key: "regularHours", headerSq: "Orë të rregullta" },
   { key: "overtimeHours", headerSq: "Orë shtesë" },
   { key: "weekendHours", headerSq: "Orë vikendi" },
   { key: "holidayHours", headerSq: "Orë feste" },
   { key: "nightHours", headerSq: "Orë nate" },
   { key: "hoursSource", headerSq: "Burimi i orëve" },
-  { key: "grossPay", headerSq: "Bruto (€)" },
+  // Contractors carry no withholding, so this single figure is both.
+  { key: "grossPay", headerSq: "Pagesa neto (€)" },
 ];
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -31,7 +34,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const rows: ReportRow[] = detail.entries.map((e) => ({
     fullName: `${e.lastName}, ${e.firstName}`,
     personalId: e.personalId,
-    hourlyRate: e.hourlyRate,
+    payBasis: e.payBasis === "MONTHLY_FLAT" ? "Mujore fikse" : "Orë",
+    // Blank, not zero, on the basis that does not apply — a 0.00 in a money
+    // column reads as "agreed and worth nothing".
+    hourlyRate: e.payBasis === "HOURLY" ? e.hourlyRate : "",
+    monthlyFlatAmount: e.payBasis === "MONTHLY_FLAT" ? e.monthlyFlatAmount : "",
     regularHours: e.regularHours,
     overtimeHours: e.overtimeHours,
     weekendHours: e.weekendHours,
@@ -47,7 +54,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   rows.push({
     fullName: "TOTALI",
     personalId: "",
+    payBasis: "",
     hourlyRate: "",
+    monthlyFlatAmount: sum((r) => r.monthlyFlatAmount),
     regularHours: sum((r) => r.regularHours),
     overtimeHours: sum((r) => r.overtimeHours),
     weekendHours: sum((r) => r.weekendHours),

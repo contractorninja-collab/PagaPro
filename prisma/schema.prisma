@@ -110,6 +110,15 @@ enum ContractorHoursSource {
   TIMECLOCK
 }
 
+/// How a contractor's pay is agreed. Both are net — contractors carry no
+/// withholding — so the figure entered is the figure paid.
+enum ContractorPayBasis {
+  /// Orë × tarifë (+ premium). Hours drive the pay.
+  HOURLY
+  /// A fixed amount per month, independent of hours worked.
+  MONTHLY_FLAT
+}
+
 /// Kosovo Labour Law (Ligji Nr. 03/L-212, Neni 10) contract-duration categories.
 enum ContractTermType {
   INDEFINITE
@@ -1321,8 +1330,17 @@ model ContractorPayrollEntry {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  /// Frozen from Employee.hourlyRate when the entry is (re)generated.
+  /// Frozen from the employee when the entry is (re)generated. Which one is
+  /// actually paid depends on payBasis; the other is kept for the audit trail.
   hourlyRateSnapshot Decimal @db.Decimal(14, 4)
+
+  /// Frozen from Employee.compensationBasis — a contractor switched mid-year
+  /// must not retroactively change how a locked period was paid.
+  payBasis ContractorPayBasis @default(HOURLY)
+
+  /// The month's agreed fee when payBasis = MONTHLY_FLAT. Editable per period so
+  /// a partial month (started late, left early) can be pro-rated by hand.
+  monthlyFlatAmount Decimal @default(0) @db.Decimal(14, 2)
 
   regularHours  Decimal @default(0) @db.Decimal(10, 2)
   overtimeHours Decimal @default(0) @db.Decimal(10, 2)

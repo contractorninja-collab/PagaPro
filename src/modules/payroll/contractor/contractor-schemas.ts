@@ -22,6 +22,13 @@ export const contractorEntryHoursSchema = z.object({
   weekendHours: hoursField,
   holidayHours: hoursField,
   nightHours: hoursField,
+  /// Paga mujore neto për kontraktorët me bazë fikse — injorohet për ata me orë.
+  /// Baza vendoset nga entry-ja, jo nga kërkesa.
+  monthlyFlatAmount: z.coerce
+    .number({ message: "Paga mujore duhet të jetë numër" })
+    .min(0, "Paga mujore nuk mund të jetë negative")
+    .max(1_000_000, "Paga mujore duket e pabesueshme")
+    .optional(),
   notes: z
     .preprocess(
       (v) => (typeof v === "string" && v.trim() === "" ? null : v),

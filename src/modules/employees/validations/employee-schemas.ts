@@ -135,7 +135,23 @@ export const employeeUpsertSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["hourlyRate"],
-        message: "Vendosni tarifën orare bruto (€/orë).",
+        message:
+          data.employmentType === "CONTRACTOR"
+            ? "Vendosni tarifën neto orare (€/orë)."
+            : "Vendosni tarifën orare bruto (€/orë).",
+      });
+    }
+    // A contractor on the flat basis is exempt from the minimum-salary floor, so
+    // nothing else would stop a fee of 0 from being saved and paid.
+    if (
+      data.employmentType === "CONTRACTOR" &&
+      data.salaryBasis === "MONTHLY" &&
+      data.baseSalaryMonthly <= 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["baseSalaryMonthly"],
+        message: "Vendosni pagën neto mujore të kontraktorit.",
       });
     }
   })

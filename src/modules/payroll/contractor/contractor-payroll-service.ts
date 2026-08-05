@@ -1,7 +1,11 @@
 import { Prisma as PrismaNs } from "@prisma/client";
-import type { ContractorHoursSource, ContractorPayrollStatus } from "@prisma/client";
+import type {
+  ContractorHoursSource,
+  ContractorPayBasis,
+  ContractorPayrollStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { computeGrossFromHours } from "@/modules/payroll/calculation/gross/from-hours";
+import { computeContractorPay } from "@/modules/payroll/calculation/gross/contractor-pay";
 import type { PremiumRules } from "@/modules/payroll/calculation/types";
 import { D } from "@/modules/payroll/calculation/money/decimal";
 import { periodBoundsUtc } from "@/modules/payroll/services/payroll-calendar-service";
@@ -9,9 +13,11 @@ import { recomputeTimeClockDaysForRange } from "@/modules/timeclock/services/tim
 
 /**
  * The contractor flow deliberately stops at gross: CONTRACTOR employees have
- * applyTrust/applyTax forced off, so hours × rate (+ premiums) IS the payout —
- * no PIT, no pension, no ATK surface. Anything shared with the regular engine
- * (premium math, holiday calendar, punch classification) is reused, not copied.
+ * applyTrust/applyTax forced off, so whatever this computes IS the payout — no
+ * PIT, no pension, no ATK surface. Two bases are supported and both are net:
+ * hours × tarifë (+ premiums), or a fixed monthly fee that hours never touch.
+ * Anything shared with the regular engine (premium math, holiday calendar,
+ * punch classification) is reused, not copied.
  */
 
 export interface ContractorHoursInput {
@@ -28,13 +34,16 @@ export interface ContractorEntryDto {
   firstName: string;
   lastName: string;
   personalId: string;
+  payBasis: ContractorPayBasis;
   hourlyRate: string;
+  monthlyFlatAmount: string;
   regularHours: string;
   overtimeHours: string;
   weekendHours: string;
   holidayHours: string;
   nightHours: string;
   hoursSource: ContractorHoursSource;
+  /** Net = gross for a contractor — the single figure that gets paid. */
   grossPay: string;
   notes: string | null;
 }
@@ -73,6 +82,7 @@ export type ContractorServiceResult<T> =
         | "NOT_EDITABLE"
         | "NO_CONTRACTORS"
         | "NO_HOURLY_RATE"
+        | "NOT_HOURLY"
         | "ERROR";
     };
 
@@ -97,19 +107,21 @@ async function loadPremiumRules(companyId: string): Promise<PremiumRules> {
   };
 }
 
-function grossForEntry(
+/**
+ * Thin adapter over the pure engine — an unpayable entry resolves to 0 with the
+ * reason recorded, rather than throwing and taking the whole period with it.
+ */
+function payForEntry(
+  basis: ContractorPayBasis,
   hourlyRate: string,
+  monthlyFlatAmount: string,
   hours: ContractorHoursInput,
   rules: PremiumRules,
 ): { grossPay: string; breakdown: object } {
-  // A contractor without a rate yet contributes 0 — the UI flags the missing rate.
-  if (!D(hourlyRate).isFinite() || D(hourlyRate).lte(0)) {
-    return {
-      grossPay: "0.00",
-      breakdown: { warning: "MISSING_HOURLY_RATE", hourlyRate, hours },
-    };
-  }
-  const { breakdown, grossDecimal } = computeGrossFromHours({
+  const result = computeContractorPay({
+    basis,
+    hourlyRate,
+    monthlyFlatAmount,
     hours: {
       regularHours: hours.regularHours,
       overtimeHours: hours.overtimeHours,
@@ -117,19 +129,17 @@ function grossForEntry(
       holidayHours: hours.holidayHours,
       nightHours: hours.nightHours,
     },
-    rates: { hourlyRate },
-    snapshot: { premiumRules: rules },
+    premiumRules: rules,
   });
-  return {
-    grossPay: grossDecimal.toFixed(2),
-    breakdown: { ...breakdown, hourlyRate, hours, premiumRules: rules },
-  };
+  return { grossPay: result.pay, breakdown: result.breakdown };
 }
 
 function entryToDto(entry: {
   id: string;
   employeeId: string;
+  payBasis: ContractorPayBasis;
   hourlyRateSnapshot: PrismaNs.Decimal;
+  monthlyFlatAmount: PrismaNs.Decimal;
   regularHours: PrismaNs.Decimal;
   overtimeHours: PrismaNs.Decimal;
   weekendHours: PrismaNs.Decimal;
@@ -146,7 +156,9 @@ function entryToDto(entry: {
     firstName: entry.employee.firstName,
     lastName: entry.employee.lastName,
     personalId: entry.employee.personalId,
+    payBasis: entry.payBasis,
     hourlyRate: entry.hourlyRateSnapshot.toFixed(2),
+    monthlyFlatAmount: entry.monthlyFlatAmount.toFixed(2),
     regularHours: entry.regularHours.toFixed(2),
     overtimeHours: entry.overtimeHours.toFixed(2),
     weekendHours: entry.weekendHours.toFixed(2),
@@ -174,8 +186,33 @@ async function findEligibleContractors(companyId: string, year: number, month: n
       ],
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: { id: true, hourlyRate: true },
+    select: { id: true, hourlyRate: true, baseSalaryMonthly: true, compensationBasis: true },
   });
+}
+
+/**
+ * `Employee.compensationBasis` is the switch for contractors too: HOURLY_GROSS
+ * means orë × tarifë, anything else means the agreed monthly fee. Contractors
+ * have no withholding, so "gross" in those enum names is also their net.
+ */
+function basisFor(employee: { compensationBasis: string }): ContractorPayBasis {
+  return employee.compensationBasis === "HOURLY_GROSS" ? "HOURLY" : "MONTHLY_FLAT";
+}
+
+function snapshotFor(employee: {
+  hourlyRate: PrismaNs.Decimal | null;
+  baseSalaryMonthly: PrismaNs.Decimal;
+  compensationBasis: string;
+}) {
+  const basis = basisFor(employee);
+  return {
+    payBasis: basis,
+    hourlyRateSnapshot: employee.hourlyRate ?? new PrismaNs.Decimal(0),
+    // Only the paid basis carries a figure; the other stays 0 so a glance at the
+    // row can never suggest a fee that was not agreed.
+    monthlyFlatAmount:
+      basis === "MONTHLY_FLAT" ? employee.baseSalaryMonthly : new PrismaNs.Decimal(0),
+  };
 }
 
 export async function listContractorPayrollsForCompany(
@@ -226,6 +263,15 @@ export async function createContractorPayrollPeriod(params: {
     const contractors = await findEligibleContractors(companyId, year, month);
     if (contractors.length === 0) return { ok: false, code: "NO_CONTRACTORS" };
 
+    const rules = await loadPremiumRules(companyId);
+    const noHours: ContractorHoursInput = {
+      regularHours: "0",
+      overtimeHours: "0",
+      weekendHours: "0",
+      holidayHours: "0",
+      nightHours: "0",
+    };
+
     const period = await prisma.contractorPayrollPeriod.create({
       data: {
         companyId,
@@ -233,10 +279,25 @@ export async function createContractorPayrollPeriod(params: {
         month,
         createdById: actorUserId,
         entries: {
-          create: contractors.map((c) => ({
-            employeeId: c.id,
-            hourlyRateSnapshot: c.hourlyRate ?? new PrismaNs.Decimal(0),
-          })),
+          create: contractors.map((c) => {
+            const snapshot = snapshotFor(c);
+            // A fixed fee is already known the moment the period opens, so price
+            // it now. An hourly line legitimately starts at 0 — nobody has said
+            // how many hours were worked yet.
+            const { grossPay, breakdown } = payForEntry(
+              snapshot.payBasis,
+              snapshot.hourlyRateSnapshot.toString(),
+              snapshot.monthlyFlatAmount.toString(),
+              noHours,
+              rules,
+            );
+            return {
+              employeeId: c.id,
+              ...snapshot,
+              grossPay: new PrismaNs.Decimal(grossPay),
+              calculationBreakdown: JSON.parse(JSON.stringify(breakdown)),
+            };
+          }),
         },
       },
       select: { id: true },
@@ -287,6 +348,16 @@ export async function getContractorPayrollDetail(
   // Mirror of the regular flow's transparency check: monthly overtime vs. weekly cap × 4.5.
   const monthlyOtCap = D(settings?.overtimeWeeklyCapHours.toString() ?? "8").mul("4.5");
   for (const e of entries) {
+    if (e.payBasis === "MONTHLY_FLAT") {
+      if (D(e.monthlyFlatAmount).lte(0)) {
+        warnings.push(
+          `${e.firstName} ${e.lastName}: mungon paga mujore neto — paga del 0. Vendoseni te profili i punonjësit dhe rifreskoni listën.`,
+        );
+      }
+      // Overtime hours on a flat fee are an attendance note, not money — warning
+      // about the cap here would imply a payment that never happens.
+      continue;
+    }
     if (D(e.overtimeHours).gt(monthlyOtCap)) {
       warnings.push(
         `${e.firstName} ${e.lastName}: ${e.overtimeHours} orë shtesë këtë muaj — mbi kufirin orientues mujor (${monthlyOtCap.toFixed(1)} orë).`,
@@ -348,6 +419,7 @@ export async function regenerateContractorPayrollEntries(
         select: {
           id: true,
           employeeId: true,
+          monthlyFlatAmount: true,
           regularHours: true,
           overtimeHours: true,
           weekendHours: true,
@@ -361,15 +433,11 @@ export async function regenerateContractorPayrollEntries(
     let updated = 0;
 
     for (const contractor of contractors) {
-      const rate = contractor.hourlyRate?.toString() ?? "0";
+      const snapshot = snapshotFor(contractor);
       const existing = byEmployee.get(contractor.id);
       if (!existing) {
         await prisma.contractorPayrollEntry.create({
-          data: {
-            periodId,
-            employeeId: contractor.id,
-            hourlyRateSnapshot: contractor.hourlyRate ?? new PrismaNs.Decimal(0),
-          },
+          data: { periodId, employeeId: contractor.id, ...snapshot },
         });
         updated += 1;
         continue;
@@ -381,11 +449,25 @@ export async function regenerateContractorPayrollEntries(
         holidayHours: existing.holidayHours.toString(),
         nightHours: existing.nightHours.toString(),
       };
-      const { grossPay, breakdown } = grossForEntry(rate, hours, rules);
+      // A flat fee already edited on this period (a pro-rated partial month) is
+      // kept; refreshing the roster must not quietly undo that decision.
+      const flatAmount =
+        snapshot.payBasis === "MONTHLY_FLAT" && existing.monthlyFlatAmount.gt(0)
+          ? existing.monthlyFlatAmount
+          : snapshot.monthlyFlatAmount;
+      const { grossPay, breakdown } = payForEntry(
+        snapshot.payBasis,
+        snapshot.hourlyRateSnapshot.toString(),
+        flatAmount.toString(),
+        hours,
+        rules,
+      );
       await prisma.contractorPayrollEntry.update({
         where: { id: existing.id },
         data: {
-          hourlyRateSnapshot: contractor.hourlyRate ?? new PrismaNs.Decimal(0),
+          payBasis: snapshot.payBasis,
+          hourlyRateSnapshot: snapshot.hourlyRateSnapshot,
+          monthlyFlatAmount: flatAmount,
           grossPay: new PrismaNs.Decimal(grossPay),
           calculationBreakdown: JSON.parse(JSON.stringify(breakdown)),
         },
@@ -405,9 +487,11 @@ export async function updateContractorEntryHours(params: {
   periodId: string;
   entryId: string;
   hours: ContractorHoursInput;
+  /** Only meaningful on MONTHLY_FLAT entries; ignored on hourly ones. */
+  monthlyFlatAmount?: string;
   notes?: string | null;
 }): Promise<ContractorServiceResult<{ grossPay: string }>> {
-  const { companyId, periodId, entryId, hours, notes } = params;
+  const { companyId, periodId, entryId, hours, monthlyFlatAmount, notes } = params;
   try {
     const { period, editable } = await loadEditablePeriod(companyId, periodId);
     if (!period) return { ok: false, code: "NOT_FOUND" };
@@ -415,13 +499,29 @@ export async function updateContractorEntryHours(params: {
 
     const entry = await prisma.contractorPayrollEntry.findFirst({
       where: { id: entryId, periodId },
-      select: { id: true, hourlyRateSnapshot: true },
+      select: {
+        id: true,
+        payBasis: true,
+        hourlyRateSnapshot: true,
+        monthlyFlatAmount: true,
+      },
     });
     if (!entry) return { ok: false, code: "NOT_FOUND" };
 
     const rules = await loadPremiumRules(companyId);
-    const rate = entry.hourlyRateSnapshot.toString();
-    const { grossPay, breakdown } = grossForEntry(rate, hours, rules);
+    // The basis lives on the entry, never on the request: a client cannot talk an
+    // hourly contractor into being paid a flat fee by posting one.
+    const flatAmount =
+      entry.payBasis === "MONTHLY_FLAT" && monthlyFlatAmount !== undefined
+        ? monthlyFlatAmount
+        : entry.monthlyFlatAmount.toString();
+    const { grossPay, breakdown } = payForEntry(
+      entry.payBasis,
+      entry.hourlyRateSnapshot.toString(),
+      flatAmount,
+      hours,
+      rules,
+    );
 
     await prisma.contractorPayrollEntry.update({
       where: { id: entry.id },
@@ -431,6 +531,7 @@ export async function updateContractorEntryHours(params: {
         weekendHours: new PrismaNs.Decimal(hours.weekendHours),
         holidayHours: new PrismaNs.Decimal(hours.holidayHours),
         nightHours: new PrismaNs.Decimal(hours.nightHours),
+        monthlyFlatAmount: new PrismaNs.Decimal(flatAmount),
         hoursSource: "MANUAL",
         grossPay: new PrismaNs.Decimal(grossPay),
         calculationBreakdown: JSON.parse(JSON.stringify(breakdown)),
@@ -463,9 +564,12 @@ export async function syncContractorEntryFromTimeClock(params: {
 
     const entry = await prisma.contractorPayrollEntry.findFirst({
       where: { id: entryId, periodId },
-      select: { id: true, employeeId: true, hourlyRateSnapshot: true },
+      select: { id: true, employeeId: true, payBasis: true, hourlyRateSnapshot: true },
     });
     if (!entry) return { ok: false, code: "NOT_FOUND" };
+    // Filling hours would not move a flat fee by a cent, so say so rather than
+    // appear to work.
+    if (entry.payBasis !== "HOURLY") return { ok: false, code: "NOT_HOURLY" };
 
     const { start, end } = periodBoundsUtc(period.year, period.month);
     const recompute = await recomputeTimeClockDaysForRange({
@@ -505,8 +609,13 @@ export async function syncContractorEntryFromTimeClock(params: {
     const daysNeedingReview = days.filter((d) => d.status === "NEEDS_REVIEW").length;
 
     const rules = await loadPremiumRules(companyId);
-    const rate = entry.hourlyRateSnapshot.toString();
-    const { grossPay, breakdown } = grossForEntry(rate, hours, rules);
+    const { grossPay, breakdown } = payForEntry(
+      "HOURLY",
+      entry.hourlyRateSnapshot.toString(),
+      "0",
+      hours,
+      rules,
+    );
 
     await prisma.contractorPayrollEntry.update({
       where: { id: entry.id },
