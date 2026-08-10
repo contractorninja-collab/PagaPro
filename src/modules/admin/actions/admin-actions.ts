@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/modules/auth/services/session";
 import { provisionCompany } from "@/modules/admin/services/company-provisioning";
 import {
   createCompanyUserForAdmin,
+  deleteCompanyForAdmin,
+  getCompanyDeletionPreviewForAdmin,
   resetUserPasswordForAdmin,
   setCompanyContractorPayrollEnabledForAdmin,
   setCompanyStatusForAdmin,
@@ -192,6 +194,59 @@ export async function setCompanyStatusAction(raw: unknown): Promise<AdminActionR
   } catch (err) {
     console.error("[setCompanyStatusAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi i statusit dështoi papritur." };
+  }
+}
+
+const deleteCompanySchema = z.object({
+  companyId: z.string().min(1),
+  confirmName: z.string().min(1),
+});
+
+/** Counts for the confirmation dialog — read-only, so the operator sees the cost. */
+export async function getCompanyDeletionPreviewAction(
+  raw: unknown,
+): Promise<AdminActionResult<Awaited<ReturnType<typeof getCompanyDeletionPreviewForAdmin>>>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+    const parsed = z.object({ companyId: z.string().min(1) }).safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const preview = await getCompanyDeletionPreviewForAdmin(parsed.data.companyId);
+    if (!preview) return { ok: false, error: "Biznesi nuk u gjet." };
+    return { ok: true, data: preview };
+  } catch (err) {
+    console.error("[getCompanyDeletionPreviewAction] unexpected:", err);
+    return { ok: false, error: "Leximi i të dhënave dështoi." };
+  }
+}
+
+export async function deleteCompanyAction(
+  raw: unknown,
+): Promise<AdminActionResult<{ deletedStorageObjects: number; deletedUsers: number }>> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = deleteCompanySchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const res = await deleteCompanyForAdmin(parsed.data.companyId, parsed.data.confirmName);
+    if (!res.ok) {
+      if (res.code === "NOT_FOUND") return { ok: false, error: "Biznesi nuk u gjet." };
+      if (res.code === "NAME_MISMATCH") {
+        return {
+          ok: false,
+          error: "Emri i shkruar nuk përputhet me emrin ligjor të biznesit.",
+          fieldErrors: { confirmName: ["Shkruani saktësisht emrin ligjor."] },
+        };
+      }
+      return { ok: false, error: "Fshirja dështoi." };
+    }
+
+    revalidateBizneset();
+    return { ok: true, data: res };
+  } catch (err) {
+    console.error("[deleteCompanyAction] unexpected:", err);
+    return { ok: false, error: "Fshirja dështoi papritur." };
   }
 }
 

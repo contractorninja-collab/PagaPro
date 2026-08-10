@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, CornerDownRight, ExternalLink, Plus, Search } from "lucide-react";
+import { Building2, CornerDownRight, ExternalLink, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/patterns/empty-state";
 import { PageHeader } from "@/components/patterns/page-header";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { DeleteCompanyDialog } from "@/components/admin/delete-company-dialog";
 import { adminPath } from "@/lib/admin-path";
 import { createCompanyAction } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyListItem } from "@/modules/admin/services/admin-service";
@@ -115,6 +116,7 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [isPending, startTransition] = useTransition();
+  const [pendingDelete, setPendingDelete] = useState<AdminCompanyListItem | null>(null);
 
   const clusters = useMemo(() => {
     const all = buildClusters(companies);
@@ -209,6 +211,22 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
         <TableCell>
           <Badge variant={status.variant}>{status.label}</Badge>
         </TableCell>
+        <TableCell className="text-right">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            title={`Fshi ${c.legalName}`}
+            // The row itself navigates; a click here must not do both.
+            onClick={(e) => {
+              e.stopPropagation();
+              setPendingDelete(c);
+            }}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+            <span className="sr-only">Fshi {c.legalName}</span>
+          </Button>
+        </TableCell>
       </TableRow>
     );
   }
@@ -287,6 +305,7 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
               <TableHead className="text-center">Punonjës aktivë</TableHead>
               <TableHead>Paketa / Pagesa</TableHead>
               <TableHead>Statusi</TableHead>
+              <TableHead className="w-[64px] text-right">Veprime</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -297,6 +316,21 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
           </TableBody>
         </Table>
       )}
+
+      {pendingDelete ? (
+        <DeleteCompanyDialog
+          companyId={pendingDelete.id}
+          legalName={pendingDelete.legalName}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPendingDelete(null);
+          }}
+          onDeleted={() => {
+            setPendingDelete(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

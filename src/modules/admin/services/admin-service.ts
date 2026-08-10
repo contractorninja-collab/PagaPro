@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { companySlugFromName } from "@/lib/company-url";
+import { safeDeleteAsset } from "@/lib/company-asset-storage";
 import { generateTempPassword, hashPassword } from "@/modules/auth/services/password";
 import { destroyAllSessionsForUser } from "@/modules/auth/services/session";
 import type { CompanyUpsertInput, CreateCompanyUserInput } from "@/modules/admin/validation/admin-schemas";
@@ -393,6 +394,194 @@ export async function resetUserPasswordForAdmin(userId: string): Promise<ResetPa
     return { ok: true, tempPassword };
   } catch (err) {
     if ((err as { code?: string })?.code === "P2025") return { ok: false, code: "NOT_FOUND" };
+    return { ok: false, code: "DB_ERROR", message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Deleting a company
+// ---------------------------------------------------------------------------
+
+export interface CompanyDeletionPreview {
+  id: string;
+  legalName: string;
+  employees: number;
+  payrolls: number;
+  contractorPayrolls: number;
+  documents: number;
+  leaveRequests: number;
+  users: number;
+  /** Logins that exist ONLY for this company and would be left with no way in. */
+  usersLosingLastCompany: number;
+  storageObjects: number;
+}
+
+/** Every blob this company owns, gathered before the cascade erases the keys. */
+async function collectCompanyStorageKeys(companyId: string): Promise<string[]> {
+  const [setting, reps, templateVersions, artifacts, reports, payrollDocs, atkExports] =
+    await Promise.all([
+      prisma.companySetting.findUnique({
+        where: { companyId },
+        select: {
+          authorizedSignatureStorageKey: true,
+          authorizedStampStorageKey: true,
+          companyLogoStorageKey: true,
+        },
+      }),
+      prisma.authorizedRepresentative.findMany({
+        where: { companyId },
+        select: { signatureStorageKey: true, stampStorageKey: true },
+      }),
+      prisma.documentTemplateVersion.findMany({
+        where: { template: { companyId } },
+        select: { sourceStorageKey: true },
+      }),
+      prisma.documentGenerationArtifact.findMany({
+        where: { companyId },
+        select: { generatedDocxStorageKey: true, generatedPdfStorageKey: true },
+      }),
+      prisma.generatedReport.findMany({ where: { companyId }, select: { storageKey: true } }),
+      prisma.payrollGeneratedDocument.findMany({
+        where: { payroll: { companyId } },
+        select: { storageKey: true },
+      }),
+      prisma.payrollATKExport.findMany({
+        where: { payroll: { companyId } },
+        select: { storageKey: true },
+      }),
+    ]);
+
+  const keys = [
+    setting?.authorizedSignatureStorageKey,
+    setting?.authorizedStampStorageKey,
+    setting?.companyLogoStorageKey,
+    ...reps.flatMap((r) => [r.signatureStorageKey, r.stampStorageKey]),
+    ...templateVersions.map((v) => v.sourceStorageKey),
+    ...artifacts.flatMap((a) => [a.generatedDocxStorageKey, a.generatedPdfStorageKey]),
+    ...reports.map((r) => r.storageKey),
+    ...payrollDocs.map((d) => d.storageKey),
+    ...atkExports.map((e) => e.storageKey),
+  ];
+  return [...new Set(keys.filter((k): k is string => Boolean(k)))];
+}
+
+/** What a delete would destroy — shown to the operator before they confirm. */
+export async function getCompanyDeletionPreviewForAdmin(
+  companyId: string,
+): Promise<CompanyDeletionPreview | null> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true, legalName: true },
+  });
+  if (!company) return null;
+
+  const [employees, payrolls, contractorPayrolls, documents, leaveRequests, memberships, keys] =
+    await Promise.all([
+      prisma.employee.count({ where: { companyId } }),
+      prisma.payroll.count({ where: { companyId } }),
+      prisma.contractorPayrollPeriod.count({ where: { companyId } }),
+      prisma.documentGenerationArtifact.count({ where: { companyId } }),
+      prisma.leaveRequest.count({ where: { companyId } }),
+      prisma.userCompanyMembership.findMany({ where: { companyId }, select: { userId: true } }),
+      collectCompanyStorageKeys(companyId),
+    ]);
+
+  // A login attached only here would survive with no company to open.
+  let usersLosingLastCompany = 0;
+  if (memberships.length > 0) {
+    const counts = await prisma.userCompanyMembership.groupBy({
+      by: ["userId"],
+      where: { userId: { in: memberships.map((m) => m.userId) } },
+      _count: { _all: true },
+    });
+    usersLosingLastCompany = counts.filter((c) => c._count._all === 1).length;
+  }
+
+  return {
+    id: company.id,
+    legalName: company.legalName,
+    employees,
+    payrolls,
+    contractorPayrolls,
+    documents,
+    leaveRequests,
+    users: memberships.length,
+    usersLosingLastCompany,
+    storageObjects: keys.length,
+  };
+}
+
+export type DeleteCompanyResult =
+  | { ok: true; deletedStorageObjects: number; deletedUsers: number }
+  | { ok: false; code: "NOT_FOUND" | "NAME_MISMATCH" | "DB_ERROR"; message?: string };
+
+/**
+ * Removes a company and everything hanging off it.
+ *
+ * This is a real delete, not an archive — 40 relations cascade from Company, so
+ * employees, payrolls, documents and leave go with it. `Company.status =
+ * ARCHIVED` remains the way to retire a client whose records must be kept; this
+ * exists for the one created by mistake.
+ *
+ * The operator has to retype the legal name. The confirmation is checked on the
+ * server as well as in the dialog, because a mis-click here is not recoverable
+ * from the UI.
+ */
+export async function deleteCompanyForAdmin(
+  companyId: string,
+  confirmName: string,
+): Promise<DeleteCompanyResult> {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, legalName: true },
+    });
+    if (!company) return { ok: false, code: "NOT_FOUND" };
+    if (confirmName.trim() !== company.legalName.trim()) {
+      return { ok: false, code: "NAME_MISMATCH" };
+    }
+
+    // Read the keys first: once the rows are gone, so is any record of them.
+    const storageKeys = await collectCompanyStorageKeys(companyId);
+
+    const memberUserIds = (
+      await prisma.userCompanyMembership.findMany({
+        where: { companyId },
+        select: { userId: true },
+      })
+    ).map((m) => m.userId);
+
+    await prisma.company.delete({ where: { id: companyId } });
+
+    // Logins left with no company at all are dead ends — they can sign in and
+    // reach nothing. Platform admins are exempt: they never hold memberships.
+    let deletedUsers = 0;
+    if (memberUserIds.length > 0) {
+      const orphaned = await prisma.user.findMany({
+        where: {
+          id: { in: memberUserIds },
+          isPlatformAdmin: false,
+          memberships: { none: {} },
+        },
+        select: { id: true },
+      });
+      if (orphaned.length > 0) {
+        const res = await prisma.user.deleteMany({ where: { id: { in: orphaned.map((u) => u.id) } } });
+        deletedUsers = res.count;
+      }
+    }
+
+    // Blobs last, best-effort: the database is already consistent, and a failed
+    // bucket delete must not resurrect a company that no longer exists.
+    let deletedStorageObjects = 0;
+    for (const key of storageKeys) {
+      await safeDeleteAsset(key);
+      deletedStorageObjects += 1;
+    }
+
+    return { ok: true, deletedStorageObjects, deletedUsers };
+  } catch (err) {
+    console.error(`[admin] deleteCompanyForAdmin failed for ${companyId}:`, err);
     return { ok: false, code: "DB_ERROR", message: err instanceof Error ? err.message : String(err) };
   }
 }
