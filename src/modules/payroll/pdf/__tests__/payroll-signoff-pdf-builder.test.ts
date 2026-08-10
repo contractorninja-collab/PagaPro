@@ -31,7 +31,6 @@ function input(count: number): PayrollRegisterPdfInput {
       addressLine: "Rr. Rexhep Luci 14, Prishtinë",
       cityLine: "Prishtinë",
       fiscalNumber: "600123456",
-      businessNumber: "811234567",
       phone: null,
       email: null,
     },

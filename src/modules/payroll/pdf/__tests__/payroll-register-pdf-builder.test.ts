@@ -9,7 +9,6 @@ const sampleCompany = {
   addressLine: "Rr. Test 1",
   cityLine: "Prishtine",
   fiscalNumber: "123456789",
-  businessNumber: "987654321",
   phone: "+383 44 000 000",
   email: "info@test.local",
 };

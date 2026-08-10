@@ -3,7 +3,7 @@ import { createCompanyUserForAdmin } from "@/modules/admin/services/admin-servic
 import type { CreateCompanyUserInput } from "@/modules/admin/validation/admin-schemas";
 
 /**
- * Brand groups — several legal entities (one Company per NUI/NRB) under one commercial brand.
+ * Brand groups — several legal entities (one Company per NUI) under one commercial brand.
  *
  * This is an admin-console organising layer only. It never widens the tenant boundary:
  * every query in the app stays scoped to a single companyId, and a user's access still

@@ -117,7 +117,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         select: {
           legalName: true,
           tradeName: true,
-          businessRegistrationNumber: true,
+          fiscalNumber: true,
           addressLine: true,
           city: true,
         },
@@ -128,7 +128,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       company: {
         legalName: company?.legalName ?? data.companyLabel ?? "",
         tradeName: company?.tradeName ?? null,
-        businessNumber: company?.businessRegistrationNumber ?? null,
+        fiscalNumber: company?.fiscalNumber ?? null,
         addressLine: company?.addressLine ?? null,
         city: company?.city ?? null,
       },

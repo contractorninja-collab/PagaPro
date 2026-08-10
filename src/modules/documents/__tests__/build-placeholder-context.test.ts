@@ -6,7 +6,6 @@ const company = {
   legalName: "PagaPro Test LLC",
   tradeName: null,
   fiscalNumber: null,
-  businessRegistrationNumber: null,
   addressLine: "Selia në Prishtinë",
   city: "Prishtinë",
   postalCode: null,

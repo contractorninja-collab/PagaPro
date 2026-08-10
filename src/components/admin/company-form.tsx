@@ -11,7 +11,6 @@ export interface CompanyFormValues {
   slug: string;
   customDomain: string;
   fiscalNumber: string;
-  businessRegistrationNumber: string;
   email: string;
   phone: string;
   website: string;
@@ -26,7 +25,6 @@ export const EMPTY_COMPANY_FORM: CompanyFormValues = {
   slug: "",
   customDomain: "",
   fiscalNumber: "",
-  businessRegistrationNumber: "",
   email: "",
   phone: "",
   website: "",
@@ -115,15 +113,6 @@ export function CompanyForm({
           <Label htmlFor="fiscalNumber">NUI (numri unik)</Label>
           <Input id="fiscalNumber" value={values.fiscalNumber} onChange={set("fiscalNumber")} />
           <FieldError errors={fieldErrors.fiscalNumber} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="businessRegistrationNumber">NRB (numri i biznesit)</Label>
-          <Input
-            id="businessRegistrationNumber"
-            value={values.businessRegistrationNumber}
-            onChange={set("businessRegistrationNumber")}
-          />
-          <FieldError errors={fieldErrors.businessRegistrationNumber} />
         </div>
       </div>
 

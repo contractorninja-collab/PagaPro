@@ -159,7 +159,7 @@ function drawHeaderBand(
     sanitize: fonts.sanitize.sans,
   };
   const sub = [
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
     input.company.addressLine,
   ]
     .filter(Boolean)
@@ -468,7 +468,7 @@ export async function buildPayrollSignoffPdf(input: PayrollRegisterPdfInput): Pr
 
   const companyLine = [
     input.company.legalName,
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
   ]
     .filter(Boolean)
     .join(" · ");

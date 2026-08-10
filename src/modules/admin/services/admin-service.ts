@@ -19,7 +19,6 @@ export interface AdminCompanyListItem {
   customDomain: string | null;
   tenantUrl: string | null;
   fiscalNumber: string | null;
-  businessRegistrationNumber: string | null;
   email: string | null;
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
   brandGroupId: string | null;
@@ -43,7 +42,6 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
       slug: true,
       customDomain: true,
       fiscalNumber: true,
-      businessRegistrationNumber: true,
       email: true,
       status: true,
       createdAt: true,
@@ -71,7 +69,6 @@ export async function listCompaniesForAdmin(): Promise<AdminCompanyListItem[]> {
     customDomain: r.customDomain,
     tenantUrl: tenantUrlForCompany({ slug: r.slug, customDomain: r.customDomain }),
     fiscalNumber: r.fiscalNumber,
-    businessRegistrationNumber: r.businessRegistrationNumber,
     email: r.email,
     status: r.status,
     brandGroupId: r.brandGroupId,
@@ -110,7 +107,6 @@ export interface AdminCompanyDetail {
   customDomain: string | null;
   tenantUrl: string | null;
   fiscalNumber: string | null;
-  businessRegistrationNumber: string | null;
   email: string | null;
   phone: string | null;
   website: string | null;
@@ -138,7 +134,6 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       slug: true,
       customDomain: true,
       fiscalNumber: true,
-      businessRegistrationNumber: true,
       email: true,
       phone: true,
       website: true,
@@ -176,7 +171,6 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
     customDomain: row.customDomain,
     tenantUrl: tenantUrlForCompany({ slug: row.slug, customDomain: row.customDomain }),
     fiscalNumber: row.fiscalNumber,
-    businessRegistrationNumber: row.businessRegistrationNumber,
     email: row.email,
     phone: row.phone,
     website: row.website,
@@ -207,7 +201,7 @@ export type UpdateCompanyResult =
   | { ok: true }
   | {
       ok: false;
-      code: "NOT_FOUND" | "DUPLICATE_NUI" | "DUPLICATE_NRB" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
+      code: "NOT_FOUND" | "DUPLICATE_NUI" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
       message?: string;
     };
 
@@ -239,7 +233,6 @@ export async function updateCompanyForAdmin(
         slug,
         customDomain: input.customDomain ?? null,
         fiscalNumber: input.fiscalNumber ?? null,
-        businessRegistrationNumber: input.businessRegistrationNumber ?? null,
         email: input.email ?? null,
         phone: input.phone ?? null,
         website: input.website ?? null,
@@ -260,7 +253,6 @@ export async function updateCompanyForAdmin(
       const meta = (err as { meta?: { target?: string[] | string } })?.meta;
       const target = Array.isArray(meta?.target) ? meta.target.join(",") : String(meta?.target ?? "");
       if (target.includes("fiscalNumber")) return { ok: false, code: "DUPLICATE_NUI" };
-      if (target.includes("businessRegistrationNumber")) return { ok: false, code: "DUPLICATE_NRB" };
       if (target.includes("slug")) return { ok: false, code: "DUPLICATE_SLUG" };
       if (target.includes("customDomain")) return { ok: false, code: "DUPLICATE_DOMAIN" };
     }

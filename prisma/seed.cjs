@@ -134,7 +134,6 @@ const PLACEHOLDER_REGISTRY_SEEDS = [
   { placeholderKey: "apply_tax", label: "Apliko tatimin", category: "payroll", isRequired: false, sourcePath: "employee.applyTax" },
   { placeholderKey: "company_name", label: "Emri i kompanisë", category: "company", isRequired: true, sourcePath: "company.legalName" },
   { placeholderKey: "company_nui", label: "NUI (numri fiskal)", category: "company", isRequired: false, sourcePath: "company.fiscalNumber" },
-  { placeholderKey: "company_nrb", label: "NRB", category: "company", isRequired: false, sourcePath: "company.businessRegistrationNumber" },
   { placeholderKey: "company_address", label: "Adresa e kompanisë", category: "company_setting", isRequired: false, sourcePath: "companySetting.companyAddressLine" },
   { placeholderKey: "company_city", label: "Qyteti i kompanisë", category: "company", isRequired: false, sourcePath: "company.city" },
   { placeholderKey: "company_phone", label: "Telefoni i kompanisë", category: "company", isRequired: false, sourcePath: "company.phone" },

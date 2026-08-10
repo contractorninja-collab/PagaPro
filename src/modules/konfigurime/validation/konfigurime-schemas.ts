@@ -71,7 +71,6 @@ export const konfigurimeConfigurationSchema = z.object({
 export const konfigurimeCompanySchema = z.object({
   legalName: z.string().min(1, "Emri i kompanisë është i detyrueshëm").max(300),
   fiscalNumber: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
-  businessRegistrationNumber: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
   addressLine: z.preprocess(emptyToNull, z.string().max(500).nullable().optional()),
   email: z.preprocess((v) => {
     if (v === "" || v === undefined) return undefined;

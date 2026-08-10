@@ -89,7 +89,7 @@ function buildBody() {
   );
   s.push(
     p(
-      "1. Punëdhënësi: {{company_name}}, me seli në {{company_address}}, NUI {{company_nui}}, NRB {{company_nrb}}, i përfaqësuar nga {{authorized_person_name}} ({{authorized_person_position}}); dhe",
+      "1. Punëdhënësi: {{company_name}}, me seli në {{company_address}}, NUI {{company_nui}}, i përfaqësuar nga {{authorized_person_name}} ({{authorized_person_position}}); dhe",
     ),
   );
   s.push(

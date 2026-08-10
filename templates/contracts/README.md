@@ -33,7 +33,6 @@ Templates are registered per company, published as v1, and editable via **Dokume
 |-----|------|
 | `company_name` | Trade or legal name |
 | `company_nui` | Fiscal number (NUI) |
-| `company_nrb` | Business registration (NRB) |
 | `company_address` | Company address from settings |
 | `employee_name` | Full name |
 | `employee_personal_number` | Personal ID |

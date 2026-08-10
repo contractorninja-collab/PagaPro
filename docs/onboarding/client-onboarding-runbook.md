@@ -20,9 +20,9 @@ Target time: ~1 hour of operator work + one 45-minute assisted-setup call with t
 1. Open `{admin path}/bizneset` → **Shto Biznes**.
 2. Fill the form. Only `legalName` is technically required — **but as policy, always fill**:
    - **Emri ligjor** (legalName) — as registered at ARBK
-   - **NUI** (fiscalNumber) and **NRB** (businessRegistrationNumber) — these print on
-     every legal document (contracts, annexes, terminations). Leaving them empty
-     produces legally incomplete documents; nothing else enforces this.
+   - **NUI** (fiscalNumber) — this prints on every legal document (contracts,
+     annexes, terminations). Leaving it empty produces legally incomplete
+     documents; nothing else enforces this.
    - **Adresa + qyteti** — used for the document letterhead and `document_place`.
    - **Slug** — auto-generated from the name if left empty; only override if the
      client wants a specific subdomain later.
@@ -62,7 +62,7 @@ of the user's sessions.
 Work top-down; the order matters because documents pull from this data.
 
 1. **Konfigurime** (client logged in):
-   - Company data: verify NUI/NRB/address flowed in correctly.
+   - Company data: verify NUI/address flowed in correctly.
    - **Përfaqësuesi i autorizuar**: name + position — these print as the signer
      on every contract/annex/termination.
    - Upload **signature** and **stamp** images (PNG, transparent background best).
@@ -98,7 +98,7 @@ Work top-down; the order matters because documents pull from this data.
 | # | Check |
 |---|---|
 | 1 | Toast showed 14 templates at creation, no warnings |
-| 2 | NUI + NRB filled and printing on a generated test document |
+| 2 | NUI filled and printing on a generated test document |
 | 3 | Authorized representative + signature + stamp set in Konfigurime |
 | 4 | Employees imported; spot-checked salary/hours/IBAN/contract term |
 | 5 | Test contract generated and opened — no blank fields |
@@ -112,7 +112,7 @@ Work top-down; the order matters because documents pull from this data.
   run `npm run templates:seed` locally against production env, or redeploy —
   the build re-seeds every company idempotently. Root cause is usually storage
   credentials; check Vercel logs for `[provisionCompany]` lines.
-- **Documents render with blank fields**: missing NUI/NRB (admin console →
+- **Documents render with blank fields**: missing NUI (admin console →
   company) or missing authorized representative (client's Konfigurime, must be
   saved at least once).
 - **Client can't log in**: check membership `isActive` and company status

@@ -31,8 +31,6 @@ export interface CompanyContractDto {
   tradeName: string | null;
   /** Fiscal / taxpayer number — maps to {{company_nui}} */
   fiscalNumber: string | null;
-  /** Business registration — maps to {{company_nrb}} */
-  businessRegistrationNumber: string | null;
   /** Legal profile address fallback for {{company_address}} when document settings are empty. */
   addressLine?: string | null;
   city?: string | null;

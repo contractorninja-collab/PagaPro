@@ -38,8 +38,6 @@ export const companyUpsertSchema = z.object({
   customDomain: customDomainInputSchema,
   /// NUI — numri unik identifikues (fiscal number)
   fiscalNumber: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
-  /// NRB — numri i regjistrimit të biznesit
-  businessRegistrationNumber: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
   email: z.preprocess(
     emptyToNull,
     z.union([z.string().email("Email jo valid"), z.null()]).optional(),

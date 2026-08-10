@@ -50,7 +50,7 @@ const BAND_FILL: Record<LibriPagaveBand, RGB> = {
 export interface LibriPagavePdfCompany {
   legalName: string;
   tradeName?: string | null;
-  businessNumber?: string | null;
+  fiscalNumber?: string | null;
   addressLine?: string | null;
   city?: string | null;
 }
@@ -173,7 +173,7 @@ function drawHeaderBlock(
   });
 
   const meta = [
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
     [input.company.addressLine, input.company.city].filter(Boolean).join(", ") || null,
   ]
     .filter(Boolean)

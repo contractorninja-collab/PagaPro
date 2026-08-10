@@ -107,7 +107,6 @@ function buildPayslipInput(params: {
       addressLine: resolveCompanyAddress(company, settings),
       cityLine: resolveCityLine(company),
       fiscalNumber: company.fiscalNumber,
-      businessNumber: company.businessRegistrationNumber,
       phone: company.phone,
       email: company.email,
     },
@@ -253,7 +252,6 @@ async function generatePayrollPdfArtifactsInner(params: {
     addressLine: resolveCompanyAddress(pay.company, settings),
     cityLine: resolveCityLine(pay.company),
     fiscalNumber: pay.company.fiscalNumber,
-    businessNumber: pay.company.businessRegistrationNumber,
     phone: pay.company.phone,
     email: pay.company.email,
   };

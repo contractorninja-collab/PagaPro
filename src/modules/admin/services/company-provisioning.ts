@@ -16,7 +16,7 @@ export type ProvisionCompanyResult =
     }
   | {
       ok: false;
-      code: "DUPLICATE_NUI" | "DUPLICATE_NRB" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
+      code: "DUPLICATE_NUI" | "DUPLICATE_SLUG" | "DUPLICATE_DOMAIN" | "DB_ERROR";
       message?: string;
     };
 
@@ -53,7 +53,6 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
         slug,
         customDomain: input.customDomain ?? null,
         fiscalNumber: input.fiscalNumber ?? null,
-        businessRegistrationNumber: input.businessRegistrationNumber ?? null,
         email: input.email ?? null,
         phone: input.phone ?? null,
         website: input.website ?? null,
@@ -69,7 +68,6 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
     if ((err as { code?: string })?.code === "P2002") {
       const target = duplicateTarget(err);
       if (target.includes("fiscalNumber")) return { ok: false, code: "DUPLICATE_NUI" };
-      if (target.includes("businessRegistrationNumber")) return { ok: false, code: "DUPLICATE_NRB" };
       if (target.includes("slug")) return { ok: false, code: "DUPLICATE_SLUG" };
       if (target.includes("customDomain")) return { ok: false, code: "DUPLICATE_DOMAIN" };
     }

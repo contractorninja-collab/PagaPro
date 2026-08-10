@@ -163,7 +163,6 @@ export function BiznesDetailClient({
     slug: company.slug ?? "",
     customDomain: company.customDomain ?? "",
     fiscalNumber: company.fiscalNumber ?? "",
-    businessRegistrationNumber: company.businessRegistrationNumber ?? "",
     email: company.email ?? "",
     phone: company.phone ?? "",
     website: company.website ?? "",
@@ -317,7 +316,7 @@ export function BiznesDetailClient({
             <Badge variant={status.variant}>{status.label}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            NUI: {company.fiscalNumber ?? "—"} · NRB: {company.businessRegistrationNumber ?? "—"}
+            NUI: {company.fiscalNumber ?? "—"}
           </p>
           {company.tenantUrl ? (
             <a
@@ -358,7 +357,7 @@ export function BiznesDetailClient({
         <Card>
           <CardHeader>
             <CardTitle>Të dhënat e biznesit</CardTitle>
-            <CardDescription>Informacioni zyrtar i klientit — NUI, NRB dhe kontaktet.</CardDescription>
+            <CardDescription>Informacioni zyrtar i klientit — NUI dhe kontaktet.</CardDescription>
           </CardHeader>
           <CardContent>
             <CompanyForm

@@ -84,13 +84,6 @@ export async function createCompanyAction(
           fieldErrors: { fiscalNumber: ["NUI duhet të jetë unik."] },
         };
       }
-      if (res.code === "DUPLICATE_NRB") {
-        return {
-          ok: false,
-          error: "Ky NRB ekziston tashmë.",
-          fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
-        };
-      }
       if (res.code === "DUPLICATE_SLUG") {
         return {
           ok: false,
@@ -141,13 +134,6 @@ export async function updateCompanyAction(raw: unknown): Promise<AdminActionResu
       if (res.code === "NOT_FOUND") return { ok: false, error: "Biznesi nuk u gjet." };
       if (res.code === "DUPLICATE_NUI") {
         return { ok: false, error: "Ky NUI ekziston tashmë.", fieldErrors: { fiscalNumber: ["NUI duhet të jetë unik."] } };
-      }
-      if (res.code === "DUPLICATE_NRB") {
-        return {
-          ok: false,
-          error: "Ky NRB ekziston tashmë.",
-          fieldErrors: { businessRegistrationNumber: ["NRB duhet të jetë unik."] },
-        };
       }
       if (res.code === "DUPLICATE_SLUG") {
         return {

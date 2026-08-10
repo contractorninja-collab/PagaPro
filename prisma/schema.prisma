@@ -408,14 +408,12 @@ model Company {
   slug      String? @unique @db.VarChar(80)
   customDomain String? @unique @db.VarChar(255)
 
-  /// Kosovo Business Registration Number (or successor identifier)
-  businessRegistrationNumber String? @unique
 
   fiscalNumber String? @unique // taxpayer / fiscal reference where applicable (NUI)
   status       CompanyStatus   @default(ACTIVE)
 
   /// Optional brand grouping for customers who run several legal entities — each with its
-  /// own NUI/NRB — under one commercial brand. Purely an admin-console organising layer:
+  /// own NUI — under one commercial brand. Purely an admin-console organising layer:
   /// it does NOT widen the tenant boundary. Every query stays scoped to a single companyId,
   /// and access still comes from UserCompanyMembership, one row per company.
   brandGroupId String?
@@ -509,7 +507,7 @@ model Company {
   @@map("companies")
 }
 
-/// A commercial brand that owns several legal entities (one Company per NUI/NRB).
+/// A commercial brand that owns several legal entities (one Company per NUI).
 ///
 /// Deliberately thin: it groups companies for the admin console and for "add this user to
 /// every company in the group" — it holds no operational data of its own, and nothing in

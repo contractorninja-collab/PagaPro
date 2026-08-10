@@ -8,7 +8,7 @@ Templates and artifacts are **category-aware** (`CONTRACT`, `LEAVE`, `TERMINATIO
 
 | Step | Data | Stored as |
 |------|------|-----------|
-| Company profile | Legal/trade name, NRB/NUI | `Company` |
+| Company profile | Legal/trade name, NUI | `Company` |
 | Company settings | Payroll toggles, **registered address** | `CompanySetting` |
 | Authorized representative | Name, title; future signature asset key | `CompanySetting` (`authorizedRepresentative*`, `authorizedSignatureStorageKey`) |
 | Templates | Logical grouping + **`documentCategory`** (+ optional contract subtype / kind when category is CONTRACT) | `DocumentTemplate` |

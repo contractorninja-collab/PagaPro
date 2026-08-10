@@ -9,7 +9,6 @@ export const DOCUMENT_CORE_PLACEHOLDER_KEYS = [
   "salary_gross",
   "company_name",
   "company_nui",
-  "company_nrb",
   "company_address",
   "authorized_person",
   "authorized_position",

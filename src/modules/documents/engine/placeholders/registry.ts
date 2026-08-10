@@ -128,12 +128,6 @@ const CORE_DEFINITIONS: PlaceholderDefinition[] = [
     labelSq: "NUI (numri fiskal)",
   },
   {
-    key: "company_nrb",
-    requiredByDefault: false,
-    sources: ["company"],
-    labelSq: "NRB",
-  },
-  {
     key: "company_address",
     requiredByDefault: false,
     sources: ["company_setting"],

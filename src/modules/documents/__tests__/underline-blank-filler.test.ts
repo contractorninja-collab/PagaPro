@@ -37,7 +37,6 @@ describe("underline blank filler", () => {
     const fields = [
       "company_name",
       "company_nui",
-      "company_nrb",
       "company_address",
       "employee_name",
       "employee_personal_number",

@@ -70,7 +70,7 @@ function buildBody() {
 
   s.push(h1("2. Konfigurimi fillestar (Konfigurime)"));
   s.push(p("Para se të gjeneroni dokumente ose paga, plotësoni të dhënat e kompanisë te menyja Konfigurime:"));
-  s.push(check("Kontrolloni emrin ligjor, NUI-në dhe NRB-në — këto shtypen në çdo kontratë e vendim."));
+  s.push(check("Kontrolloni emrin ligjor dhe NUI-në — këto shtypen në çdo kontratë e vendim."));
   s.push(check("Shkruani emrin dhe pozitën e përfaqësuesit të autorizuar (personi që nënshkruan dokumentet)."));
   s.push(check("Ngarkoni nënshkrimin dhe vulën e kompanisë (foto PNG, mundësisht me sfond transparent)."));
   s.push(check("Vendosni adresën e saktë të selisë."));

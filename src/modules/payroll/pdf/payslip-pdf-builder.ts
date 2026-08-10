@@ -35,7 +35,6 @@ export interface PayslipPdfCompany {
   cityLine: string;
   /** Kept on the interface for contracts; the payslip prints only the NUI. */
   fiscalNumber: string | null;
-  businessNumber: string | null;
   phone: string | null;
   email: string | null;
 }
@@ -322,7 +321,7 @@ function drawHeaderBand(
   };
   const sub = [
     input.company.addressLine,
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -865,7 +864,7 @@ export async function buildProfessionalPayslipPdf(input: PayslipPdfInput): Promi
     margin: MARGIN,
     companyLine: [
       input.company.legalName,
-      input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+      input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
     ]
       .filter(Boolean)
       .join(" · "),

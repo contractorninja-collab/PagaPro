@@ -66,7 +66,6 @@ export function mapCompanyRowToContractDto(row: {
   legalName: string;
   tradeName: string | null;
   fiscalNumber: string | null;
-  businessRegistrationNumber: string | null;
   addressLine?: string | null;
   city?: string | null;
   postalCode?: string | null;
@@ -76,7 +75,6 @@ export function mapCompanyRowToContractDto(row: {
     legalName: row.legalName,
     tradeName: row.tradeName,
     fiscalNumber: row.fiscalNumber,
-    businessRegistrationNumber: row.businessRegistrationNumber,
     addressLine: row.addressLine ?? null,
     city: row.city ?? null,
     postalCode: row.postalCode ?? null,

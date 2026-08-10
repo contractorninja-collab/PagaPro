@@ -55,7 +55,6 @@ async function loadCompanySlice(
         legalName: true,
         tradeName: true,
         fiscalNumber: true,
-        businessRegistrationNumber: true,
         addressLine: true,
         city: true,
         postalCode: true,

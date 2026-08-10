@@ -205,7 +205,6 @@ export function KonfigurimeConfigurator({
       company: {
         legalName: company.legalName,
         fiscalNumber: company.fiscalNumber,
-        businessRegistrationNumber: company.businessRegistrationNumber,
         addressLine: company.addressLine,
         email: company.email,
         phone: company.phone,

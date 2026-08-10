@@ -204,7 +204,7 @@ function drawRunningHeader(
   });
 
   const meta = [
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
     [input.company.addressLine, input.company.cityLine].filter(Boolean).join(", ") || null,
   ]
     .filter(Boolean)
@@ -541,7 +541,7 @@ function drawFooter(
 ): void {
   const left = [
     input.generatedAtLabel ? `PAGAPRO · GJENERUAR ${input.generatedAtLabel}` : "PAGAPRO",
-    input.company.businessNumber ? `NUI ${input.company.businessNumber}` : null,
+    input.company.fiscalNumber ? `NUI ${input.company.fiscalNumber}` : null,
     "paga-pro.com",
   ]
     .filter(Boolean)

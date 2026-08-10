@@ -55,7 +55,7 @@ function input(rows: LibriPagaveRow[]): LibriPagavePdfInput {
   return {
     company: {
       legalName: "Ndërtimi Alba SH.P.K.",
-      businessNumber: "811234567",
+      fiscalNumber: "811234567",
       addressLine: "Rr. Rexhep Luci 14",
       city: "Prishtinë",
     },

@@ -104,7 +104,7 @@ function buildClusters(companies: AdminCompanyListItem[]): CompanyCluster[] {
 }
 
 function matches(c: AdminCompanyListItem, q: string): boolean {
-  return [c.legalName, c.tradeName, c.brandGroupName, c.slug, c.customDomain, c.tenantUrl, c.fiscalNumber, c.businessRegistrationNumber, c.email]
+  return [c.legalName, c.tradeName, c.brandGroupName, c.slug, c.customDomain, c.tenantUrl, c.fiscalNumber, c.email]
     .filter(Boolean)
     .some((v) => v!.toLowerCase().includes(q));
 }
@@ -278,7 +278,7 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Kërko sipas emrit, NUI, NRB ose email…"
+          placeholder="Kërko sipas emrit, NUI ose email…"
           className="pl-9"
           aria-label="Kërko biznese"
         />

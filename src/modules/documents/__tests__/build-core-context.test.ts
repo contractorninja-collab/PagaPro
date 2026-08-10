@@ -5,7 +5,6 @@ const company = {
   legalName: "FastTech LLC",
   tradeName: null,
   fiscalNumber: null,
-  businessRegistrationNumber: null,
 };
 
 const employee = {

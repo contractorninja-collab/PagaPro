@@ -34,7 +34,6 @@ export interface KonfigurimePageDto {
   company: {
     legalName: string;
     fiscalNumber: string | null;
-    businessRegistrationNumber: string | null;
     addressLine: string | null;
     email: string | null;
     phone: string | null;
@@ -159,7 +158,6 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
     company: {
       legalName: row.legalName,
       fiscalNumber: row.fiscalNumber ?? null,
-      businessRegistrationNumber: row.businessRegistrationNumber ?? null,
       addressLine: row.addressLine ?? null,
       email: row.email ?? null,
       phone: row.phone ?? null,
@@ -312,7 +310,6 @@ export async function persistKonfigurimeSave(
       data: {
         legalName: payload.company.legalName.trim(),
         fiscalNumber: payload.company.fiscalNumber ?? null,
-        businessRegistrationNumber: payload.company.businessRegistrationNumber ?? null,
         addressLine: payload.company.addressLine ?? null,
         email: payload.company.email ?? null,
         phone: payload.company.phone ?? null,
