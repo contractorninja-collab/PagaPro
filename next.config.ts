@@ -18,7 +18,25 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     // scripts/** because company provisioning loads the per-company template
     // seeders (scripts/seed-*-templates.cjs) at runtime via createRequire.
-    "/**": ["./templates/**", "./public/atk_template/**", "./scripts/**"],
+    //
+    // Those seeders `require("pizzip")` and `require("@supabase/storage-js")`
+    // when they load. Webpack cannot parse the createRequire call (it warns
+    // "module.createRequire failed parsing argument"), so it never follows the
+    // .cjs files' own requires: copying the scripts is not enough, their npm
+    // dependencies have to be named here too or every seeder throws
+    // "Cannot find module 'pizzip'" the moment a client is created in the admin
+    // console — which is exactly what happened in production. Transitive deps
+    // (pako, tslib, iceberg-js) are listed for the same reason.
+    "/**": [
+      "./templates/**",
+      "./public/atk_template/**",
+      "./scripts/**",
+      "./node_modules/pizzip/**",
+      "./node_modules/pako/**",
+      "./node_modules/@supabase/storage-js/**",
+      "./node_modules/iceberg-js/**",
+      "./node_modules/tslib/**",
+    ],
   },
   async redirects() {
     return [{ source: "/konfigurimet", destination: "/konfigurime", permanent: true }];
