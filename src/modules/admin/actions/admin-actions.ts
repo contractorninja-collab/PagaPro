@@ -20,8 +20,10 @@ import {
   addUserToBrandGroupCompanies,
   copyCompanyMemberships,
   createBrandGroup,
+  createBrandGroupWithCompanies,
   setCompanyBrandGroup,
   type BrandGroupAttachOutcome,
+  type GroupCompanyOutcome,
 } from "@/modules/admin/services/company-brand-group-service";
 import {
   createTimeClockDevice,
@@ -233,6 +235,60 @@ export async function deleteCompanyAction(
   } catch (err) {
     console.error("[deleteCompanyAction] unexpected:", err);
     return { ok: false, error: "Fshirja dështoi papritur." };
+  }
+}
+
+const createGroupWithCompaniesSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Emri i grupit duhet të ketë të paktën 2 karaktere.")
+    .max(160, "Emri i grupit është shumë i gjatë."),
+  companies: z
+    .array(companyUpsertSchema)
+    .min(1, "Shtoni të paktën një biznes në grup."),
+});
+
+/**
+ * Creates the brand group and its businesses in one go. Partial success is a
+ * real outcome here — see createBrandGroupWithCompanies — so the caller gets a
+ * per-company result list rather than a single ok/failed.
+ */
+export async function createBrandGroupWithCompaniesAction(
+  raw: unknown,
+): Promise<
+  AdminActionResult<{
+    brandGroupId: string;
+    brandGroupName: string;
+    results: GroupCompanyOutcome[];
+  }>
+> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = createGroupWithCompaniesSchema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Ju lutem korrigjoni fushat e theksuara.",
+        // Zod paths dot-join, so a bad row surfaces as companies.1.legalName —
+        // which is exactly how the dialog addresses its rows.
+        fieldErrors: formatAdminFieldErrors(parsed.error),
+      };
+    }
+
+    const res = await createBrandGroupWithCompanies({
+      name: parsed.data.name,
+      companies: parsed.data.companies,
+    });
+
+    revalidateBizneset();
+    for (const r of res.results) if (r.companyId) revalidateBizneset(r.companyId);
+
+    return { ok: true, data: res };
+  } catch (err) {
+    console.error("[createBrandGroupWithCompaniesAction] unexpected:", err);
+    return { ok: false, error: "Krijimi i grupit dështoi papritur." };
   }
 }
 

@@ -20,10 +20,20 @@ export type ProvisionCompanyResult =
       message?: string;
     };
 
+/**
+ * Which column collided on a P2002.
+ *
+ * `meta.target` is not populated under the pg adapter, so relying on it alone
+ * turned every duplicate into a generic "Krijimi i biznesit dështoi." with no
+ * field highlighted. The driver still names the column in the message, so fall
+ * back to that.
+ */
 function duplicateTarget(err: unknown): string {
   const meta = (err as { meta?: { target?: string[] | string } })?.meta;
   const target = meta?.target;
-  return Array.isArray(target) ? target.join(",") : String(target ?? "");
+  const fromMeta = Array.isArray(target) ? target.join(",") : String(target ?? "");
+  if (fromMeta && fromMeta !== "undefined") return fromMeta;
+  return err instanceof Error ? err.message : String(err);
 }
 
 async function generateUniqueCompanySlug(baseName: string): Promise<string> {

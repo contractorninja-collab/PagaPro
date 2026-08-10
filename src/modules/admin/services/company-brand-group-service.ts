@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { createCompanyUserForAdmin } from "@/modules/admin/services/admin-service";
-import type { CreateCompanyUserInput } from "@/modules/admin/validation/admin-schemas";
+import { provisionCompany } from "@/modules/admin/services/company-provisioning";
+import type {
+  CompanyUpsertInput,
+  CreateCompanyUserInput,
+} from "@/modules/admin/validation/admin-schemas";
 
 /**
  * Brand groups — several legal entities (one Company per NUI) under one commercial brand.
@@ -15,6 +19,72 @@ export async function createBrandGroup(name: string): Promise<{ id: string; name
     data: { name: name.trim() },
     select: { id: true, name: true },
   });
+}
+
+export interface GroupCompanyOutcome {
+  index: number;
+  legalName: string;
+  companyId: string | null;
+  outcome: "created" | "duplicate_nui" | "duplicate_slug" | "duplicate_domain" | "failed";
+  templatesSeeded: number;
+  warnings: string[];
+}
+
+export interface CreateBrandGroupWithCompaniesResult {
+  brandGroupId: string;
+  brandGroupName: string;
+  results: GroupCompanyOutcome[];
+}
+
+/**
+ * Creates the group and provisions its companies in one operator action.
+ *
+ * Deliberately NOT all-or-nothing. Provisioning a company is not a single insert
+ * — it also seeds holidays, payroll parameters, a leave policy and fourteen
+ * document templates, some of which touch blob storage. Rolling four good
+ * companies back because the fifth had a duplicate NUI would throw away far more
+ * work than it saves, and the operator can simply add the fifth again. So each
+ * company reports its own outcome and the caller shows partial success honestly.
+ */
+export async function createBrandGroupWithCompanies(params: {
+  name: string;
+  companies: CompanyUpsertInput[];
+}): Promise<CreateBrandGroupWithCompaniesResult> {
+  const group = await createBrandGroup(params.name);
+
+  const results: GroupCompanyOutcome[] = [];
+  for (const [index, input] of params.companies.entries()) {
+    const res = await provisionCompany({ ...input, brandGroupId: group.id });
+    if (res.ok) {
+      results.push({
+        index,
+        legalName: input.legalName,
+        companyId: res.id,
+        outcome: "created",
+        templatesSeeded: res.templatesSeeded,
+        warnings: res.warnings,
+      });
+      continue;
+    }
+    const outcome =
+      res.code === "DUPLICATE_NUI"
+        ? "duplicate_nui"
+        : res.code === "DUPLICATE_SLUG"
+          ? "duplicate_slug"
+          : res.code === "DUPLICATE_DOMAIN"
+            ? "duplicate_domain"
+            : "failed";
+    results.push({
+      index,
+      legalName: input.legalName,
+      companyId: null,
+      outcome,
+      templatesSeeded: 0,
+      warnings: [],
+    });
+  }
+
+  return { brandGroupId: group.id, brandGroupName: group.name, results };
 }
 
 /** `null` ungroups the company. */

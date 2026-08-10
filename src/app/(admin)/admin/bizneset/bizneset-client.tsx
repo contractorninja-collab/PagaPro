@@ -3,7 +3,17 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, CornerDownRight, ExternalLink, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  CornerDownRight,
+  ExternalLink,
+  Layers,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/patterns/empty-state";
 import { PageHeader } from "@/components/patterns/page-header";
 import { CompanyForm, type CompanyFormValues } from "@/components/admin/company-form";
+import { CreateGroupDialog } from "@/components/admin/create-group-dialog";
 import { DeleteCompanyDialog } from "@/components/admin/delete-company-dialog";
 import { adminPath } from "@/lib/admin-path";
 import { createCompanyAction } from "@/modules/admin/actions/admin-actions";
@@ -117,6 +128,19 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [isPending, startTransition] = useTransition();
   const [pendingDelete, setPendingDelete] = useState<AdminCompanyListItem | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  // Groups start folded: a customer with five entities should read as one client,
+  // not five rows. Expanding is per-group and remembered while the page lives.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+
+  function toggleGroup(brandGroupId: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(brandGroupId)) next.delete(brandGroupId);
+      else next.add(brandGroupId);
+      return next;
+    });
+  }
 
   const clusters = useMemo(() => {
     const all = buildClusters(companies);
@@ -150,8 +174,10 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
     });
   }
 
-  function companyRow(c: AdminCompanyListItem, child: boolean) {
+  function companyRow(c: AdminCompanyListItem, child: boolean, groupSize = 0) {
     const status = STATUS_LABELS[c.status];
+    const expandable = !child && groupSize > 0 && c.brandGroupId != null;
+    const expanded = expandable && expandedGroups.has(c.brandGroupId!);
     return (
       <TableRow
         key={c.id}
@@ -173,9 +199,32 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
               </Link>
               {c.tradeName ? <p className="text-xs text-muted-foreground">{c.tradeName}</p> : null}
               {!child && c.brandGroupName ? (
-                <Badge variant="secondary" className="mt-1 font-normal">
-                  {c.brandGroupName}
-                </Badge>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="font-normal">
+                    {c.brandGroupName}
+                  </Badge>
+                  {expandable ? (
+                    <button
+                      type="button"
+                      // The row navigates on click; this must not do both.
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroup(c.brandGroupId!);
+                      }}
+                      aria-expanded={expanded}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-brand-blue transition-colors hover:bg-muted"
+                    >
+                      {expanded ? (
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {expanded
+                        ? "Fshih kompanitë"
+                        : `Shiko më shumë (${groupSize} kompani)`}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
               {c.tenantUrl ? (
                 <a
@@ -237,6 +286,11 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
         title="Bizneset"
         description="Klientët e platformës — krijoni biznese të reja dhe menaxhoni qasjet e tyre."
         actions={
+          <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => setGroupOpen(true)}>
+            <Layers className="h-4 w-4" aria-hidden />
+            Krijo Grup
+          </Button>
           <Dialog
             open={createOpen}
             onOpenChange={(open) => {
@@ -270,8 +324,11 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
               />
             </DialogContent>
           </Dialog>
+          </div>
         }
       />
+
+      <CreateGroupDialog open={groupOpen} onOpenChange={setGroupOpen} />
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -309,10 +366,22 @@ export function BiznesetClient({ companies }: { companies: AdminCompanyListItem[
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clusters.map((cl) => [
-              companyRow(cl.mother, false),
-              ...cl.children.map((c) => companyRow(c, true)),
-            ])}
+            {clusters.map((cl) => {
+              // Whole group counted, mother included — "3 kompani" should mean
+              // three, not "one plus two others".
+              const groupSize = cl.children.length > 0 ? cl.children.length + 1 : 0;
+              const q = query.trim().toLowerCase();
+              // A search that hits a child must show it, even folded — otherwise
+              // the result you searched for is the one thing you cannot see.
+              const searchHitsChild = q.length > 0 && cl.children.some((c) => matches(c, q));
+              const open =
+                searchHitsChild ||
+                (cl.mother.brandGroupId != null && expandedGroups.has(cl.mother.brandGroupId));
+              return [
+                companyRow(cl.mother, false, groupSize),
+                ...(open ? cl.children.map((c) => companyRow(c, true)) : []),
+              ];
+            })}
           </TableBody>
         </Table>
       )}

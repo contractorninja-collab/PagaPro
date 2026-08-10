@@ -251,7 +251,14 @@ export async function updateCompanyForAdmin(
     if (code === "P2025") return { ok: false, code: "NOT_FOUND" };
     if (code === "P2002") {
       const meta = (err as { meta?: { target?: string[] | string } })?.meta;
-      const target = Array.isArray(meta?.target) ? meta.target.join(",") : String(meta?.target ?? "");
+      const fromMeta = Array.isArray(meta?.target) ? meta.target.join(",") : String(meta?.target ?? "");
+      // meta.target is empty under the pg adapter; the message still names the column.
+      const target =
+        fromMeta && fromMeta !== "undefined"
+          ? fromMeta
+          : err instanceof Error
+            ? err.message
+            : String(err);
       if (target.includes("fiscalNumber")) return { ok: false, code: "DUPLICATE_NUI" };
       if (target.includes("slug")) return { ok: false, code: "DUPLICATE_SLUG" };
       if (target.includes("customDomain")) return { ok: false, code: "DUPLICATE_DOMAIN" };
