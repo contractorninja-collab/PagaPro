@@ -20,6 +20,8 @@ export type PushimetLeaveRowDto = {
   rejectionReason: string | null;
   /** Kush e aprovoi tejkalimin e bilancit (borxh ditësh) — null kur s'ka tejkalim. */
   balanceOverrideApprovedBy: string | null;
+  /** When it was raised — drives "Pret prej N ditësh" on the pending queue. */
+  createdAtIso: string | null;
   decidedAtIso: string | null;
   decidedByLabel: string | null;
 };

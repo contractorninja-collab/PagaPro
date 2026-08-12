@@ -16,6 +16,7 @@ import {
   listOnLeaveToday,
 } from "@/modules/leaves/services/leave-query-service";
 import { getMergedHolidayIsoSetForUtcRange } from "@/modules/leaves/services/leave-working-time-service";
+import { buildLeaveQueueDecisions } from "@/modules/leaves/services/leave-queue-decision-service";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { PushimetFiltersForm } from "@/modules/leaves/components/pushimet-filters-form";
 import { PushimetDashboardClient } from "@/modules/leaves/components/pushimet-dashboard-client";
@@ -70,6 +71,7 @@ function serializeLeaveRow(
     reason: string | null;
     rejectionReason: string | null;
     balanceOverrideApprovedBy: string | null;
+    createdAt?: Date | null;
     decidedAt: Date | null;
     employee: {
       firstName: string;
@@ -102,6 +104,7 @@ function serializeLeaveRow(
     reason: lr.reason,
     rejectionReason: lr.rejectionReason,
     balanceOverrideApprovedBy: lr.balanceOverrideApprovedBy,
+    createdAtIso: lr.createdAt?.toISOString() ?? null,
     decidedAtIso: lr.decidedAt?.toISOString() ?? null,
     decidedByLabel:
       lr.decidedByMembership?.user.displayName?.trim() ||
@@ -315,6 +318,9 @@ export default async function PushimetPage({
 
   const rows = listPage.rows.map(serializeLeaveRow);
   const pendingRows = listPage.pending.map(serializeLeaveRow);
+  // Everything needed to decide the queue, in four set-based queries rather
+  // than one validation round trip per row.
+  const queueDecisions = await buildLeaveQueueDecisions(companyId, pendingRows);
   const chips = calendarRaw.map(serializeLeaveRow).map(chipFromRow);
   const onLeaveToday = onLeaveTodayRaw.map(serializeLeaveRow);
 
@@ -371,6 +377,7 @@ export default async function PushimetPage({
           stats={stats}
           rows={rows}
           pendingRows={pendingRows}
+          queueDecisions={queueDecisions}
           onLeaveToday={onLeaveToday}
           chips={chips}
           holidayIsoDates={[...holidaySet]}

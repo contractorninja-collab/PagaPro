@@ -40,6 +40,7 @@ function serializeLeaveRowDto(lr: {
   reason: string | null;
   rejectionReason: string | null;
   balanceOverrideApprovedBy: string | null;
+  createdAt?: Date | null;
   decidedAt: Date | null;
   employee: { firstName: string; lastName: string; department: { name: string } | null };
   decidedByMembership?:
@@ -65,6 +66,7 @@ function serializeLeaveRowDto(lr: {
     reason: lr.reason,
     rejectionReason: lr.rejectionReason,
     balanceOverrideApprovedBy: lr.balanceOverrideApprovedBy,
+    createdAtIso: lr.createdAt?.toISOString() ?? null,
     decidedAtIso: lr.decidedAt?.toISOString() ?? null,
     decidedByLabel:
       lr.decidedByMembership?.user.displayName?.trim() ||

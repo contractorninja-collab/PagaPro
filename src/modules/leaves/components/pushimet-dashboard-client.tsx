@@ -24,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
+import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
 import { LeaveRejectDialog } from "@/modules/leaves/components/leave-reject-dialog";
@@ -122,6 +123,8 @@ export function PushimetDashboardClient(props: {
   rows: PushimetLeaveRowDto[];
   /** Pinned to the top and never paged — see listLeaveRequestsPage. */
   pendingRows: PushimetLeaveRowDto[];
+  /** Balance, coverage, payroll state and waiting age, keyed by leave id. */
+  queueDecisions: Record<string, LeaveQueueDecision>;
   /** Computed from today on the server, not from the month being viewed. */
   onLeaveToday: PushimetLeaveRowDto[];
   chips: PushimetCalendarChipDto[];
@@ -420,10 +423,18 @@ export function PushimetDashboardClient(props: {
               <ul className="divide-y divide-[#f1f5f9]">
                 {props.pendingRows.map((row) => {
                   const flags = conflictFlags(row);
+                  const d = props.queueDecisions[row.id];
+                  // The rail states the worst thing about the row before it is read.
+                  const rail =
+                    d?.severity === "block"
+                      ? "border-l-[#dc2626]"
+                      : d?.severity === "warn"
+                        ? "border-l-[#f59e0b]"
+                        : "border-l-brand-blue";
                   return (
                     <li
                       key={row.id}
-                      className="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center"
+                      className={`flex flex-col gap-3 border-l-[3px] px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center ${rail}`}
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         <InitialsAvatar name={row.employeeName} />
@@ -445,6 +456,44 @@ export function PushimetDashboardClient(props: {
                             {row.departmentName ? ` · ${row.departmentName}` : ""}
                           </p>
                           <LeaveFlagPills flags={flags} className="mt-1.5" />
+
+                          {/* The three things the decision actually turns on,
+                              printed rather than left behind a click. */}
+                          {d ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {d.balanceAfter != null ? (
+                                <TonePill
+                                  tone={d.goesNegative ? "destructive" : "neutral"}
+                                  size="sm"
+                                >
+                                  {d.goesNegative
+                                    ? `Shkon në ${d.balanceAfter} ditë`
+                                    : `Mbetur ${d.balanceBefore} → ${d.balanceAfter}`}
+                                </TonePill>
+                              ) : null}
+
+                              <TonePill tone="neutral" size="sm">
+                                {d.departmentHeadcount != null && d.departmentLabel
+                                  ? `${d.departmentOff} nga ${d.departmentHeadcount} në ${d.departmentLabel} jashtë`
+                                  : `${d.departmentOff} kolegë jashtë atë periudhë`}
+                              </TonePill>
+
+                              <TonePill tone={d.payrollLocked ? "destructive" : "neutral"} size="sm">
+                                {d.payrollLocked
+                                  ? `Paga ${d.payrollLabel} është e kyçur — miratimi s'shkon te payroll-i`
+                                  : `Prek pagën ${d.payrollLabel}`}
+                              </TonePill>
+
+                              {d.waitingDays > 0 ? (
+                                <TonePill
+                                  tone={d.waitingDays > 7 ? "destructive" : "neutral"}
+                                  size="sm"
+                                >
+                                  Pret prej {d.waitingDays} ditësh
+                                </TonePill>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
