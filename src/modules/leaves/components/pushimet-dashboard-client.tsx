@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
-import type { PayrollSyncSkipRow } from "@/modules/leaves/services/leave-query-service";
+import type { PayrollSyncSkipRow, LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
@@ -129,6 +129,8 @@ export function PushimetDashboardClient(props: {
   queueDecisions: Record<string, LeaveQueueDecision>;
   /** Rows behind the payroll-sync-skip count, shown in a Sheet. */
   payrollSyncSkips: PayrollSyncSkipRow[];
+  /** Company position for the year, from a DB aggregate — not the capped list. */
+  balanceTotals: LeaveBalanceTotals;
   /** Computed from today on the server, not from the month being viewed. */
   onLeaveToday: PushimetLeaveRowDto[];
   chips: PushimetCalendarChipDto[];
@@ -695,6 +697,7 @@ export function PushimetDashboardClient(props: {
           wide object, not a rail ornament. */}
       <AnnualLeaveBalancePanel
         balances={props.balances}
+        companyTotals={props.balanceTotals}
         year={props.calendarYear}
         action={
           <button

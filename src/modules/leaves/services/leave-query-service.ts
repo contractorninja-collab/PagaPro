@@ -142,6 +142,78 @@ export async function listOnLeaveToday(companyId: string, now = new Date()) {
  * Approved leave whose payroll hours never landed. Stale payroll is otherwise
  * only discoverable by opening one request's timeline and reading it.
  */
+export interface LeaveBalanceTotals {
+  employees: number;
+  yearlyQuota: string;
+  carryOverDays: string;
+  accruedYtd: string;
+  usedDays: string;
+  pendingDays: string;
+  remainingDays: string;
+  /** Distinct engine versions behind these rows — more than one means the sum mixes definitions. */
+  ruleVersions: string[];
+}
+
+/**
+ * The company's leave position for a year.
+ *
+ * Computed by the database, not by adding up the rows on screen: that list is
+ * capped at 400, so summing it would quietly under-report every company past
+ * roughly 130 employees and the total would change as filters moved. The same
+ * exclusions as the panel apply — departed staff are out, and an employee
+ * filter narrows this too, so the footer always describes the rows above it.
+ */
+export async function leaveBalanceTotals(
+  companyId: string,
+  year: number,
+  leaveType: LeaveType,
+  employeeId?: string | null,
+): Promise<LeaveBalanceTotals> {
+  const where = {
+    companyId,
+    year,
+    leaveType,
+    ...(employeeId ? { employeeId } : {}),
+    employee: { status: { not: "TERMINATED" as const } },
+  };
+
+  const [agg, versions] = await Promise.all([
+    prisma.leaveBalance.aggregate({
+      where,
+      _count: { _all: true },
+      _sum: {
+        yearlyQuota: true,
+        carryOverDays: true,
+        accruedYtd: true,
+        usedDays: true,
+        pendingDays: true,
+        remainingDays: true,
+      },
+    }),
+    prisma.leaveBalance.groupBy({
+      by: ["computedFromRuleVersion"],
+      where,
+    }),
+  ]);
+
+  const n = (v: { toString(): string } | null | undefined): string =>
+    v == null ? "0.00" : Number(v.toString()).toFixed(2);
+
+  return {
+    employees: agg._count._all,
+    yearlyQuota: n(agg._sum.yearlyQuota),
+    carryOverDays: n(agg._sum.carryOverDays),
+    accruedYtd: n(agg._sum.accruedYtd),
+    usedDays: n(agg._sum.usedDays),
+    pendingDays: n(agg._sum.pendingDays),
+    remainingDays: n(agg._sum.remainingDays),
+    ruleVersions: versions
+      .map((v) => v.computedFromRuleVersion)
+      .filter((v): v is string => Boolean(v))
+      .sort(),
+  };
+}
+
 export interface PayrollSyncSkipRow {
   id: string;
   employeeName: string;

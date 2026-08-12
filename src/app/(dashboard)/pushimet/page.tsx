@@ -5,6 +5,7 @@ import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave
 import {
   countPayrollSyncSkips,
   listPayrollSyncSkips,
+  leaveBalanceTotals,
   hasLeaveBalancesForYear,
   latestAccrualPeriod,
   leaveDashboardStats,
@@ -325,6 +326,8 @@ export default async function PushimetPage({
   // Everything needed to decide the queue, in four set-based queries rather
   // than one validation round trip per row.
   const queueDecisions = await buildLeaveQueueDecisions(companyId, pendingRows);
+  // The footer of the ledger comes from the database, never from the capped page.
+  const balanceTotals = await leaveBalanceTotals(companyId, year, "PUSHIM_VJETOR", employeeId);
   const chips = calendarRaw.map(serializeLeaveRow).map(chipFromRow);
   const onLeaveToday = onLeaveTodayRaw.map(serializeLeaveRow);
 
@@ -383,6 +386,7 @@ export default async function PushimetPage({
           pendingRows={pendingRows}
           queueDecisions={queueDecisions}
           payrollSyncSkips={syncSkipRows}
+          balanceTotals={balanceTotals}
           onLeaveToday={onLeaveToday}
           chips={chips}
           holidayIsoDates={[...holidaySet]}

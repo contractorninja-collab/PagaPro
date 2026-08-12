@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import type { PushimetBalanceRowDto } from "@/modules/leaves/types/pushimet";
+import type { LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
 import { LEAVE_CARD, MICRO_LABEL, TonePill } from "@/modules/leaves/components/leave-ui";
 
 const n = (s: string | null | undefined): number => {
@@ -27,10 +28,13 @@ function daysUntil(iso: string | null): number | null {
  */
 export function AnnualLeaveBalancePanel({
   balances,
+  companyTotals,
   year,
   action,
 }: {
   balances: PushimetBalanceRowDto[];
+  /** Company position from a DB aggregate — the list below may be capped. */
+  companyTotals: LeaveBalanceTotals;
   year: number;
   /** Header slot — carries the explicit "Rifresko balancat" control. */
   action?: ReactNode;
@@ -239,6 +243,58 @@ export function AnnualLeaveBalancePanel({
           })}
         </ul>
       )}
+
+      {/* The company position. Read from the database rather than added up from
+          the rows above, which are capped — a company past ~130 people would
+          otherwise see a total that silently excluded everyone off the end. */}
+      <div className="border-t-2 border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#334155]">
+            Totali · {companyTotals.employees} punonjës
+          </p>
+          <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12px] tabular-nums">
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Kuota</dt>
+              <dd className="font-semibold text-[#0f172a]">{companyTotals.yearlyQuota}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Bartur</dt>
+              <dd className="font-semibold text-[#0f172a]">{companyTotals.carryOverDays}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Akumuluar</dt>
+              <dd className="font-semibold text-[#0f172a]">{companyTotals.accruedYtd}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Përdorur</dt>
+              <dd className="font-semibold text-[#0f172a]">{companyTotals.usedDays}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Në pritje</dt>
+              <dd className="font-semibold text-[#0f172a]">{companyTotals.pendingDays}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[#94a3b8]">Disponueshme</dt>
+              <dd className="text-[14px] font-extrabold text-[#15803d]">{companyTotals.remainingDays}</dd>
+            </div>
+          </dl>
+        </div>
+
+        {/* Two engine versions in one column do not add up to one meaning. */}
+        {companyTotals.ruleVersions.length > 1 ? (
+          <p className="mt-2 text-[11.5px] font-medium text-[#b45309]">
+            Këto bilanca janë llogaritur me {companyTotals.ruleVersions.length} versione rregullash (
+            {companyTotals.ruleVersions.join(", ")}). Totali i mbledh të dyja — rifreskoni balancat për t&apos;i
+            njësuar.
+          </p>
+        ) : null}
+
+        {annual.length > filtered.length ? null : companyTotals.employees > annual.length ? (
+          <p className="mt-2 text-[11.5px] text-[#94a3b8]">
+            Po shfaqen {annual.length} nga {companyTotals.employees} punonjës.
+          </p>
+        ) : null}
+      </div>
 
       <p className="border-t border-[#eef2f7] bg-[#f8fafc] px-4 py-3 text-[11px] leading-relaxed text-[#94a3b8]">
         &quot;Disponueshme tani&quot; = ditët e akumuluara deri sot minus të përdorurat (plus ditët e bartura,
