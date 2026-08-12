@@ -30,11 +30,12 @@ export function ReportBrandHeader({
         <div className="flex items-center gap-4">
           <svg width={40} height={40} viewBox="0 0 40 40" className="shrink-0" aria-hidden>
             <rect width={40} height={40} rx={9} fill={BRAND.navy} />
+            {/* SVG text inherits nothing — name the brand face explicitly. */}
             <text
               x={20}
               y={27}
               textAnchor="middle"
-              fontFamily="ui-sans-serif, system-ui, Inter, sans-serif"
+              fontFamily="var(--font-brand), ui-sans-serif, system-ui, sans-serif"
               fontSize={15}
               fontWeight="700"
               letterSpacing="-0.06em"
@@ -44,7 +45,7 @@ export function ReportBrandHeader({
             </text>
           </svg>
           <div>
-            <div className="flex items-baseline gap-0 font-bold tracking-tight" style={{ fontFamily: "inherit" }}>
+            <div className="flex items-baseline gap-0 font-brand font-bold tracking-tight">
               <span style={{ color: BRAND.navy }} className="text-xl">
                 Paga
               </span>

@@ -64,6 +64,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "Segoe UI", "sans-serif"],
+        /** Wordmark only — the logo does not follow the UI face. */
+        brand: ["var(--font-brand)", "system-ui", "Segoe UI", "sans-serif"],
       },
       boxShadow: {
         /** Flat operational surfaces — no glow */

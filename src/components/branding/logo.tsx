@@ -24,6 +24,9 @@ interface PagaProLogoProps {
 /**
  * Wordmark: **Paga** (navy / light-on-dark) + **PRO** (professional blue).
  * Tight tracking, bold Inter — operational enterprise tone.
+ *
+ * `font-brand` pins this to Inter deliberately: the logo is a fixed brand asset
+ * and does not follow the UI face, which is Manrope everywhere else.
  */
 export function PagaProLogo({
   variant = "default",
@@ -37,7 +40,7 @@ export function PagaProLogo({
   const inner = (
     <span
       className={cn(
-        "inline-flex items-baseline font-bold tracking-[-0.04em] select-none",
+        "inline-flex items-baseline font-brand font-bold tracking-[-0.04em] select-none",
         sizeClasses[variant],
         className,
       )}
