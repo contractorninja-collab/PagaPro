@@ -98,7 +98,9 @@ export function AnnualLeaveBalancePanel({
         {action}
       </div>
 
-      <div className="grid grid-cols-2 gap-px border-b border-[#eef2f7] bg-[#eef2f7]">
+      {/* Four across once the panel spans the page — in the old 340px rail these
+          were stuck two-by-two and the card ran the height of the screen. */}
+      <div className="grid grid-cols-2 gap-px border-b border-[#eef2f7] bg-[#eef2f7] lg:grid-cols-4">
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Disponueshme tani</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#15803d]">
@@ -147,7 +149,10 @@ export function AnnualLeaveBalancePanel({
       {filtered.length === 0 ? (
         <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">Asnjë përputhje për kërkimin.</p>
       ) : (
-        <ul className="divide-y divide-[#f1f5f9]">
+        // Employees flow across the width instead of stacking into one tall
+        // column. gap-px over a hairline background draws the separators a
+        // grid cannot get from divide-y.
+        <ul className="grid gap-px bg-[#f1f5f9] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((b) => {
             const carry = n(b.carryOverDays);
             const entitlement = n(b.yearlyQuota);
@@ -178,7 +183,7 @@ export function AnnualLeaveBalancePanel({
               : Math.max(0, Math.min(100 - usedPct, (Math.max(0, pending) / total) * 100));
 
             return (
-              <li key={b.id} className="px-4 py-3 transition-colors hover:bg-[#f8fafc]">
+              <li key={b.id} className="bg-white px-4 py-3 transition-colors hover:bg-[#f8fafc]">
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold text-[#0f172a]">{b.employeeName}</p>

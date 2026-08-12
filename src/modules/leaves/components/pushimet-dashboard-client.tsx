@@ -542,11 +542,11 @@ export function PushimetDashboardClient(props: {
           />
         </div>
 
-        {/* Right rail — who's off today, then balances and other quotas.
-            "Sot në pushim" used to also be a stat tile at the top of the page,
-            answering the same question twice with the count in one place and
-            the actual people far below it. One surface now, and it leads the
-            rail instead of trailing two other cards. */}
+        {/* Right rail — who's off today, and only that. The balance sheet and
+            the other-quota table used to sit here too, which squeezed a
+            company-wide table into 340px and ran it far past the bottom of the
+            calendar, leaving the left column blank alongside it. Both now span
+            the page below this section. */}
         <div className="min-w-0 space-y-6">
           <div className={`overflow-hidden ${LEAVE_CARD}`}>
             <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
@@ -588,26 +588,32 @@ export function PushimetDashboardClient(props: {
             )}
           </div>
 
-          <AnnualLeaveBalancePanel
-            balances={props.balances}
-            year={props.calendarYear}
-            action={
-              <button
-                type="button"
-                className={BTN_SECONDARY_DENSE}
-                disabled={refreshing}
-                onClick={() => void runRefreshBalances()}
-                title="Rillogarit kuotat dhe mbetjet nga akumulimi dhe pushimet e miratuara"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-                  aria-hidden
-                />
-                Rifresko balancat
-              </button>
-            }
-          />
+        </div>
+      </section>
 
+      {/* Balances span the page, under the calendar — a company-wide sheet is a
+          wide object, not a rail ornament. */}
+      <AnnualLeaveBalancePanel
+        balances={props.balances}
+        year={props.calendarYear}
+        action={
+          <button
+            type="button"
+            className={BTN_SECONDARY_DENSE}
+            disabled={refreshing}
+            onClick={() => void runRefreshBalances()}
+            title="Rillogarit kuotat dhe mbetjet nga akumulimi dhe pushimet e miratuara"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            Rifresko balancat
+          </button>
+        }
+      />
+
+      <div>
           {otherTypeBalances.length > 0 ? (
             <div className={`overflow-hidden ${LEAVE_CARD}`}>
               <div className="border-b border-[#eef2f7] px-4 py-3.5">
@@ -670,8 +676,7 @@ export function PushimetDashboardClient(props: {
               </div>
             </div>
           ) : null}
-        </div>
-      </section>
+      </div>
 
       <LeaveRejectDialog
         leaveId={rejectId}
