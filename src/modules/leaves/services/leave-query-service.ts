@@ -142,6 +142,51 @@ export async function listOnLeaveToday(companyId: string, now = new Date()) {
  * Approved leave whose payroll hours never landed. Stale payroll is otherwise
  * only discoverable by opening one request's timeline and reading it.
  */
+export interface PayrollSyncSkipRow {
+  id: string;
+  employeeName: string;
+  /** Albanian sentence the timeline event already carries. */
+  reason: string;
+  occurredAtIso: string;
+}
+
+/**
+ * The approved leave whose hours never reached a payroll, named.
+ *
+ * The banner used to print a bare count and tell the operator to go and fix it
+ * somewhere else, without saying who or why — the information was already on
+ * the timeline event the whole time.
+ */
+export async function listPayrollSyncSkips(
+  companyId: string,
+  sinceDays = 60,
+  take = 25,
+): Promise<PayrollSyncSkipRow[]> {
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+  const rows = await prisma.employeeTimelineEvent.findMany({
+    where: {
+      companyId,
+      eventType: "LEAVE_PAYROLL_SYNC_SKIPPED",
+      occurredAt: { gte: since },
+    },
+    orderBy: { occurredAt: "desc" },
+    take,
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      occurredAt: true,
+      employee: { select: { firstName: true, lastName: true } },
+    },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    employeeName: `${r.employee.firstName} ${r.employee.lastName}`.trim(),
+    reason: (r.body ?? r.title ?? "").trim(),
+    occurredAtIso: r.occurredAt.toISOString(),
+  }));
+}
+
 export async function countPayrollSyncSkips(companyId: string, sinceDays = 60): Promise<number> {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   return prisma.employeeTimelineEvent.count({

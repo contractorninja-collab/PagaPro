@@ -25,6 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
+import type { PayrollSyncSkipRow } from "@/modules/leaves/services/leave-query-service";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { LeaveRequestsMobileList } from "@/modules/leaves/components/leave-requests-mobile-list";
 import { LeaveRequestsTable } from "@/modules/leaves/components/leave-requests-table";
 import { LeaveRejectDialog } from "@/modules/leaves/components/leave-reject-dialog";
@@ -125,6 +127,8 @@ export function PushimetDashboardClient(props: {
   pendingRows: PushimetLeaveRowDto[];
   /** Balance, coverage, payroll state and waiting age, keyed by leave id. */
   queueDecisions: Record<string, LeaveQueueDecision>;
+  /** Rows behind the payroll-sync-skip count, shown in a Sheet. */
+  payrollSyncSkips: PayrollSyncSkipRow[];
   /** Computed from today on the server, not from the month being viewed. */
   onLeaveToday: PushimetLeaveRowDto[];
   chips: PushimetCalendarChipDto[];
@@ -146,6 +150,7 @@ export function PushimetDashboardClient(props: {
   const [pendingUi, startTransition] = useTransition();
 
   const [rejectId, setRejectId] = useState<string | null>(null);
+  const [skipsOpen, setSkipsOpen] = useState(false);
 
   const [genId, setGenId] = useState<string | null>(null);
   const [genTemplateId, setGenTemplateId] = useState(props.templates[0]?.id ?? "");
@@ -374,33 +379,79 @@ export function PushimetDashboardClient(props: {
 
       {props.filtersSlot}
 
-      {/* Health signals that were previously buried one request deep. */}
+      {/* Health signals, each with a control. Both of these used to be text
+          that named a destination and offered no way to reach it. */}
       {props.health.payrollSyncSkips > 0 ? (
-        <div className="flex flex-wrap items-start gap-2.5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" aria-hidden />
-          <div className="min-w-0 text-[13px] leading-relaxed text-[#92400e]">
-            <p className="font-semibold text-[#78350f]">
+        <div
+          className={`flex items-center gap-3.5 border-l-[3px] border-l-[#f59e0b] px-4 py-3 ${LEAVE_CARD}`}
+        >
+          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[#fef3c7]">
+            <AlertTriangle className="h-4 w-4 text-[#b45309]" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-bold text-[#0f172a]">
               {props.health.payrollSyncSkips} ndryshime pushimi nuk arritën te payroll-i
             </p>
-            <p>
-              Orët e pushimit në ato payroll-e mund të jenë të vjetruara. Kthejini në DRAFT dhe
-              rifreskoni, ose ndryshojini manualisht në spreadsheet.
+            <p className="text-[12.5px] text-[#64748b]">
+              Orët e pushimit në ato payroll-e janë të vjetruara.
             </p>
           </div>
+          <button
+            type="button"
+            className={BTN_SECONDARY_DENSE}
+            onClick={() => setSkipsOpen(true)}
+          >
+            Shiko listën
+          </button>
         </div>
       ) : null}
 
       {accrualStale ? (
-        <div className="flex flex-wrap items-start gap-2.5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#64748b]" aria-hidden />
-          <p className="min-w-0 text-[13px] leading-relaxed text-[#475569]">
-            {props.health.lastAccrual
-              ? `Akumulimi mujor i pushimeve është postuar së fundi për ${String(props.health.lastAccrual.month).padStart(2, "0")}/${props.health.lastAccrual.year}.`
-              : "Akumulimi mujor i pushimeve nuk është postuar asnjëherë."}{" "}
-            Postimi bëhet manualisht te Konfigurimet.
-          </p>
+        <div
+          className={`flex items-center gap-3.5 border-l-[3px] border-l-[#94a3b8] px-4 py-3 ${LEAVE_CARD}`}
+        >
+          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[#f1f5f9]">
+            <Info className="h-4 w-4 text-[#64748b]" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-bold text-[#0f172a]">
+              {props.health.lastAccrual
+                ? `Akumulimi mujor u postua së fundi për ${String(props.health.lastAccrual.month).padStart(2, "0")}/${props.health.lastAccrual.year}`
+                : "Akumulimi mujor nuk është postuar asnjëherë"}
+            </p>
+            <p className="text-[12.5px] text-[#64748b]">Postimi bëhet manualisht te Konfigurimet.</p>
+          </div>
+          <Link href="/konfigurime" className={BTN_SECONDARY_DENSE}>
+            Hap Konfigurimet →
+          </Link>
         </div>
       ) : null}
+
+      {/* Who, why and when — the rows behind that count. */}
+      <Sheet open={skipsOpen} onOpenChange={setSkipsOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Ndryshime që nuk arritën te payroll-i</SheetTitle>
+          </SheetHeader>
+          {props.payrollSyncSkips.length === 0 ? (
+            <p className="px-1 py-6 text-[13px] text-[#64748b]">
+              Asgjë për të shfaqur në 60 ditët e fundit.
+            </p>
+          ) : (
+            <ul className="mt-2 divide-y divide-[#f1f5f9] overflow-y-auto">
+              {props.payrollSyncSkips.map((s) => (
+                <li key={s.id} className="py-3">
+                  <p className="text-[13px] font-semibold text-[#0f172a]">{s.employeeName}</p>
+                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#64748b]">{s.reason}</p>
+                  <p className="mt-1 text-[11.5px] tabular-nums text-[#94a3b8]">
+                    {formatSqDate(s.occurredAtIso)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* Left column — one list (pending pinned), then the calendar */}

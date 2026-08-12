@@ -32,7 +32,7 @@ import {
   revokeLeaveRequestAction,
 } from "@/modules/leaves/actions/leave-actions";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
-import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
+import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ , leaveEventLabelSq } from "@/modules/leaves/helpers/leave-type-metadata";
 import { payrollImpactLabel } from "@/modules/leaves/helpers/payroll-impact-label";
 import { LEAVE_STATUS_LABELS_SQ } from "@/modules/leaves/helpers/leave-status-labels";
 import type {
@@ -521,20 +521,27 @@ export function PushimetDetailClient(props: {
               {props.timeline.map((ev) => (
                 <li key={ev.id} className="border-l-2 border-[#bfdbfe] pl-4">
                   <p className="text-[11.5px] tabular-nums text-[#94a3b8]">
-                    {ev.occurredAtIso.slice(0, 19).replace("T", " ")}
+                    {formatSqDate(ev.occurredAtIso)}
                   </p>
                   <p className="text-[13.5px] font-semibold text-[#0f172a]">{ev.title}</p>
-                  <p className={MICRO_LABEL}>{ev.eventType}</p>
+                  <p className={MICRO_LABEL}>{leaveEventLabelSq(ev.eventType)}</p>
                   {ev.actorLabel ? (
                     <p className="text-[12px] text-[#64748b]">Aktori: {ev.actorLabel}</p>
                   ) : null}
                   {ev.body ? (
                     <p className="mt-1 whitespace-pre-wrap text-[13px] text-[#64748b]">{ev.body}</p>
                   ) : null}
+                  {/* The raw JSON is audit material, not reading material — it
+                      stays available but folded away instead of dumped inline. */}
                   {ev.metadataJson ? (
-                    <pre className="mt-2 max-h-40 overflow-auto rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] p-2 text-[11px] leading-snug text-[#64748b]">
-                      {ev.metadataJson}
-                    </pre>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-[11.5px] font-semibold text-[#64748b] hover:text-brand-blue">
+                        Të dhëna teknike
+                      </summary>
+                      <pre className="mt-1.5 max-h-40 overflow-auto rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] p-2 text-[11px] leading-snug text-[#64748b]">
+                        {ev.metadataJson}
+                      </pre>
+                    </details>
                   ) : null}
                 </li>
               ))}

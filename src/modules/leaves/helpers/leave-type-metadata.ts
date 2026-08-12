@@ -79,3 +79,32 @@ export function defaultPaidAndPayrollFlags(
 export function leaveTypesWithBalance(): LeaveType[] {
   return ["PUSHIM_VJETOR", "PUSHIM_PERSONAL", "PUSHIM_MJEKESOR"];
 }
+
+/**
+ * Albanian names for the timeline's event types.
+ *
+ * The detail page printed the raw enum — "LEAVE_PAYROLL_SYNC_SKIPPED" — under
+ * every entry. Anything unmapped falls back to a readable form of the enum
+ * rather than disappearing, so a newly added event type degrades instead of
+ * showing a blank line.
+ */
+const LEAVE_EVENT_LABELS_SQ: Record<string, string> = {
+  LEAVE_REQUESTED: "Kërkesë e re",
+  LEAVE_SUBMITTED: "Dërguar për miratim",
+  LEAVE_APPROVED: "Miratuar",
+  LEAVE_REJECTED: "Refuzuar",
+  LEAVE_CANCELLED: "Anuluar",
+  LEAVE_REVOKED: "Revokuar",
+  LEAVE_DOCUMENT_GENERATED: "Dokument i gjeneruar",
+  LEAVE_PAYROLL_SYNC_SKIPPED: "Nuk arriti te payroll-i",
+  LEAVE_PAYROLL_SYNCED: "Sinkronizuar me payroll-in",
+  LEAVE_BALANCE_OVERRIDE: "Tejkalim bilanci i aprovuar",
+  LEAVE_INTERRUPTED_BY_SICK: "Ndërprerë nga pushimi mjekësor",
+};
+
+export function leaveEventLabelSq(eventType: string): string {
+  return (
+    LEAVE_EVENT_LABELS_SQ[eventType] ??
+    eventType.replace(/^LEAVE_/, "").replace(/_/g, " ").toLowerCase()
+  );
+}

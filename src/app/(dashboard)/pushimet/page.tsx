@@ -4,6 +4,7 @@ import type { LeaveRequestStatus, LeaveSubtype, LeaveType } from "@prisma/client
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 import {
   countPayrollSyncSkips,
+  listPayrollSyncSkips,
   hasLeaveBalancesForYear,
   latestAccrualPeriod,
   leaveDashboardStats,
@@ -250,6 +251,7 @@ export default async function PushimetPage({
   let balancesRaw;
   let holidaySet: Set<string>;
   let syncSkips = 0;
+  let syncSkipRows: Awaited<ReturnType<typeof listPayrollSyncSkips>> = [];
   let lastAccrual: { year: number; month: number } | null = null;
 
   try {
@@ -277,6 +279,7 @@ export default async function PushimetPage({
       balancesRaw,
       holidaySet,
       syncSkips,
+      syncSkipRows,
       lastAccrual,
     ] = await Promise.all([
       listLeaveRequestsPage(companyId, filters, pageNumber),
@@ -293,6 +296,7 @@ export default async function PushimetPage({
       listLeaveBalancesOverview(companyId, year, employeeId),
       getMergedHolidayIsoSetForUtcRange(companyId, monthStart, monthEnd),
       countPayrollSyncSkips(companyId),
+      listPayrollSyncSkips(companyId),
       latestAccrualPeriod(companyId),
     ]);
   } catch (err) {
@@ -378,6 +382,7 @@ export default async function PushimetPage({
           rows={rows}
           pendingRows={pendingRows}
           queueDecisions={queueDecisions}
+          payrollSyncSkips={syncSkipRows}
           onLeaveToday={onLeaveToday}
           chips={chips}
           holidayIsoDates={[...holidaySet]}
