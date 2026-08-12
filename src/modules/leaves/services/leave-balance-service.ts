@@ -462,9 +462,25 @@ export async function syncLeaveBalancesForEmployeeYear(
   }
 }
 
+/**
+ * Rebuilds balances for everyone who was employed at any point during `year`.
+ *
+ * The test is the termination DATE, not the current status: someone who left in
+ * June still earned a balance for that year, and the engine already clips their
+ * accrual at the leaving date. Testing `status` instead would wrongly drop last
+ * year's rows for anyone who left this year — and this is called for `year - 1`
+ * too, from the Konfigurimet leave-config save.
+ *
+ * Someone who left before the year started gets no row at all, which is what
+ * stops departed staff accumulating rows forever.
+ */
 export async function syncLeaveBalancesForCompanyYear(companyId: string, year: number): Promise<number> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
   const employees = await prisma.employee.findMany({
-    where: { companyId },
+    where: {
+      companyId,
+      OR: [{ terminationDate: null }, { terminationDate: { gte: yearStart } }],
+    },
     select: { id: true },
   });
   for (const employee of employees) {

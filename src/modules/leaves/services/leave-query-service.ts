@@ -258,9 +258,31 @@ export async function listLeaveTemplatesPicklist(companyId: string) {
   });
 }
 
-export async function listLeaveBalancesOverview(companyId: string, year: number) {
+/**
+ * Balance rows for the "Pushimi vjetor — bilanci" panel.
+ *
+ * Leavers are excluded the same way `listActiveEmployeesPicklist` above excludes
+ * them. Without this the panel listed people who had left while the filter
+ * dropdown on the same screen did not offer them — so HR saw a balance for
+ * someone they could not select. Their rows still exist and stay correct
+ * (accrual is clipped at the termination date); they simply belong to Largimet,
+ * not to a live balance sheet.
+ *
+ * `employeeId` narrows the panel to one person, which is what the filter bar's
+ * employee dropdown is for.
+ */
+export async function listLeaveBalancesOverview(
+  companyId: string,
+  year: number,
+  employeeId?: string | null,
+) {
   return prisma.leaveBalance.findMany({
-    where: { companyId, year },
+    where: {
+      companyId,
+      year,
+      ...(employeeId ? { employeeId } : {}),
+      employee: { status: { not: "TERMINATED" } },
+    },
     include: {
       employee: {
         select: {

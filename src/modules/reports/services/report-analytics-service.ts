@@ -396,7 +396,15 @@ export async function leavePressure(companyId: string, year: number): Promise<Le
 
   const [balances, approved] = await Promise.all([
     prisma.leaveBalance.findMany({
-      where: { companyId, year, leaveType: "PUSHIM_VJETOR" },
+      // Departed staff are excluded here for the same reason as the Pushimet
+      // balance panel — otherwise the two screens report different totals for
+      // the same year.
+      where: {
+        companyId,
+        year,
+        leaveType: "PUSHIM_VJETOR",
+        employee: { status: { not: "TERMINATED" } },
+      },
       select: {
         employeeId: true,
         yearlyQuota: true,

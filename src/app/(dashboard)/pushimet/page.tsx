@@ -284,7 +284,10 @@ export default async function PushimetPage({
       listActiveEmployeesPicklist(companyId),
       listDepartmentsPicklist(companyId),
       listLeaveTemplatesPicklist(companyId),
-      listLeaveBalancesOverview(companyId, year),
+      // The employee filter narrows the balance panel too — picking someone and
+      // pressing Filtro previously changed the request list but left the balance
+      // sheet showing the whole company.
+      listLeaveBalancesOverview(companyId, year, employeeId),
       getMergedHolidayIsoSetForUtcRange(companyId, monthStart, monthEnd),
       countPayrollSyncSkips(companyId),
       latestAccrualPeriod(companyId),
