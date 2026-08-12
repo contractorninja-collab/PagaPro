@@ -50,3 +50,11 @@ export const leaveInterruptLinkSchema = z.object({
   annualLeaveId: z.string().min(1),
   sickLeaveId: z.string().min(1),
 });
+
+/** Read-only preview of a range before the request exists — no side effects. */
+export const leaveRangePreviewSchema = z.object({
+  employeeId: z.string().min(1),
+  type: leaveTypeSchema,
+  startDateIso: z.string().min(1),
+  endDateIso: z.string().min(1),
+});

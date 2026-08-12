@@ -14,9 +14,12 @@ import {
 } from "@/modules/leaves/services/leave-workflow-service";
 import { generateLeavePdfArtifact } from "@/modules/leaves/services/leave-document-service";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
+import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
+import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 import {
   leaveGenerateDocSchema,
   leaveInterruptLinkSchema,
+  leaveRangePreviewSchema,
   leaveRejectSchema,
   leaveRequestCreateSchema,
   leaveRequestIdSchema,
@@ -258,5 +261,117 @@ export async function refreshLeaveBalancesAction(
     return { ok: true, data: { synced } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Rifreskimi dështoi." };
+  }
+}
+
+export interface LeaveRangePreview {
+  workingDays: number;
+  calendarDays: number;
+  totalHours: string;
+  /** Public holidays that fall on a weekday inside the range, by name. */
+  holidayNames: string[];
+  /** Null when the type carries no balance, or no balance row exists yet. */
+  remainingBefore: string | null;
+  remainingAfter: string | null;
+  /** Colleagues already approved or pending off during the same span. */
+  colleaguesOff: number;
+  /** True when the end date precedes the start — the form allows it. */
+  reversed: boolean;
+}
+
+/**
+ * What the request would mean, before it is submitted.
+ *
+ * Today the operator learns about an insufficient balance only after sending it
+ * and reading a rejection, and learns about colleagues being away not at all.
+ * All of this is DB-bound — holidays, hours-per-day, balances — so it cannot run
+ * inside the client dialog; one action answers the lot in a single round trip.
+ */
+export async function previewLeaveRangeAction(
+  raw: unknown,
+): Promise<LeaveModuleActionResult<LeaveRangePreview>> {
+  try {
+    const ctx = await getCompanyContext();
+    if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+    const { companyId } = ctx.context;
+
+    const parsed = leaveRangePreviewSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Vlera jo valide." };
+
+    const start = new Date(parsed.data.startDateIso);
+    const end = new Date(parsed.data.endDateIso);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return { ok: false, error: "Datat nuk janë valide." };
+    }
+    if (end < start) {
+      return {
+        ok: true,
+        data: {
+          workingDays: 0,
+          calendarDays: 0,
+          totalHours: "0",
+          holidayNames: [],
+          remainingBefore: null,
+          remainingAfter: null,
+          colleaguesOff: 0,
+          reversed: true,
+        },
+      };
+    }
+
+    // Same rule version the draft will be written with, so the strip cannot
+    // promise a different number of days than the saved record.
+    const metrics = await computeLeaveMetrics(companyId, start, end, LEAVE_ENGINE_RULE_VERSION);
+
+    const [holidays, balance, colleaguesOff] = await Promise.all([
+      metrics.weekdayHolidayDatesInRange.length > 0
+        ? prisma.companyHoliday.findMany({
+            where: {
+              companyId,
+              isActive: true,
+              observedOn: { in: metrics.weekdayHolidayDatesInRange },
+            },
+            select: { name: true },
+          })
+        : Promise.resolve([] as Array<{ name: string }>),
+      prisma.leaveBalance.findFirst({
+        where: {
+          companyId,
+          employeeId: parsed.data.employeeId,
+          leaveType: parsed.data.type,
+          year: start.getUTCFullYear(),
+        },
+        select: { remainingDays: true },
+      }),
+      prisma.leaveRequest.count({
+        where: {
+          companyId,
+          employeeId: { not: parsed.data.employeeId },
+          status: { in: ["APPROVED", "PENDING"] },
+          startDate: { lte: end },
+          endDate: { gte: start },
+        },
+      }),
+    ]);
+
+    const before = balance ? Number(balance.remainingDays) : null;
+    const after = before == null ? null : before - metrics.workingDays;
+
+    return {
+      ok: true,
+      data: {
+        workingDays: metrics.workingDays,
+        calendarDays: metrics.calendarDays,
+        totalHours: metrics.totalHours,
+        holidayNames: holidays.map((h) => h.name),
+        remainingBefore: before == null ? null : before.toFixed(2),
+        remainingAfter: after == null ? null : after.toFixed(2),
+        colleaguesOff,
+        reversed: false,
+      },
+    };
+  } catch (err) {
+    console.error("[previewLeaveRangeAction] failed:", err);
+    return { ok: false, error: "Llogaritja e periudhës dështoi." };
   }
 }

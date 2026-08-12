@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import type { LeaveSubtype, LeaveType } from "@prisma/client";
@@ -14,7 +14,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BTN_PRIMARY } from "@/modules/leaves/components/leave-ui";
-import { createLeaveRequestAction } from "@/modules/leaves/actions/leave-actions";
+import {
+  createLeaveRequestAction,
+  previewLeaveRangeAction,
+  type LeaveRangePreview,
+} from "@/modules/leaves/actions/leave-actions";
 import {
   LEAVE_TYPE_HELP_SQ,
   LEAVE_TYPE_LABELS_SQ,
@@ -50,6 +54,15 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
   // The balance gate is the one block management may overrule in writing: when
   // the server says INSUFFICIENT_BALANCE, the dialog opens the override panel
   // instead of dead-ending — days go into debt and refill as months accrue.
+  /**
+   * What the request would mean, shown before it is sent.
+   *
+   * Holidays, hours-per-day and balances all live in the database, so this is a
+   * debounced server call rather than client arithmetic — the same shape the
+   * employee form uses for its net-hourly hint.
+   */
+  const [preview, setPreview] = useState<LeaveRangePreview | null>(null);
+
   const [overridePanel, setOverridePanel] = useState<{ message: string } | null>(null);
   const [overrideApprovedBy, setOverrideApprovedBy] = useState("");
 
@@ -57,6 +70,22 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
     setOverridePanel(null);
     setOverrideApprovedBy("");
   }
+
+  useEffect(() => {
+    if (!form.employeeId || !form.startDateIso || !form.endDateIso) {
+      setPreview(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void previewLeaveRangeAction({
+        employeeId: form.employeeId,
+        type: form.type,
+        startDateIso: form.startDateIso,
+        endDateIso: form.endDateIso,
+      }).then((res) => setPreview(res.ok && res.data ? res.data : null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [form.employeeId, form.type, form.startDateIso, form.endDateIso]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -220,6 +249,49 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                 />
               </div>
             </div>
+
+            {/* What this request would mean, before it is sent. Renders a
+                sentence in every state rather than collapsing, so the dialog
+                does not jump as dates are picked. */}
+            <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5">
+              {preview == null ? (
+                <p className="text-xs text-muted-foreground">
+                  Zgjidhni punonjësin dhe datat për të parë ditët, festat dhe bilancin.
+                </p>
+              ) : preview.reversed ? (
+                <p className="text-xs font-medium text-destructive">
+                  Data e mbarimit është para datës së fillimit.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-xs tabular-nums text-[#334155]">
+                    <span className="font-semibold">{preview.workingDays} ditë pune</span>
+                    {` (${preview.calendarDays} kalendarike · ${preview.totalHours} orë)`}
+                    {preview.holidayNames.length > 0
+                      ? ` · përfshin ${preview.holidayNames.length} festë: ${preview.holidayNames.join(", ")}`
+                      : ""}
+                  </p>
+                  {preview.remainingAfter != null ? (
+                    <p
+                      className={`text-xs tabular-nums ${
+                        Number(preview.remainingAfter) < 0
+                          ? "font-semibold text-destructive"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      Bilanci: {preview.remainingBefore} → {preview.remainingAfter} ditë pas miratimit
+                      {Number(preview.remainingAfter) < 0 ? " — kalon në minus" : ""}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    {preview.colleaguesOff === 0
+                      ? "Askush tjetër nuk është jashtë në këto ditë."
+                      : `${preview.colleaguesOff} koleg${preview.colleaguesOff === 1 ? "" : "ë"} jashtë në këto ditë.`}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <label htmlFor="nl-reason" className="text-xs font-medium text-muted-foreground">
                 Arsyeja / shënim
