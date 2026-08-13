@@ -101,6 +101,8 @@ function CellInput(props: {
   value: string;
   /** When set, the cell turns amber if its value drifts from this expectation. */
   baseline?: string | null;
+  /** Overrides the drift tooltip — e.g. why a disabled cell is disabled. */
+  title?: string;
   onSaved?: () => void;
 }) {
   const router = useRouter();
@@ -123,9 +125,10 @@ function CellInput(props: {
       disabled={props.disabled}
       value={val}
       title={
-        deviates && props.baseline != null
+        props.title ??
+        (deviates && props.baseline != null
           ? `Ndryshuar nga pritshmëria (${props.baseline})`
-          : undefined
+          : undefined)
       }
       onChange={(ev) => setVal(ev.target.value)}
       className={cn(CELL_BASE, cellTone(state, deviates))}
@@ -255,6 +258,23 @@ const INPUT_COLUMNS: Array<{
 ];
 
 type CellInputField = Parameters<typeof CellInput>[0]["field"];
+
+/** The hour columns Prezenca owns when the employee punched this month. */
+const CLOCK_OWNED_FIELDS = new Set<CellInputField>([
+  "actualRegularHours",
+  "overtimeHours",
+  "weekendHours",
+  "holidayHours",
+  "nightHours",
+]);
+
+const CLOCK_OWNED_HINT =
+  "Orët vijnë nga ora e punës — korrigjohen te Prezenca, jo këtu.";
+
+/** True when this cell is read-only because the badge clock feeds it. */
+function clockOwnsCell(entry: Entry, field: CellInputField | undefined): boolean {
+  return Boolean(field && entry.timeClockOwned && CLOCK_OWNED_FIELDS.has(field));
+}
 
 export function PayrollSpreadsheet(props: {
   payrollId: string;
@@ -420,7 +440,8 @@ export function PayrollSpreadsheet(props: {
                           />
                         ) : (
                           <CellInput
-                            disabled={!editable}
+                            disabled={!editable || clockOwnsCell(e, c.field)}
+                            title={clockOwnsCell(e, c.field) ? CLOCK_OWNED_HINT : undefined}
                             payrollId={props.payrollId}
                             entryId={e.id}
                             field={c.field!}
@@ -553,7 +574,8 @@ export function PayrollSpreadsheet(props: {
                       <CellInput
                         payrollId={props.payrollId}
                         entryId={e.id}
-                        disabled={false}
+                        disabled={clockOwnsCell(e, c.field)}
+                        title={clockOwnsCell(e, c.field) ? CLOCK_OWNED_HINT : undefined}
                         field={c.field!}
                         value={String(e[c.field as keyof Entry] ?? "")}
                         baseline={c.field === "actualRegularHours" ? e.expectedRegularHours : undefined}

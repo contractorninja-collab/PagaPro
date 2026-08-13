@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { approximateLeaveHoursForPayrollMonth } from "@/modules/payroll/services/payroll-leave-integration-service";
 import { updatePayrollEntryAmounts } from "@/modules/payroll/services/payroll-period-service";
+import { timeClockOwnsMonth } from "@/modules/payroll/services/payroll-timeclock-sync-service";
 import { resolvePayrollMonthWorkingTime } from "@/modules/payroll/services/payroll-working-time-service";
 
 /** Muajt (viti, muaji) të mbuluar nga një interval datash UTC — përfshirës në të dy skajet. */
@@ -151,11 +152,24 @@ export async function syncDraftPayrollsForLeaveChange(params: {
           : Number(entry.actualRegularHours) + Number(entry.paidLeaveHours) + Number(entry.sickLeaveHours);
       const actualRegular = Math.max(0, expected - leaveHrs.paidLeaveHours - leaveHrs.sickLeaveHours);
 
+      /**
+       * When the badge clock owns this employee's month, worked hours are a
+       * measurement, not a derivation — deriving them here from expected − leave
+       * would overwrite what was actually scanned. The leave sync then patches
+       * only the leave columns and leaves `actualRegularHours` to Prezenca.
+       */
+      const clockOwned = await timeClockOwnsMonth(
+        params.companyId,
+        params.employeeId,
+        p.year,
+        p.month,
+      );
+
       const recalc = await updatePayrollEntryAmounts(
         params.companyId,
         entry.id,
         {
-          actualRegularHours: actualRegular.toFixed(2),
+          ...(clockOwned ? {} : { actualRegularHours: actualRegular.toFixed(2) }),
           paidLeaveHours: leaveHrs.paidLeaveHours.toFixed(2),
           sickLeaveHours: leaveHrs.sickLeaveHours.toFixed(2),
           unpaidLeaveHours: leaveHrs.unpaidLeaveHours.toFixed(2),

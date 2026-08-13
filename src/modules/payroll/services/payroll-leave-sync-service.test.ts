@@ -23,6 +23,12 @@ vi.mock("@/modules/payroll/services/payroll-period-service", () => ({
   updatePayrollEntryAmounts: updateEntry,
 }));
 
+// These tests describe the pre-clock world: the module is off, so the sync
+// keeps deriving actualRegularHours. Clock ownership has its own E2E coverage.
+vi.mock("@/modules/payroll/services/payroll-timeclock-sync-service", () => ({
+  timeClockOwnsMonth: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("@/modules/payroll/services/payroll-working-time-service", () => ({
   resolvePayrollMonthWorkingTime: resolveWorkingTime,
 }));

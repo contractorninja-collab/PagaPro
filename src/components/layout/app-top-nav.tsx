@@ -47,6 +47,7 @@ export function AppTopNav({
   userLabel,
   userEmail,
   alertCount = 0,
+  timeClockEnabled = false,
 }: {
   activeCompanyLabel: string | null;
   activeCompanyId?: string | null;
@@ -55,8 +56,11 @@ export function AppTopNav({
   userLabel?: string | null;
   userEmail?: string | null;
   alertCount?: number;
+  /** Companies without the badge clock see no Prezenca tab — nothing changes for them. */
+  timeClockEnabled?: boolean;
 }) {
   const pathname = usePathname();
+  const navTabs = NAV_TABS.filter((m) => !m.requiresTimeClock || timeClockEnabled);
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [switching, setSwitching] = useState(false);
@@ -103,7 +107,7 @@ export function AppTopNav({
       </Link>
 
       <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex" aria-label="Navigimi kryesor">
-        {NAV_TABS.map((tab) => {
+        {navTabs.map((tab) => {
           const active = isActive(pathname, tab.href);
           return (
             <Link

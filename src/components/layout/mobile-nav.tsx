@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_MODULES } from "@/components/layout/nav-config";
 
-export function MobileNav() {
+export function MobileNav({ timeClockEnabled = false }: { timeClockEnabled?: boolean }) {
   const pathname = usePathname();
+  const modules = SIDEBAR_MODULES.filter((m) => !m.requiresTimeClock || timeClockEnabled);
 
   return (
     <nav
@@ -15,7 +16,7 @@ export function MobileNav() {
       aria-label="Navigimi kryesor mobil"
     >
       <div className="flex gap-1 overflow-x-auto px-2 pt-2 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {SIDEBAR_MODULES.map((item) => {
+        {modules.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;
           return (

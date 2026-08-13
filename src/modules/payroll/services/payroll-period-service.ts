@@ -24,7 +24,7 @@ import { countWeekdaysInclusiveUtc } from "@/modules/payroll/helpers/weekday-cou
 
 const EDITABLE: PayrollPeriodStatus[] = ["DRAFT"];
 
-function payrollNotEditableMessage(status: PayrollPeriodStatus): string | null {
+export function payrollNotEditableMessage(status: PayrollPeriodStatus): string | null {
   if (!EDITABLE.includes(status)) {
     return "Ky payroll nuk mund të modifikohet në këtë status (vetëm DRAFT).";
   }
@@ -226,8 +226,33 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { legalName: true, tradeName: true },
+    select: { legalName: true, tradeName: true, timeClockEnabled: true },
   });
+
+  /**
+   * Rows whose hour columns the badge clock owns: the module is on and the
+   * employee actually punched in this month. The spreadsheet greys those cells
+   * and the action layer refuses hand edits to them — Prezenca is where such
+   * hours are corrected.
+   */
+  const clockOwnedEmployeeIds = new Set<string>();
+  if (company?.timeClockEnabled) {
+    const monthStart = new Date(Date.UTC(payroll.year, payroll.month - 1, 1));
+    const monthEnd = new Date(Date.UTC(payroll.year, payroll.month, 0, 23, 59, 59, 999));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const punched = await prisma.timeClockPunch.groupBy({
+      by: ["employeeId"],
+      where: {
+        companyId,
+        voidedAt: null,
+        occurredAt: {
+          gte: new Date(monthStart.getTime() - dayMs),
+          lte: new Date(monthEnd.getTime() + dayMs),
+        },
+      },
+    });
+    for (const p of punched) clockOwnedEmployeeIds.add(p.employeeId);
+  }
 
   const activities = await prisma.domainActivity.findMany({
     where: { companyId, entityType: "Payroll", entityId: payrollId },
@@ -375,6 +400,7 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
       manualNetReason: e.manualNetReason,
       notes: e.notes,
       paidDays: decimalToPlain(e.paidDays),
+      timeClockOwned: clockOwnedEmployeeIds.has(e.employee.id),
       breakdown: jsonSerializableClone(e.calculationBreakdown),
       adjustments: e.adjustments.map((a) => ({
         id: a.id,
@@ -1242,6 +1268,12 @@ export type PayrollEntrySpreadsheetPatch = {
   weekendHours?: string;
   holidayHours?: string;
   nightHours?: string;
+  /**
+   * Uplift-only stacked hours (multiplier − 1). Written by the time-clock sync;
+   * the spreadsheet has no cell for them, so hand edits leave them untouched.
+   */
+  overtimeStackHours?: string;
+  nightStackHours?: string;
   manualGrossOverride?: string | null;
   manualNetOverride?: string | null;
   manualGrossReason?: string | null;
@@ -1340,6 +1372,8 @@ export async function updatePayrollEntryAmounts(
     weekendHours: pick(patch.weekendHours, entry.weekendHours),
     holidayHours: pick(patch.holidayHours, entry.holidayHours),
     nightHours: pick(patch.nightHours, entry.nightHours),
+    overtimeStackHours: pick(patch.overtimeStackHours, entry.overtimeStackHours),
+    nightStackHours: pick(patch.nightStackHours, entry.nightStackHours),
     bonuses: pick(patch.bonuses, entry.bonuses),
     otherDeductions: pick(patch.otherDeductions, entry.otherDeductions),
     salaryAdvanceDeduction: pick(patch.salaryAdvanceDeduction, entry.salaryAdvanceDeduction),
@@ -1394,6 +1428,8 @@ export async function updatePayrollEntryAmounts(
       weekendHours: new Prisma.Decimal(lineInput.weekendHours),
       holidayHours: new Prisma.Decimal(lineInput.holidayHours),
       nightHours: new Prisma.Decimal(lineInput.nightHours),
+      overtimeStackHours: new Prisma.Decimal(lineInput.overtimeStackHours ?? "0"),
+      nightStackHours: new Prisma.Decimal(lineInput.nightStackHours ?? "0"),
       hourlyRate: new Prisma.Decimal(v.hourlyRate),
       regularPay: new Prisma.Decimal(v.regularPay),
       paidLeavePay: new Prisma.Decimal(v.paidLeavePay),

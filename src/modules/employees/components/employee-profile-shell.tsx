@@ -21,6 +21,7 @@ import {
 } from "@/modules/employees/components/salary-visibility";
 import { AnnexPanel } from "@/modules/annex/components/annex-panel";
 import { WarningsPanel } from "@/modules/warnings/components/warnings-panel";
+import { EmployeePresencePanel } from "@/modules/timeclock/components/employee-presence-panel";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
@@ -760,6 +761,11 @@ export function EmployeeProfileShell(props: {
             <TabsTrigger className={TAB_TRIGGER} value="leave">
               Pushimet
             </TabsTrigger>
+            {timeClockEnabled ? (
+              <TabsTrigger className={TAB_TRIGGER} value="prezenca">
+                Prezenca
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger className={TAB_TRIGGER} value="warnings">
               Vërejtjet
             </TabsTrigger>
@@ -784,6 +790,11 @@ export function EmployeeProfileShell(props: {
           <TabsContent value="leave" className="mt-5">
             <EmptyTab title="Pushimet" body="Kërkesat dhe bilanci i lejeve." />
           </TabsContent>
+          {timeClockEnabled ? (
+            <TabsContent value="prezenca" className="mt-5">
+              <EmployeePresencePanel employeeId={employee.id} />
+            </TabsContent>
+          ) : null}
           <TabsContent value="warnings" className="mt-5">
             <WarningsPanel employeeId={employee.id} canEdit={canEdit} />
           </TabsContent>

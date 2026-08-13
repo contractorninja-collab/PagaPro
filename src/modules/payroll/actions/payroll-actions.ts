@@ -32,6 +32,7 @@ import {
   formatPayrollFieldErrors,
 } from "@/modules/payroll/validators/payroll-schemas";
 import { resolvePayrollMonthWorkingTime } from "@/modules/payroll/services/payroll-working-time-service";
+import { timeClockOwnsMonth } from "@/modules/payroll/services/payroll-timeclock-sync-service";
 import { listEmployeesEligibleForPayrollSelection } from "@/modules/payroll/services/payroll-selection-service";
 
 export type PayrollActionResult<T = undefined> =
@@ -282,6 +283,42 @@ export async function generatePayrollPdfsAction(payrollId: string): Promise<Payr
   return { ok: true };
 }
 
+/** The hour columns Prezenca writes; the spreadsheet must not fight it. */
+const CLOCK_OWNED_FIELDS = [
+  "actualRegularHours",
+  "overtimeHours",
+  "weekendHours",
+  "holidayHours",
+  "nightHours",
+] as const;
+
+/**
+ * Hiding the cell is not a gate — this is the server-side rule. A hand edit to
+ * a clock-owned hour column is rejected here, in the action, so the time-clock
+ * sync itself (which calls the service directly) can still write them.
+ */
+async function rejectIfClockOwned(
+  companyId: string,
+  entryId: string,
+  patch: Record<string, unknown>,
+): Promise<string | null> {
+  if (!CLOCK_OWNED_FIELDS.some((f) => patch[f] !== undefined)) return null;
+  const entry = await prisma.payrollEntry.findFirst({
+    where: { id: entryId, payroll: { companyId } },
+    select: { employeeId: true, payroll: { select: { year: true, month: true } } },
+  });
+  if (!entry) return null; // the service will report "not found" properly
+  const owned = await timeClockOwnsMonth(
+    companyId,
+    entry.employeeId,
+    entry.payroll.year,
+    entry.payroll.month,
+  );
+  return owned
+    ? "Orët e këtij punonjësi vijnë nga ora e punës — rregullohen te Prezenca, jo në tabelë."
+    : null;
+}
+
 export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollActionResult> {
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
@@ -296,6 +333,8 @@ export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollAct
   }
   const { payrollId, entryId, ...patch } = parsed.data;
   void payrollId;
+  const ownedError = await rejectIfClockOwned(companyId, entryId, patch);
+  if (ownedError) return { ok: false, error: ownedError };
   const res = await updatePayrollEntryAmounts(companyId, entryId, patch, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${parsed.data.payrollId}`);
@@ -318,6 +357,10 @@ export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<Payro
     const { entryId, ...rest } = r;
     return { entryId, patch: rest };
   });
+  for (const row of rows) {
+    const ownedError = await rejectIfClockOwned(companyId, row.entryId, row.patch);
+    if (ownedError) return { ok: false, error: ownedError };
+  }
   const res = await patchPayrollEntriesBulk(companyId, parsed.data.payrollId, rows, user.id);
   if (!res.ok) return { ok: false, error: res.error };
   safeRevalidatePath(`/pagat/${parsed.data.payrollId}`);

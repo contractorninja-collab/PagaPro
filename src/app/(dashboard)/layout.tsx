@@ -17,11 +17,12 @@ export default async function DashboardLayout({
    * nav renders exactly as before.
    */
   let companies: TopNavCompanyOption[] = [];
+  let timeClockEnabled = false;
   try {
     const [row, memberships] = await Promise.all([
       prisma.company.findUnique({
         where: { id: companyId },
-        select: { legalName: true, tradeName: true },
+        select: { legalName: true, tradeName: true, timeClockEnabled: true },
       }),
       prisma.userCompanyMembership.findMany({
         where: { userId: user.id, isActive: true, company: { status: "ACTIVE" } },
@@ -30,6 +31,7 @@ export default async function DashboardLayout({
     ]);
     if (row) {
       activeCompanyLabel = row.tradeName?.trim() || row.legalName || null;
+      timeClockEnabled = row.timeClockEnabled;
     }
     companies = memberships
       .map((m) => ({
@@ -65,11 +67,12 @@ export default async function DashboardLayout({
         userLabel={user.displayName}
         userEmail={user.email}
         alertCount={alertCount}
+        timeClockEnabled={timeClockEnabled}
       />
       <main className="flex-1 bg-brand-canvas px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-10 md:pt-6 md:pb-9">
         {children}
       </main>
-      <MobileNav />
+      <MobileNav timeClockEnabled={timeClockEnabled} />
     </div>
   );
 }
