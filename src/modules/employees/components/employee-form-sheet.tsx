@@ -37,6 +37,7 @@ import {
   WORK_ARRANGEMENT_LABELS,
   isoDateInput,
 } from "@/modules/employees/components/employees-labels";
+import { KOSOVO_BANKS, isKnownKosovoBank } from "@/modules/employees/constants/kosovo-banks";
 
 const fieldGrid = "grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start";
 
@@ -970,15 +971,34 @@ export function EmployeeFormSheet(props: {
                 />
               </FormField>
               <FormField label="Banka" error={fieldErrors.bankName}>
-                <Input
-                  className={errClass("bankName")}
+                <select
+                  className={cn(
+                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    errClass("bankName"),
+                  )}
                   value={values.bankName}
                   onChange={(e) => {
                     clearKey("bankName");
                     setValues((s) => ({ ...s, bankName: e.target.value }));
                   }}
                   disabled={pending}
-                />
+                >
+                  <option value="">—</option>
+                  {/*
+                    Whatever this employee already had, when it predates the list
+                    — free text produced "RBKO", "PCB" and "Raiffeisen Bank" for
+                    two banks. Kept selectable so opening the form does not
+                    quietly rewrite it; picking a real bank replaces it.
+                  */}
+                  {values.bankName && !isKnownKosovoBank(values.bankName) ? (
+                    <option value={values.bankName}>{values.bankName} (e vjetër)</option>
+                  ) : null}
+                  {KOSOVO_BANKS.map((b) => (
+                    <option key={b.code} value={b.code} title={b.officialName}>
+                      {b.code}
+                    </option>
+                  ))}
+                </select>
               </FormField>
               <FormField label="Numri i llogarisë" error={fieldErrors.bankAccountIban}>
                 <Input
