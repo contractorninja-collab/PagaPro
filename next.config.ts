@@ -42,6 +42,27 @@ const nextConfig: NextConfig = {
     return [{ source: "/konfigurimet", destination: "/konfigurime", permanent: true }];
   },
   /**
+   * Baseline security headers on every response. A payroll app has no business
+   * being framed, sniffed, or leaking referrers. No CSP yet — Next's inline
+   * runtime needs nonces and a broken CSP fails silently in the worst way;
+   * that lands as its own change with real testing.
+   */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          // Two years, subdomains included — browsers refuse plain HTTP after the first visit.
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
+  /**
    * Dev-only: webpack’s persistent cache + interrupted builds often leaves stale chunk IDs
    * (`Cannot find module './611.js'`) and missing CSS chunks (unstyled HTML). Disable
    * filesystem cache in development. After `npm run build`, restart dev with `npm run dev:clean`.

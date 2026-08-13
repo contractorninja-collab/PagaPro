@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Company, CompanySetting, Employee, EmployeeBankAccount, Payroll, PayrollEntry } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptField } from "@/lib/field-crypto";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { payrollDocumentPdfKey } from "@/modules/documents/engine/storage/payroll-path-keys";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
@@ -41,9 +42,11 @@ function resolveEmployeeBank(employee: Employee & { bankAccounts: EmployeeBankAc
   const primary =
     employee.bankAccounts.find((a) => a.isPrimary && (a.validTo == null || a.validTo > new Date())) ??
     employee.bankAccounts[0];
+  const storedIban = primary?.iban ?? employee.bankAccountIban ?? null;
   return {
     bankName: primary?.bankName ?? employee.bankName ?? null,
-    iban: primary?.iban ?? employee.bankAccountIban ?? null,
+    // Stored encrypted; the payslip prints the real account number.
+    iban: storedIban ? decryptField(storedIban) : null,
     accountHolder: primary?.accountHolderName ?? `${employee.firstName} ${employee.lastName}`,
     bicSwift: primary?.bicSwift ?? null,
   };

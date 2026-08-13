@@ -1,5 +1,6 @@
 import type { DocumentSubjectKind, PrismaClient } from "@prisma/client";
 import { prisma as defaultPrisma } from "@/lib/prisma";
+import { decryptField } from "@/lib/field-crypto";
 import { formatTemplateDate } from "../context/format";
 import { buildMergedPlaceholderContext } from "../services/build-placeholder-context";
 import type { PlaceholderValidationError } from "../types/template-mapping";
@@ -101,7 +102,8 @@ export async function resolvePlaceholderValues(
       values.apply_pension = employee.applyTrust ? "Po" : "Jo";
       values.apply_tax = employee.applyTax ? "Po" : "Jo";
       values.bank_name = employee.bankName ?? employee.bankAccounts[0]?.bankName ?? "";
-      values.iban = employee.bankAccounts[0]?.iban ?? "";
+      // Stored encrypted; contracts print the real account number.
+      values.iban = decryptField(employee.bankAccounts[0]?.iban ?? "");
       values.employee_department = employee.department?.name ?? values.employee_department ?? "";
     }
   }

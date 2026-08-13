@@ -1,6 +1,7 @@
 import { DomainActivityVerb, EmployeeHistoryEventKind, Prisma } from "@prisma/client";
 import type { EmploymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptField, encryptField } from "@/lib/field-crypto";
 import type {
   EmployeeCountsDto,
   EmployeeDetailDto,
@@ -174,7 +175,10 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
 
   const ec = e.emergencyContacts[0];
   const bank = e.bankAccounts[0];
-  const iban = e.bankAccountIban ?? bank?.iban ?? null;
+  // Stored encrypted (enc1:…); the DTO carries plaintext for the people the
+  // tenant gate already authorised to see this employee.
+  const rawIban = e.bankAccountIban ?? bank?.iban ?? null;
+  const iban = rawIban ? decryptField(rawIban) : null;
   const bankName = e.bankName ?? bank?.bankName ?? null;
 
   return {
@@ -277,7 +281,7 @@ async function syncPrimaryBankAccount(
   await tx.employeeBankAccount.create({
     data: {
       employeeId,
-      iban: trimmed,
+      iban: encryptField(trimmed),
       bankName: bankName ?? undefined,
       isPrimary: true,
     },
@@ -427,7 +431,10 @@ export async function createEmployee(
           priorWorkExperienceYears: input.priorWorkExperienceYears,
           badgeCode: input.badgeCode ?? undefined,
           bankName: input.bankName ?? undefined,
-          bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || undefined,
+          bankAccountIban: (() => {
+            const v = input.bankAccountIban?.replace(/\s+/g, "").trim();
+            return v ? encryptField(v) : undefined;
+          })(),
           addressLine: input.addressLine ?? undefined,
           addressCity: input.addressCity ?? undefined,
           addressCountry: input.addressCountry ?? undefined,
@@ -571,7 +578,10 @@ export async function updateEmployee(
           priorWorkExperienceYears: input.priorWorkExperienceYears,
           badgeCode: input.badgeCode ?? null,
           bankName: input.bankName ?? null,
-          bankAccountIban: input.bankAccountIban?.replace(/\s+/g, "").trim() || null,
+          bankAccountIban: (() => {
+            const v = input.bankAccountIban?.replace(/\s+/g, "").trim();
+            return v ? encryptField(v) : null;
+          })(),
           addressLine: input.addressLine ?? null,
           addressCity: input.addressCity ?? null,
           addressCountry: input.addressCountry ?? null,

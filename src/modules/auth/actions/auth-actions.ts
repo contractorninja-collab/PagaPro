@@ -1,10 +1,15 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/modules/auth/services/password";
+import {
+  isLoginThrottled,
+  recordLoginAttempt,
+  THROTTLED_MESSAGE,
+} from "@/modules/auth/services/login-throttle";
 import {
   createSession,
   destroyAllSessionsForUser,
@@ -32,6 +37,17 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
     }
     const { email, password } = parsed.data;
 
+    /**
+     * Throttle before touching the password: five failures in fifteen minutes
+     * ends the conversation, for existing and non-existing addresses alike —
+     * differing behavior is exactly what an enumeration attack measures.
+     */
+    if (await isLoginThrottled(email)) {
+      return { ok: false, error: THROTTLED_MESSAGE };
+    }
+    const ip =
+      (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim()?.slice(0, 64) ?? null;
+
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
@@ -48,13 +64,20 @@ export async function loginAction(raw: unknown): Promise<AuthActionResult> {
       },
     });
 
-    if (!user?.passwordHash) return { ok: false, error: INVALID_CREDENTIALS };
+    if (!user?.passwordHash) {
+      await recordLoginAttempt({ email, ip, success: false });
+      return { ok: false, error: INVALID_CREDENTIALS };
+    }
     if (user.status === "DISABLED") {
       return { ok: false, error: "Llogaria juaj është çaktivizuar. Kontaktoni administratorin." };
     }
 
     const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) return { ok: false, error: INVALID_CREDENTIALS };
+    if (!valid) {
+      await recordLoginAttempt({ email, ip, success: false });
+      return { ok: false, error: INVALID_CREDENTIALS };
+    }
+    await recordLoginAttempt({ email, ip, success: true });
 
     if (!user.isPlatformAdmin && user.memberships.length === 0) {
       return { ok: false, error: "Llogaria juaj nuk ka qasje në asnjë biznes aktiv." };

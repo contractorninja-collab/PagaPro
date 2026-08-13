@@ -21,6 +21,15 @@ export async function createSession(userId: string): Promise<void> {
     data: { tokenHash: hashToken(token), userId, expiresAt },
   });
 
+  // Retention hygiene, paid at login rather than by a scheduler: expired
+  // session hashes are dead weight and every stored secret is one more thing
+  // a breach could enumerate.
+  try {
+    await prisma.session.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } });
+  } catch {
+    /* cleanup must never block a login */
+  }
+
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,

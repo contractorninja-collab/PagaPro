@@ -15,6 +15,22 @@ const SESSION_COOKIE = "pp_session";
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  /**
+   * Preview deployments run against the PRODUCTION database, so an unlisted
+   * preview URL is a second door to real salaries and personal ids. Closed by
+   * default; set PREVIEW_ALLOW=1 in the Preview environment for a deliberate
+   * test window. Blocking /hyrje too means no session can even be minted here,
+   * which also covers the API routes the matcher skips — they all require a
+   * session that this wall prevents from existing.
+   */
+  if (process.env.VERCEL_ENV === "preview" && process.env.PREVIEW_ALLOW !== "1") {
+    return new NextResponse("Ky preview është i mbyllur. Përdorni app.paga-pro.com.", {
+      status: 403,
+      headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
   const tenantSlug = tenantSlugFromHost(host);

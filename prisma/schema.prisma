@@ -741,6 +741,20 @@ model Session {
   @@map("sessions")
 }
 
+/// Login attempts, kept briefly to throttle credential stuffing. No relation to
+/// User on purpose — attempts against addresses that do not exist must be
+/// recorded and counted exactly like attempts against ones that do.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String   @db.VarChar(320)
+  ip        String?  @db.VarChar(64)
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@map("login_attempts")
+}
+
 model UserCompanyMembership {
   id String @id @default(cuid())
 
