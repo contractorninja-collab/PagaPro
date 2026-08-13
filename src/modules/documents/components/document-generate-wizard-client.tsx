@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import type { DocumentCategory } from "@prisma/client";
 import {
   AlertTriangle,
-  Check,
   CheckCircle2,
   Download,
   FileText,
@@ -15,6 +14,7 @@ import {
   Search,
 } from "lucide-react";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { StepCircle } from "@/components/patterns/step-circle";
 import { cn } from "@/lib/utils";
 import {
   generateHrDocumentsBatchAction,
@@ -87,28 +87,6 @@ interface PreviewRow {
   subject: string;
   errors: string[];
   values: Record<string, string>;
-}
-
-function StepCircle({ state, index }: { state: "done" | "active" | "idle"; index: number }) {
-  if (state === "done") {
-    return (
-      <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-brand-blue text-white">
-        <Check className="h-3.5 w-3.5" aria-hidden />
-      </span>
-    );
-  }
-  return (
-    <span
-      className={cn(
-        "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
-        state === "active"
-          ? "border-2 border-brand-blue bg-[#eff6ff] text-brand-blue"
-          : "bg-[#f1f5f9] text-[#94a3b8]",
-      )}
-    >
-      {index + 1}
-    </span>
-  );
 }
 
 function SectionCard({

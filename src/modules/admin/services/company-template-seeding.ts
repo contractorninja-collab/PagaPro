@@ -24,6 +24,9 @@ const FAMILIES: ReadonlyArray<{ label: string; module: string; export: string }>
   { label: "pushimet", module: "./seed-leave-templates.cjs", export: "seedLeaveTemplatesForCompany" },
   { label: "largimet", module: "./seed-termination-templates.cjs", export: "seedTerminationTemplatesForCompany" },
   { label: "vërejtjet", module: "./seed-warning-templates.cjs", export: "seedWarningTemplatesForCompany" },
+  // Was missing: the build-time seeder has always included annexes, so a
+  // company created between deploys had no Aneks template until the next one.
+  { label: "anekset", module: "./seed-annex-templates.cjs", export: "seedAnnexTemplatesForCompany" },
 ];
 
 export interface CompanyTemplateSeedResult {

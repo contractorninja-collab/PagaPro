@@ -11,6 +11,7 @@ import { FormField, FormStack } from "@/components/patterns/form-stack";
 import { HolidaySettingsPanel } from "@/components/konfigurime/holiday-settings-panel";
 import { LeaveMonthlyAccrualPanel } from "@/components/konfigurime/leave-monthly-accrual-panel";
 import { KonfigurimePageSkeleton } from "@/components/konfigurime/konfigurime-skeleton";
+import { SetupWizardCard } from "@/components/konfigurime/setup/setup-wizard-card";
 import { DepartmentsSettingsPanel } from "@/modules/departments/components/departments-settings-panel";
 import { JobTitlesSettingsPanel } from "@/modules/job-titles/components/job-titles-settings-panel";
 import type { KonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
@@ -23,9 +24,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, randomClientId } from "@/lib/utils";
 import { useKonfigurimeSave } from "@/modules/konfigurime/hooks/use-konfigurime-save";
 import { setLeaveTenureBonusAction } from "@/modules/konfigurime/actions/leave-policy-actions";
+import type { SaveKonfigurimeResult } from "@/modules/konfigurime/actions/save-konfigurime";
 import type { KonfigurimePageDto, KonfigurimeRepresentativeDto } from "@/modules/konfigurime/services/konfigurime-service";
 
 const fieldGrid = "grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start";
+
+/**
+ * Lets the setup card drive the same save as the main button without
+ * duplicating the payload builder.
+ */
+export interface KonfigurimeSubmitOverrides {
+  /** Bypasses `reps` state — React batching makes set-then-submit unsafe. */
+  representativeEmployeeIds?: string[];
+  /**
+   * Configuration values to save instead of current state. The setup card uses
+   * this for fields it suggests a default for: seeding those into state from a
+   * child effect does not survive, because child effects run *before* the
+   * parent effect that resets state from `initial`.
+   */
+  configuration?: Partial<KonfigurimePageDto["configuration"]>;
+  logoFile?: File | null;
+  removeLogo?: boolean;
+  /** Wizard steps advance their own mirror; only the last one refreshes. */
+  skipRouterRefresh?: boolean;
+  /** The card reports its own progress; a toast per step would be noise. */
+  silentSuccess?: boolean;
+}
 
 type RepDraft = KonfigurimeRepresentativeDto & { rowKey: string };
 
@@ -195,13 +219,35 @@ export function KonfigurimeConfigurator({
       stampStorageKey: r.stampStorageKey ?? null,
     }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitKonfigurime = async (
+    overrides?: KonfigurimeSubmitOverrides,
+  ): Promise<SaveKonfigurimeResult> => {
     setFormError(null);
     setFieldErrors({});
 
+    // The setup card selects a representative and saves in one go. React
+    // batches state updates, so `reps` would still be stale here — the caller
+    // passes the id explicitly rather than hoping the re-render landed first.
+    const representatives =
+      overrides?.representativeEmployeeIds !== undefined
+        ? overrides.representativeEmployeeIds.map((employeeId) => ({
+            employeeId,
+            signatureStorageKey: null,
+            stampStorageKey: null,
+          }))
+        : fixPayloadRepresentativeKeys();
+
+    const logoFile = overrides?.logoFile !== undefined ? overrides.logoFile : companyLogoFile;
+    const removeLogo = overrides?.removeLogo !== undefined ? overrides.removeLogo : removeCompanyLogo;
+
+    // Same reason as the representatives override, plus one of its own: the
+    // setup card suggests defaults for fields the client never types into, and
+    // seeding those into `cfg` from the card's own effect does not survive —
+    // child effects run before the parent effect below that resets from `initial`.
+    const cfgOut = overrides?.configuration ? { ...cfg, ...overrides.configuration } : cfg;
+
     const payload = {
-      companyLogoStorageKey: removeCompanyLogo ? null : initial.companyLogoStorageKey,
+      companyLogoStorageKey: removeLogo ? null : initial.companyLogoStorageKey,
       company: {
         legalName: company.legalName,
         fiscalNumber: company.fiscalNumber,
@@ -210,34 +256,34 @@ export function KonfigurimeConfigurator({
         phone: company.phone,
         website: company.website,
       },
-      representatives: fixPayloadRepresentativeKeys(),
+      representatives,
       configuration: {
-        minimumSalaryCurrent: parseOptionalNumber(cfg.minimumSalaryCurrent),
-        minimumSalaryFromJuly1: parseOptionalNumber(cfg.minimumSalaryFromJuly1),
-        trustContributionPercent: parseOptionalNumber(cfg.trustContributionPercent),
-        standardWeeklyHours: parseOptionalNumber(cfg.standardWeeklyHours),
-        contractReferencePrefix: cfg.contractReferencePrefix,
-        payrollPdfPrefix: cfg.payrollPdfPrefix,
-        generalDocumentPrefix: cfg.generalDocumentPrefix,
-        annualLeaveDaysDefault: parseOptionalNumber(cfg.annualLeaveDaysDefault),
-        personalLeaveDaysDefault: parseOptionalNumber(cfg.personalLeaveDaysDefault),
-        medicalLeaveDaysDefault: parseOptionalNumber(cfg.medicalLeaveDaysDefault),
-        workingDaysPerWeek: parseOptionalNumber(cfg.workingDaysPerWeek),
-        annualLeaveAccrualMode: cfg.annualLeaveAccrualMode,
-        annualLeaveRoundingMode: cfg.annualLeaveRoundingMode,
-        allowNegativeAnnualLeaveBalance: cfg.allowNegativeAnnualLeaveBalance,
-        medicalLeavePolicyNote: cfg.medicalLeavePolicyNote,
-        notifyContractExpiring: cfg.notifyContractExpiring,
-        notifyPayrollReminders: cfg.notifyPayrollReminders,
-        notifyLeaveApprovals: cfg.notifyLeaveApprovals,
-        notifyEmployeeWarnings: cfg.notifyEmployeeWarnings,
+        minimumSalaryCurrent: parseOptionalNumber(cfgOut.minimumSalaryCurrent),
+        minimumSalaryFromJuly1: parseOptionalNumber(cfgOut.minimumSalaryFromJuly1),
+        trustContributionPercent: parseOptionalNumber(cfgOut.trustContributionPercent),
+        standardWeeklyHours: parseOptionalNumber(cfgOut.standardWeeklyHours),
+        contractReferencePrefix: cfgOut.contractReferencePrefix,
+        payrollPdfPrefix: cfgOut.payrollPdfPrefix,
+        generalDocumentPrefix: cfgOut.generalDocumentPrefix,
+        annualLeaveDaysDefault: parseOptionalNumber(cfgOut.annualLeaveDaysDefault),
+        personalLeaveDaysDefault: parseOptionalNumber(cfgOut.personalLeaveDaysDefault),
+        medicalLeaveDaysDefault: parseOptionalNumber(cfgOut.medicalLeaveDaysDefault),
+        workingDaysPerWeek: parseOptionalNumber(cfgOut.workingDaysPerWeek),
+        annualLeaveAccrualMode: cfgOut.annualLeaveAccrualMode,
+        annualLeaveRoundingMode: cfgOut.annualLeaveRoundingMode,
+        allowNegativeAnnualLeaveBalance: cfgOut.allowNegativeAnnualLeaveBalance,
+        medicalLeavePolicyNote: cfgOut.medicalLeavePolicyNote,
+        notifyContractExpiring: cfgOut.notifyContractExpiring,
+        notifyPayrollReminders: cfgOut.notifyPayrollReminders,
+        notifyLeaveApprovals: cfgOut.notifyLeaveApprovals,
+        notifyEmployeeWarnings: cfgOut.notifyEmployeeWarnings,
       },
     };
 
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
-    if (companyLogoFile) fd.append("company_logo", companyLogoFile);
-    fd.append("remove_company_logo", String(removeCompanyLogo));
+    if (logoFile) fd.append("company_logo", logoFile);
+    fd.append("remove_company_logo", String(removeLogo));
 
     try {
       const result = await submit(fd);
@@ -248,16 +294,28 @@ export function KonfigurimeConfigurator({
         const firstPath = Object.keys(flat)[0];
         if (firstPath) setActiveTab(tabForKonfigurimePath(firstPath));
         toast.error((firstPath && flat[firstPath]) || result.error);
-        return;
+        return result;
       }
-      toast.success("Konfigurimet u ruajtën me sukses.");
+      if (!overrides?.silentSuccess) toast.success("Konfigurimet u ruajtën me sukses.");
       setCompanyLogoFile(null);
       setCompanyLogoPreview(null);
-      router.refresh();
+      /**
+       * The effect keyed on `initial` resets company/cfg/reps and drops a
+       * staged logo. Mid-wizard that would wipe what the client is typing, so
+       * the setup card advances its own mirror and refreshes once at the end.
+       */
+      if (!overrides?.skipRouterRefresh) router.refresh();
+      return result;
     } catch {
       toast.error("Gabim papritur gjatë ruajtjes.");
       setFormError("Gabim papritur gjatë ruajtjes.");
+      return { ok: false, error: "Gabim papritur gjatë ruajtjes." };
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitKonfigurime();
   };
 
   const patchRep = (rowKey: string, patch: Partial<KonfigurimeRepresentativeDto>) => {
@@ -308,6 +366,18 @@ export function KonfigurimeConfigurator({
             ) : null}
           </div>
         }
+      />
+      {/* Sits OUTSIDE the form on purpose — see the rules in setup-wizard-card. */}
+      <SetupWizardCard
+        initial={initial}
+        company={company}
+        cfg={cfg}
+        pending={pending}
+        onPatchCompany={setCompany}
+        onPatchConfiguration={setCfg}
+        submitKonfigurime={submitKonfigurime}
+        onGoToTab={setActiveTab}
+        onFinished={() => router.refresh()}
       />
       <form id="konfigurime-form" className={cn("space-y-8 pb-28 md:pb-8", className)} onSubmit={(e) => void handleSubmit(e)}>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as KonfigurimeTabId)} className="w-full">
