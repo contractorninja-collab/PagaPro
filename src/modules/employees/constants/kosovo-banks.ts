@@ -49,3 +49,75 @@ export function officialBankName(code: string | null | undefined): string | null
   if (!code) return null;
   return KOSOVO_BANKS.find((b) => b.code === code)?.officialName ?? null;
 }
+
+/**
+ * Words that carry no information about *which* bank this is. Dropping them
+ * lets "Raiffeisen Bank Kosovo J.S.C.", "Raiffeisen" and "raiffeisen bank"
+ * all land on the same entry. Only whole tokens are dropped, so "Pribank" and
+ * "bpbbank" survive intact.
+ */
+const NOISE_TOKENS = new Set([
+  "bank", "banka", "bankasi", "sh", "a", "sha", "shpk", "jsc", "j", "s", "c",
+  "kosova", "kosove", "kosovo", "ks", "xk", "dega", "deget", "filiala",
+]);
+
+/** Lowercase, unaccent, strip punctuation and noise words. */
+function fold(raw: string): string {
+  return raw
+    .toLocaleLowerCase("sq-AL")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((t) => t.length > 0 && !NOISE_TOKENS.has(t))
+    .join(" ");
+}
+
+/**
+ * What a spreadsheet actually says, per bank.
+ *
+ * The official name and the short code are folded in automatically; these are
+ * the extras — trading names, local abbreviations, and the spellings already
+ * sitting in real data ("RBKO", "PCB", "Raiffeisen Bank").
+ */
+const ALIASES: Record<string, readonly string[]> = {
+  NLB: ["nlb", "nlb prishtina", "nlb banka prishtina", "nova ljubljanska banka"],
+  BpB: ["bpb", "bpbbank", "banka per biznes", "per biznes"],
+  "Banka Ekonomike": ["ekonomike", "bek", "b ekonomike"],
+  Raiffeisen: ["raiffeisen", "rbko", "rbk", "raiffeisen kosovo", "rzb"],
+  ProCredit: ["procredit", "pcb", "pro credit", "procredit holding"],
+  TEB: ["teb", "teb sh a", "turk ekonomi bankasi"],
+  BKT: ["bkt", "banka kombetare tregtare", "kombetare tregtare"],
+  Ziraat: ["ziraat", "ziraat bankasi", "turkiye cumhuriyeti ziraat"],
+  Credins: ["credins", "banka credins"],
+  Pribank: ["pribank", "pri bank"],
+};
+
+const BY_FOLDED = new Map<string, string>();
+for (const bank of KOSOVO_BANKS) {
+  for (const candidate of [bank.code, bank.officialName, ...(ALIASES[bank.code] ?? [])]) {
+    const key = fold(candidate);
+    if (key) BY_FOLDED.set(key, bank.code);
+  }
+}
+
+export interface BankNameMatch {
+  /** The canonical code when recognised, otherwise the input, trimmed. */
+  value: string | null;
+  /** False when the name was left as written because nothing matched. */
+  matched: boolean;
+}
+
+/**
+ * Maps whatever a client's spreadsheet says onto one of the ten banks.
+ *
+ * An unrecognised name is **kept as written**, never blanked: an import that
+ * silently dropped a bank would be worse than one that records an odd spelling,
+ * and the employee form surfaces such values as "(e vjetër)" for correction.
+ */
+export function normalizeKosovoBankName(raw: string | null | undefined): BankNameMatch {
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (!trimmed) return { value: null, matched: false };
+  const hit = BY_FOLDED.get(fold(trimmed));
+  return hit ? { value: hit, matched: true } : { value: trimmed, matched: false };
+}

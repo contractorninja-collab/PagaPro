@@ -28,6 +28,26 @@ describe("employee CSV import", () => {
     });
   });
 
+  it("maps the bank column onto the licensed list, and keeps what it cannot place", () => {
+    const rows = parseEmployeeImportCsv(Buffer.from(
+      "Emri,Mbiemri,Nr personal,Data e punësimit,Banka\n" +
+      "Arta,Krasniqi,201,2024-07-01,RBKO\n" +
+      "Blerim,Gashi,202,2024-07-01,pcb\n" +
+      "Drita,Hoxha,203,2024-07-01,BANKA KOMBËTARE TREGTARE KOSOVË SH.A.\n" +
+      "Endrit,Berisha,204,2024-07-01,Banka e Kursimeve\n" +
+      "Fatime,Zeqiri,205,2024-07-01,",
+    ));
+
+    expect(rows.map((r) => r.bankName)).toEqual([
+      "Raiffeisen",
+      "ProCredit",
+      "BKT",
+      "Banka e Kursimeve", // unknown, kept verbatim rather than dropped
+      null,
+    ]);
+    expect(rows.every((r) => r.errors.length === 0)).toBe(true);
+  });
+
   it("keeps the former IBAN header compatible with existing CSV files", () => {
     const rows = parseEmployeeImportCsv(Buffer.from(
       "Emri,Mbiemri,Nr personal,Data e punësimit,IBAN\n" +

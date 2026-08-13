@@ -6,6 +6,7 @@ import type {
   EmployeeImportPreview,
   EmployeeImportRow,
 } from "@/modules/employees/types/employee-import";
+import { normalizeKosovoBankName } from "@/modules/employees/constants/kosovo-banks";
 
 export const EMPLOYEE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 export const EMPLOYEE_IMPORT_MAX_ROWS = 2_000;
@@ -199,7 +200,11 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       dateOfBirthIso: birthDate.iso,
       hireDateIso: hireDate.iso ?? "",
       baseSalaryMonthly: salary.amount,
-      bankName: values.bankName || null,
+      // Client spreadsheets spell the same bank a dozen ways. Map what we can
+      // onto the licensed list so the register does not fill up with "RBKO",
+      // "PCB" and "Raiffeisen Bank" again; anything unrecognised is kept
+      // verbatim rather than dropped, and shows in the preview as written.
+      bankName: normalizeKosovoBankName(values.bankName).value,
       iban: normalizedAccountNumber.accountNumber,
       intendedStatus: salary.provided && !salary.error && Number(salary.amount) > 0 ? "ACTIVE" : "INACTIVE",
       errors,
