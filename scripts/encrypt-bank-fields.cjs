@@ -1,17 +1,33 @@
 /**
- * One-time backfill: encrypts existing plaintext bank account numbers
- * (Employee.bankAccountIban and EmployeeBankAccount.iban) in place.
+ * Encrypts plaintext bank account numbers (Employee.bankAccountIban and
+ * EmployeeBankAccount.iban) in place.
  *
- * Idempotent — rows already in `enc1:` form are skipped, so re-running is safe.
+ * Runs as part of vercel-build, after migrations: Vercel's secrets never leave
+ * Vercel (env pull redacts them as [SENSITIVE]), so build time — where the same
+ * DATABASE_URL and FIELD_ENCRYPTION_KEY the runtime uses are injected — is the
+ * one place a backfill can run against production. Idempotent by design: rows
+ * already in `enc1:` form are skipped, so every deploy is also a sweep that
+ * catches any plaintext that slipped in while the key was unset.
+ *
  * The storage format must stay in lockstep with src/lib/field-crypto.ts.
  *
- * Usage:  DATABASE_URL=... FIELD_ENCRYPTION_KEY=... node scripts/encrypt-bank-fields.cjs
+ * Local:  node -r dotenv/config scripts/encrypt-bank-fields.cjs
  */
 const { createCipheriv, randomBytes } = require("node:crypto");
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 
 const PREFIX = "enc1:";
+
+function resolveConnectionString() {
+  return (
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_URL_NON_POOLING ??
+    null
+  );
+}
 
 function encryptField(plain, key) {
   if (!plain || plain.startsWith(PREFIX)) return plain;
@@ -24,12 +40,21 @@ function encryptField(plain, key) {
 
 async function main() {
   const rawKey = process.env.FIELD_ENCRYPTION_KEY;
-  if (!rawKey) throw new Error("FIELD_ENCRYPTION_KEY is required");
+  if (!rawKey) {
+    // In the build pipeline a missing key must not fail the deploy — the app
+    // itself degrades to plaintext writes with a loud log, and the next deploy
+    // after the key is set sweeps everything.
+    console.warn("[encrypt-bank-fields] FIELD_ENCRYPTION_KEY not set — skipping backfill.");
+    return;
+  }
   const key = Buffer.from(rawKey, "base64");
   if (key.length !== 32) throw new Error("FIELD_ENCRYPTION_KEY must be 32 bytes base64");
 
+  const connectionString = resolveConnectionString();
+  if (!connectionString) throw new Error("No database connection string in the environment");
+
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+    adapter: new PrismaPg({ connectionString }),
   });
 
   const employees = await prisma.employee.findMany({
