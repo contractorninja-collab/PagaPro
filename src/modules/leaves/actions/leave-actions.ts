@@ -17,6 +17,7 @@ import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave
 import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
 import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versions";
 import {
+  leaveBulkApproveSchema,
   leaveGenerateDocSchema,
   leaveInterruptLinkSchema,
   leaveRangePreviewSchema,
@@ -141,6 +142,63 @@ export async function approveLeaveRequestAction(raw: unknown): Promise<LeaveModu
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Miratimi dështoi." };
   }
+}
+
+export interface BulkApproveOutcome {
+  /** How many actually flipped to APPROVED. */
+  approved: number;
+  /** Every request that did not, with the reason the workflow gave. */
+  failures: { leaveId: string; error: string }[];
+}
+
+/**
+ * Approves a selection of pending requests, one after another — never in
+ * parallel. The order matters: two pending requests from the same employee
+ * share one balance, and the second approval must be validated against a world
+ * where the first has already happened. `approveLeaveRequest` re-reads all
+ * state per call, so a sequential loop gets that for free.
+ *
+ * One failure does not stop the rest. Each request passes or fails on its own
+ * merits, and the caller receives the full account instead of an aborted
+ * batch's guesswork.
+ */
+export async function bulkApproveLeaveRequestsAction(
+  raw: unknown,
+): Promise<LeaveModuleActionResult<BulkApproveOutcome>> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const { companyId, user } = ctx.context;
+
+  const parsed = leaveBulkApproveSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Lista e ID-ve është e pavlefshme." };
+  }
+
+  const decidedByMembershipId = await activeMembershipId(user.id, companyId);
+  const failures: BulkApproveOutcome["failures"] = [];
+  let approved = 0;
+
+  for (const leaveId of parsed.data.leaveIds) {
+    try {
+      // Scoped to companyId inside the service — a foreign id fails as "not found".
+      await approveLeaveRequest({
+        companyId,
+        leaveId,
+        decidedByMembershipId,
+        actorUserId: user.id,
+      });
+      approved += 1;
+    } catch (e) {
+      failures.push({ leaveId, error: e instanceof Error ? e.message : "Miratimi dështoi." });
+    }
+  }
+
+  // Even a fully-failed run revalidates: a stale queue is how double-clicks happen.
+  safeRev("/pushimet");
+  safeRev("/paneli");
+  safeRev("/pagat");
+
+  return { ok: true, data: { approved, failures } };
 }
 
 export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {

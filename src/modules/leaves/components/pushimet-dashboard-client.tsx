@@ -48,9 +48,11 @@ import {
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import {
   approveLeaveRequestAction,
+  bulkApproveLeaveRequestsAction,
   cancelLeaveRequestAction,
   generateLeaveDocumentAction,
   refreshLeaveBalancesAction,
+  type BulkApproveOutcome,
 } from "@/modules/leaves/actions/leave-actions";
 import { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import type {
@@ -167,6 +169,64 @@ export function PushimetDashboardClient(props: {
    *  double-click fired the action twice. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Bulk approval. Selection lives on ids, not rows — after a refresh the
+   * approved ones vanish from `pendingRows` and stale ids simply stop counting.
+   * The dialog is confirm-then-result: it opens to state what will happen and,
+   * when anything fails, stays open with the per-request account instead of
+   * compressing five different failures into one toast.
+   */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkApproveOutcome | null>(null);
+
+  const selectedRows = useMemo(
+    () => props.pendingRows.filter((r) => selected.has(r.id)),
+    [props.pendingRows, selected],
+  );
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runBulkApprove() {
+    if (bulkRunning || selectedRows.length === 0) return;
+    setBulkRunning(true);
+    try {
+      // Display order — startDate ascending, the order the queue argues for.
+      const r = await bulkApproveLeaveRequestsAction({
+        leaveIds: selectedRows.map((row) => row.id),
+      });
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      const outcome = r.data;
+      if (!outcome) return;
+      if (outcome.failures.length === 0) {
+        toast.success(
+          outcome.approved === 1 ? "1 kërkesë u miratua." : `${outcome.approved} kërkesa u miratuan.`,
+        );
+        setBulkOpen(false);
+        setSelected(new Set());
+        refresh();
+      } else {
+        // Keep the dialog open with the account; the queue refreshes behind it.
+        setBulkResult(outcome);
+        setSelected(new Set(outcome.failures.map((f) => f.leaveId)));
+        refresh();
+      }
+    } finally {
+      setBulkRunning(false);
+    }
+  }
 
   const prevHref = useMemo(() => {
     const { year, month } = shiftMonth(props.calendarYear, props.calendarMonth, -1);
@@ -500,6 +560,37 @@ export function PushimetDashboardClient(props: {
                     Reflektohet menjëherë në payroll pas miratimit.
                   </p>
                 </div>
+                {props.pendingRows.length > 1 ? (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-[#64748b]">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[#2563EB]"
+                        checked={selectedRows.length === props.pendingRows.length}
+                        onChange={() =>
+                          setSelected(
+                            selectedRows.length === props.pendingRows.length
+                              ? new Set()
+                              : new Set(props.pendingRows.map((r) => r.id)),
+                          )
+                        }
+                        aria-label="Zgjidh të gjitha kërkesat në pritje"
+                      />
+                      Zgjidh të gjitha
+                    </label>
+                    <button
+                      type="button"
+                      className={BTN_PRIMARY_DENSE}
+                      disabled={selectedRows.length === 0}
+                      onClick={() => {
+                        setBulkResult(null);
+                        setBulkOpen(true);
+                      }}
+                    >
+                      Mirato të zgjedhurat ({selectedRows.length})
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <ul className="divide-y divide-[#f1f5f9]">
                 {props.pendingRows.map((row) => {
@@ -518,6 +609,15 @@ export function PushimetDashboardClient(props: {
                       className={`flex flex-col gap-3 border-l-[3px] px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center ${rail}`}
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-3">
+                        {props.pendingRows.length > 1 ? (
+                          <input
+                            type="checkbox"
+                            className="mt-2.5 h-4 w-4 shrink-0 accent-[#2563EB]"
+                            checked={selected.has(row.id)}
+                            onChange={() => toggleSelected(row.id)}
+                            aria-label={`Zgjidh kërkesën e ${row.employeeName}`}
+                          />
+                        ) : null}
                         <InitialsAvatar name={row.employeeName} />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -825,6 +925,110 @@ export function PushimetDashboardClient(props: {
         onOpenChange={(o) => !o && setRejectId(null)}
         onRejected={refresh}
       />
+
+      {/* Bulk approval: confirm first, and after a partial run stay open with
+          the per-request account — five different failures do not fit a toast. */}
+      <Dialog
+        open={bulkOpen}
+        onOpenChange={(o) => {
+          if (!o && !bulkRunning) {
+            setBulkOpen(false);
+            setBulkResult(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkResult ? "Rezultati i miratimit" : `Mirato ${selectedRows.length} kërkesa?`}
+            </DialogTitle>
+          </DialogHeader>
+
+          {bulkResult ? (
+            <div className="space-y-3">
+              <p className="text-sm">
+                {bulkResult.approved === 1
+                  ? "1 kërkesë u miratua."
+                  : `${bulkResult.approved} kërkesa u miratuan.`}{" "}
+                <span className="font-semibold text-[#dc2626]">
+                  {bulkResult.failures.length === 1
+                    ? "1 dështoi:"
+                    : `${bulkResult.failures.length} dështuan:`}
+                </span>
+              </p>
+              <ul className="max-h-56 space-y-2 overflow-y-auto">
+                {bulkResult.failures.map((f) => {
+                  const row = props.pendingRows.find((r) => r.id === f.leaveId);
+                  return (
+                    <li
+                      key={f.leaveId}
+                      className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[12.5px]"
+                    >
+                      <p className="font-semibold text-[#7f1d1d]">
+                        {row ? row.employeeName : "Kërkesë"}
+                        {row
+                          ? ` · ${formatSqDate(row.startDateIso)} → ${formatSqDate(row.endDateIso)}`
+                          : ""}
+                      </p>
+                      <p className="mt-0.5 text-[#991b1b]">{f.error}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-[12px] text-[#64748b]">
+                Kërkesat e dështuara mbeten të zgjedhura në listë — trajtojini një nga një.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-[#334155]">
+                Çdo kërkesë miratohet veç e veç, në radhë — bilanci dhe mbivendosjet validohen për
+                secilën. Nëse ndonjëra bllokohet, të tjerat vazhdojnë.
+              </p>
+              <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+                {selectedRows.map((row) => {
+                  const d = props.queueDecisions[row.id];
+                  return (
+                    <li key={row.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+                      <span className="min-w-0 truncate font-medium text-[#0f172a]">
+                        {row.employeeName}
+                        <span className="text-[#94a3b8]">
+                          {" "}
+                          · {formatSqDate(row.startDateIso)} → {formatSqDate(row.endDateIso)}
+                        </span>
+                      </span>
+                      {d && d.severity !== "clean" ? (
+                        <TonePill tone={d.severity === "block" ? "destructive" : "warning"} size="sm">
+                          {d.severity === "block" ? "Bllokim" : "Kujdes"}
+                        </TonePill>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={bulkRunning}
+              onClick={() => {
+                setBulkOpen(false);
+                setBulkResult(null);
+              }}
+            >
+              Mbyll
+            </Button>
+            {bulkResult ? null : (
+              <Button type="button" disabled={bulkRunning} onClick={() => void runBulkApprove()}>
+                {bulkRunning ? "Duke miratuar…" : `Mirato ${selectedRows.length}`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={genId != null} onOpenChange={(o) => !o && setGenId(null)}>
         <DialogContent>

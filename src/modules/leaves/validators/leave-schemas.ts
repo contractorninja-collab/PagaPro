@@ -30,6 +30,20 @@ export const leaveRequestIdSchema = z.object({
   leaveId: z.string().min(1),
 });
 
+/**
+ * Bulk approval takes the visible queue, which the server pins at 200 rows —
+ * the cap follows from that, not from taste. Duplicates are rejected rather
+ * than deduplicated silently: a client sending the same id twice is confused,
+ * and approving is not the place to guess what it meant.
+ */
+export const leaveBulkApproveSchema = z.object({
+  leaveIds: z
+    .array(z.string().min(1))
+    .min(1, "Zgjidhni të paktën një kërkesë.")
+    .max(200, "Maksimumi 200 kërkesa në një veprim.")
+    .refine((ids) => new Set(ids).size === ids.length, "Lista përmban ID të përsëritura."),
+});
+
 export const leaveRejectSchema = leaveRequestIdSchema.extend({
   rejectionReason: z
     .string()
