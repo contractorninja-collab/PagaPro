@@ -8,7 +8,7 @@
     "dev": "next dev",
     "dev:clean": "node -e \"try { require('fs').rmSync('.next', { recursive: true, force: true }); } catch (_) {}\" && next dev",
     "build": "next build",
-    "vercel-build": "node scripts/prepare-production-database.cjs && node scripts/run-migrations.cjs && node scripts/encrypt-bank-fields.cjs && node scripts/seed-templates.cjs all --deploy-guard && next build",
+    "vercel-build": "node scripts/prepare-production-database.cjs && node scripts/run-migrations.cjs && node scripts/encrypt-bank-fields.cjs && (node scripts/normalize-bank-names.cjs || true) && node scripts/seed-templates.cjs all --deploy-guard && next build",
     "start": "next start",
     "lint": "next lint",
     "db:validate": "prisma validate",
