@@ -19,12 +19,25 @@ export const WORK_ARRANGEMENT_LABELS: Record<WorkArrangement, string> = {
   HYBRID: "Hybrid",
 };
 
+/**
+ * Every value the column can hold, for display.
+ *
+ * OTHER and UNSPECIFIED are no longer offered anywhere — see GENDER_OPTIONS —
+ * but they stay listed here so a record saved before that still shows a name
+ * instead of a blank where its gender should be.
+ */
 export const GENDER_LABELS: Record<Gender, string> = {
   MALE: "Mashkull",
   FEMALE: "Femër",
   OTHER: "Tjetër",
   UNSPECIFIED: "Pa specifikuar",
 };
+
+/** The choices offered when picking a gender. */
+export const GENDER_OPTIONS = [
+  { value: "MALE", label: GENDER_LABELS.MALE },
+  { value: "FEMALE", label: GENDER_LABELS.FEMALE },
+] as const;
 
 export function formatEur(amount: string | number): string {
   const n = typeof amount === "string" ? Number(amount) : amount;

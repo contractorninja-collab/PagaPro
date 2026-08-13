@@ -33,7 +33,7 @@ import {
 import { createDepartmentAction } from "@/modules/departments/actions/department-actions";
 import type { DepartmentOptionDto, EmployeeDetailDto, JobTitleOptionDto } from "@/modules/employees/types";
 import {
-  GENDER_LABELS,
+  GENDER_OPTIONS,
   WORK_ARRANGEMENT_LABELS,
   isoDateInput,
 } from "@/modules/employees/components/employees-labels";
@@ -530,9 +530,9 @@ export function EmployeeFormSheet(props: {
                   disabled={pending}
                 >
                   <option value="">—</option>
-                  {Object.entries(GENDER_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
+                  {GENDER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>

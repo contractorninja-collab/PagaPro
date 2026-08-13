@@ -17,7 +17,12 @@ export const employmentStatusFieldSchema = z.enum([
 ]);
 export const workArrangementFieldSchema = z.enum(["ON_SITE", "REMOTE", "HYBRID"]);
 export const employerPrimacyFieldSchema = z.enum(["PRIMARY", "SECONDARY"]);
-export const genderFieldSchema = z.enum(["MALE", "FEMALE", "OTHER", "UNSPECIFIED"]);
+/**
+ * Only the two the form offers. The column's enum still carries OTHER and
+ * UNSPECIFIED so records saved before this keep their value and still display,
+ * but nothing can write them again.
+ */
+export const genderFieldSchema = z.enum(["MALE", "FEMALE"]);
 
 function parseOptionalDate(v: unknown): Date | null | undefined {
   if (v === undefined) return undefined;
