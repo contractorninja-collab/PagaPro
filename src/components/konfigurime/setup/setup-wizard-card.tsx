@@ -68,6 +68,17 @@ export interface SetupWizardCardProps {
   onPatchConfiguration: React.Dispatch<React.SetStateAction<KonfigurimePageDto["configuration"]>>;
   submitKonfigurime: (o?: KonfigurimeSubmitOverrides) => Promise<SaveKonfigurimeResult>;
   onGoToTab: (tab: "dokumentet" | "pozitat") => void;
+  /** Keeps the Autorizuari dropdown in step with people the wizard just created. */
+  onEmployeesCreated: (created: KonfigurimeEmployeeOptionDto[]) => void;
+  /**
+   * Hands the saved signer back to the configurator's own `reps` state.
+   *
+   * Without it the main "Ruaj ndryshimet" button keeps submitting the blank row
+   * the loader synthesised — Zod rejects the save and jumps to a tab whose
+   * select is empty — or, for a company that already had a signer, quietly
+   * writes the old one back over the one just chosen.
+   */
+  onRepresentativeSaved: (employeeId: string) => void;
   onFinished: () => void;
 }
 
@@ -257,6 +268,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
       if (!res.ok) return; // toast + field errors already surfaced upstream
       setRepSaved(true);
       setSavedRepEmployeeId(repEmployeeId);
+      props.onRepresentativeSaved(repEmployeeId);
       // Only now is it true on the server.
       setSavedCompany({
         fiscalNumber: props.company.fiscalNumber,
@@ -459,16 +471,17 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       departments={departments}
                       disabled={disabled}
                       onDepartmentCreated={(d) => setDepartments((prev) => [...prev, d])}
-                      onCreated={(created) =>
-                        setEmployees((prev) => [
-                          ...prev,
-                          ...created.map((c) => ({
-                            id: c.id,
-                            fullName: c.fullName,
-                            jobTitle: c.jobTitle,
-                          })),
-                        ])
-                      }
+                      onCreated={(created) => {
+                        const options = created.map((c) => ({
+                          id: c.id,
+                          fullName: c.fullName,
+                          jobTitle: c.jobTitle,
+                        }));
+                        setEmployees((prev) => [...prev, ...options]);
+                        // The Autorizuari tab reads the configurator's own list,
+                        // which no refresh has updated — tell it directly.
+                        props.onEmployeesCreated(options);
+                      }}
                     />
                   ) : null}
 

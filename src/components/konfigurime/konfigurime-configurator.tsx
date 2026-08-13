@@ -182,6 +182,9 @@ export function KonfigurimeConfigurator({
   const [company, setCompany] = useState(initial.company);
   const [cfg, setCfg] = useState(initial.configuration);
   const [reps, setReps] = useState<RepDraft[]>(() => assignRepresentativeRowKeys(initial.representatives));
+  // The wizard creates employees without a refresh, so the signer dropdown
+  // cannot read `initial.employees` — it would stay empty for a new company.
+  const [employeeOptions, setEmployeeOptions] = useState(() => initial.employees);
   const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [removeCompanyLogo, setRemoveCompanyLogo] = useState(false);
@@ -198,6 +201,7 @@ export function KonfigurimeConfigurator({
     setCompany(initial.company);
     setCfg(initial.configuration);
     setReps(assignRepresentativeRowKeys(initial.representatives));
+    setEmployeeOptions(initial.employees);
     setCompanyLogoFile(null);
     setCompanyLogoPreview(null);
     setRemoveCompanyLogo(false);
@@ -219,6 +223,15 @@ export function KonfigurimeConfigurator({
       stampStorageKey: r.stampStorageKey ?? null,
     }));
 
+  /** Assets already on file for this person, so an id-only override keeps them. */
+  const pickRepresentativeAssets = (employeeId: string) => {
+    const existing = reps.find((r) => r.employeeId === employeeId);
+    return {
+      signatureStorageKey: existing?.signatureStorageKey ?? null,
+      stampStorageKey: existing?.stampStorageKey ?? null,
+    };
+  };
+
   const submitKonfigurime = async (
     overrides?: KonfigurimeSubmitOverrides,
   ): Promise<SaveKonfigurimeResult> => {
@@ -232,8 +245,9 @@ export function KonfigurimeConfigurator({
       overrides?.representativeEmployeeIds !== undefined
         ? overrides.representativeEmployeeIds.map((employeeId) => ({
             employeeId,
-            signatureStorageKey: null,
-            stampStorageKey: null,
+            // Keep whatever this person already had — rebuilding the row from
+            // the id alone would blank their signature and stamp keys.
+            ...pickRepresentativeAssets(employeeId),
           }))
         : fixPayloadRepresentativeKeys();
 
@@ -377,6 +391,29 @@ export function KonfigurimeConfigurator({
         onPatchConfiguration={setCfg}
         submitKonfigurime={submitKonfigurime}
         onGoToTab={setActiveTab}
+        onEmployeesCreated={(created) =>
+          setEmployeeOptions((prev) => [
+            ...prev,
+            ...created.filter((c) => !prev.some((p) => p.id === c.id)),
+          ])
+        }
+        onRepresentativeSaved={(employeeId) => {
+          // Without this the main save button keeps sending the stale blank row
+          // the loader synthesised, and Zod rejects the whole save — or worse,
+          // sends the previous signer and silently reverts the one just chosen.
+          const emp = employeeOptions.find((e) => e.id === employeeId) ?? null;
+          setReps((prev) => [
+            {
+              rowKey: prev[0]?.rowKey ?? randomClientId(),
+              ...(prev[0]?.id ? { id: prev[0].id } : {}),
+              employeeId,
+              fullName: emp?.fullName ?? prev[0]?.fullName ?? "",
+              position: emp?.jobTitle ?? prev[0]?.position ?? null,
+              signatureStorageKey: prev[0]?.signatureStorageKey ?? null,
+              stampStorageKey: prev[0]?.stampStorageKey ?? null,
+            },
+          ]);
+        }}
         onFinished={() => router.refresh()}
       />
       <form id="konfigurime-form" className={cn("space-y-8 pb-28 md:pb-8", className)} onSubmit={(e) => void handleSubmit(e)}>
@@ -540,7 +577,7 @@ export function KonfigurimeConfigurator({
                     </div>
                     {(() => {
                       const selectedEmployee =
-                        initial.employees.find((emp) => emp.id === rep.employeeId) ?? null;
+                        employeeOptions.find((emp) => emp.id === rep.employeeId) ?? null;
                       const linkedButInactive = Boolean(rep.employeeId) && !selectedEmployee;
                       const positionValue = selectedEmployee?.jobTitle ?? rep.position ?? "";
                       return (
@@ -561,7 +598,7 @@ export function KonfigurimeConfigurator({
                               value={rep.employeeId ?? ""}
                               onChange={(e) => {
                                 clearFieldErrorKey(`representatives.${idx}.employeeId`);
-                                const emp = initial.employees.find((x) => x.id === e.target.value) ?? null;
+                                const emp = employeeOptions.find((x) => x.id === e.target.value) ?? null;
                                 patchRep(rep.rowKey, {
                                   employeeId: emp?.id ?? null,
                                   fullName: emp?.fullName ?? "",
@@ -576,13 +613,13 @@ export function KonfigurimeConfigurator({
                                   {rep.fullName || "Punonjës joaktiv"} (joaktiv)
                                 </option>
                               ) : null}
-                              {initial.employees.map((emp) => (
+                              {employeeOptions.map((emp) => (
                                 <option key={emp.id} value={emp.id}>
                                   {emp.fullName}
                                 </option>
                               ))}
                             </select>
-                            {initial.employees.length === 0 ? (
+                            {employeeOptions.length === 0 ? (
                               <p className="mt-2 text-xs text-muted-foreground">
                                 Nuk ka punonjës aktivë ende — shtojeni direkt me hapësirën më poshtë.
                               </p>

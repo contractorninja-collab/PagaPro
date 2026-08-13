@@ -132,6 +132,17 @@ export function SetupEmployeeRows(props: {
       const nextErrors: Record<string, string> = {};
 
       for (const row of started) {
+        // A blank salary cell used to become "0": the schema accepts zero for a
+        // regular employee, so the person was created on a zero gross wage and
+        // even the final check called the contract complete, because a
+        // formatted "0.00 €" is not a blank placeholder. Refuse it here instead.
+        const salary = row.baseSalaryMonthly.trim();
+        if (!salary || Number(salary.replace(",", ".")) <= 0) {
+          failedKeys.add(row.rowKey);
+          nextErrors[row.rowKey] = "Shkruani pagën bruto mujore.";
+          continue;
+        }
+
         const res = await createEmployeeAction({
           ...SETUP_EMPLOYEE_ROW_CONSTANTS,
           firstName: row.firstName.trim(),
@@ -140,7 +151,7 @@ export function SetupEmployeeRows(props: {
           jobTitleId: row.jobTitleId,
           departmentId: row.departmentId || null,
           hireDate: row.hireDate,
-          baseSalaryMonthly: row.baseSalaryMonthly.trim() || "0",
+          baseSalaryMonthly: salary,
         });
 
         if (res.ok && res.data) {
