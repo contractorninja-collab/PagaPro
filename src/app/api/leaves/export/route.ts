@@ -74,17 +74,12 @@ export async function GET(request: Request) {
     documentCount: lr.documents.length,
   }));
 
+  // The BOM lives in rowsToCsvBuffer itself, so every CSV in the app gets it.
   const buf = rowsToCsvBuffer(COLUMNS, csvRows);
-  /**
-   * Excel on Windows reads a BOM-less UTF-8 CSV as the system codepage, which
-   * turns every ë and ç — most Albanian names carry one — into mojibake. The
-   * BOM is what makes the file open correctly by double-click.
-   */
-  const withBom = Buffer.concat([Buffer.from("﻿", "utf8"), buf]);
 
   const period = allMonths ? String(year) : `${year}-${String(month).padStart(2, "0")}`;
 
-  return new NextResponse(new Uint8Array(withBom), {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="Pushimet_${period}.csv"`,
