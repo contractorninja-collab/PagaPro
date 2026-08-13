@@ -283,6 +283,21 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
 
   async function saveParametersStep() {
     if (busy) return;
+    // The server takes these through Number(); anything it cannot read becomes
+    // null, and a nullable column accepts null, so "500€" would save silently
+    // and still tick the step green off the raw string. Catch it here.
+    for (const [value, label] of [
+      [effectiveParameters.minimumSalaryCurrent, "Paga minimale"],
+      [effectiveParameters.standardWeeklyHours, "Orët javore"],
+      [effectiveParameters.workingDaysPerWeek, "Ditët e punës në javë"],
+      [effectiveParameters.annualLeaveDaysDefault, "Pushimi vjetor"],
+    ] as const) {
+      const n = Number(String(value ?? "").trim().replace(",", "."));
+      if (!String(value ?? "").trim() || !Number.isFinite(n) || n <= 0) {
+        toast.error(`${label}: shkruani një numër të vlefshëm.`);
+        return;
+      }
+    }
     setBusy(true);
     try {
       const res = await props.submitKonfigurime({
