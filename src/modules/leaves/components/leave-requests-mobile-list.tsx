@@ -41,6 +41,8 @@ export function LeaveRequestsMobileList(props: {
       {rows.map((row) => {
         const flags = flagsFor?.(row) ?? [];
         const busy = busyId === row.id;
+        const docCount = row.documents?.length ?? 0;
+        const newestDocument = row.documents?.[0] ?? null;
         return (
         <div key={row.id} className={`overflow-hidden p-4 ${LEAVE_CARD}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -86,6 +88,13 @@ export function LeaveRequestsMobileList(props: {
             <Link href={`/pushimet/${row.id}`} className={BTN_SECONDARY_DENSE}>
               Shiko detajet
             </Link>
+            {/* Mirrors the desktop Dokumenti column — the card used to offer
+                "Gjenero dokument…" without ever saying one already existed. */}
+            {newestDocument ? (
+              <Link href={`/dokumentet/${newestDocument.artifactId}`} className={BTN_SECONDARY_DENSE}>
+                Dokumenti{docCount > 1 ? ` (${docCount})` : ""}
+              </Link>
+            ) : null}
             {row.status === "PENDING" ? (
               <>
                 <button

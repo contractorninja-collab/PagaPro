@@ -24,6 +24,15 @@ export type PushimetLeaveRowDto = {
   createdAtIso: string | null;
   decidedAtIso: string | null;
   decidedByLabel: string | null;
+  /**
+   * Archived documents for this request, newest first.
+   *
+   * `null` means the query behind this row did not load them — the calendar and
+   * the "Sot në pushim" card deliberately skip the join. It is not the same as
+   * `[]`, which is a loaded answer of "none yet", and only `[]` may be drawn as
+   * "no document".
+   */
+  documents: { artifactId: string }[] | null;
 };
 
 export type PushimetCalendarChipDto = Pick<

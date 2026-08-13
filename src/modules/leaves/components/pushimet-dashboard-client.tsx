@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Download,
   FileText,
   Info,
   RefreshCw,
@@ -177,6 +178,18 @@ export function PushimetDashboardClient(props: {
     p.set("month", String(month));
     return `/pushimet?${p.toString()}`;
   }, [props.calendarMonth, props.calendarYear, searchParams]);
+
+  /**
+   * The export carries the filters currently on screen, minus paging — a CSV of
+   * page 3 would be a surprising thing to receive. The route re-reads these with
+   * the same parser the page uses, so the file matches the list.
+   */
+  const exportHref = useMemo(() => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.delete("page");
+    const qs = p.toString();
+    return qs ? `/api/leaves/export?${qs}` : "/api/leaves/export";
+  }, [searchParams]);
 
   /**
    * Who is off today, deduplicated by employee. This used to be filtered out of
@@ -585,9 +598,15 @@ export function PushimetDashboardClient(props: {
               <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
                 {props.pendingRows.length > 0 ? "Të vendosura" : "Kërkesat"}
               </h2>
-              <p className="text-[12px] text-[#94a3b8]">
-                {props.page.total} kërkesa · filtrimi aplikon edhe për kalendarin
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-[12px] text-[#94a3b8]">
+                  {props.page.total} kërkesa · filtrimi aplikon edhe për kalendarin
+                </p>
+                <a href={exportHref} className={BTN_SECONDARY_DENSE} download>
+                  <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  Shkarko CSV
+                </a>
+              </div>
             </div>
             <LeaveRequestsTable
               rows={props.rows}

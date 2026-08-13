@@ -32,28 +32,12 @@ import type {
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
 import { eligibleLeaveYears } from "@/modules/leaves/helpers/eligible-leave-years";
+import { parseLeaveListParams } from "@/modules/leaves/helpers/leave-list-params";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
   title: "Pushimet",
 };
-
-function first(sp: Record<string, string | string[] | undefined>, key: string): string {
-  const v = sp[key];
-  if (Array.isArray(v)) return v[0] ?? "";
-  return v ?? "";
-}
-
-const LEAVE_TYPES = new Set<LeaveType>([
-  "PUSHIM_VJETOR",
-  "PUSHIM_MJEKESOR",
-  "PUSHIM_PERSONAL",
-  "PUSHIM_PA_PAGESE",
-  "PUSHIM_LEHONIE",
-  "TJETER",
-]);
-
-const STATUSES = new Set<LeaveRequestStatus>(["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELLED"]);
 
 function serializeLeaveRow(
   lr: {
@@ -85,6 +69,8 @@ function serializeLeaveRow(
           user: { displayName: string | null; email: string | null };
         }
       | null;
+    /** Absent on the calendar/today queries, which skip the join by design. */
+    documents?: { generatedDocumentId: string }[];
   },
 ): PushimetLeaveRowDto {
   return {
@@ -112,6 +98,9 @@ function serializeLeaveRow(
       lr.decidedByMembership?.user.displayName?.trim() ||
       lr.decidedByMembership?.user.email?.trim() ||
       null,
+    documents: lr.documents
+      ? lr.documents.map((d) => ({ artifactId: d.generatedDocumentId }))
+      : null,
   };
 }
 
@@ -201,46 +190,20 @@ export default async function PushimetPage({
   const sp = await searchParams;
   const now = new Date();
   const defaultYear = now.getUTCFullYear();
-  const defaultMonth = now.getUTCMonth() + 1;
 
-  const employeeId = first(sp, "employeeId");
-  const departmentId = first(sp, "departmentId");
-  const typeRaw = first(sp, "type");
-  const statusRaw = first(sp, "status");
-  const yearRaw = first(sp, "year");
-  const monthRaw = first(sp, "month");
-
-  const filterYear = Number(yearRaw);
-  const filterMonth = Number(monthRaw);
-  /**
-   * `Number("")` is 0 and 0 is finite, so an absent `year` used to resolve to
-   * year 0 — the bare `/pushimet` filtered to nothing and drew a 1900 calendar.
-   */
-  const year =
-    Number.isInteger(filterYear) && filterYear >= 1970 && filterYear <= 2100
-      ? filterYear
-      : defaultYear;
-  /**
-   * `month=0` means "the whole year" for the *list*. The calendar always draws
-   * one month, so it keeps its own value — otherwise a stat tile could only
-   * ever show the requests that happen to fall in the month on screen.
-   */
-  const allMonths = monthRaw === "0";
-  const month =
-    !allMonths && Number.isFinite(filterMonth) && filterMonth >= 1 && filterMonth <= 12
-      ? filterMonth
-      : defaultMonth;
-
-  const filters = {
-    employeeId: employeeId || undefined,
-    departmentId: departmentId || undefined,
-    type: LEAVE_TYPES.has(typeRaw as LeaveType) ? (typeRaw as LeaveType) : undefined,
-    status: STATUSES.has(statusRaw as LeaveRequestStatus) ? (statusRaw as LeaveRequestStatus) : undefined,
+  // Same reader the CSV route uses, so the export cannot describe a different
+  // list than the one on screen.
+  const {
+    filters,
+    employeeId,
+    departmentId,
+    type: typeRaw,
+    status: statusRaw,
     year,
-    month: allMonths ? undefined : month,
-  };
-
-  const pageNumber = Number(first(sp, "page")) || 1;
+    month,
+    allMonths,
+    page: pageNumber,
+  } = parseLeaveListParams(sp, now);
 
   let listPage;
   let calendarRaw;
@@ -407,8 +370,9 @@ export default async function PushimetPage({
               defaults={{
                 employeeId,
                 departmentId,
-                type: LEAVE_TYPES.has(typeRaw as LeaveType) ? typeRaw : "",
-                status: STATUSES.has(statusRaw as LeaveRequestStatus) ? statusRaw : "",
+                // Already validated by the parser — an unknown value arrives as "".
+                type: typeRaw,
+                status: statusRaw,
                 year: String(year),
                 month: allMonths ? "0" : String(month),
               }}

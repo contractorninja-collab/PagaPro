@@ -48,7 +48,56 @@ const LEAVE_ROW_INCLUDE = {
   },
 } as const;
 
+/**
+ * The archive additionally reports whether a request has an archived document.
+ *
+ * The calendar and the "who is off today" card never render that, and the
+ * calendar query is capped at 400 rows — loading the relation there would cost
+ * an extra round trip on every page view to build something immediately thrown
+ * away. So only the paged list and the export ask for it.
+ */
+const LEAVE_ROW_INCLUDE_WITH_DOCUMENTS = {
+  ...LEAVE_ROW_INCLUDE,
+  documents: {
+    select: { id: true, generatedDocumentId: true },
+    orderBy: { createdAt: "desc" },
+  },
+} as const;
+
 export const LEAVE_PAGE_SIZE = 50;
+
+/**
+ * Ceiling for one CSV. Reached only by a company with years of history and no
+ * filter applied; the caller is told when it bites rather than handed a short
+ * file that looks complete.
+ */
+export const LEAVE_EXPORT_MAX_ROWS = 5000;
+
+/**
+ * The filtered list for the CSV export — same `where` as the screen, no paging.
+ *
+ * Fetches one row past the cap so truncation is a fact rather than an
+ * assumption: a file silently cut at exactly N reads as a complete file.
+ */
+export async function listLeaveRequestsForExport(
+  companyId: string,
+  filters: LeaveListFilters,
+): Promise<{
+  rows: Awaited<ReturnType<typeof listLeaveRequestsPage>>["rows"];
+  truncated: boolean;
+}> {
+  const found = await prisma.leaveRequest.findMany({
+    where: leaveWhere(companyId, filters),
+    orderBy: [{ startDate: "desc" }],
+    take: LEAVE_EXPORT_MAX_ROWS + 1,
+    include: LEAVE_ROW_INCLUDE_WITH_DOCUMENTS,
+  });
+
+  return {
+    rows: found.slice(0, LEAVE_EXPORT_MAX_ROWS),
+    truncated: found.length > LEAVE_EXPORT_MAX_ROWS,
+  };
+}
 
 export async function listLeaveRequestsFiltered(companyId: string, filters: LeaveListFilters) {
   return prisma.leaveRequest.findMany({
@@ -90,7 +139,7 @@ export async function listLeaveRequestsPage(
       where: { ...where, status: "PENDING" },
       orderBy: [{ startDate: "asc" }],
       take: 200,
-      include: LEAVE_ROW_INCLUDE,
+      include: LEAVE_ROW_INCLUDE_WITH_DOCUMENTS,
     }),
     pendingOnly ? Promise.resolve(0) : prisma.leaveRequest.count({ where: restWhere }),
     pendingOnly
@@ -100,7 +149,7 @@ export async function listLeaveRequestsPage(
           orderBy: [{ startDate: "desc" }],
           skip: (safePage - 1) * LEAVE_PAGE_SIZE,
           take: LEAVE_PAGE_SIZE,
-          include: LEAVE_ROW_INCLUDE,
+          include: LEAVE_ROW_INCLUDE_WITH_DOCUMENTS,
         }),
   ]);
 

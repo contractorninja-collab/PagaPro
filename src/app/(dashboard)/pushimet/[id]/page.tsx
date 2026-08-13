@@ -72,6 +72,12 @@ function serializeLeaveRowDto(lr: {
       lr.decidedByMembership?.user.displayName?.trim() ||
       lr.decidedByMembership?.user.email?.trim() ||
       null,
+    /**
+     * The detail page renders its documents from its own richer list (title and
+     * timestamp per artifact), so this row-shaped view does not carry them.
+     * `null` says "not loaded here" rather than claiming there are none.
+     */
+    documents: null,
   };
 }
 

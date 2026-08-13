@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MoreHorizontal } from "lucide-react";
+import { FileText, MoreHorizontal } from "lucide-react";
 import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
 import {
   DropdownMenu,
@@ -23,6 +23,58 @@ import type { PushimetLeaveRowDto } from "@/modules/leaves/types/pushimet";
 
 const TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 const TD = "px-4 py-3 align-middle";
+
+/**
+ * Whether this leave has a document in the archive.
+ *
+ * Until now the only way to answer that was to open the request. Generating one
+ * was already offered in the row menu, so the archive could create documents it
+ * then refused to show.
+ *
+ * `documents === null` means the query did not load them, which is not the same
+ * as "none" and must not be drawn as an invitation to generate a second copy.
+ */
+function LeaveDocumentCell({
+  row,
+  onGenerate,
+}: {
+  row: PushimetLeaveRowDto;
+  onGenerate: (id: string) => void;
+}) {
+  const docs = row.documents;
+  if (docs === null) return <span className="text-[#cbd5e1]">—</span>;
+
+  const newest = docs[0];
+  if (newest) {
+    return (
+      <Link
+        href={`/dokumentet/${newest.artifactId}`}
+        className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-semibold text-brand-blue hover:underline"
+      >
+        <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Hape
+        {docs.length > 1 ? (
+          <span className="font-medium text-[#94a3b8]">+{docs.length - 1}</span>
+        ) : null}
+      </Link>
+    );
+  }
+
+  // Only an approved leave can be documented, so nothing else offers the action.
+  if (row.status === "APPROVED") {
+    return (
+      <button
+        type="button"
+        onClick={() => onGenerate(row.id)}
+        className="whitespace-nowrap text-[12.5px] font-medium text-[#64748b] underline-offset-2 transition-colors hover:text-brand-blue hover:underline"
+      >
+        Gjenero
+      </button>
+    );
+  }
+
+  return <span className="text-[#cbd5e1]">—</span>;
+}
 
 export function LeaveRequestsTable(props: {
   rows: PushimetLeaveRowDto[];
@@ -48,7 +100,7 @@ export function LeaveRequestsTable(props: {
   return (
     <div className={`hidden overflow-hidden md:block ${LEAVE_CARD}`}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] border-collapse text-[13px] text-[#111827]">
+        <table className="w-full min-w-[1020px] border-collapse text-[13px] text-[#111827]">
           <thead>
             <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
               <th className={TH}>Punonjësi</th>
@@ -59,6 +111,7 @@ export function LeaveRequestsTable(props: {
               <th className={`${TH} text-right`}>Ditë</th>
               <th className={TH}>Statusi</th>
               <th className={TH}>Payroll</th>
+              <th className={TH}>Dokumenti</th>
               <th className={`${TH} text-right`}>Veprime</th>
             </tr>
           </thead>
@@ -100,6 +153,9 @@ export function LeaveRequestsTable(props: {
                   </td>
                   <td className={`${TD} max-w-[140px] text-xs leading-snug text-[#64748b]`}>
                     {payrollImpactLabel(row)}
+                  </td>
+                  <td className={TD}>
+                    <LeaveDocumentCell row={row} onGenerate={onGenerate} />
                   </td>
                   <td className={`${TD} text-right`}>
                     <DropdownMenu>
