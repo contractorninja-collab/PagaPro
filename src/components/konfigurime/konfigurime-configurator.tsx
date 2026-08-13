@@ -4,7 +4,7 @@ import { ImagePlus, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
@@ -23,6 +23,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, randomClientId } from "@/lib/utils";
 import { useKonfigurimeSave } from "@/modules/konfigurime/hooks/use-konfigurime-save";
+import {
+  mergeEmployeeOptions,
+  applyServerChanges,
+  representativesMatch,
+} from "@/modules/konfigurime/helpers/merge-server-state";
 import { setLeaveTenureBonusAction } from "@/modules/konfigurime/actions/leave-policy-actions";
 import type { SaveKonfigurimeResult } from "@/modules/konfigurime/actions/save-konfigurime";
 import type { KonfigurimePageDto, KonfigurimeRepresentativeDto } from "@/modules/konfigurime/services/konfigurime-service";
@@ -197,16 +202,39 @@ export function KonfigurimeConfigurator({
     setActiveTab(initialTab);
   }, [initialTab]);
 
+  const lastServerRef = useRef(initial);
   useEffect(() => {
-    setCompany(initial.company);
-    setCfg(initial.configuration);
-    setReps(assignRepresentativeRowKeys(initial.representatives));
-    setEmployeeOptions(initial.employees);
-    setCompanyLogoFile(null);
-    setCompanyLogoPreview(null);
-    setRemoveCompanyLogo(false);
-    setFieldErrors({});
-    setFormError(null);
+    const lastServer = lastServerRef.current;
+    if (initial === lastServer) return; // mount: state was seeded from this already
+    lastServerRef.current = initial;
+
+    // A different company is never a merge — carrying one client's half-typed
+    // address into another's form would be a data leak, not a convenience.
+    // Switching companies reloads the page today; this does not depend on that.
+    if (initial.companyId !== lastServer.companyId) {
+      setCompany(initial.company);
+      setCfg(initial.configuration);
+      setReps(assignRepresentativeRowKeys(initial.representatives));
+      setEmployeeOptions(initial.employees);
+      setCompanyLogoFile(null);
+      setCompanyLogoPreview(null);
+      setRemoveCompanyLogo(false);
+      setFieldErrors({});
+      setFormError(null);
+      return;
+    }
+
+    setCompany((cur) => applyServerChanges(cur, lastServer.company, initial.company));
+    setCfg((cur) => applyServerChanges(cur, lastServer.configuration, initial.configuration));
+    setReps((cur) =>
+      representativesMatch(cur, lastServer.representatives)
+        ? assignRepresentativeRowKeys(initial.representatives)
+        : cur,
+    );
+    setEmployeeOptions((cur) => mergeEmployeeOptions(cur, initial.employees));
+    // A staged logo, a pending removal and the current errors are all local
+    // intent that no server round-trip should silently cancel; the save path
+    // clears them itself once it succeeds.
   }, [initial]);
 
   useEffect(() => {
@@ -313,6 +341,11 @@ export function KonfigurimeConfigurator({
       if (!overrides?.silentSuccess) toast.success("Konfigurimet u ruajtën me sukses.");
       setCompanyLogoFile(null);
       setCompanyLogoPreview(null);
+      // `removeCompanyLogo` is deliberately left alone: clearing it here fires
+      // before the refresh that nulls `initial.companyLogoStorageKey`, so the
+      // logo box and its delete button flash back for a beat as if the removal
+      // had failed. Once the refresh lands there is no key left to remove, and
+      // staging a new upload clears the flag itself.
       /**
        * The effect keyed on `initial` resets company/cfg/reps and drops a
        * staged logo. Mid-wizard that would wipe what the client is typing, so

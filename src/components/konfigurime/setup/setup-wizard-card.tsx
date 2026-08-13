@@ -262,6 +262,9 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
     try {
       const res = await props.submitKonfigurime({
         representativeEmployeeIds: [repEmployeeId],
+        // Explicit: a removal staged on the Dokumentet tab must not ride along
+        // on a step that says nothing about the logo and delete the blob.
+        removeLogo: false,
         skipRouterRefresh: true,
         silentSuccess: true,
       });
@@ -303,6 +306,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
       const res = await props.submitKonfigurime({
         ...(savedRepEmployeeId ? { representativeEmployeeIds: [savedRepEmployeeId] } : {}),
         configuration: effectiveParameters,
+        removeLogo: false,
         skipRouterRefresh: true,
         silentSuccess: true,
       });
@@ -326,6 +330,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
         ...(savedRepEmployeeId ? { representativeEmployeeIds: [savedRepEmployeeId] } : {}),
         configuration: effectiveParameters,
         logoFile,
+        removeLogo: false,
         skipRouterRefresh: true,
         silentSuccess: true,
       });
