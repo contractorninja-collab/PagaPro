@@ -19,13 +19,35 @@ const { PrismaPg } = require("@prisma/adapter-pg");
 
 const PREFIX = "enc1:";
 
+/**
+ * Connection + schema must mirror src/lib/prisma.ts exactly. Two details bite
+ * on Vercel and both are silent-to-catastrophic if missed:
+ *
+ * - `uselibpqcompat=true`: without it the pooler's chain is rejected as a
+ *   self-signed certificate and nothing connects at all (loud, at least).
+ * - schema `pagapro`, not `public`: with the wrong schema the queries would
+ *   find zero rows and this script would report "nothing to encrypt" as
+ *   success, leaving every real IBAN in plaintext.
+ */
 function resolveConnectionString() {
-  return (
+  const raw =
     process.env.DATABASE_URL ??
     process.env.POSTGRES_PRISMA_URL ??
     process.env.POSTGRES_URL ??
     process.env.POSTGRES_URL_NON_POOLING ??
-    null
+    null;
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!process.env.VERCEL) return trimmed;
+  const url = new URL(trimmed);
+  url.searchParams.set("uselibpqcompat", "true");
+  return url.toString();
+}
+
+function resolveSchema() {
+  return (
+    process.env.PAGAPRO_DATABASE_SCHEMA?.trim() ||
+    (process.env.VERCEL ? "pagapro" : "public")
   );
 }
 
@@ -53,8 +75,9 @@ async function main() {
   const connectionString = resolveConnectionString();
   if (!connectionString) throw new Error("No database connection string in the environment");
 
+  const schema = resolveSchema();
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter: new PrismaPg({ connectionString }, { schema }),
   });
 
   const employees = await prisma.employee.findMany({
@@ -84,8 +107,11 @@ async function main() {
     accountsUpdated += 1;
   }
 
+  // Schema is printed so a "scanned 0" line can be read as either "nothing to
+  // do" or "wrong schema" without guessing.
   console.log(
     JSON.stringify({
+      schema,
       employeesScanned: employees.length,
       employeesUpdated,
       accountsScanned: accounts.length,
