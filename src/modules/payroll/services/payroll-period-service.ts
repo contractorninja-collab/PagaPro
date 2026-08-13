@@ -21,6 +21,11 @@ import {
 import { statutorySickLeavePayPercent } from "@/modules/payroll/calculation/legislation/sick-pay";
 import { generatePayrollPdfArtifacts } from "@/modules/payroll/services/payroll-pdf-service";
 import { countWeekdaysInclusiveUtc } from "@/modules/payroll/helpers/weekday-count";
+import {
+  countWorkingDaysInWindow,
+  resolveEmploymentWindow,
+  type EmploymentWindow,
+} from "@/modules/payroll/calculation/employment-window";
 
 const EDITABLE: PayrollPeriodStatus[] = ["DRAFT"];
 
@@ -49,13 +54,56 @@ function payrollCalculationBreakdownAsJson(breakdown: Record<string, unknown>): 
   return JSON.parse(JSON.stringify(breakdown)) as object;
 }
 
+/**
+ * The days each candidate was actually employed inside the payroll month.
+ *
+ * Employees with no period rows fall back to their hire/termination dates, so
+ * anyone predating the EmploymentPeriod table keeps behaving exactly as before
+ * — dropping them from payroll would be a worse bug than the one this fixes.
+ */
+async function resolveEmploymentWindowsForEmployees(
+  companyId: string,
+  employees: Employee[],
+  start: Date,
+  end: Date,
+): Promise<Record<string, EmploymentWindow>> {
+  if (employees.length === 0) return {};
+
+  const periods = await prisma.employmentPeriod.findMany({
+    where: { companyId, employeeId: { in: employees.map((e) => e.id) } },
+    select: { employeeId: true, startedAt: true, endedAt: true },
+    orderBy: { startedAt: "asc" },
+  });
+
+  const byEmployee = new Map<string, { startedAt: Date; endedAt: Date | null }[]>();
+  for (const p of periods) {
+    const list = byEmployee.get(p.employeeId) ?? [];
+    list.push({ startedAt: p.startedAt, endedAt: p.endedAt });
+    byEmployee.set(p.employeeId, list);
+  }
+
+  const out: Record<string, EmploymentWindow> = {};
+  for (const employee of employees) {
+    out[employee.id] = resolveEmploymentWindow({
+      periods: byEmployee.get(employee.id) ?? [],
+      hireDate: employee.hireDate,
+      terminationDate: employee.terminationDate,
+      monthStart: start,
+      monthEnd: end,
+    });
+  }
+  return out;
+}
+
 async function findEmployeesEligibleForPayrollMonth(
   companyId: string,
   year: number,
   month: number,
   start: Date,
   end: Date,
-): Promise<{ ok: true; employees: Employee[] } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; employees: Employee[]; windows: Record<string, EmploymentWindow> } | { ok: false; error: string }
+> {
   const eligibleWhere = {
     companyId,
     employmentType: "EMPLOYEE" as const,
@@ -72,13 +120,20 @@ async function findEmployeesEligibleForPayrollMonth(
     ],
   };
 
-  const employees = await prisma.employee.findMany({
+  const candidates = await prisma.employee.findMany({
     where: eligibleWhere,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
+  // The WHERE above is a superset: it reads two Employee columns, which cannot
+  // express a gap in employment. Someone re-hired after a break has a cleared
+  // terminationDate and their original hireDate, so every month in between still
+  // matches. The employment periods are what settle it.
+  const windows = await resolveEmploymentWindowsForEmployees(companyId, candidates, start, end);
+  const employees = candidates.filter((e) => windows[e.id]?.employed);
+
   if (employees.length > 0) {
-    return { ok: true, employees };
+    return { ok: true, employees, windows };
   }
 
   const totalInCompany = await prisma.employee.count({ where: { companyId } });
@@ -560,11 +615,17 @@ async function createPayrollEntriesForEmployeesTx(
     wt: NonNullable<Awaited<ReturnType<typeof resolvePayrollMonthWorkingTime>>>;
     sickPct: string;
     lastWorkingDayByEmployeeId?: Record<string, Date>;
+    /** Days actually employed this month, per employee — drives the pro-rata. */
+    employmentWindows?: Record<string, EmploymentWindow>;
     entryStatus: PayrollEntryStatus;
     lineOverridesByEmployeeId?: Record<string, Partial<SpreadsheetLineComputationInput>>;
   },
 ): Promise<{ aggPaidLeaveHrs: number; aggSickLeaveHrs: number; aggUnpaidLeaveHrs: number }> {
   const wd = params.wt.expectedWorkingDays;
+  // The full-month figure already excludes weekday public holidays, so a partial
+  // window has to exclude them too — otherwise a short month credits a day the
+  // denominator removed.
+  const holidayIsoDates = new Set(params.wt.weekdayPublicHolidayDates ?? []);
   const { start, end } = periodBoundsUtc(params.payrollYear, params.payrollMonth);
   const days = calendarDaysInMonth(params.payrollYear, params.payrollMonth);
 
@@ -633,11 +694,33 @@ async function createPayrollEntriesForEmployeesTx(
     let lineWd = wd;
     let expHoursForLine = empFullMonthHours;
     const lwCap = params.lastWorkingDayByEmployeeId?.[emp.id];
-    if (lwCap) {
-      const effectiveEnd = lwCap.getTime() < end.getTime() ? lwCap : end;
-      const effectiveStart = emp.hireDate.getTime() > start.getTime() ? emp.hireDate : start;
-      const partialWd = countWeekdaysInclusiveUtc(effectiveStart, effectiveEnd);
-      lineWd = Math.max(0, partialWd);
+    const employmentWindow = params.employmentWindows?.[emp.id];
+
+    // Pro-rata used to run only when a termination cap existed, so a leaver was
+    // pro-rated and a joiner was not — someone hired on the 20th was paid the
+    // whole month, and every gap month of a re-hired employee was too. The days
+    // now come from the window the person was actually employed, and the
+    // termination workflow's own last-working-day still caps it on top.
+    if (employmentWindow || lwCap) {
+      const capped: EmploymentWindow | undefined = employmentWindow
+        ? lwCap
+          ? {
+              ...employmentWindow,
+              segments: employmentWindow.segments
+                .map((s) => ({ start: s.start, end: s.end.getTime() < lwCap.getTime() ? s.end : lwCap }))
+                .filter((s) => s.start.getTime() <= s.end.getTime()),
+            }
+          : employmentWindow
+        : undefined;
+
+      if (capped) {
+        lineWd = Math.max(0, countWorkingDaysInWindow(capped, holidayIsoDates));
+      } else if (lwCap) {
+        // No window (should not happen, but a payroll line must never guess high).
+        const effectiveEnd = lwCap.getTime() < end.getTime() ? lwCap : end;
+        const effectiveStart = emp.hireDate.getTime() > start.getTime() ? emp.hireDate : start;
+        lineWd = Math.max(0, countWeekdaysInclusiveUtc(effectiveStart, effectiveEnd));
+      }
       expHoursForLine = lineWd * dailyH;
     }
 
@@ -863,6 +946,7 @@ export async function recalculatePayrollEntriesForEmployees(params: {
           ...(params.lastWorkingDayByEmployeeId ?? {}),
         },
         entryStatus,
+        employmentWindows: picked.windows,
         lineOverridesByEmployeeId: params.lineOverridesByEmployeeId,
       });
 
@@ -1001,6 +1085,7 @@ export async function regeneratePayrollEntriesAndCalculate(
         wt,
         sickPct,
         lastWorkingDayByEmployeeId: terminationDayCaps(employees, start, end),
+        employmentWindows: picked.windows,
         entryStatus: "FINAL",
       });
       aggPaidLeaveHrs = totals.aggPaidLeaveHrs;
