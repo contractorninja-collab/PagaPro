@@ -27,9 +27,12 @@ const manrope = Manrope({
  * applied only by the two components that draw the wordmark: `logo.tsx` and the
  * report letterhead. Loaded as a variable, never as a body className, so it
  * cannot leak onto ordinary text.
+ *
+ * latin only, unlike the UI face: the wordmark renders "PagaPRO" and the "PP"
+ * mark, both pure ASCII, so latin-ext would preload a file nothing can use.
  */
 const inter = Inter({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
   variable: "--font-brand",
   display: "swap",
 });
