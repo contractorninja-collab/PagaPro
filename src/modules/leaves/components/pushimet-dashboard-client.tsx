@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LeaveOperationalCalendar } from "@/modules/leaves/calendar/leave-operational-calendar";
+import { LeaveWallchart } from "@/modules/leaves/wallchart/leave-wallchart";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
 import type { PayrollSyncSkipRow, LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
@@ -58,6 +58,7 @@ import type {
   PushimetCalendarChipDto,
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
+  PushimetWallchartEmployeeDto,
 } from "@/modules/leaves/types/pushimet";
 
 function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
@@ -135,6 +136,10 @@ export function PushimetDashboardClient(props: {
   /** Computed from today on the server, not from the month being viewed. */
   onLeaveToday: PushimetLeaveRowDto[];
   chips: PushimetCalendarChipDto[];
+  /** Every current employee — the wallchart also shows who is present. */
+  wallchartEmployees: PushimetWallchartEmployeeDto[];
+  /** UTC today as YYYY-MM-DD, decided on the server like every other date. */
+  todayIso: string;
   holidayIsoDates: string[];
   calendarYear: number;
   calendarMonth: number;
@@ -178,6 +183,16 @@ export function PushimetDashboardClient(props: {
     p.set("month", String(month));
     return `/pushimet?${p.toString()}`;
   }, [props.calendarMonth, props.calendarYear, searchParams]);
+
+  /** Back to the current month, keeping every other filter as it is. */
+  const todayMonthHref = useMemo(() => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.delete("year");
+    p.delete("month");
+    p.delete("page");
+    const qs = p.toString();
+    return qs ? `/pushimet?${qs}` : "/pushimet";
+  }, [searchParams]);
 
   /**
    * The export carries the filters currently on screen, minus paging — a CSV of
@@ -652,14 +667,19 @@ export function PushimetDashboardClient(props: {
             ) : null}
           </div>
 
-          {/* 5b — month calendar */}
-          <LeaveOperationalCalendar
+          {/* The team wallchart — rows are people, columns are days. It replaced
+              the month-cell calendar, which answered "who is off on day X" one
+              cell at a time and never showed who is present. */}
+          <LeaveWallchart
             year={props.calendarYear}
             month={props.calendarMonth}
-            chips={props.chips.filter((c) => c.status === "APPROVED" || c.status === "PENDING")}
+            employees={props.wallchartEmployees}
+            chips={props.chips}
             holidayIsoDates={props.holidayIsoDates}
+            todayIso={props.todayIso}
             prevHref={prevHref}
             nextHref={nextHref}
+            todayHref={todayMonthHref}
           />
         </div>
 

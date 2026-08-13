@@ -37,8 +37,23 @@ export type PushimetLeaveRowDto = {
 
 export type PushimetCalendarChipDto = Pick<
   PushimetLeaveRowDto,
-  "id" | "employeeId" | "employeeName" | "startDateIso" | "endDateIso" | "status" | "type"
+  | "id"
+  | "employeeId"
+  | "employeeName"
+  | "startDateIso"
+  | "endDateIso"
+  | "status"
+  | "type"
+  | "workingDays"
 >;
+
+/** One wallchart row — every non-terminated employee, absent or not. */
+export type PushimetWallchartEmployeeDto = {
+  id: string;
+  name: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+};
 
 export type PushimetBalanceRowDto = {
   id: string;

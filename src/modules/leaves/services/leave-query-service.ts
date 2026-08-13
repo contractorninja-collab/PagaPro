@@ -109,6 +109,48 @@ export async function listLeaveRequestsFiltered(companyId: string, filters: Leav
 }
 
 /**
+ * The wallchart's feed: the same employee/department/type/status filters as
+ * the list, but over an explicit UTC day range instead of the year/month
+ * window — a six-week grid borrows days from the neighbouring months, and
+ * absences on those borrowed days must still draw.
+ */
+export async function listLeaveRequestsForWallchart(
+  companyId: string,
+  filters: LeaveListFilters,
+  rangeStart: Date,
+  rangeEnd: Date,
+) {
+  const where = leaveWhere(companyId, { ...filters, year: undefined, month: undefined });
+  return prisma.leaveRequest.findMany({
+    where: { ...where, AND: [{ startDate: { lte: rangeEnd } }, { endDate: { gte: rangeStart } }] },
+    orderBy: [{ startDate: "asc" }],
+    take: 400,
+    include: LEAVE_ROW_INCLUDE,
+  });
+}
+
+/**
+ * Everyone the wallchart draws a row for — including people with no absence,
+ * because "who is NOT away that week" is half of what a wallchart answers.
+ * Ordered so department groups come out contiguous.
+ */
+export async function listWallchartRoster(companyId: string) {
+  return prisma.employee.findMany({
+    where: { companyId, status: { not: "TERMINATED" } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      jobTitle: true,
+      departmentId: true,
+      department: { select: { name: true } },
+    },
+    orderBy: [{ department: { name: "asc" } }, { lastName: "asc" }, { firstName: "asc" }],
+    take: 500,
+  });
+}
+
+/**
  * The filtered list, split into what needs a decision and what does not.
  *
  * Pending requests are returned whole and are *not* part of the pagination —

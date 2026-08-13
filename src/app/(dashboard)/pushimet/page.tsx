@@ -12,10 +12,11 @@ import {
   listActiveEmployeesPicklist,
   listDepartmentsPicklist,
   listLeaveBalancesOverview,
-  listLeaveRequestsFiltered,
+  listLeaveRequestsForWallchart,
   listLeaveRequestsPage,
   listLeaveTemplatesPicklist,
   listOnLeaveToday,
+  listWallchartRoster,
 } from "@/modules/leaves/services/leave-query-service";
 import { getMergedHolidayIsoSetForUtcRange } from "@/modules/leaves/services/leave-working-time-service";
 import { buildLeaveQueueDecisions } from "@/modules/leaves/services/leave-queue-decision-service";
@@ -28,6 +29,7 @@ import type {
   PushimetCalendarChipDto,
   PushimetDepartmentOptionDto,
   PushimetEmployeeOptionDto,
+  PushimetWallchartEmployeeDto,
   PushimetLeaveRowDto,
   PushimetTemplateOptionDto,
 } from "@/modules/leaves/types/pushimet";
@@ -157,6 +159,7 @@ function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
     endDateIso: row.endDateIso,
     status: row.status,
     type: row.type,
+    workingDays: row.workingDays,
   };
 }
 
@@ -210,6 +213,7 @@ export default async function PushimetPage({
   let onLeaveTodayRaw;
   let stats;
   let employeesRaw;
+  let rosterRaw;
   let departmentsRaw;
   let templatesRaw;
   let balancesRaw;
@@ -229,8 +233,17 @@ export default async function PushimetPage({
       await syncLeaveBalancesForCompanyYear(companyId, year);
     }
 
-    const monthStart = new Date(Date.UTC(year, month - 1, 1));
-    const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    /**
+     * The wallchart draws six full weeks behind the month — from the Monday on
+     * or before the 1st, 42 days. Chips and holidays are fetched for that whole
+     * window so the borrowed lead-in/lead-out days are never blank. This is the
+     * same window wallchart-layout.ts computes; the -/+42 arithmetic must agree.
+     */
+    const monthFirst = new Date(Date.UTC(year, month - 1, 1));
+    const gridStart = new Date(
+      monthFirst.getTime() - (((monthFirst.getUTCDay() + 6) % 7) * 24 * 60 * 60 * 1000),
+    );
+    const gridEnd = new Date(gridStart.getTime() + 42 * 24 * 60 * 60 * 1000 - 1);
 
     [
       listPage,
@@ -238,6 +251,7 @@ export default async function PushimetPage({
       onLeaveTodayRaw,
       stats,
       employeesRaw,
+      rosterRaw,
       departmentsRaw,
       templatesRaw,
       balancesRaw,
@@ -247,18 +261,19 @@ export default async function PushimetPage({
       lastAccrual,
     ] = await Promise.all([
       listLeaveRequestsPage(companyId, filters, pageNumber),
-      // The calendar spans the whole month regardless of the list's paging.
-      listLeaveRequestsFiltered(companyId, filters),
+      // The wallchart spans its six-week grid regardless of the list's paging.
+      listLeaveRequestsForWallchart(companyId, filters, gridStart, gridEnd),
       listOnLeaveToday(companyId),
       leaveDashboardStats(companyId),
       listActiveEmployeesPicklist(companyId),
+      listWallchartRoster(companyId),
       listDepartmentsPicklist(companyId),
       listLeaveTemplatesPicklist(companyId),
       // The employee filter narrows the balance panel too — picking someone and
       // pressing Filtro previously changed the request list but left the balance
       // sheet showing the whole company.
       listLeaveBalancesOverview(companyId, year, employeeId),
-      getMergedHolidayIsoSetForUtcRange(companyId, monthStart, monthEnd),
+      getMergedHolidayIsoSetForUtcRange(companyId, gridStart, gridEnd),
       countPayrollSyncSkips(companyId),
       listPayrollSyncSkips(companyId),
       latestAccrualPeriod(companyId),
@@ -299,6 +314,21 @@ export default async function PushimetPage({
     label: `${e.firstName} ${e.lastName}`.trim(),
     eligibleYears: eligibleLeaveYears(e.hireDate, e.terminationDate, defaultYear),
   }));
+
+  /**
+   * Wallchart rows follow the page filters: narrowing to a department or a
+   * person must narrow the rows, not just strip their bars — a full roster
+   * with bars for one department would read as "nobody else is ever away".
+   */
+  const wallchartEmployees: PushimetWallchartEmployeeDto[] = rosterRaw
+    .filter((e) => !filters.departmentId || e.departmentId === filters.departmentId)
+    .filter((e) => !filters.employeeId || e.id === filters.employeeId)
+    .map((e) => ({
+      id: e.id,
+      name: `${e.firstName} ${e.lastName}`.trim(),
+      jobTitle: e.jobTitle,
+      departmentName: e.department?.name ?? null,
+    }));
 
   const departments: PushimetDepartmentOptionDto[] = departmentsRaw.map((d) => ({
     id: d.id,
@@ -352,6 +382,8 @@ export default async function PushimetPage({
           balanceTotals={balanceTotals}
           onLeaveToday={onLeaveToday}
           chips={chips}
+          wallchartEmployees={wallchartEmployees}
+          todayIso={now.toISOString().slice(0, 10)}
           holidayIsoDates={[...holidaySet]}
           calendarYear={year}
           calendarMonth={month}
