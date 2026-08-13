@@ -491,6 +491,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       departments={departments}
                       disabled={disabled}
                       onDepartmentCreated={(d) => setDepartments((prev) => [...prev, d])}
+                      onRowsFailed={() => setOpenStep("punonjesit")}
                       onCreated={(created) => {
                         const options = created.map((c) => ({
                           id: c.id,

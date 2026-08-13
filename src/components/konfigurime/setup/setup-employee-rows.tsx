@@ -66,6 +66,12 @@ export function SetupEmployeeRows(props: {
   disabled?: boolean;
   onDepartmentCreated: (dept: { id: string; name: string }) => void;
   onCreated: (created: SetupCreatedEmployee[]) => void;
+  /**
+   * Some rows did not save. The card derives its open step from the data, so a
+   * single successful row slides it onward and unmounts this grid — taking the
+   * failed rows and their reasons with it. This asks it to stay put.
+   */
+  onRowsFailed: () => void;
 }) {
   const activeTitles = props.jobTitles.filter((j) => j.status === "ACTIVE");
   const defaultTitleId = activeTitles[0]?.id ?? "";
@@ -184,6 +190,7 @@ export function SetupEmployeeRows(props: {
         );
       }
       if (failedKeys.size > 0) {
+        props.onRowsFailed();
         toast.warning(
           `${failedKeys.size} rresht(a) nuk u ruajtën — shikoni arsyen te secili rresht.`,
           { duration: 9000 },
