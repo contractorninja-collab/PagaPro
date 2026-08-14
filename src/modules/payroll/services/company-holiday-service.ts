@@ -88,7 +88,11 @@ export async function maybeSeedKosovoOfficialFixedHolidaysForYearIfEmpty(
     if (count > 0) {
       return { seeded: false, upserted: 0 };
     }
-    const { upserted } = await seedKosovoOfficialFixedHolidaysForYear(companyId, calendarYear);
+    // The full official calendar, not just the fixed dates: a company created
+    // through the admin console used to start life with neither Bajram nor
+    // either Easter, and nothing said so — payroll counted them as ordinary
+    // working days until somebody noticed and added them by hand.
+    const { upserted } = await seedKosovoOfficialHolidaysForYear(companyId, calendarYear);
     return { seeded: true, upserted };
   } catch (e) {
     if (

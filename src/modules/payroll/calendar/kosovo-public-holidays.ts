@@ -45,11 +45,27 @@ export interface KosovoOfficialMovableHolidayDefinition {
   datesByYear: Readonly<Record<number, { month: number; day: number }>>;
 }
 
-/** Official movable holidays (Ligji Nr. 03/L-064). 2026 dates confirmed by the client. */
+/**
+ * Official movable holidays (Ligji Nr. 03/L-064). 2026 dates confirmed by the client.
+ *
+ * Named plainly — "Fitër Bajrami" and "Kurban Bajrami" — rather than "i Madh" /
+ * "i Vogël". The two labels had been attached to the wrong feast (20 March, the
+ * end of Ramadan, was carrying "i Madh"), and since the plain names are the
+ * unambiguous ones there is nothing left to get backwards.
+ *
+ * The `sourceCode` values keep their original spelling on purpose: they are the
+ * identity a holiday row is matched by, so renaming one would orphan every date
+ * HR has already corrected. Read them as opaque keys, not as descriptions —
+ * XK_BAJRAM_I_MADH is the Ramadan feast and XK_BAJRAM_I_VOGEL the sacrifice one.
+ *
+ * Dates are deliberately known for 2026 only. HR sets them each year from the
+ * Festat panel, because Kosovo's Bajram dates are announced by the Islamic
+ * Community and an astronomical estimate can be a day out.
+ */
 export const KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS: readonly KosovoOfficialMovableHolidayDefinition[] = [
   {
     sourceCode: "XK_BAJRAM_I_MADH",
-    defaultNameSq: "Bajrami i Madh (Fitër Bajrami)",
+    defaultNameSq: "Fitër Bajrami",
     datesByYear: { 2026: { month: 3, day: 20 } },
   },
   {
@@ -64,7 +80,7 @@ export const KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS: readonly KosovoOfficia
   },
   {
     sourceCode: "XK_BAJRAM_I_VOGEL",
-    defaultNameSq: "Bajrami i Vogël (Kurban Bajrami)",
+    defaultNameSq: "Kurban Bajrami",
     datesByYear: { 2026: { month: 5, day: 27 } },
   },
 ] as const;
