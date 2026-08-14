@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCompanyContext, companyContextErrorMessage } from "@/server/company-context";
+import { getCompanyContext, companyContextErrorMessage, requireCapability } from "@/server/company-context";
 import {
   createTerminationWorkflow,
   updateTerminationWorkflow,
@@ -32,8 +32,8 @@ function rev(): void {
 }
 
 export async function createTerminationAction(raw: unknown): Promise<TerminationActionResult<{ id: string }>> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationCreateSchema.safeParse(raw);
@@ -48,8 +48,8 @@ export async function createTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function updateTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationUpdateSchema.safeParse(raw);
@@ -69,8 +69,8 @@ export async function updateTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function submitTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
@@ -88,8 +88,8 @@ export async function submitTerminationAction(raw: unknown): Promise<Termination
 }
 
 export async function approveTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
@@ -107,8 +107,8 @@ export async function approveTerminationAction(raw: unknown): Promise<Terminatio
 }
 
 export async function prepareFinalPayrollTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
@@ -131,8 +131,8 @@ export async function generateTerminationDocumentActionServer(
   /** Force a fresh artifact even when one already exists ("Rigjenero dokumentin"). */
   force = false,
 ): Promise<TerminationActionResult<{ artifactId: string }>> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("documents.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
@@ -151,8 +151,8 @@ export async function generateTerminationDocumentActionServer(
 }
 
 export async function completeTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);
@@ -180,8 +180,8 @@ export async function completeTerminationAction(raw: unknown): Promise<Terminati
 }
 
 export async function cancelTerminationAction(raw: unknown): Promise<TerminationActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("employees.write");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const parsed = terminationIdSchema.safeParse(raw);

@@ -6,6 +6,7 @@ import type { CompanyMembershipRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, type SessionUser } from "@/modules/auth/services/session";
 import { resolveActiveCompanyId } from "@/server/company-scope";
+import { can, capabilityDeniedMessage, type Capability } from "@/server/permissions";
 
 export type CompanyContextFailure =
   | "UNAUTHENTICATED"
@@ -82,6 +83,46 @@ export function companyContextHttpError(reason: CompanyContextFailure): NextResp
     { error: status === 401 ? "Unauthorized" : "Forbidden" },
     { status },
   );
+}
+
+/**
+ * Context plus a capability check, for a mutating server action.
+ *
+ * Collapses the four lines every action would otherwise repeat, and — more to
+ * the point — makes the permission an argument the author has to supply, so a
+ * new action cannot quietly ship ungated. Returns the same
+ * `{ ok: false, error }` shape actions already return.
+ */
+export async function requireCapability(
+  capability: Capability,
+): Promise<
+  { ok: true; context: CompanyContext } | { ok: false; error: string }
+> {
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+
+  const { user, role } = result.context;
+  if (!can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+    return { ok: false, error: capabilityDeniedMessage(capability) };
+  }
+  return { ok: true, context: result.context };
+}
+
+/** API-route variant: a 403 response instead of a result object. */
+export async function requireCapabilityHttp(
+  capability: Capability,
+): Promise<{ ok: true; context: CompanyContext } | { ok: false; response: NextResponse }> {
+  const result = await getCompanyContext();
+  if (!result.ok) return { ok: false, response: companyContextHttpError(result.reason) };
+
+  const { user, role } = result.context;
+  if (!can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: capabilityDeniedMessage(capability) }, { status: 403 }),
+    };
+  }
+  return { ok: true, context: result.context };
 }
 
 /**

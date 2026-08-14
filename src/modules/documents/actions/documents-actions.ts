@@ -7,7 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   templateVersionSourceKey,
 } from "@/modules/documents/engine";
@@ -133,9 +133,9 @@ export async function uploadDocumentTemplateVersionAction(
     needsMapping: boolean;
   }>
 > {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -284,9 +284,9 @@ export async function uploadDocumentTemplateVersionAction(
 export async function publishDocumentTemplateVersionAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -342,9 +342,9 @@ export async function publishDocumentTemplateVersionAction(
 export async function saveTemplateMappingAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -456,9 +456,9 @@ export async function previewPlaceholderValuesAction(
 export async function setDocumentTemplateActiveAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -478,9 +478,9 @@ export async function setDocumentTemplateActiveAction(
 export async function updateDocumentTemplateTerminationKeyAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -688,9 +688,9 @@ async function runGeneration(params: {
 export async function previewDocumentGenerationAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 
@@ -710,9 +710,9 @@ export async function previewDocumentGenerationAction(
 export async function generateFinalDocumentAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 
@@ -789,9 +789,9 @@ export async function generateHrDocumentsBatchAction(
     artifactId?: string;
   }>
 > {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 
@@ -875,9 +875,9 @@ export async function generateBulkDocumentsAction(
 ): Promise<
   DocumentModuleActionResult<{ generated: number; failed: BulkGenerationFailure[]; artifactIds: string[] }>
 > {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 
@@ -967,9 +967,9 @@ export async function generateContractDocumentsAction(
     artifactId?: string;
   }>
 > {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -1029,9 +1029,9 @@ const regeneratePayloadSchema = z.object({
 export async function regenerateDocumentAction(
   raw: unknown,
 ): Promise<DocumentModuleActionResult<{ artifactId: string }>> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 
@@ -1070,9 +1070,9 @@ export async function regenerateDocumentAction(
 }
 
 export async function archiveArtifactAction(raw: unknown): Promise<DocumentModuleActionResult> {
-  const auth = await getCompanyContext();
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId, user } = auth.context;
 

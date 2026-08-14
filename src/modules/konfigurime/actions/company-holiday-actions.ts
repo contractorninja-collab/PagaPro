@@ -13,21 +13,34 @@ import {
   updateCompanyHoliday,
 } from "@/modules/payroll/services/company-holiday-service";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { can, capabilityDeniedMessage, type Capability } from "@/server/permissions";
 
 const categorySchema = z.enum(["KOSOVO_OFFICIAL_FIXED", "KOSOVO_OFFICIAL_MOVABLE", "COMPANY_CUSTOM"]);
 
 const yearSchema = z.number().int().min(2000).max(2100);
 
-async function companyIdOrError(): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
+/**
+ * `capability` is required so a new action must state whether it reads or
+ * writes. The official-holiday calendar drives payroll day counts and leave
+ * deductions, so changing it is company.settings.
+ */
+async function companyIdOrError(
+  capability: Capability | null,
+): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
-  return { ok: true, companyId: result.context.companyId };
+
+  const { user, role, companyId } = result.context;
+  if (capability && !can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+    return { ok: false, error: capabilityDeniedMessage(capability) };
+  }
+  return { ok: true, companyId };
 }
 
 export async function loadCompanyHolidaysAction(
   rawYear: unknown,
 ): Promise<{ ok: true; holidays: CompanyHolidayDto[] } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError(null);
   if (!company.ok) return company;
 
   const yearParsed = yearSchema.safeParse(rawYear);
@@ -42,7 +55,7 @@ export async function seedKosovoOfficialFixedHolidaysAction(
 ): Promise<
   { ok: true; upserted: number; movableWithoutDate: string[] } | { ok: false; error: string }
 > {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("company.settings");
   if (!company.ok) return company;
 
   const yearParsed = yearSchema.safeParse(rawYear);
@@ -67,7 +80,7 @@ const createSchema = z.object({
 export async function createCompanyHolidayAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("company.settings");
   if (!company.ok) return company;
 
   const parsed = createSchema.safeParse(raw);
@@ -98,7 +111,7 @@ const updateSchema = z.object({
 export async function updateCompanyHolidayAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("company.settings");
   if (!company.ok) return company;
 
   const parsed = updateSchema.safeParse(raw);
@@ -123,7 +136,7 @@ const idSchema = z.object({ id: z.string().min(1) });
 export async function deleteCompanyHolidayAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("company.settings");
   if (!company.ok) return company;
 
   const parsed = idSchema.safeParse(raw);
@@ -144,7 +157,7 @@ const toggleSchema = z.object({
 export async function toggleCompanyHolidayActiveAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("company.settings");
   if (!company.ok) return company;
 
   const parsed = toggleSchema.safeParse(raw);

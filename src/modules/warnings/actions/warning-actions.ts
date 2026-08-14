@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   createDisciplinaryWarning,
   deleteDisciplinaryWarning,
@@ -33,8 +33,8 @@ export async function listWarningsAction(raw: unknown): Promise<WarningActionRes
 }
 
 export async function createWarningAction(raw: unknown): Promise<WarningActionResult<{ id: string }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   const parsed = warningCreateSchema.safeParse(raw);
   if (!parsed.success) {
@@ -57,8 +57,8 @@ export async function createWarningAction(raw: unknown): Promise<WarningActionRe
 export async function createWarningsBulkAction(
   raw: unknown,
 ): Promise<WarningActionResult<{ warningIds: string[]; failed: string[] }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   const parsed = warningBulkCreateSchema.safeParse(raw);
   if (!parsed.success) {
@@ -92,8 +92,8 @@ export async function createWarningsBulkAction(
 }
 
 export async function deleteWarningAction(raw: unknown): Promise<WarningActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   const parsed = warningDeleteSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };

@@ -12,6 +12,7 @@ import {
   jobTitleUpsertSchema,
 } from "@/modules/job-titles/validation/job-title-schemas";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { can, capabilityDeniedMessage, type Capability } from "@/server/permissions";
 
 const REVALIDATE_PATHS = ["/konfigurime", "/punonjesit", "/dokumentet"] as const;
 
@@ -19,13 +20,22 @@ function revalidateJobTitlePaths(): void {
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
 }
 
-async function companyIdOrError(): Promise<
-  { ok: true; companyId: string; userId: string } | { ok: false; error: string }
-> {
+/**
+ * `capability` is required so a new action must state whether it reads or
+ * writes. Job titles are HR data: writing them is employees.write, not
+ * company.settings, even though the UI sits under Konfigurimet.
+ */
+async function companyIdOrError(
+  capability: Capability | null,
+): Promise<{ ok: true; companyId: string; userId: string } | { ok: false; error: string }> {
   const result = await getCompanyContext();
-  return result.ok
-    ? { ok: true, companyId: result.context.companyId, userId: result.context.user.id }
-    : { ok: false, error: companyContextErrorMessage(result.reason) };
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+
+  const { user, role, companyId } = result.context;
+  if (capability && !can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+    return { ok: false, error: capabilityDeniedMessage(capability) };
+  }
+  return { ok: true, companyId, userId: user.id };
 }
 
 function mutationError(
@@ -42,7 +52,7 @@ function mutationError(
 export async function loadJobTitlesAction(): Promise<
   { ok: true; jobTitles: JobTitleDto[] } | { ok: false; error: string }
 > {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError(null);
   if (!company.ok) return company;
 
   const jobTitles = await listJobTitlesForCompany(company.companyId);
@@ -52,7 +62,7 @@ export async function loadJobTitlesAction(): Promise<
 export async function saveJobTitleAction(
   raw: unknown,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string; fieldErrors?: Record<string, string[]> }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = jobTitleUpsertSchema.safeParse(raw);
@@ -74,7 +84,7 @@ export async function saveJobTitleAction(
 export async function archiveJobTitleAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = jobTitleIdSchema.safeParse(raw);
@@ -90,7 +100,7 @@ export async function archiveJobTitleAction(
 export async function restoreJobTitleAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = jobTitleIdSchema.safeParse(raw);

@@ -17,7 +17,7 @@ import {
   rehireEmployeeSchema,
   terminateEmployeeSchema,
 } from "@/modules/employees/validations/employee-schemas";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import { z } from "zod";
 import { calculateEmployeeLine } from "@/modules/payroll/calculation/payroll-calculator";
 import { loadPayrollLegislationContext } from "@/modules/payroll/services/payroll-settings-service";
@@ -92,9 +92,9 @@ export async function previewNetHourlyRateAction(raw: unknown): Promise<
 
 export async function createEmployeeAction(raw: unknown): Promise<EmployeeActionResult<{ id: string }>> {
   try {
-    const result = await getCompanyContext();
+    const result = await requireCapability("employees.write");
     if (!result.ok) {
-      return { ok: false, error: companyContextErrorMessage(result.reason) };
+      return { ok: false, error: result.error };
     }
     const { user, companyId } = result.context;
 
@@ -159,9 +159,9 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
 
 export async function updateEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
   try {
-    const result = await getCompanyContext();
+    const result = await requireCapability("employees.write");
     if (!result.ok) {
-      return { ok: false, error: companyContextErrorMessage(result.reason) };
+      return { ok: false, error: result.error };
     }
     const { user, companyId } = result.context;
 
@@ -236,9 +236,9 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
 }
 
 export async function archiveEmployeeAction(employeeId: string): Promise<EmployeeActionResult> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("employees.write");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { user, companyId } = result.context;
 
@@ -255,9 +255,9 @@ export async function archiveEmployeeAction(employeeId: string): Promise<Employe
 }
 
 export async function terminateEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("employees.write");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { user, companyId } = result.context;
 
@@ -284,9 +284,9 @@ export async function terminateEmployeeAction(raw: unknown): Promise<EmployeeAct
 }
 
 export async function rehireEmployeeAction(raw: unknown): Promise<EmployeeActionResult> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("employees.write");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { user, companyId } = result.context;
 
@@ -314,9 +314,9 @@ export async function rehireEmployeeAction(raw: unknown): Promise<EmployeeAction
 }
 
 export async function deleteEmployeeAction(employeeId: string): Promise<EmployeeActionResult> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("employees.write");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { user, companyId } = result.context;
 

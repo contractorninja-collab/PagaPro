@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   createContractorPayrollPeriod,
   lockContractorPayrollPeriod,
@@ -50,8 +50,8 @@ function safeRevalidate(path: string): void {
 export async function createContractorPayrollAction(
   raw: unknown,
 ): Promise<ContractorActionResult<{ id: string }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.prepare");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorPeriodCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -74,8 +74,8 @@ export async function createContractorPayrollAction(
 export async function updateContractorEntryHoursAction(
   raw: unknown,
 ): Promise<ContractorActionResult<{ grossPay: string }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.prepare");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorEntryHoursSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -109,8 +109,8 @@ export async function updateContractorEntryHoursAction(
 export async function syncContractorEntryFromTimeClockAction(
   raw: unknown,
 ): Promise<ContractorActionResult<{ grossPay: string; daysNeedingReview: number }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.prepare");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorEntrySyncSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
   const result = await syncContractorEntryFromTimeClock({
@@ -126,8 +126,8 @@ export async function syncContractorEntryFromTimeClockAction(
 export async function regenerateContractorEntriesAction(
   raw: unknown,
 ): Promise<ContractorActionResult<{ updated: number }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.prepare");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorPeriodIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
   const result = await regenerateContractorPayrollEntries(
@@ -142,8 +142,8 @@ export async function regenerateContractorEntriesAction(
 export async function lockContractorPayrollAction(
   raw: unknown,
 ): Promise<ContractorActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.signoff");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorPeriodIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
   const result = await lockContractorPayrollPeriod({
@@ -160,8 +160,8 @@ export async function lockContractorPayrollAction(
 export async function reopenContractorPayrollAction(
   raw: unknown,
 ): Promise<ContractorActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.signoff");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = contractorPeriodIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Kërkesë e pavlefshme." };
   const result = await reopenContractorPayrollPeriod({

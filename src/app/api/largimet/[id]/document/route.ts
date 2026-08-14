@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { TerminationType } from "@prisma/client";
 import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import { renderTerminationDocument } from "@/modules/terminations/documents/render-termination-document";
 import { registerRenderedArtifact } from "@/modules/documents/services/register-rendered-artifact";
 import { TERMINATION_TEMPLATE_OPTIONS } from "@/modules/terminations/types";
@@ -33,7 +34,11 @@ export async function GET(
 ) {
   const ctx = await getCompanyContext();
   if (!ctx.ok) return companyContextHttpError(ctx.reason);
-  const { companyId } = ctx.context;
+  const { companyId, role, user } = ctx.context;
+  // Downloading is reading, and every role may read. But this GET also files the
+  // document in the company's register, which is authoring — so the download
+  // stays open to everyone and only the bookkeeping is gated.
+  const mayRegister = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
 
   const { id } = await params;
   const searchParams = new URL(request.url).searchParams;
@@ -45,7 +50,7 @@ export async function GET(
     return NextResponse.json({ error: result.error }, { status: 404 });
   }
 
-  if (result.templateId && result.templateVersionId) {
+  if (mayRegister && result.templateId && result.templateVersionId) {
     // Never let a bookkeeping failure block the download the user asked for.
     try {
       await registerRenderedArtifact({

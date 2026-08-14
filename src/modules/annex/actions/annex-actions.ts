@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCompanyContext, companyContextErrorMessage } from "@/server/company-context";
+import { getCompanyContext, companyContextErrorMessage, requireCapability } from "@/server/company-context";
 import {
   computeAnnexDiff,
   createEmployeeContractAnnex,
@@ -58,8 +58,8 @@ const updateContractTermSchema = z.object({
 });
 
 export async function updateContractTermAction(raw: unknown): Promise<AnnexActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = updateContractTermSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
@@ -100,8 +100,8 @@ const updateAnnexDateSchema = z.object({
 export async function updateAnnexEffectiveDateAction(
   raw: unknown,
 ): Promise<AnnexActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = updateAnnexDateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
 
@@ -126,8 +126,8 @@ export async function updateAnnexEffectiveDateAction(
 }
 
 export async function deleteAnnexAction(raw: unknown): Promise<AnnexActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const parsed = annexIdSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "ID e pavlefshme." };
 
@@ -148,8 +148,8 @@ export async function deleteAnnexAction(raw: unknown): Promise<AnnexActionResult
 export async function createAnnexAction(
   raw: unknown,
 ): Promise<AnnexActionResult<{ id: string; annexNumber: number }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("employees.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
 
   const parsed = createAnnexSchema.safeParse(raw);

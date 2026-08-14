@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import { addManualPunch, voidPunch } from "@/modules/timeclock/services/timeclock-correction-service";
 import {
   getEmployeePresenceMonth,
@@ -37,8 +37,8 @@ const manualPunchSchema = z.object({
 });
 
 export async function addManualPunchAction(raw: unknown): Promise<TimeClockActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("timeclock.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
 
   const parsed = manualPunchSchema.safeParse(raw);
@@ -67,8 +67,8 @@ const voidPunchSchema = z.object({
 });
 
 export async function voidPunchAction(raw: unknown): Promise<TimeClockActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("timeclock.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
 
   const parsed = voidPunchSchema.safeParse(raw);
@@ -120,8 +120,8 @@ const syncSchema = z.object({
 export async function syncTimeClockMonthToPayrollAction(
   raw: unknown,
 ): Promise<TimeClockActionResult<TimeClockSyncAccount>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("payroll.prepare");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
 
   const parsed = syncSchema.safeParse(raw);

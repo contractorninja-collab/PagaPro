@@ -16,6 +16,7 @@ import {
 } from "@/modules/departments/validation/department-schemas";
 import type { DepartmentOptionDto } from "@/modules/employees/types";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { can, capabilityDeniedMessage, type Capability } from "@/server/permissions";
 
 const REVALIDATE_PATHS = ["/konfigurime", "/punonjesit", "/paneli", "/pushimet", "/raportet"] as const;
 
@@ -25,11 +26,23 @@ function revalidateDepartmentPaths(): void {
   }
 }
 
-async function companyIdOrError(): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
+/**
+ * `capability` is required rather than optional on purpose: a new action here
+ * has to say whether it reads or writes, so it cannot ship ungated by omission.
+ * Departments are HR data, so writing them is employees.write — not
+ * company.settings — even though the UI lives under Konfigurimet.
+ */
+async function companyIdOrError(
+  capability: Capability | null,
+): Promise<{ ok: true; companyId: string } | { ok: false; error: string }> {
   const result = await getCompanyContext();
-  return result.ok
-    ? { ok: true, companyId: result.context.companyId }
-    : { ok: false, error: companyContextErrorMessage(result.reason) };
+  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+
+  const { user, role, companyId } = result.context;
+  if (capability && !can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+    return { ok: false, error: capabilityDeniedMessage(capability) };
+  }
+  return { ok: true, companyId };
 }
 
 function mutationError(
@@ -48,7 +61,7 @@ function mutationError(
 export async function loadDepartmentsAction(): Promise<
   { ok: true; departments: DepartmentWithEmployeeCountDto[] } | { ok: false; error: string }
 > {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError(null);
   if (!company.ok) return company;
 
   const departments = await listDepartmentsWithEmployeeCounts(company.companyId);
@@ -58,7 +71,7 @@ export async function loadDepartmentsAction(): Promise<
 export async function loadDepartmentOptionsAction(): Promise<
   { ok: true; departments: DepartmentOptionDto[] } | { ok: false; error: string }
 > {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError(null);
   if (!company.ok) return company;
 
   const departments = await listDepartmentsForCompany(company.companyId);
@@ -68,7 +81,7 @@ export async function loadDepartmentOptionsAction(): Promise<
 export async function createDepartmentAction(
   raw: unknown,
 ): Promise<{ ok: true; id: string; name: string } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = createDepartmentSchema.safeParse(raw);
@@ -86,7 +99,7 @@ export async function createDepartmentAction(
 export async function renameDepartmentAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = renameDepartmentSchema.safeParse(raw);
@@ -104,7 +117,7 @@ export async function renameDepartmentAction(
 export async function deleteDepartmentAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const company = await companyIdOrError();
+  const company = await companyIdOrError("employees.write");
   if (!company.ok) return company;
 
   const parsed = deleteDepartmentSchema.safeParse(raw);

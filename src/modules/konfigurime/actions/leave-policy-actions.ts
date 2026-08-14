@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ensureDefaultLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 
 const toggleSchema = z.object({ enabled: z.boolean() });
 
@@ -17,8 +17,8 @@ const toggleSchema = z.object({ enabled: z.boolean() });
 export async function setLeaveTenureBonusAction(
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("company.settings");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId } = ctx.context;
 
   const parsed = toggleSchema.safeParse(raw);

@@ -8,7 +8,7 @@ import {
   konfigurimePayloadSchema,
 } from "@/modules/konfigurime/validation/konfigurime-schemas";
 import { persistKonfigurimeSave } from "@/modules/konfigurime/services/konfigurime-service";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   companyLogoStorageKey,
   normalizeCompanyLogo,
@@ -47,9 +47,9 @@ export type SaveKonfigurimeResult =
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
 export async function saveKonfigurimeAction(formData: FormData): Promise<SaveKonfigurimeResult> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("company.settings");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { companyId } = result.context;
 

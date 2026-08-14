@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   approveLeaveRequest,
   cancelLeaveRequest,
@@ -56,8 +56,8 @@ async function activeMembershipId(userId: string, companyId: string): Promise<st
 export async function linkSickInterruptingAnnualLeaveAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed = leaveInterruptLinkSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
@@ -81,8 +81,8 @@ export async function linkSickInterruptingAnnualLeaveAction(
 export async function createLeaveRequestAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult<{ id: string }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed = leaveRequestCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
@@ -120,8 +120,8 @@ export async function createLeaveRequestAction(
 }
 
 export async function approveLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
@@ -165,8 +165,8 @@ export interface BulkApproveOutcome {
 export async function bulkApproveLeaveRequestsAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult<BulkApproveOutcome>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
 
   const parsed = leaveBulkApproveSchema.safeParse(raw);
@@ -202,8 +202,8 @@ export async function bulkApproveLeaveRequestsAction(
 }
 
 export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
@@ -226,8 +226,8 @@ export async function rejectLeaveRequestAction(raw: unknown): Promise<LeaveModul
 }
 
 export async function cancelLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId } = ctx.context;
   const parsed =
     typeof raw === "string"
@@ -245,8 +245,8 @@ export async function cancelLeaveRequestAction(raw: unknown): Promise<LeaveModul
 }
 
 export async function revokeLeaveRequestAction(raw: unknown): Promise<LeaveModuleActionResult> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed =
     typeof raw === "string"
@@ -273,8 +273,8 @@ export async function revokeLeaveRequestAction(raw: unknown): Promise<LeaveModul
 export async function generateLeaveDocumentAction(
   raw: unknown,
 ): Promise<LeaveModuleActionResult<{ artifactId: string }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("documents.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId, user } = ctx.context;
   const parsed = leaveGenerateDocSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
@@ -304,8 +304,8 @@ export async function generateLeaveDocumentAction(
 export async function refreshLeaveBalancesAction(
   year: number,
 ): Promise<LeaveModuleActionResult<{ synced: number }>> {
-  const ctx = await getCompanyContext();
-  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+  const ctx = await requireCapability("leave.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId } = ctx.context;
 
   const y = Number(year);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { PayrollCorrectionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
 import {
   approvePayroll,
   archivePayroll,
@@ -104,9 +104,9 @@ export async function payrollSelectionPreviewAction(
 }
 
 export async function createPayrollDraftAction(raw: unknown): Promise<PayrollActionResult<{ id: string }>> {
-  const result = await getCompanyContext();
+  const result = await requireCapability("payroll.prepare");
   if (!result.ok) {
-    return { ok: false, error: companyContextErrorMessage(result.reason) };
+    return { ok: false, error: result.error };
   }
   const { companyId, user } = result.context;
   const parsed = payrollCreateSchema.safeParse(raw);
@@ -140,8 +140,8 @@ export async function createPayrollDraftAction(raw: unknown): Promise<PayrollAct
 }
 
 export async function regeneratePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await regeneratePayrollEntriesAndCalculate(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -154,8 +154,8 @@ export async function regeneratePayrollAction(payrollId: string): Promise<Payrol
 export async function includeAllEmployeesInPayrollAction(
   payrollId: string,
 ): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await includeAllEmployeesInPayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -165,8 +165,8 @@ export async function includeAllEmployeesInPayrollAction(
 }
 
 export async function reviewPayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.signoff");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await reviewPayrollExplicit(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -176,8 +176,8 @@ export async function reviewPayrollAction(payrollId: string): Promise<PayrollAct
 }
 
 export async function returnPayrollReviewToDraftAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.signoff");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await returnPayrollReviewToDraft(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -187,8 +187,8 @@ export async function returnPayrollReviewToDraftAction(payrollId: string): Promi
 }
 
 export async function approvePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.signoff");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await approvePayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -198,8 +198,8 @@ export async function approvePayrollAction(payrollId: string): Promise<PayrollAc
 }
 
 export async function validatePayrollAction(payrollId: string): Promise<PayrollActionResult<{ warnings: string[] }>> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId } = result.context;
   const res = await validatePayrollSpreadsheet(companyId, payrollId);
   if (!res.ok) return { ok: false, error: res.error };
@@ -208,8 +208,8 @@ export async function validatePayrollAction(payrollId: string): Promise<PayrollA
 }
 
 export async function lockPayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.signoff");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await lockPayrollWithSnapshot(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -219,8 +219,8 @@ export async function lockPayrollAction(payrollId: string): Promise<PayrollActio
 }
 
 export async function archivePayrollAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.signoff");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const res = await archivePayroll(companyId, payrollId, user.id);
   if (!res.ok) return { ok: false, error: res.error };
@@ -230,8 +230,8 @@ export async function archivePayrollAction(payrollId: string): Promise<PayrollAc
 }
 
 export async function generatePayrollAtkExportAction(payrollId: string): Promise<PayrollActionResult<{ exportId: string }>> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const res = await generatePayrollAtkExport({ companyId, payrollId, actorUserId: user.id });
@@ -242,8 +242,8 @@ export async function generatePayrollAtkExportAction(payrollId: string): Promise
 }
 
 export async function archivePayrollAtkExportAction(exportId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const row = await prisma.payrollATKExport.findFirst({
@@ -260,8 +260,8 @@ export async function archivePayrollAtkExportAction(exportId: string): Promise<P
 }
 
 export async function generatePayrollPdfsAction(payrollId: string): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
 
   const payroll = await prisma.payroll.findFirst({
@@ -320,8 +320,8 @@ async function rejectIfClockOwned(
 }
 
 export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const parsed = payrollEntryPatchSchema.safeParse(raw);
   if (!parsed.success) {
@@ -342,8 +342,8 @@ export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollAct
 }
 
 export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<PayrollActionResult> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const parsed = payrollBulkPatchSchema.safeParse(raw);
   if (!parsed.success) {
@@ -368,8 +368,8 @@ export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<Payro
 }
 
 export async function createPayrollCorrectionAction(raw: unknown): Promise<PayrollActionResult<{ id: string }>> {
-  const result = await getCompanyContext();
-  if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
+  const result = await requireCapability("payroll.prepare");
+  if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
   const parsed = payrollCorrectionCreateSchema.safeParse(raw);
   if (!parsed.success) {
