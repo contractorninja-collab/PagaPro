@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { requireCapability } from "@/server/company-context";
 import {
   createContractorPayrollPeriod,
   lockContractorPayrollPeriod,

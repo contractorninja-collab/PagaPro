@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runMonthlyLeaveAccrualForCompany } from "@/modules/leaves/services/leave-accrual-service";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { requireCapability } from "@/server/company-context";
 
 const monthlyAccrualBodySchema = z.object({
   periodYear: z.number().int().min(1970).max(2100),

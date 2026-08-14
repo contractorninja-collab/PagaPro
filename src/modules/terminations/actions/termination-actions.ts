@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCompanyContext, companyContextErrorMessage, requireCapability } from "@/server/company-context";
+import { requireCapability } from "@/server/company-context";
 import {
   createTerminationWorkflow,
   updateTerminationWorkflow,

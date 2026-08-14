@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ensureDefaultLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { requireCapability } from "@/server/company-context";
 
 const toggleSchema = z.object({ enabled: z.boolean() });
 

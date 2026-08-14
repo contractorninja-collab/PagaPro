@@ -8,7 +8,7 @@ import {
   konfigurimePayloadSchema,
 } from "@/modules/konfigurime/validation/konfigurime-schemas";
 import { persistKonfigurimeSave } from "@/modules/konfigurime/services/konfigurime-service";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { requireCapability } from "@/server/company-context";
 import {
   companyLogoStorageKey,
   normalizeCompanyLogo,
