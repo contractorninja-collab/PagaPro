@@ -38,6 +38,7 @@ import {
   isoDateInput,
 } from "@/modules/employees/components/employees-labels";
 import { KOSOVO_BANKS, isKnownKosovoBank } from "@/modules/employees/constants/kosovo-banks";
+import { bankAccountNumberError } from "@/modules/employees/validations/employee-schemas";
 
 const fieldGrid = "grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start";
 
@@ -456,6 +457,10 @@ export function EmployeeFormSheet(props: {
 
   const errClass = (key: string) =>
     cn(fieldErrors[key] && "border-destructive ring-1 ring-destructive/35");
+
+  // Told as they type rather than only on submit — a wrong account number is
+  // cheap to fix in the moment and expensive to find later in a payment file.
+  const bankAccountLiveError = bankAccountNumberError(values.bankAccountIban);
 
   return (
     <>
@@ -1000,11 +1005,21 @@ export function EmployeeFormSheet(props: {
                   ))}
                 </select>
               </FormField>
-              <FormField label="Numri i llogarisë" error={fieldErrors.bankAccountIban}>
+              <FormField
+                label="Numri i llogarisë"
+                hint="16 shifra."
+                error={fieldErrors.bankAccountIban ?? bankAccountLiveError}
+              >
                 <Input
-                  className={cn("font-mono text-xs", errClass("bankAccountIban"))}
+                  className={cn(
+                    "font-mono text-xs",
+                    errClass("bankAccountIban"),
+                    bankAccountLiveError ? "border-destructive" : "",
+                  )}
                   value={values.bankAccountIban}
                   placeholder="p.sh. 1234567890123456"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(fieldErrors.bankAccountIban ?? bankAccountLiveError)}
                   onChange={(e) => {
                     clearKey("bankAccountIban");
                     setValues((s) => ({ ...s, bankAccountIban: e.target.value }));

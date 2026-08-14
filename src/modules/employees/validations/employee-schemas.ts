@@ -35,6 +35,21 @@ function parseOptionalDate(v: unknown): Date | null | undefined {
   return null;
 }
 
+/**
+ * Kosovo bank account numbers are 16 digits. Exported so the form can say the
+ * same thing while the client types that the server says on submit — one rule,
+ * one message, no chance of the two drifting apart.
+ */
+export const BANK_ACCOUNT_NUMBER_PATTERN = /^\d{16}$/;
+export const BANK_ACCOUNT_NUMBER_MESSAGE = "Numri i llogarisë duhet të ketë 16 shifra.";
+
+/** True when a typed value is present and not yet 16 digits — for live feedback. */
+export function bankAccountNumberError(raw: string): string | null {
+  const compact = raw.replace(/\s+/g, "");
+  if (compact.length === 0) return null;
+  return BANK_ACCOUNT_NUMBER_PATTERN.test(compact) ? null : BANK_ACCOUNT_NUMBER_MESSAGE;
+}
+
 export const employeeUpsertSchema = z
   .object({
     firstName: z.string().trim().min(1, "Emri është i detyrueshëm"),
@@ -94,7 +109,16 @@ export const employeeUpsertSchema = z
     weeklyHours: z.coerce.number({ message: "Orët javore duhet të jenë numër" }).min(0).max(168).default(40),
 
     bankName: z.preprocess(emptyToNull, z.string().max(120).nullable().optional()),
-    bankAccountIban: z.preprocess(emptyToNull, z.string().max(64).nullable().optional()),
+    bankAccountIban: z.preprocess(
+      // Spaces are how people read a 16-digit number out loud, so accept them
+      // and strip rather than rejecting "1234 5678 9012 3456".
+      (v) => (typeof v === "string" ? emptyToNull(v.replace(/\s+/g, "")) : emptyToNull(v)),
+      z
+        .string()
+        .regex(BANK_ACCOUNT_NUMBER_PATTERN, BANK_ACCOUNT_NUMBER_MESSAGE)
+        .nullable()
+        .optional(),
+    ),
     applyTrust: z.boolean(),
     applyTax: z.boolean(),
 
