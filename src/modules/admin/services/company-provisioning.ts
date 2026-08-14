@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { KOSOVO_MINIMUM_MONTHLY_GROSS } from "@/modules/payroll/calculation/legislation/minimum-wage";
 import { companySlugFromName } from "@/lib/company-url";
 import { maybeSeedKosovoOfficialFixedHolidaysForCurrentUtcYearIfEmpty } from "@/modules/payroll/services/company-holiday-service";
 import { ensureDefaultLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
@@ -102,7 +103,7 @@ export async function provisionCompany(input: CompanyUpsertInput): Promise<Provi
         companyId,
         effectiveFrom: new Date("2020-01-01T00:00:00.000Z"),
         label: "Parametrat bazë (Kosovë)",
-        minimumMonthlyWage: "350",
+        minimumMonthlyWage: KOSOVO_MINIMUM_MONTHLY_GROSS,
         pensionEmployeeRate: "0.05",
         pensionEmployerRate: "0.05",
       },

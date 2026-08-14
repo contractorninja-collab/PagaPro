@@ -1,3 +1,4 @@
+import { KOSOVO_MINIMUM_MONTHLY_GROSS } from "@/modules/payroll/calculation/legislation/minimum-wage";
 import type { LegislationSnapshot, PitBandSnapshot } from "../types";
 import {
   KOSOVO_DEFAULT_PENSION_EMPLOYEE_RATE,
@@ -17,7 +18,7 @@ export function kosovo2026AtkDefaults(snapshot?: Partial<LegislationSnapshot>): 
     snapshotId: snapshot?.snapshotId,
     effectiveFromIso: snapshot?.effectiveFromIso,
     currency: snapshot?.currency ?? "EUR",
-    minimumMonthlyGross: snapshot?.minimumMonthlyGross ?? "450",
+    minimumMonthlyGross: snapshot?.minimumMonthlyGross ?? KOSOVO_MINIMUM_MONTHLY_GROSS,
     minimumHourlyWage: snapshot?.minimumHourlyWage,
     standardMonthlyHours: snapshot?.standardMonthlyHours,
     pensionEmployeeRate: snapshot?.pensionEmployeeRate ?? KOSOVO_DEFAULT_PENSION_EMPLOYEE_RATE,

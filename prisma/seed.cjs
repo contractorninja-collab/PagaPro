@@ -342,7 +342,7 @@ async function main() {
         companyId: company.id,
         effectiveFrom: new Date("2020-01-01T00:00:00.000Z"),
         label: "Dev baseline",
-        minimumMonthlyWage: "350",
+        minimumMonthlyWage: "500", // keep in step with KOSOVO_MINIMUM_MONTHLY_GROSS
         pensionEmployeeRate: "0.05",
         pensionEmployerRate: "0.05",
       },

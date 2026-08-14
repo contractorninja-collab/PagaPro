@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { KOSOVO_MINIMUM_MONTHLY_GROSS } from "@/modules/payroll/calculation/legislation/minimum-wage";
 import { Prisma as PrismaNs } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { KonfigurimePayloadValidated } from "@/modules/konfigurime/validation/konfigurime-schemas";
@@ -71,8 +72,10 @@ export async function syncPayrollSettingsFromKonfigurime(
     orderBy: { effectiveFrom: "desc" },
   });
 
-  const minCurrent = cfg.minimumSalaryCurrent ?? "425";
-  const minJuly = cfg.minimumSalaryFromJuly1 ?? "500";
+  const minCurrent = cfg.minimumSalaryCurrent ?? KOSOVO_MINIMUM_MONTHLY_GROSS;
+  // No scheduled step any more: a company either sets its own figure or takes
+  // the statutory one. The column stays for records that already carry a value.
+  const minJuly = cfg.minimumSalaryFromJuly1 ?? minCurrent;
   const standardWeekly = cfg.standardWeeklyHours ?? "40";
 
   let pensionEmp = new PrismaNs.Decimal("0.05");
@@ -157,8 +160,8 @@ export async function ensurePayrollSettingsRow(companyId: string): Promise<void>
     orderBy: { effectiveFrom: "desc" },
   });
 
-  const minCurrent = cfg?.minimumSalaryCurrent?.toString() ?? "425";
-  const minJuly = cfg?.minimumSalaryFromJuly1?.toString() ?? "500";
+  const minCurrent = cfg?.minimumSalaryCurrent?.toString() ?? KOSOVO_MINIMUM_MONTHLY_GROSS;
+  const minJuly = cfg?.minimumSalaryFromJuly1?.toString() ?? minCurrent;
   const weekly = cfg?.standardWeeklyHours?.toString() ?? "40";
 
   let pensionEmp = new PrismaNs.Decimal("0.05");
