@@ -12,13 +12,26 @@
  * "below minimum wage" warnings are measured against a stale number. This says
  * which companies those are.
  *
- * STRICTLY READ-ONLY. There is deliberately no --apply: overwriting a figure a
- * client chose is a decision for a human, not a build step.
+ * READ-ONLY by default. `--apply` performs one narrowly scoped correction, and
+ * only that:
  *
- *   node -r dotenv/config scripts/report-minimum-wages.cjs
+ *   for companies whose Konfigurimet figure is UNSET — so they never chose a
+ *   number and simply inherited whatever provisioning wrote — bring the ACTIVE
+ *   parameter set up to the statutory default.
+ *
+ * It will not touch a company that typed a figure, and it will not touch a
+ * historical parameter set. Both restrictions matter: the first is the
+ * difference between correcting an inherited default and overriding a client's
+ * decision; the second is because the minimum wage genuinely differed in the
+ * past, and a closed date range is a record of that, not a mistake.
+ *
+ *   node -r dotenv/config scripts/report-minimum-wages.cjs            # dry run
+ *   node -r dotenv/config scripts/report-minimum-wages.cjs --apply    # write
  */
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
+
+const APPLY = process.argv.includes("--apply");
 
 // Mirrors src/modules/payroll/calculation/legislation/minimum-wage.ts.
 const STATUTORY_DEFAULT = "500";
@@ -54,7 +67,7 @@ async function main() {
   const schema = resolveSchema();
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }, { schema }) });
 
-  console.log(`[minimum-wages] READ-ONLY report · schema "${schema}" · default ${STATUTORY_DEFAULT}`);
+  console.log(`[minimum-wages] ${APPLY ? "APPLY (writing)" : "DRY RUN (nothing is written)"} · schema "${schema}" · default ${STATUTORY_DEFAULT}`);
 
   const companies = await prisma.company.findMany({
     select: {
@@ -68,7 +81,7 @@ async function main() {
   });
 
   const sets = await prisma.payrollParameterSet.findMany({
-    select: { companyId: true, minimumMonthlyWage: true, effectiveFrom: true },
+    select: { id: true, companyId: true, minimumMonthlyWage: true, effectiveFrom: true, effectiveTo: true },
     orderBy: { effectiveFrom: "desc" },
   });
 
@@ -105,9 +118,70 @@ async function main() {
 
   console.log(`\nSummary against the statutory default of ${STATUTORY_DEFAULT}:`);
   console.log(`  already at ${STATUTORY_DEFAULT} : ${current.length}${current.length ? " — " + current.join(", ") : ""}`);
-  console.log(`  holding an older figure : ${stale.length}${stale.length ? " — " + stale.join(", ") : ""}`);
-  console.log(`  nothing set, so they take the default : ${unset.length}${unset.length ? " — " + unset.join(", ") : ""}`);
-  console.log(`\nRead-only. Changing a figure a client chose is a human decision, not a build step.`);
+  console.log(`  on a different figure : ${stale.length}${stale.length ? " — " + stale.join(", ") : ""}`);
+  console.log(`  nothing anywhere : ${unset.length}${unset.length ? " — " + unset.join(", ") : ""}`);
+
+  // ---- the correction, scoped to inherited defaults only -------------------
+  const now = new Date();
+  const candidates = [];
+  const skippedChosen = [];
+  const skippedHistorical = [];
+
+  for (const c of companies) {
+    if (c.configuration?.minimumSalaryCurrent != null) {
+      skippedChosen.push(`${c.legalName} (chose ${c.configuration.minimumSalaryCurrent.toString()})`);
+      continue;
+    }
+    const mine = sets.filter((s) => s.companyId === c.id);
+    const active = mine.find((s) => s.effectiveFrom <= now && (s.effectiveTo == null || s.effectiveTo > now));
+    for (const s of mine) {
+      if (s !== active && s.minimumMonthlyWage.toString() !== STATUTORY_DEFAULT) {
+        skippedHistorical.push(`${c.legalName} @ ${s.effectiveFrom.toISOString().slice(0, 10)} = ${s.minimumMonthlyWage.toString()}`);
+      }
+    }
+    if (!active) continue;
+    if (active.minimumMonthlyWage.toString() === STATUTORY_DEFAULT) continue;
+    candidates.push({
+      id: active.id,
+      company: c.legalName,
+      from: active.minimumMonthlyWage.toString(),
+      effectiveFrom: active.effectiveFrom.toISOString().slice(0, 10),
+    });
+  }
+
+  console.log(`\n--- correction: inherited defaults only ---`);
+  if (candidates.length === 0) {
+    console.log("  Nothing to correct.");
+  } else {
+    console.log(`  WOULD CHANGE ${candidates.length} active parameter set(s):\n`);
+    for (const c of candidates) {
+      console.log(`    ${c.company.padEnd(28)} ${c.from} -> ${STATUTORY_DEFAULT}   (active from ${c.effectiveFrom})`);
+    }
+  }
+  if (skippedChosen.length > 0) {
+    console.log(`\n  Left alone — the client chose a figure:`);
+    for (const s of skippedChosen) console.log(`    ${s}`);
+  }
+  if (skippedHistorical.length > 0) {
+    console.log(`\n  Left alone — historical parameter sets (past periods keep their own rate):`);
+    for (const s of skippedHistorical) console.log(`    ${s}`);
+  }
+
+  if (!APPLY) {
+    console.log(`\nDry run. Re-run with --apply to write these changes.`);
+    await prisma.$disconnect();
+    return;
+  }
+
+  let written = 0;
+  for (const c of candidates) {
+    await prisma.payrollParameterSet.update({
+      where: { id: c.id },
+      data: { minimumMonthlyWage: STATUTORY_DEFAULT },
+    });
+    written += 1;
+  }
+  console.log(`\nWrote ${written} parameter set(s).`);
 
   await prisma.$disconnect();
 }
