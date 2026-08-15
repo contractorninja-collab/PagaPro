@@ -13,11 +13,21 @@
  * appear solely for the ones a human has to chase, because you cannot chase a
  * row you cannot identify.
  *
- * Both columns are read, because the form writes both — employee-service.ts
+ * Both columns are read AND EACH IS CLASSIFIED AGAINST ITS OWN VALUE, which is
+ * the whole game. The form writes both — employee-service.ts
  * syncPrimaryBankAccount mirrors Employee.bankAccountIban into a fresh
- * EmployeeBankAccount row on every save. They should agree; where they do not,
- * that is itself the finding, since the payslip PDF and {{iban}} read the
- * EmployeeBankAccount side while the profile screen shows the other.
+ * EmployeeBankAccount row on every save — but they are stored independently,
+ * and it is the EmployeeBankAccount row that pays: payroll-pdf-service prefers
+ * it and resolve-placeholder-values reads only it. Judging one column and
+ * repairing both would let a clean profile vouch for a broken row, and would
+ * let a repair derived from the profile overwrite the number payroll actually
+ * pays into. So:
+ *
+ *   - a row is repaired only when both columns hold the SAME value and that
+ *     value is unambiguously repairable;
+ *   - where the two disagree, nothing is written. A divergence asks which
+ *     account is current, and reformatting does not answer that question — a
+ *     person does.
  *
  * Classification, and why only two kinds are safe to repair:
  *
@@ -151,6 +161,23 @@ function classify(plain) {
 
 const REPAIRABLE = new Set(["SEPARATORS", "XK_IBAN"]);
 
+/**
+ * Free-text columns are printed to identify a row, and free text can contain
+ * anything. Kosovo payment slips write the bank and the account number on one
+ * line, the CSV import's "Banka" and "Numri i llogarisë" are adjacent columns,
+ * and bankName is stored verbatim with no charset rule — so a Banka cell
+ * reading "TEB - llogaria 1234567890123456" would print a whole account number
+ * from the one field this script never treats as sensitive. Digits are masked
+ * so the no-digits rule is a property of the code and not of the data.
+ */
+function safeText(value) {
+  return String(value ?? "").replace(/\d/g, "•");
+}
+
+function describe(verdict) {
+  return verdict ? verdict.kind : "empty";
+}
+
 async function main() {
   const connectionString = resolveConnectionString();
   if (!connectionString) {
@@ -189,58 +216,91 @@ async function main() {
     counts[k] = (counts[k] ?? 0) + 1;
   };
   const needHuman = [];
-  const mismatches = [];
+  const divergent = [];
   const repairs = [];
   let withNumber = 0;
 
   for (const e of employees) {
-    const who = `${e.firstName} ${e.lastName}`.trim();
-    const where = e.company?.legalName ?? "(pa kompani)";
+    const who = safeText(`${e.firstName} ${e.lastName}`.trim());
+    const where = safeText(e.company?.legalName ?? "(pa kompani)");
+    const bank = safeText(e.bankName ?? "—");
 
-    const profileRaw = e.bankAccountIban ?? "";
-    const profile = profileRaw ? decryptField(profileRaw, key) : "";
-
-    // The primary row is what the payslip and {{iban}} actually read.
+    // Trimmed before the emptiness tests: a whitespace-only column is not a
+    // number, and treating it as one made it classify EMPTY and then fall out
+    // of every list while still counting toward the total.
+    const profile = (e.bankAccountIban ? decryptField(e.bankAccountIban, key) : "").trim();
     const primary = e.bankAccounts.find((a) => a.isPrimary) ?? e.bankAccounts[0] ?? null;
-    const rowPlain = primary ? decryptField(primary.iban, key) : "";
+    const row = primary ? decryptField(primary.iban, key).trim() : "";
 
-    if (!profile && !rowPlain) continue;
+    if (!profile && !row) continue;
     withNumber += 1;
 
-    const verdict = classify(profile || rowPlain);
-    bump(verdict.kind);
+    // EACH COLUMN AGAINST ITS OWN VALUE. The form writes both together, but a
+    // verdict read off one says nothing about the other, and it is the
+    // EmployeeBankAccount row that payroll pays: payroll-pdf-service prefers it
+    // and resolve-placeholder-values reads only it. Classifying one and
+    // repairing both would let a clean profile vouch for a broken row — or
+    // worse, overwrite a good row with a number derived from somewhere else.
+    const profileVerdict = profile ? classify(profile) : null;
+    const rowVerdict = row ? classify(row) : null;
+    const paying = rowVerdict ?? profileVerdict;
 
-    if (verdict.kind !== "OK" && verdict.kind !== "EMPTY") {
-      if (REPAIRABLE.has(verdict.kind)) {
-        repairs.push({
-          employeeId: e.id,
-          bankAccountId: primary?.id ?? null,
-          repaired: verdict.repaired,
-          who,
-          where,
-          kind: verdict.kind,
-        });
-      } else {
-        needHuman.push({ where, who, status: e.status, bank: e.bankName ?? "—", kind: verdict.kind, detail: verdict.detail });
-      }
+    // A divergence is a question — which of these two accounts is the current
+    // one? — and no amount of reformatting answers it. Never repaired. It is
+    // counted as the divergence rather than as the paying column's format, so
+    // the table never reports a row as OK that the list below says needs
+    // chasing; every employee lands in exactly one bucket.
+    if (profile && row && profile !== row) {
+      bump("COLUMNS_DISAGREE");
+      divergent.push({ where, who, note: `profile ${describe(profileVerdict)} · payslip row ${describe(rowVerdict)}` });
+      needHuman.push({
+        where, who, status: e.status, bank,
+        kind: "COLUMNS_DISAGREE",
+        detail: "the two stored numbers differ — somebody must say which account is current",
+      });
+      continue;
+    }
+    if (profile && !primary) {
+      bump("NO_PAYSLIP_ROW");
+      needHuman.push({
+        where, who, status: e.status, bank,
+        kind: "NO_PAYSLIP_ROW",
+        detail: "profile holds a number but no bank row exists — the payslip has nothing to print",
+      });
+      continue;
+    }
+    bump(paying.kind);
+    if (!profile && row) {
+      divergent.push({ where, who, note: "payslip row has a number, profile does not" });
     }
 
-    // Both columns are written together; a divergence means one of the two
-    // screens that read them is showing a number the other does not have.
-    if (profile && rowPlain && profile.replace(/\s+/g, "") !== rowPlain.replace(/\s+/g, "")) {
-      mismatches.push({ where, who });
-    } else if (profile && !primary) {
-      mismatches.push({ where, who, note: "profile has a number, no EmployeeBankAccount row" });
-    } else if (!profile && rowPlain) {
-      mismatches.push({ where, who, note: "EmployeeBankAccount row has a number, profile does not" });
+    if (paying.kind === "OK") continue;
+
+    if (REPAIRABLE.has(paying.kind)) {
+      repairs.push({
+        employeeId: e.id,
+        bankAccountId: primary?.id ?? null,
+        repaired: paying.repaired,
+        who,
+        where,
+        kind: paying.kind,
+      });
+    } else {
+      needHuman.push({ where, who, status: e.status, bank, kind: paying.kind, detail: paying.detail });
     }
   }
 
   console.log(`\n${employees.length} employees scanned · ${withNumber} have a bank account number.\n`);
 
-  const order = ["OK", "SEPARATORS", "XK_IBAN", "MALFORMED_XK", "FOREIGN_IBAN", "WRONG_LENGTH", "OTHER", "UNREADABLE"];
+  const order = ["OK", "EMPTY", "SEPARATORS", "XK_IBAN", "MALFORMED_XK", "FOREIGN_IBAN", "WRONG_LENGTH", "COLUMNS_DISAGREE", "NO_PAYSLIP_ROW", "OTHER", "UNREADABLE"];
   for (const k of order) {
     if (counts[k]) console.log(`  ${k.padEnd(13)} ${counts[k]}`);
+  }
+
+  const summed = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (summed !== withNumber) {
+    console.log(`
+  !! ${withNumber - summed} row(s) counted but not classified — the table below is incomplete.`);
   }
 
   if (repairs.length > 0) {
@@ -262,9 +322,9 @@ async function main() {
     }
   }
 
-  if (mismatches.length > 0) {
-    console.log(`\nTHE TWO COLUMNS DISAGREE — ${mismatches.length}:`);
-    for (const m of mismatches) console.log(`  ${m.where} · ${m.who}${m.note ? ` · ${m.note}` : ""}`);
+  if (divergent.length > 0) {
+    console.log(`\nTHE TWO COLUMNS DISAGREE — ${divergent.length}. None of these is repaired:`);
+    for (const m of divergent) console.log(`  ${m.where} · ${m.who}${m.note ? ` · ${m.note}` : ""}`);
   }
 
   if (!APPLY) {
@@ -275,6 +335,11 @@ async function main() {
 
   let written = 0;
   for (const r of repairs) {
+    // Nothing but sixteen digits is ever written, whatever classify decided.
+    if (!SIXTEEN_DIGITS.test(r.repaired ?? "")) {
+      console.error(`  refusing to write a non-16-digit repair for ${r.who}`);
+      continue;
+    }
     const stored = encryptField(r.repaired, key);
     await prisma.employee.update({ where: { id: r.employeeId }, data: { bankAccountIban: stored } });
     if (r.bankAccountId) {
