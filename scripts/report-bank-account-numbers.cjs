@@ -350,6 +350,11 @@ async function main() {
       });
     }
     written += 1;
+    // Named, so there is a record of which rows moved. An XK repair is
+    // reversible without this — the check digits are computable from the
+    // account number by ISO 13616 mod-97 — but knowing WHO changed should not
+    // depend on recomputing anything.
+    console.log(`  repaired: ${r.where} · ${r.who} · ${r.kind}`);
   }
   console.log(`\nRepaired ${written} account number(s). Nothing in the "needs a human" list was touched.`);
 
