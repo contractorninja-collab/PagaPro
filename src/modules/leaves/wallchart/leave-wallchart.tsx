@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LEAVE_CARD, LEAVE_TYPE_TONES } from "@/modules/leaves/components/leave-ui";
 import { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
+import { matchesQuery } from "@/lib/search";
 import {
   assignLanes,
   buildWallchartDays,
@@ -39,6 +40,21 @@ const LEGEND_TYPES: LeaveType[] = [
 
 const NAME_COL = "220px";
 const LANE_PX = 24;
+
+/**
+ * The chart is bounded and scrolls inside itself. Unbounded, it drew one row
+ * per employee down the page — eighteen people pushed everything below it off
+ * screen, and a company of two hundred made the rest of Pushimet unreachable
+ * without a very long scroll. The header and the coverage strip stay pinned, so
+ * scrolling never costs you the day you are reading.
+ *
+ * clamp() rather than a flat pixel height: short rosters still shrink to fit
+ * and never leave a tall empty box, tall ones stop at a readable window.
+ */
+const CHART_VIEWPORT = "max-h-[clamp(240px,52vh,560px)]";
+
+/** Sentinel for the "no department" bucket, since the column is nullable. */
+const NO_DEPARTMENT = "__none__";
 
 function initials(name: string): string {
   return name
@@ -95,6 +111,7 @@ export function LeaveWallchart(props: {
   const [view, setView] = useState<"month" | "sixWeeks">("month");
   const [who, setWho] = useState<"all" | "away">("all");
   const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("");
 
   const holidays = useMemo(() => new Set(props.holidayIsoDates), [props.holidayIsoDates]);
 
@@ -164,17 +181,31 @@ export function LeaveWallchart(props: {
     return new Date(t.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   }, [props.todayIso]);
 
+  /** Every department present in the roster, plus the unassigned bucket. */
+  const departmentOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const e of props.employees) {
+      const key = e.departmentName ?? NO_DEPARTMENT;
+      if (!seen.has(key)) seen.set(key, e.departmentName ?? "Pa departament");
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1], "sq-AL"));
+  }, [props.employees]);
+
   const visibleEmployees = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return props.employees.filter((e) => {
-      if (q && !e.name.toLowerCase().includes(q)) return false;
+      // matchesQuery folds ë and ç, so "Recica" finds "Reçica" — the plain
+      // lowercase compare this used could not.
+      if (!matchesQuery(search, e.name, e.jobTitle)) return false;
+      if (department && (e.departmentName ?? NO_DEPARTMENT) !== department) return false;
       if (who === "away") {
         const list = barsByEmployee.get(e.id) ?? [];
         if (!list.some((b) => clampBar(b, days) !== null)) return false;
       }
       return true;
     });
-  }, [props.employees, search, who, barsByEmployee, days]);
+  }, [props.employees, search, department, who, barsByEmployee, days]);
+
+  const filtered = visibleEmployees.length !== props.employees.length;
 
   const monthLabel = new Date(Date.UTC(props.year, props.month - 1, 1)).toLocaleDateString("sq-AL", {
     month: "long",
@@ -294,6 +325,26 @@ export function LeaveWallchart(props: {
           </button>
         </div>
         <span className="min-w-0 flex-1" />
+        {filtered ? (
+          <span className="text-[11.5px] tabular-nums text-[#64748b]">
+            {visibleEmployees.length} nga {props.employees.length}
+          </span>
+        ) : null}
+        {departmentOptions.length > 1 ? (
+          <select
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            aria-label="Filtro sipas departamentit"
+            className="h-[30px] rounded-lg border border-[#e2e8f0] bg-white px-2 text-[12.5px] text-[#334155] focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+          >
+            <option value="">Të gjitha departamentet</option>
+            {departmentOptions.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <input
           type="search"
           value={search}
@@ -304,11 +355,17 @@ export function LeaveWallchart(props: {
         />
       </div>
 
-      {/* the chart */}
-      <div className="overflow-x-auto">
+      {/* The chart scrolls in both directions inside its own box. The day header
+          and the coverage strip are sticky to the top of THIS container, and the
+          name column is sticky to its left, so neither the date you are reading
+          nor the person you are reading about can scroll out of view. */}
+      <div className={`${CHART_VIEWPORT} overflow-auto overscroll-contain`}>
         <div className="min-w-[940px]">
           {/* day header */}
-          <div className="grid h-10 border-b border-[#eef2f7]" style={{ gridTemplateColumns: cols }}>
+          <div
+            className="sticky top-0 z-[5] grid h-10 border-b border-[#eef2f7] bg-white"
+            style={{ gridTemplateColumns: cols }}
+          >
             <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-white px-3">
               <span className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
                 Punonjësi
@@ -336,7 +393,7 @@ export function LeaveWallchart(props: {
 
           {/* coverage row — approved only, blank on weekends and holidays */}
           <div
-            className="grid h-[26px] border-b border-[#eef2f7] bg-[#fcfdff]"
+            className="sticky top-10 z-[5] grid h-[26px] border-b border-[#eef2f7] bg-[#fcfdff]"
             style={{ gridTemplateColumns: cols }}
           >
             <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-[#fcfdff] px-3">
