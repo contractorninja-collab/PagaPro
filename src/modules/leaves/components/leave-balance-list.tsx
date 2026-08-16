@@ -41,6 +41,16 @@ export function LeaveBalanceList({
 
   const searching = query.trim().length > 0;
 
+  /**
+   * What one row means. The annual panel holds one row per person, so "punonjës"
+   * is accurate. The other-types panel holds one row per person PER QUOTA —
+   * six employees with a personal and a medical entitlement are twelve rows —
+   * so counting them as people would report the company as twice its size.
+   * showTypePill is exactly that distinction: it is set when a row has to name
+   * which quota it is about.
+   */
+  const unit = showTypePill ? { one: "rresht", many: "rreshta" } : { one: "punonjës", many: "punonjës" };
+
   const entries = useMemo<AttentionEntry[]>(
     () => rows.map((row) => ({ row, verdict: evaluateBalanceAttention(row, attention) })),
     [rows, attention],
@@ -164,9 +174,9 @@ export function LeaveBalanceList({
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <p className="text-[12.5px] text-[#64748b]">
                   {cohorts.length > 0
-                    ? `${hidden.length} ${hidden.length === 1 ? "punonjës tjetër" : "punonjës të tjerë"}`
+                    ? `${hidden.length} ${hidden.length === 1 ? `${unit.one} tjetër` : `${unit.many} të tjerë`}`
                     : `${hidden.length} ${
-                        hidden.length === 1 ? "punonjës tjetër është" : "punonjës të tjerë janë"
+                        hidden.length === 1 ? `${unit.one} tjetër është` : `${unit.many} të tjerë janë`
                       } brenda normales.`}
                 </p>
                 <button
@@ -179,13 +189,20 @@ export function LeaveBalanceList({
                   {showAll ? "Fshih" : "Shfaq të gjithë"}
                 </button>
               </div>
-              {showAll ? (
-                <ul id={listId} className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]">
-                  {hidden.map((e) => (
-                    <LeaveBalanceRow key={e.row.id} row={e.row} verdict={e.verdict} showTypePill={showTypePill} />
-                  ))}
-                </ul>
-              ) : null}
+              {/* Rendered even when collapsed, with `hidden`. The conditional
+                  version left aria-controls pointing at an id that was not in
+                  the document, so a screen reader following the button's own
+                  reference found nothing — the one moment the association
+                  matters is before you open it. */}
+              <ul
+                id={listId}
+                hidden={!showAll}
+                className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]"
+              >
+                {hidden.map((e) => (
+                  <LeaveBalanceRow key={e.row.id} row={e.row} verdict={e.verdict} showTypePill={showTypePill} />
+                ))}
+              </ul>
             </div>
           ) : null}
         </>
