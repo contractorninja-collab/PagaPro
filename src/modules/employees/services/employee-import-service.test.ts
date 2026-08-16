@@ -48,13 +48,34 @@ describe("employee CSV import", () => {
     expect(rows.every((r) => r.errors.length === 0)).toBe(true);
   });
 
-  it("keeps the former IBAN header compatible with existing CSV files", () => {
+  it("keeps the former IBAN header compatible, and stores the account number behind it", () => {
     const rows = parseEmployeeImportCsv(Buffer.from(
       "Emri,Mbiemri,Nr personal,Data e punësimit,IBAN\n" +
       "Arta,Krasniqi,124,2024-07-01,XK051212012345678906",
     ));
 
-    expect(rows[0]).toMatchObject({ iban: "XK051212012345678906", errors: [] });
+    // The IBAN is accepted — client spreadsheets are full of them — but what
+    // lands in the register is the sixteen digits, the same form the employee
+    // form enforces. Same digits, prefix removed.
+    expect(rows[0]).toMatchObject({ iban: "1212012345678906", errors: [] });
+  });
+
+  it("refuses account numbers the employee form would refuse", () => {
+    const rows = parseEmployeeImportCsv(Buffer.from(
+      "Emri,Mbiemri,Nr personal,Data e punësimit,Numri i llogarisë\n" +
+      "A,Aliu,301,2024-07-01,123456789012\n" +          // twelve digits — the real production defect
+      "B,Bytyqi,302,2024-07-01,12345678901234567\n" +   // one too many
+      "C,Curri,303,2024-07-01,XK0512120123456789067\n" + // mistyped Kosovo IBAN
+      "D,Dema,304,2024-07-01,1234-5678-9012-3456\n" +   // separators, still sixteen digits
+      "E,Elshani,305,2024-07-01,",                      // blank stays allowed
+    ));
+
+    expect(rows.map((r) => r.errors.length > 0)).toEqual([true, true, true, false, false]);
+    for (const row of rows.slice(0, 3)) {
+      expect(row.errors.join(" ")).toContain("16 shifra");
+    }
+    expect(rows[3]?.iban).toBe("1234567890123456");
+    expect(rows[4]?.iban).toBeNull();
   });
 
   it("allows optional profile fields and keeps zero-salary rows inactive", () => {

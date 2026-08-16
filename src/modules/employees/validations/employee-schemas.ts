@@ -50,6 +50,34 @@ export function bankAccountNumberError(raw: string): string | null {
   return BANK_ACCOUNT_NUMBER_PATTERN.test(compact) ? null : BANK_ACCOUNT_NUMBER_MESSAGE;
 }
 
+/**
+ * Brings a written account number to the sixteen digits the rule requires, or
+ * refuses it. For bulk paths (CSV import) where nobody is at the keyboard to be
+ * told what to retype.
+ *
+ * Two conversions are safe, because both change the presentation and not the
+ * number:
+ *
+ *   - separators come out — spreadsheets group digits with spaces, dots,
+ *     dashes and slashes;
+ *   - a Kosovo IBAN loses its XK and two check digits, because an XK IBAN IS
+ *     the account number with a country prefix. "XK05 1212 0123 4567 8906" and
+ *     "1212012345678906" are the same account, which is why the app used to
+ *     store either and why the register carried both forms until they were
+ *     reconciled.
+ *
+ * Everything else is refused. Padding a short number or truncating a long one
+ * would produce a well-formed account number belonging to somebody else, and a
+ * salary would follow it there.
+ */
+export function normalizeBankAccountNumber(raw: string): { value: string | null; error: string | null } {
+  const compact = raw.replace(/[\s.\-/]/g, "").toUpperCase();
+  if (compact === "") return { value: null, error: null };
+  if (BANK_ACCOUNT_NUMBER_PATTERN.test(compact)) return { value: compact, error: null };
+  if (/^XK\d{18}$/.test(compact)) return { value: compact.slice(4), error: null };
+  return { value: null, error: BANK_ACCOUNT_NUMBER_MESSAGE };
+}
+
 export const employeeUpsertSchema = z
   .object({
     firstName: z.string().trim().min(1, "Emri është i detyrueshëm"),

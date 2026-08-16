@@ -7,6 +7,8 @@ import type {
   EmployeeImportRow,
 } from "@/modules/employees/types/employee-import";
 import { normalizeKosovoBankName } from "@/modules/employees/constants/kosovo-banks";
+import { normalizeBankAccountNumber } from "@/modules/employees/validations/employee-schemas";
+import { encryptField } from "@/lib/field-crypto";
 
 export const EMPLOYEE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 export const EMPLOYEE_IMPORT_MAX_ROWS = 2_000;
@@ -114,14 +116,10 @@ function parseSalary(value: string): { amount: string; provided: boolean; error:
   return { amount: amount.toFixed(2), provided: true, error: null };
 }
 
-function normalizeBankAccountNumber(value: string): { accountNumber: string | null; error: string | null } {
-  const accountNumber = value.replace(/\s+/g, "").toUpperCase();
-  if (!accountNumber) return { accountNumber: null, error: null };
-  if (!/^[A-Z0-9][A-Z0-9./-]{2,63}$/.test(accountNumber)) {
-    return { accountNumber, error: "Numri i llogarisë nuk ka format valid." };
-  }
-  return { accountNumber, error: null };
-}
+// The account-number rule now comes from employee-schemas, so the import cannot
+// admit what the employee form rejects. It used to accept /^[A-Z0-9][A-Z0-9./-]{2,63}$/
+// — three to sixty-four characters of very nearly anything — which is how
+// twelve-digit numbers reached the register.
 
 export function employeeImportTemplateBuffer(): Buffer {
   return Buffer.from(`\uFEFF${EMPLOYEE_IMPORT_HEADERS.join(",")}\r\n`, "utf8");
@@ -205,7 +203,7 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       // "PCB" and "Raiffeisen Bank" again; anything unrecognised is kept
       // verbatim rather than dropped, and shows in the preview as written.
       bankName: normalizeKosovoBankName(values.bankName).value,
-      iban: normalizedAccountNumber.accountNumber,
+      iban: normalizedAccountNumber.value,
       intendedStatus: salary.provided && !salary.error && Number(salary.amount) > 0 ? "ACTIVE" : "INACTIVE",
       errors,
     };
@@ -260,7 +258,7 @@ async function importOneEmployee(
         applyTrust: true,
         applyTax: true,
         bankName: row.bankName ?? undefined,
-        bankAccountIban: row.iban ?? undefined,
+        bankAccountIban: row.iban ? encryptField(row.iban) : undefined,
         addressCountry: "XK",
         documentsMissing: true,
       },
@@ -280,7 +278,11 @@ async function importOneEmployee(
     });
     if (row.iban) {
       await tx.employeeBankAccount.create({
-        data: { employeeId: employee.id, iban: row.iban, bankName: row.bankName ?? undefined, isPrimary: true, validFrom: hireDate },
+        // Encrypted on the way in, as the employee form does. This path used to
+        // store plaintext and lean on the next deploy's encrypt-bank-fields
+        // sweep to catch it, which left a window as long as the gap between
+        // an import and a deploy.
+        data: { employeeId: employee.id, iban: encryptField(row.iban), bankName: row.bankName ?? undefined, isPrimary: true, validFrom: hireDate },
       });
     }
 
