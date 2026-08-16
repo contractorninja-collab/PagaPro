@@ -81,6 +81,17 @@ export type PushimetBalanceRowDto = {
    * overlap. They were written and then read by nobody.
    */
   warnings: string[];
+  /**
+   * The stable `code` of each warning above (KOSOVO_FIRST_YEAR_ENTITLEMENT_WARN
+   * and friends, from engine/validation-result.ts).
+   *
+   * Carried separately because the messages are Albanian prose that copy edits
+   * will rewrite, and the attention rules have to key off something that does
+   * not move. They were being dropped on the floor: readAnnualBreakdown took
+   * `rec.message ?? … ?? rec.code`, so the code survived only when the message
+   * was missing, which never happens.
+   */
+  warningCodes: string[];
 };
 
 export type PushimetEmployeeOptionDto = {

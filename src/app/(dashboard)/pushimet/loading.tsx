@@ -33,9 +33,11 @@ export default function Loading() {
         <div className="h-64 rounded-xl border border-[#e2e8f0] bg-white" />
       </div>
 
-      {/* Balance panels, full width under the calendar */}
-      <div className="h-[420px] rounded-xl border border-[#e2e8f0] bg-white" />
-      <div className="h-48 rounded-xl border border-[#e2e8f0] bg-white" />
+      {/* Balance panels, full width under the calendar. Both were roughly twice
+          this tall when each employee had a card; a skeleton that keeps drawing
+          the old shape reintroduces the layout shift it exists to prevent. */}
+      <div className="h-[260px] rounded-xl border border-[#e2e8f0] bg-white" />
+      <div className="h-[150px] rounded-xl border border-[#e2e8f0] bg-white" />
     </div>
   );
 }

@@ -1,80 +1,49 @@
-"use client";
-
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { PushimetBalanceRowDto } from "@/modules/leaves/types/pushimet";
 import type { LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
-import { LEAVE_CARD, MICRO_LABEL, TonePill } from "@/modules/leaves/components/leave-ui";
-
-const n = (s: string | null | undefined): number => {
-  const v = Number(s);
-  return Number.isFinite(v) ? v : 0;
-};
-const fmt = (v: number): string => {
-  const r = Math.round((v + Number.EPSILON) * 100) / 100;
-  return String(r);
-};
-
-function daysUntil(iso: string | null): number | null {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return null;
-  return Math.ceil((then - Date.now()) / 86400000);
-}
+import { LEAVE_CARD, MICRO_LABEL } from "@/modules/leaves/components/leave-ui";
+import { LeaveBalanceList } from "@/modules/leaves/components/leave-balance-list";
+import { fmtDays } from "@/modules/leaves/helpers/leave-balance-view";
+import type { AttentionContext } from "@/modules/leaves/helpers/leave-balance-attention";
 
 /**
- * Annual-leave usage bars for the right rail (screen 5a):
- * fill = used share of (carry + entitlement); pending shown as a lighter segment;
- * low remaining renders amber, negative renders red.
+ * The company's annual leave position, then the people who need a decision.
+ *
+ * This used to be a card per employee in a four-column grid. With eighteen
+ * employees, thirteen of the cards were identical — same quota, same accrual,
+ * "Përdorur 0 · Pritje 0" on every one — so the block filled the viewport and
+ * said almost nothing. Now the exceptions are listed and the rest fold away
+ * behind a count, reachable by search.
+ *
+ * Every tile reads the DB aggregate. They used to be summed on the client from
+ * the row array, which is capped: past roughly 130 employees the tiles and the
+ * footer directly beneath them were adding up different populations and quietly
+ * disagreeing on the same card.
  */
 export function AnnualLeaveBalancePanel({
   balances,
   companyTotals,
   year,
+  attention,
   action,
 }: {
   balances: PushimetBalanceRowDto[];
   /** Company position from a DB aggregate — the list below may be capped. */
   companyTotals: LeaveBalanceTotals;
   year: number;
+  /**
+   * Server-supplied date and the company's policy switches. Built by the caller
+   * so both balance panels judge rows against exactly the same context, and so
+   * neither reads a clock of its own.
+   */
+  attention: AttentionContext;
   /** Header slot — carries the explicit "Rifresko balancat" control. */
   action?: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
-
   const annual = useMemo(
     () => balances.filter((b) => b.leaveType === "PUSHIM_VJETOR"),
     [balances],
   );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = q
-      ? annual.filter(
-          (b) =>
-            b.employeeName.toLowerCase().includes(q) ||
-            (b.departmentName ?? "").toLowerCase().includes(q),
-        )
-      : annual;
-    // Most-negative / lowest available first — the rows HR needs to see.
-    return [...rows].sort((a, b) => n(a.remainingDays) - n(b.remainingDays));
-  }, [annual, query]);
-
-  const totals = useMemo(() => {
-    let available = 0;
-    let used = 0;
-    let pending = 0;
-    let negative = 0;
-    let expiring = 0;
-    for (const b of annual) {
-      available += n(b.remainingDays);
-      used += n(b.usedDays);
-      pending += n(b.pendingDays);
-      if (n(b.remainingDays) < 0) negative += 1;
-      const d = daysUntil(b.carryExpiresIso);
-      if (n(b.carryOverDays) > 0 && d != null && d <= 45 && d >= 0) expiring += 1;
-    }
-    return { available, used, pending, negative, expiring, count: annual.length };
-  }, [annual]);
 
   if (annual.length === 0) {
     return (
@@ -96,156 +65,58 @@ export function AnnualLeaveBalancePanel({
             Pushimi vjetor — bilanci {year}
           </h2>
           <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#94a3b8]">
-            {totals.count} punonjës · mbetja e ulët në të verdhë, negative në të kuqe
+            {companyTotals.employees} punonjës · shfaqen ata që kërkojnë vendim
           </p>
         </div>
         {action}
       </div>
 
-      {/* Four across once the panel spans the page — in the old 340px rail these
-          were stuck two-by-two and the card ran the height of the screen. */}
       <div className="grid grid-cols-2 gap-px border-b border-[#eef2f7] bg-[#eef2f7] lg:grid-cols-4">
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Disponueshme tani</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#15803d]">
-            {fmt(totals.available)}
+            {fmtDays(companyTotals.remainingDays)}
           </p>
         </div>
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Përdorur {year}</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
-            {fmt(totals.used)}
+            {fmtDays(companyTotals.usedDays)}
           </p>
         </div>
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Në pritje</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
-            {fmt(totals.pending)}
+            {fmtDays(companyTotals.pendingDays)}
           </p>
         </div>
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Alarme</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em]">
-            {totals.negative > 0 ? (
-              <span className="text-[#dc2626]">{totals.negative} negativ</span>
+            {companyTotals.negativeCount > 0 ? (
+              <span className="text-[#dc2626]">{companyTotals.negativeCount} negativ</span>
             ) : (
               <span className="text-[#15803d]">0</span>
             )}
-            {totals.expiring > 0 ? (
+            {companyTotals.carryExpiringSoonCount > 0 ? (
               <span className="ml-1.5 text-[13px] font-semibold text-[#b45309]">
-                · {totals.expiring} skadojnë
+                · {companyTotals.carryExpiringSoonCount} skadojnë
               </span>
             ) : null}
           </p>
         </div>
       </div>
 
-      <div className="border-b border-[#eef2f7] px-4 py-3">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Kërko punonjës ose departament…"
-          className="h-9 w-full rounded-[10px] border border-[#e2e8f0] bg-white px-3 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus-visible:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue/25"
+      <div className="border-b border-[#eef2f7] pt-2">
+        <LeaveBalanceList
+          rows={annual}
+          attention={attention}
+          emptyText={`Nuk ka balanca të pushimit vjetor për vitin ${year}.`}
         />
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">Asnjë përputhje për kërkimin.</p>
-      ) : (
-        // Employees flow across the width instead of stacking into one tall
-        // column. gap-px over a hairline background draws the separators a
-        // grid cannot get from divide-y.
-        <ul className="grid gap-px bg-[#f1f5f9] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((b) => {
-            const carry = n(b.carryOverDays);
-            const entitlement = n(b.yearlyQuota);
-            const accrued = n(b.accruedDays);
-            const used = n(b.usedDays);
-            const pending = n(b.pendingDays);
-            const available = n(b.remainingDays);
-            const projected = b.projectedYearEndDays != null ? n(b.projectedYearEndDays) : null;
-            const total = Math.max(carry + entitlement, 0.01);
-            const expiresIn = daysUntil(b.carryExpiresIso);
-            const carryExpiringSoon = carry > 0 && expiresIn != null && expiresIn <= 45 && expiresIn >= 0;
-            const bd = b.entitlementBreakdown;
-            const entitlementHint =
-              bd && (bd.tenure > 0 || bd.special > 0)
-                ? ` (${bd.base}${bd.tenure > 0 ? ` +${bd.tenure} vjetërsi` : ""}${bd.special > 0 ? ` +${bd.special} kategori` : ""})`
-                : "";
-
-            const negative = available < 0;
-            const low =
-              !negative && (pending > available || available / total < 0.15 || available < 2);
-            const fill = negative ? "bg-[#dc2626]" : low ? "bg-[#d97706]" : "bg-brand-blue";
-            const valueColor = negative ? "text-[#dc2626]" : low ? "text-[#b45309]" : "text-[#15803d]";
-            const usedPct = negative
-              ? 100
-              : Math.max(0, Math.min(100, (Math.max(0, used) / total) * 100));
-            const pendingPct = negative
-              ? 0
-              : Math.max(0, Math.min(100 - usedPct, (Math.max(0, pending) / total) * 100));
-
-            return (
-              <li key={b.id} className="bg-white px-4 py-3 transition-colors hover:bg-[#f8fafc]">
-                <div className="flex items-baseline justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold text-[#0f172a]">{b.employeeName}</p>
-                    <p className="truncate text-[11px] text-[#94a3b8]">
-                      {b.departmentName ?? "Pa departament"}
-                    </p>
-                  </div>
-                  <p className={`shrink-0 text-[15px] font-bold tabular-nums ${valueColor}`}>
-                    {fmt(available)}
-                    <span className="ml-1 text-[11px] font-medium text-[#94a3b8]">ditë</span>
-                  </p>
-                </div>
-
-                <div
-                  className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f7]"
-                  role="img"
-                  aria-label={`Përdorur ${fmt(used)}, disponueshme ${fmt(available)} nga ${fmt(carry + entitlement)} ditë`}
-                >
-                  <div className={`h-full ${fill}`} style={{ width: `${usedPct}%` }} />
-                  <div className={`h-full opacity-40 ${fill}`} style={{ width: `${pendingPct}%` }} />
-                </div>
-
-                <p className="mt-1.5 text-[11px] tabular-nums leading-relaxed text-[#64748b]">
-                  Kuota {fmt(entitlement)}
-                  {entitlementHint} · Akumuluar {fmt(carry + accrued)} · Përdorur {fmt(used)} · Pritje{" "}
-                  {fmt(pending)} · Fund viti {projected != null ? fmt(projected) : "—"}
-                </p>
-
-                {negative || carry > 0 || (pending > available && available >= 0) ? (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {negative ? <TonePill tone="destructive" size="sm">Tejkalim bilanci</TonePill> : null}
-                    {carry > 0 ? (
-                      <TonePill tone={carryExpiringSoon ? "warning" : "neutral"} size="sm">
-                        Bartur {fmt(carry)}
-                        {expiresIn != null && expiresIn >= 0 ? ` · skadon për ${expiresIn} ditë` : ""}
-                      </TonePill>
-                    ) : null}
-                    {pending > available && available >= 0 ? (
-                      <TonePill tone="warning" size="sm">Pritja tejkalon bilancin</TonePill>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {b.warnings.length > 0 ? (
-                  <ul className="mt-2 space-y-1 border-l-2 border-[#fcd34d] pl-2.5 text-[11px] leading-relaxed text-[#92400e]">
-                    {b.warnings.map((w) => (
-                      <li key={w}>{w}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
       {/* The company position. Read from the database rather than added up from
-          the rows above, which are capped — a company past ~130 people would
+          the rows above, which are capped — a company past the ceiling would
           otherwise see a total that silently excluded everyone off the end. */}
       <div className="border-t-2 border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
@@ -289,9 +160,13 @@ export function AnnualLeaveBalancePanel({
           </p>
         ) : null}
 
-        {annual.length > filtered.length ? null : companyTotals.employees > annual.length ? (
+        {/* Shown whenever the list is short of the company, search or no search.
+            It used to be suppressed while searching, which is exactly backwards:
+            an incomplete list matters most when somebody is looking for one
+            person and not finding them. */}
+        {companyTotals.employees > annual.length ? (
           <p className="mt-2 text-[11.5px] text-[#94a3b8]">
-            Po shfaqen {annual.length} nga {companyTotals.employees} punonjës.
+            Po shfaqen {annual.length} nga {companyTotals.employees} punonjës — kërkimi mbulon vetëm këta.
           </p>
         ) : null}
       </div>

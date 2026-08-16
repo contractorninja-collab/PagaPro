@@ -1,5 +1,7 @@
 import type { LeaveRequestStatus, LeaveType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { CARRY_EXPIRY_SOON_DAYS } from "@/modules/leaves/helpers/leave-balance-attention";
+import { leaveTypesWithBalance } from "@/modules/leaves/helpers/leave-type-metadata";
 
 export type LeaveListFilters = {
   employeeId?: string;
@@ -241,6 +243,14 @@ export interface LeaveBalanceTotals {
   usedDays: string;
   pendingDays: string;
   remainingDays: string;
+  /**
+   * Employees in day-debt, counted by the database for the same reason the sums
+   * are: the panel's list is capped, and a tile that disagreed with the footer
+   * beneath it on the same card would be worse than no tile.
+   */
+  negativeCount: number;
+  /** Employees whose carried-over days expire within the engine's 45-day window. */
+  carryExpiringSoonCount: number;
   /** Distinct engine versions behind these rows — more than one means the sum mixes definitions. */
   ruleVersions: string[];
 }
@@ -268,7 +278,11 @@ export async function leaveBalanceTotals(
     employee: { status: { not: "TERMINATED" as const } },
   };
 
-  const [agg, versions] = await Promise.all([
+  // Both counts join the batch already in flight rather than adding a round trip.
+  const now = new Date();
+  const carryHorizon = new Date(now.getTime() + CARRY_EXPIRY_SOON_DAYS * 86_400_000);
+
+  const [agg, versions, negativeCount, carryExpiringSoonCount] = await Promise.all([
     prisma.leaveBalance.aggregate({
       where,
       _count: { _all: true },
@@ -285,6 +299,14 @@ export async function leaveBalanceTotals(
       by: ["computedFromRuleVersion"],
       where,
     }),
+    prisma.leaveBalance.count({ where: { ...where, remainingDays: { lt: 0 } } }),
+    prisma.leaveBalance.count({
+      where: {
+        ...where,
+        carryOverDays: { gt: 0 },
+        carryExpiresAt: { gte: now, lte: carryHorizon },
+      },
+    }),
   ]);
 
   const n = (v: { toString(): string } | null | undefined): string =>
@@ -298,6 +320,8 @@ export async function leaveBalanceTotals(
     usedDays: n(agg._sum.usedDays),
     pendingDays: n(agg._sum.pendingDays),
     remainingDays: n(agg._sum.remainingDays),
+    negativeCount,
+    carryExpiringSoonCount,
     ruleVersions: versions
       .map((v) => v.computedFromRuleVersion)
       .filter((v): v is string => Boolean(v))
@@ -435,6 +459,9 @@ export async function leaveDashboardStats(companyId: string) {
   return { pending, approvedThisUtcMonth: approvedMonth, draft };
 }
 
+/** How many employees any one company-wide picklist or panel will load. */
+export const EMPLOYEE_PICKLIST_CAP = 500;
+
 export async function listActiveEmployeesPicklist(companyId: string) {
   return prisma.employee.findMany({
     where: { companyId, status: { not: "TERMINATED" } },
@@ -446,7 +473,7 @@ export async function listActiveEmployeesPicklist(companyId: string) {
       terminationDate: true,
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    take: 500,
+    take: EMPLOYEE_PICKLIST_CAP,
   });
 }
 
@@ -478,7 +505,17 @@ export async function listLeaveTemplatesPicklist(companyId: string) {
  *
  * `employeeId` narrows the panel to one person, which is what the filter bar's
  * employee dropdown is for.
+ *
+ * The cap is derived rather than picked. `@@unique([companyId, employeeId,
+ * leaveType, year])` means exactly one row per employee per type per year, so
+ * with an explicit type filter the row count is `employees × 3` and the ceiling
+ * follows from the employee ceiling. The old bare `take: 400` filtered by no
+ * type at all, which made the arithmetic unprovable and silently truncated the
+ * panel at roughly 133 employees — a real problem now that search over this
+ * array is how you find a person.
  */
+export const BALANCE_OVERVIEW_ROW_CAP = EMPLOYEE_PICKLIST_CAP * leaveTypesWithBalance().length;
+
 export async function listLeaveBalancesOverview(
   companyId: string,
   year: number,
@@ -488,6 +525,7 @@ export async function listLeaveBalancesOverview(
     where: {
       companyId,
       year,
+      leaveType: { in: leaveTypesWithBalance() },
       ...(employeeId ? { employeeId } : {}),
       employee: { status: { not: "TERMINATED" } },
     },
@@ -502,7 +540,7 @@ export async function listLeaveBalancesOverview(
       },
     },
     orderBy: [{ employee: { lastName: "asc" } }, { leaveType: "asc" }],
-    take: 400,
+    take: BALANCE_OVERVIEW_ROW_CAP,
   });
 }
 

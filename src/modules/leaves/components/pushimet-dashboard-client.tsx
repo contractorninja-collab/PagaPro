@@ -25,6 +25,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveWallchart } from "@/modules/leaves/wallchart/leave-wallchart";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
+import { OtherLeaveBalancePanel } from "@/modules/leaves/components/other-leave-balance-panel";
+import type { AttentionContext } from "@/modules/leaves/helpers/leave-balance-attention";
 import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
 import type { PayrollSyncSkipRow, LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -151,6 +153,15 @@ export function PushimetDashboardClient(props: {
   health: {
     payrollSyncSkips: number;
     lastAccrual: { year: number; month: number } | null;
+  };
+  /**
+   * Leave policy switches, so the balance panels respect a company that turned
+   * a warning off instead of showing it alerts it asked not to see.
+   */
+  leavePolicy: {
+    splitLeaveMinWorkingDays: number;
+    warnCarryOverExpiry: boolean;
+    warnInsufficientBalance: boolean;
   };
   /** Rendered right after the stat tiles — overview before controls. */
   filtersSlot?: ReactNode;
@@ -312,9 +323,20 @@ export function PushimetDashboardClient(props: {
     return flags;
   }
 
-  const otherTypeBalances = useMemo(
-    () => props.balances.filter((b) => b.leaveType !== "PUSHIM_VJETOR"),
-    [props.balances],
+  /**
+   * Shared by both balance panels. Built once here because it is the same
+   * question for both, and because the panels must never read a clock of their
+   * own — todayIso comes from the server for exactly that reason.
+   */
+  const attentionContext = useMemo<AttentionContext>(
+    () => ({
+      todayIso: props.todayIso,
+      currentYear: Number(props.todayIso.slice(0, 4)),
+      splitLeaveMinWorkingDays: props.leavePolicy.splitLeaveMinWorkingDays,
+      warnCarryOverExpiry: props.leavePolicy.warnCarryOverExpiry,
+      warnInsufficientBalance: props.leavePolicy.warnInsufficientBalance,
+    }),
+    [props.todayIso, props.leavePolicy],
   );
 
   /**
@@ -838,6 +860,7 @@ export function PushimetDashboardClient(props: {
         balances={props.balances}
         companyTotals={props.balanceTotals}
         year={props.calendarYear}
+        attention={attentionContext}
         action={
           <button
             type="button"
@@ -855,70 +878,7 @@ export function PushimetDashboardClient(props: {
         }
       />
 
-      <div>
-          {otherTypeBalances.length > 0 ? (
-            <div className={`overflow-hidden ${LEAVE_CARD}`}>
-              <div className="border-b border-[#eef2f7] px-4 py-3.5">
-                <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
-                  Lloje të tjera (kuotë vjetore)
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[300px] border-collapse text-[12.5px] text-[#111827]">
-                  <thead>
-                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
-                      <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
-                        Punonjësi
-                      </th>
-                      <th className="px-2 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
-                        Kuota
-                      </th>
-                      <th className="px-2 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
-                        Përdorur
-                      </th>
-                      <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
-                        Mbetur
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {otherTypeBalances.map((b) => {
-                      const neg = parseFloat(b.remainingDays) < 0;
-                      const tone = LEAVE_TYPE_TONES[b.leaveType];
-                      return (
-                        <tr
-                          key={b.id}
-                          className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
-                        >
-                          <td className="px-4 py-2.5">
-                            <p className="font-semibold text-[#0f172a]">{b.employeeName}</p>
-                            <p className="flex items-center gap-1.5 text-[11px] text-[#64748b]">
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
-                              {LEAVE_TYPE_LABELS_SQ[b.leaveType]}
-                            </p>
-                          </td>
-                          <td className="px-2 py-2.5 text-right tabular-nums text-[#64748b]">
-                            {b.yearlyQuota}
-                          </td>
-                          <td className="px-2 py-2.5 text-right tabular-nums text-[#64748b]">
-                            {b.usedDays}
-                          </td>
-                          <td className="px-4 py-2.5 text-right tabular-nums">
-                            {neg ? (
-                              <span className="font-bold text-[#dc2626]">{b.remainingDays}</span>
-                            ) : (
-                              <span className="font-semibold text-[#0f172a]">{b.remainingDays}</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
-      </div>
+      <OtherLeaveBalancePanel balances={props.balances} attention={attentionContext} />
 
       <LeaveRejectDialog
         leaveId={rejectId}

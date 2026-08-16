@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { LeaveRequestStatus, LeaveSubtype, LeaveType } from "@prisma/client";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
+import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
 import {
   countPayrollSyncSkips,
   listPayrollSyncSkips,
@@ -112,6 +113,7 @@ function readAnnualBreakdown(bd: unknown): {
   tenure: number;
   special: number;
   warnings: string[];
+  warningCodes: string[];
 } | null {
   if (!bd || typeof bd !== "object") return null;
   const ent = (bd as { entitlement?: unknown }).entitlement;
@@ -127,6 +129,14 @@ function readAnnualBreakdown(bd: unknown): {
    * them as a toast while submitting.
    */
   const rawWarnings = Array.isArray(e.warnings) ? e.warnings : [];
+  /**
+   * The stable code, kept beside the prose. The mapping below collapses to the
+   * message whenever there is one, which is always, so the code never survived
+   * — and the attention rules need something copy edits cannot move.
+   */
+  const warningCodes = rawWarnings
+    .map((w) => (w && typeof w === "object" ? (w as Record<string, unknown>).code : null))
+    .filter((c): c is string => typeof c === "string" && c.length > 0);
   const warnings = rawWarnings
     .map((w) => {
       if (typeof w === "string") return w;
@@ -145,6 +155,7 @@ function readAnnualBreakdown(bd: unknown): {
     tenure: num(e.experienceExtraDays) ?? 0,
     special: num(e.protectedCategoryExtraDays) ?? 0,
     warnings,
+    warningCodes,
   };
 }
 
@@ -305,7 +316,12 @@ export default async function PushimetPage({
   // than one validation round trip per row.
   const queueDecisions = await buildLeaveQueueDecisions(companyId, pendingRows);
   // The footer of the ledger comes from the database, never from the capped page.
-  const balanceTotals = await leaveBalanceTotals(companyId, year, "PUSHIM_VJETOR", employeeId);
+  // The policy row rides along: a company that switched a warning off should not
+  // meet it again as an alert on the balance sheet.
+  const [balanceTotals, leavePolicyRow] = await Promise.all([
+    leaveBalanceTotals(companyId, year, "PUSHIM_VJETOR", employeeId),
+    resolveLeavePolicyParameterSet(companyId, new Date()),
+  ]);
   const chips = calendarRaw.map(serializeLeaveRow).map(chipFromRow);
   const onLeaveToday = onLeaveTodayRaw.map(serializeLeaveRow);
 
@@ -360,6 +376,7 @@ export default async function PushimetPage({
       carryExpiresIso: b.carryExpiresAt ? b.carryExpiresAt.toISOString() : null,
       entitlementBreakdown: bd ? { base: bd.base, tenure: bd.tenure, special: bd.special } : null,
       warnings: bd?.warnings ?? [],
+      warningCodes: bd?.warningCodes ?? [],
     };
   });
 
@@ -384,6 +401,11 @@ export default async function PushimetPage({
           chips={chips}
           wallchartEmployees={wallchartEmployees}
           todayIso={now.toISOString().slice(0, 10)}
+          leavePolicy={{
+            splitLeaveMinWorkingDays: leavePolicyRow.splitLeaveMinWorkingDays,
+            warnCarryOverExpiry: leavePolicyRow.warnCarryOverExpiry,
+            warnInsufficientBalance: leavePolicyRow.warnInsufficientBalance,
+          }}
           holidayIsoDates={[...holidaySet]}
           calendarYear={year}
           calendarMonth={month}
