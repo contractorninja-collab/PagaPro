@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ export function PayrollsPageClient(props: {
 }) {
   const router = useRouter();
   const [yearFilter, setYearFilter] = useState(props.initialYear);
+  const canPreparePayroll = useCan("payroll.prepare");
   const [createOpen, setCreateOpen] = useState(false);
   const [createMonth, setCreateMonth] = useState(String(new Date().getMonth() + 1));
   const [createYear, setCreateYear] = useState(String(props.initialYear));
@@ -171,14 +173,16 @@ export function PayrollsPageClient(props: {
                 ))}
               </select>
             </div>
-            <Button
-              type="button"
-              className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
-              Krijo payroll
-            </Button>
+            {canPreparePayroll ? (
+              <Button
+                type="button"
+                className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
+                Krijo payroll
+              </Button>
+            ) : null}
           </div>
         }
       />

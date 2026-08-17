@@ -9,6 +9,7 @@ import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Input } from "@/components/ui/input";
 import {
   lockContractorPayrollAction,
@@ -46,7 +47,14 @@ function formatEuro(raw: string): string {
 export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodDetailDto }) {
   const { detail } = props;
   const router = useRouter();
-  const editable = detail.status === "DRAFT";
+  /**
+   * `editable` was purely about status. The grid's row controls and the refresh
+   * are payroll.prepare; locking and reopening the period are payroll.signoff,
+   * so the two are asked separately rather than folded into one flag.
+   */
+  const canPreparePayroll = useCan("payroll.prepare");
+  const canSignOffPayroll = useCan("payroll.signoff");
+  const editable = detail.status === "DRAFT" && canPreparePayroll;
   const status = STATUS_LABELS[detail.status] ?? STATUS_LABELS.DRAFT!;
 
   const [drafts, setDrafts] = useState<Record<string, RowDraft>>(() =>
@@ -182,7 +190,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                 <Button
                   type="button"
                   className="h-10 gap-1.5 rounded-[10px] bg-brand-blue text-white hover:bg-[#1d4ed8]"
-                  disabled={busyGlobal}
+                  disabled={busyGlobal || !canSignOffPayroll}
                   onClick={() =>
                     void runGlobal(
                       () => lockContractorPayrollAction({ periodId: detail.id }),
@@ -199,7 +207,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                 type="button"
                 variant="secondary"
                 className="h-10 gap-1.5 rounded-[10px]"
-                disabled={busyGlobal}
+                disabled={busyGlobal || !canSignOffPayroll}
                 onClick={() =>
                   void runGlobal(
                     () => reopenContractorPayrollAction({ periodId: detail.id }),

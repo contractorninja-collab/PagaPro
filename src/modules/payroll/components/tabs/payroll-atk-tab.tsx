@@ -4,6 +4,7 @@ import { Download, Info, Lock } from "lucide-react";
 import type { PayrollPeriodStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import type { PayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
 import { CARD, CARD_TITLE } from "@/modules/payroll/components/payroll-card";
 import {
@@ -27,6 +28,9 @@ export function PayrollAtkTab(props: {
   onGenerate: () => void;
   onArchive: (exportId: string) => void;
 }) {
+  // The generate button already arrives pre-gated via canGenerate; archiving an
+  // export is the same payroll.prepare and had no prop of its own.
+  const canPreparePayroll = useCan("payroll.prepare");
   const active = props.exports.find((x) => !x.isArchived);
   const previous = props.exports.filter((x) => x.id !== active?.id);
   const statusEligible = isAtkStatusEligible(props.status);
@@ -77,7 +81,7 @@ export function PayrollAtkTab(props: {
                     Shkarko
                   </a>
                 </Button>
-                {props.status === "APPROVED" ? (
+                {props.status === "APPROVED" && canPreparePayroll ? (
                   <Button
                     type="button"
                     size="sm"

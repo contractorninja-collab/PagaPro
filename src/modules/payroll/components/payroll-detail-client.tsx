@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
+import type { Capability } from "@/server/permissions";
 import type { PayrollPeriodStatus } from "@prisma/client";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
@@ -123,6 +125,15 @@ interface WorkflowAction {
   variant: "default" | "secondary" | "outlinePrimary";
   run: () => void;
   disabled?: boolean;
+  /**
+   * The capability the underlying server action requires. Declared per action
+   * because this one bar spans both halves of the payroll split: preparing is
+   * payroll.prepare, and the steps that freeze amounts — approve, lock, return,
+   * archive — are payroll.signoff. An HR_MANAGER holds the first and not the
+   * second, so gating the bar as a unit would be wrong for exactly the role it
+   * matters most for.
+   */
+  capability: Capability;
 }
 
 /** A workflow button carries its own explanation — nobody should have to guess. */
@@ -148,6 +159,15 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   const draftEditable = payroll.status === "DRAFT";
   const [atkPending, startAtkTransition] = useTransition();
 
+  /**
+   * The payroll split, read once. Preparing a period and signing it off are
+   * different capabilities held by different roles, and this page mixes them —
+   * the workflow bar, the ATK tab and the corrections panel all consult one or
+   * the other.
+   */
+  const canPreparePayroll = useCan("payroll.prepare");
+  const canSignOffPayroll = useCan("payroll.signoff");
+
   const latestAtkExport = data.atkExports.find((x) => !x.isArchived);
   const canGenerateAtk = canGenerateAtkExport({
     status: payroll.status,
@@ -171,7 +191,8 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   }
 
   const [pdfPending, setPdfPending] = useState(false);
-  const canGeneratePdfs = payroll.status === "APPROVED" || payroll.status === "LOCKED";
+  const canGeneratePdfs =
+    canPreparePayroll && (payroll.status === "APPROVED" || payroll.status === "LOCKED");
 
   async function generatePdfs() {
     setPdfPending(true);
@@ -202,6 +223,10 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
   const hasEntries = data.entries.length > 0;
   const validated = payroll.validatedAt != null;
   const workflowActions: WorkflowAction[] = [];
+  const heldCapabilities = {
+    "payroll.prepare": canPreparePayroll,
+    "payroll.signoff": canSignOffPayroll,
+  } as const;
 
   if (draftEditable) {
     workflowActions.push({
@@ -210,6 +235,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
       shortLabel: "Llogarit Pagat",
       hint: "Ndërton rreshtat nga punonjësit aktivë të muajit.",
       variant: hasEntries ? "secondary" : "default",
+      capability: "payroll.prepare",
       run: () => void exec("Pagat u llogaritën.", regeneratePayrollAction(payroll.id)),
     });
     if (hasEntries) {
@@ -219,6 +245,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         shortLabel: "Valido",
         hint: "Kontrollon të dhënat dhe shfaq sinjalizimet përpara miratimit.",
         variant: validated ? "secondary" : "default",
+        capability: "payroll.prepare",
         run: () => void exec("Të dhënat u validuan.", validatePayrollAction(payroll.id)),
       });
     }
@@ -229,6 +256,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         shortLabel: "Mirato",
         hint: "Kontrollet janë kryer — pagat janë gati për hapat e fundit.",
         variant: "default",
+        capability: "payroll.signoff",
         run: () => void exec("Pagat u miratuan.", approvePayrollAction(payroll.id)),
       });
     }
@@ -242,6 +270,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
       shortLabel: "Mirato",
       hint: "Kontrollet janë kryer — pagat janë gati për hapat e fundit.",
       variant: "default",
+      capability: "payroll.signoff",
       run: () => void exec("Pagat u miratuan.", approvePayrollAction(payroll.id)),
     });
   }
@@ -253,6 +282,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
       shortLabel: "Aprovo Pagat",
       hint: "Ngrin pagat. Pas këtij hapi nuk mund të ktheheni për t'i ndryshuar.",
       variant: "default",
+      capability: "payroll.signoff",
       run: () => void exec("Pagat u aprovuan dhe u ngrinë.", lockPayrollAction(payroll.id)),
     });
   }
@@ -264,6 +294,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
       shortLabel: "Kthehu",
       hint: "Kthehu një hap prapa për të ndryshuar pagat.",
       variant: "outlinePrimary",
+      capability: "payroll.signoff",
       run: () => void exec("U kthye për redaktim.", returnPayrollReviewToDraftAction(payroll.id)),
     });
   }
@@ -275,9 +306,19 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
       shortLabel: "Mbyll dhe Arkivo",
       hint: "Mbyll muajin dhe e kalon në arkiv.",
       variant: "secondary",
+      capability: "payroll.signoff",
       run: () => void exec("Muaji u mbyll dhe u arkivua.", archivePayrollAction(payroll.id)),
     });
   }
+
+  /**
+   * One filter for the whole bar. Buttons are removed rather than disabled: a
+   * payroll workflow reads as a sequence, and a greyed-out "Aprovo Pagat" would
+   * suggest the month is stuck rather than that somebody else signs it off.
+   */
+  const visibleWorkflowActions = workflowActions.filter(
+    (a) => heldCapabilities[a.capability as keyof typeof heldCapabilities] ?? false,
+  );
 
   const correctionEmployees = data.entries.map((e) => ({
     id: e.employeeId,
@@ -308,9 +349,9 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         status={<PayrollSubBarStatus status={payroll.status} />}
         description={subBarDescription || undefined}
         actions={
-          workflowActions.length > 0 ? (
+          visibleWorkflowActions.length > 0 ? (
             <div className="hidden flex-wrap items-stretch gap-2 lg:flex">
-              {workflowActions.map((a) => (
+              {visibleWorkflowActions.map((a) => (
                 <WorkflowButton key={a.id} action={a} />
               ))}
             </div>
@@ -341,7 +382,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
                 Ripëllogaritja përfshin vetëm këta punonjës — punonjësit e tjerë të përshtatshëm nuk
                 shfaqen. Hiqni kufizimin që payroll-i të mbulojë të gjithë punonjësit e muajit.
               </p>
-              {draftEditable ? (
+              {draftEditable && canPreparePayroll ? (
                 <Button
                   type="button"
                   size="sm"
@@ -446,7 +487,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             <PayrollAtkTab
               status={payroll.status}
               exports={data.atkExports}
-              canGenerate={canGenerateAtk}
+              canGenerate={canPreparePayroll && canGenerateAtk}
               pending={atkPending}
               onGenerate={() =>
                 startAtkTransition(() => {
@@ -474,7 +515,9 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             <PayrollCorrectionsPanel
               payrollId={payroll.id}
               status={payroll.status}
-              allowCreate={payroll.status === "LOCKED" || payroll.status === "ARCHIVED"}
+              allowCreate={
+                canPreparePayroll && (payroll.status === "LOCKED" || payroll.status === "ARCHIVED")
+              }
               corrections={data.corrections}
               employeeOptions={correctionEmployees}
             />

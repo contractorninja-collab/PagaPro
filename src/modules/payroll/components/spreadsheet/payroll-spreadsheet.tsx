@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PayrollPeriodStatus } from "@prisma/client";
+import { useCan } from "@/components/layout/capability-provider";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -286,7 +287,9 @@ export function PayrollSpreadsheet(props: {
   /** Payroll settings decimal rate string for Trust 2 header */
   pensionEmployerPercent?: string;
 }) {
-  const editable = props.status === "DRAFT";
+  // Editing a payroll row is payroll.prepare; the status alone was deciding it.
+  const canPreparePayroll = useCan("payroll.prepare");
+  const editable = props.status === "DRAFT" && canPreparePayroll;
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const markSaved = useCallback(() => setSavedAt(new Date()), []);
 

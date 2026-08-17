@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
+import { useCan } from "@/components/layout/capability-provider";
 import type { PayrollPeriodStatus } from "@prisma/client";
 import { ArrowRight, Check } from "lucide-react";
 import { PayrollStatusBadge } from "@/modules/payroll/components/payroll-status-badge";
@@ -165,7 +166,9 @@ function HeroStat({ label, value, accent }: { label: string; value: string; acce
 
 /** 3a — active-run hero card: period, status pill, figures, stage rail, action bar. */
 function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHandlers }) {
-  const primary = getPrimaryAction(row.status, handlers);
+  const canPreparePayroll = useCan("payroll.prepare");
+  const canSignOffPayroll = useCan("payroll.signoff");
+  const primary = canSignOffPayroll ? getPrimaryAction(row.status, handlers) : null;
 
   return (
     <section className="overflow-hidden rounded-[14px] border border-[#dbe4f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
@@ -202,12 +205,12 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
             {primary.label}
           </button>
         ) : null}
-        {row.status === "DRAFT" ? (
+        {row.status === "DRAFT" && canPreparePayroll ? (
           <button type="button" className={BTN_SECONDARY} onClick={() => handlers.onRegenerate(row.id)}>
             Llogarit Pagat
           </button>
         ) : null}
-        {row.status === "APPROVED" || row.status === "LOCKED" ? (
+        {(row.status === "APPROVED" || row.status === "LOCKED") && canPreparePayroll ? (
           <button type="button" className={BTN_SECONDARY} onClick={() => handlers.onPdf(row.id)}>
             Gjenero PDF
           </button>
@@ -223,7 +226,9 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
 const REGISTER_GRID = "grid grid-cols-[1.6fr_1.2fr_1fr_1.3fr_1.3fr_1.1fr_1.6fr] items-center gap-x-3";
 
 function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHandlers }) {
-  const primary = getPrimaryAction(row.status, handlers);
+  const canPreparePayroll = useCan("payroll.prepare");
+  const canSignOffPayroll = useCan("payroll.signoff");
+  const primary = canSignOffPayroll ? getPrimaryAction(row.status, handlers) : null;
 
   return (
     <div
@@ -263,7 +268,7 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
             {primary.label}
           </button>
         ) : null}
-        {row.status === "DRAFT" ? (
+        {row.status === "DRAFT" && canPreparePayroll ? (
           <button
             type="button"
             className="whitespace-nowrap text-[12.5px] font-semibold text-[#64748b] hover:text-[#334155] hover:underline"
@@ -272,7 +277,7 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
             Llogarit Pagat
           </button>
         ) : null}
-        {row.status === "APPROVED" || row.status === "LOCKED" ? (
+        {(row.status === "APPROVED" || row.status === "LOCKED") && canPreparePayroll ? (
           <button
             type="button"
             className="whitespace-nowrap text-[12.5px] font-semibold text-brand-blue hover:underline"

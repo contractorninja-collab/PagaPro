@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ function formatEuro(raw: string): string {
 
 export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodListRowDto[] }) {
   const router = useRouter();
+  const canPreparePayroll = useCan("payroll.prepare");
   const [createOpen, setCreateOpen] = useState(false);
   const now = useMemo(() => new Date(), []);
   const [createMonth, setCreateMonth] = useState(String(now.getMonth() + 1));
@@ -54,6 +56,7 @@ export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodList
         title="Pagat — Kontraktor"
         description="Payroll i veçantë për kontraktorë: orë × tarifë orare, bruto = neto (pa tatim, pa Trust)."
         actions={
+          !canPreparePayroll ? null : (
           <Button
             type="button"
             className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
@@ -62,6 +65,7 @@ export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodList
             <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
             Krijo periudhë
           </Button>
+          )
         }
       />
 
