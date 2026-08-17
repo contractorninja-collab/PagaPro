@@ -15,6 +15,7 @@ import {
 } from "@/modules/documents/services/document-queries";
 import { WarningIssuePanel } from "@/modules/warnings/components/warning-issue-panel";
 import { requireCompanyContextPage } from "@/server/company-context";
+import { can } from "@/server/permissions";
 
 export const metadata: Metadata = {
   title: "Dokumentet",
@@ -40,7 +41,9 @@ export default async function DokumentetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { companyId } = await requireCompanyContextPage();
+  const { companyId, role, user } = await requireCompanyContextPage();
+  // A server component cannot use the client hook, so it asks the same matrix.
+  const canWriteDocuments = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
 
   const sp = await searchParams;
   const q = first(sp, "q");
@@ -147,9 +150,11 @@ export default async function DokumentetPage({
                 }))}
               />
             </WarningIssueTrigger>
-            <Button asChild>
-              <Link href="/dokumentet/generate">Gjenero dokumente</Link>
-            </Button>
+            {canWriteDocuments ? (
+              <Button asChild>
+                <Link href="/dokumentet/generate">Gjenero dokumente</Link>
+              </Button>
+            ) : null}
           </div>
         }
       />

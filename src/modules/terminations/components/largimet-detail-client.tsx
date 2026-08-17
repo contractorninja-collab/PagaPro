@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
 import { Banknote, CalendarDays, Check, FileText } from "lucide-react";
@@ -250,6 +251,16 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
   const [pending, startTransition] = useTransition();
   const t = props.termination;
   const readOnly = t.status === "COMPLETED" || t.status === "CANCELLED";
+  /**
+   * Three capabilities meet in this one action bar. The termination workflow
+   * itself is employees.write; the document button is documents.write; the
+   * payroll button is payroll.prepare. An HR_MANAGER holds all three, a
+   * READ_ONLY member none, but they are separate answers and asking once would
+   * be wrong for anyone in between.
+   */
+  const canWriteEmployees = useCan("employees.write");
+  const canWriteDocuments = useCan("documents.write");
+  const canPreparePayroll = useCan("payroll.prepare");
 
   function run(labelOk: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
@@ -577,7 +588,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_SECONDARY}
-            disabled={pending || readOnly || t.status !== "DRAFT"}
+            disabled={pending || readOnly || !canWriteEmployees || t.status !== "DRAFT"}
             onClick={() => run("U dërgua.", () => submitTerminationAction({ id: t.id }))}
           >
             Dërgo në shqyrtim
@@ -585,7 +596,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_SECONDARY}
-            disabled={pending || readOnly || t.status !== "PENDING_REVIEW"}
+            disabled={pending || readOnly || !canWriteEmployees || t.status !== "PENDING_REVIEW"}
             onClick={() => run("U miratua.", () => approveTerminationAction({ id: t.id }))}
           >
             Mirato
@@ -593,7 +604,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_SECONDARY}
-            disabled={pending || readOnly}
+            disabled={pending || readOnly || !canWriteDocuments}
             onClick={() => run("U gjenerua.", () => generateTerminationDocumentActionServer({ id: t.id }))}
           >
             Gjenero dokument
@@ -601,7 +612,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_SECONDARY}
-            disabled={pending || readOnly}
+            disabled={pending || readOnly || !canPreparePayroll}
             onClick={() => run("U përgatit.", () => prepareFinalPayrollTerminationAction({ id: t.id }))}
           >
             Përgatit payroll
@@ -609,7 +620,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_DESTRUCTIVE}
-            disabled={pending || readOnly}
+            disabled={pending || readOnly || !canWriteEmployees}
             onClick={() => run("U anulua.", () => cancelTerminationAction({ id: t.id }))}
           >
             Anulo
@@ -617,7 +628,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
           <button
             type="button"
             className={BTN_PRIMARY}
-            disabled={pending || t.status !== "APPROVED"}
+            disabled={pending || readOnly || !canWriteEmployees || t.status !== "APPROVED"}
             onClick={() => run("U përfundua.", () => completeTerminationAction({ id: t.id }))}
           >
             Përfundo largimin

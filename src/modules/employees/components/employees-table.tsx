@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,7 @@ function RowActions(props: {
   onRefresh: () => void;
 }) {
   const { row, onEdit, onRefresh } = props;
+  const canWriteEmployees = useCan("employees.write");
   const router = useRouter();
   const [termOpen, setTermOpen] = useState(false);
   const [confirmInactiveOpen, setConfirmInactiveOpen] = useState(false);
@@ -99,6 +101,15 @@ function RowActions(props: {
   };
 
   const terminated = row.status === "TERMINATED";
+
+  /**
+   * Every item in this menu mutates, and there is deliberately no read item —
+   * the row and the name already open the profile (see below). So for a member
+   * without employees.write the menu has nothing in it, and an empty menu is
+   * worse than no menu. The header cell is fixed at w-10, so the row keeps its
+   * shape when the trigger goes.
+   */
+  if (!canWriteEmployees) return null;
 
   return (
     <>

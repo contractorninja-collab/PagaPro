@@ -5,6 +5,7 @@ import { Archive, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +66,14 @@ export function JobTitlesSettingsPanel(props: {
   const [jobTitles, setJobTitles] = useState(initialJobTitles);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [busy, setBusy] = useState(false);
+  /**
+   * `busy` means an operation is in flight; `locked` adds "or this member may
+   * not change job titles at all". Job titles are employees.write even though
+   * the panel sits inside Konfigurimet — the capability follows what the action
+   * requires, not where the UI happens to live.
+   */
+  const canWrite = useCan("employees.write");
+  const locked = busy || !canWrite;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"ALL" | "ACTIVE" | "ARCHIVED">("ALL");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -194,7 +203,7 @@ export function JobTitlesSettingsPanel(props: {
                     patchDraft({ title: e.target.value });
                   }}
                   placeholder="p.sh. Menaxher i shitjes"
-                  disabled={busy}
+                  disabled={locked}
                 />
                 {fieldErrors.title ? <p className="text-xs text-destructive">{fieldErrors.title}</p> : null}
               </div>
@@ -207,7 +216,7 @@ export function JobTitlesSettingsPanel(props: {
                     value={draft.department}
                     onChange={(e) => patchDraft({ department: e.target.value })}
                     placeholder="p.sh. Shitje"
-                    disabled={busy}
+                    disabled={locked}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -217,7 +226,7 @@ export function JobTitlesSettingsPanel(props: {
                     value={draft.level}
                     onChange={(e) => patchDraft({ level: e.target.value })}
                     placeholder="Junior, Senior, Lead"
-                    disabled={busy}
+                    disabled={locked}
                   />
                 </div>
               </div>
@@ -232,7 +241,7 @@ export function JobTitlesSettingsPanel(props: {
                     clearField("description");
                     patchDraft({ description: e.target.value });
                   }}
-                  disabled={busy}
+                  disabled={locked}
                 />
                 {fieldErrors.description ? <p className="text-xs text-destructive">{fieldErrors.description}</p> : null}
               </div>
@@ -245,7 +254,7 @@ export function JobTitlesSettingsPanel(props: {
                   value={draft.responsibilities}
                   onChange={(e) => patchDraft({ responsibilities: e.target.value })}
                   placeholder="Një përgjegjësi për rresht"
-                  disabled={busy}
+                  disabled={locked}
                 />
               </div>
 
@@ -257,16 +266,16 @@ export function JobTitlesSettingsPanel(props: {
                   value={draft.requirements}
                   onChange={(e) => patchDraft({ requirements: e.target.value })}
                   placeholder="Një kërkesë për rresht"
-                  disabled={busy}
+                  disabled={locked}
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="secondary" disabled={busy} onClick={resetDraft}>
+              <Button type="button" variant="secondary" disabled={locked} onClick={resetDraft}>
                 Pastro
               </Button>
-              <Button type="button" disabled={busy} onClick={() => void handleSave()}>
+              <Button type="button" disabled={locked} onClick={() => void handleSave()}>
                 {busy ? "Duke ruajtur..." : "Ruaj pozitën"}
               </Button>
             </div>
@@ -281,14 +290,14 @@ export function JobTitlesSettingsPanel(props: {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Kërko sipas titullit, departamentit ose përshkrimit"
-                  disabled={busy}
+                  disabled={locked}
                 />
               </div>
               <select
                 className="flex h-10 min-w-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as typeof status)}
-                disabled={busy}
+                disabled={locked}
               >
                 <option value="ALL">Të gjitha</option>
                 <option value="ACTIVE">Aktive</option>
@@ -338,7 +347,7 @@ export function JobTitlesSettingsPanel(props: {
                               type="button"
                               size="sm"
                               variant="secondary"
-                              disabled={busy}
+                              disabled={locked}
                               onClick={() => setDraft(asDraft(row))}
                             >
                               Ndrysho
@@ -347,7 +356,7 @@ export function JobTitlesSettingsPanel(props: {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={locked}
                               aria-label={row.status === "ACTIVE" ? `Arkivo ${row.title}` : `Rikthe ${row.title}`}
                               onClick={() => void handleArchiveToggle(row)}
                             >

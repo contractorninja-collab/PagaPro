@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
 import { Banknote, Check, ChevronDown, Clock, Download, FileText, MoreHorizontal, UserMinus } from "lucide-react";
@@ -197,6 +198,7 @@ export function LargimetDashboardClient(props: {
 }) {
   const [pending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
+  const canWriteEmployees = useCan("employees.write");
 
   const rows = props.rows;
   const currentYear = new Date().getUTCFullYear();
@@ -223,6 +225,7 @@ export function LargimetDashboardClient(props: {
         title="Largimet"
         description="Procesi operativ i largimeve: dokumentet, payroll përfundimtar dhe gjurmimi HR."
         actions={
+          !canWriteEmployees ? null : (
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <button type="button" className={BTN_PRIMARY}>
@@ -236,6 +239,7 @@ export function LargimetDashboardClient(props: {
               onDone={() => setCreateOpen(false)}
             />
           </Dialog>
+          )
         }
       />
 
@@ -742,6 +746,9 @@ function RowNextAction(props: {
   startTransition: (fn: () => void) => void;
 }) {
   const { row, pending, startTransition } = props;
+  // The inline CTA advances the termination workflow, so it is the same
+  // employees.write the detail page's action bar asks for.
+  const canWriteEmployees = useCan("employees.write");
   const run = useRowRunner(startTransition);
 
   if (row.status === "DRAFT") {
@@ -749,7 +756,7 @@ function RowNextAction(props: {
       <button
         type="button"
         className={BTN_DENSE_PRIMARY}
-        disabled={pending}
+        disabled={pending || !canWriteEmployees}
         onClick={() => run(() => submitTerminationAction({ id: row.id }))}
       >
         Dërgo
@@ -761,7 +768,7 @@ function RowNextAction(props: {
       <button
         type="button"
         className={BTN_DENSE_PRIMARY}
-        disabled={pending}
+        disabled={pending || !canWriteEmployees}
         onClick={() => run(() => approveTerminationAction({ id: row.id }))}
       >
         Mirato
@@ -773,7 +780,7 @@ function RowNextAction(props: {
       <button
         type="button"
         className={BTN_DENSE_PRIMARY}
-        disabled={pending}
+        disabled={pending || !canWriteEmployees}
         onClick={() => run(() => completeTerminationAction({ id: row.id }))}
       >
         Përfundo
@@ -799,6 +806,11 @@ function RowActionsMenu(props: {
   startTransition: (fn: () => void) => void;
 }) {
   const { row, pending, startTransition } = props;
+  // The menu keeps its read item ("Shiko detajet"), so the trigger stays and
+  // only the three mutations answer to their own capability.
+  const canWriteEmployees = useCan("employees.write");
+  const canWriteDocuments = useCan("documents.write");
+  const canPreparePayroll = useCan("payroll.prepare");
   const run = useRowRunner(startTransition);
   const closed = row.status === "COMPLETED" || row.status === "CANCELLED";
 
@@ -819,13 +831,13 @@ function RowActionsMenu(props: {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          disabled={pending || row.status === "CANCELLED"}
+          disabled={pending || !canWriteDocuments || row.status === "CANCELLED"}
           onClick={() => run(() => generateTerminationDocumentActionServer({ id: row.id }, true))}
         >
           {row.generatedDocument ? "Rigjenero dokumentin" : "Gjenero dokumentin"}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={pending || closed}
+          disabled={pending || closed || !canPreparePayroll}
           onClick={() => run(() => prepareFinalPayrollTerminationAction({ id: row.id }))}
         >
           Përgatit payroll
@@ -835,7 +847,7 @@ function RowActionsMenu(props: {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              disabled={pending}
+              disabled={pending || !canWriteEmployees}
               onClick={() => run(() => cancelTerminationAction({ id: row.id }))}
             >
               Anulo largimin

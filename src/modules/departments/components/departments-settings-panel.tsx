@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -30,6 +31,14 @@ export function DepartmentsSettingsPanel(props: {
   const { initialDepartments } = props;
   const [departments, setDepartments] = useState(initialDepartments);
   const [busy, setBusy] = useState(false);
+  /**
+   * `busy` means an operation is in flight; `locked` adds "or this member may
+   * not change these at all". Kept separate so the two reasons a control is
+   * inert stay legible, and folded into one name so every disabled= below reads
+   * the same.
+   */
+  const canWrite = useCan("employees.write");
+  const locked = busy || !canWrite;
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -132,6 +141,7 @@ export function DepartmentsSettingsPanel(props: {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {canWrite ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
               <Label htmlFor="new-department-name">Emri i departamentit</Label>
@@ -140,7 +150,7 @@ export function DepartmentsSettingsPanel(props: {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="p.sh. Financa, HR, IT"
-                disabled={busy}
+                disabled={locked}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -149,10 +159,11 @@ export function DepartmentsSettingsPanel(props: {
                 }}
               />
             </div>
-            <Button type="button" disabled={busy} onClick={() => void handleCreate()}>
+            <Button type="button" disabled={locked} onClick={() => void handleCreate()}>
               Shto departament
             </Button>
           </div>
+          ) : null}
 
           {departments.length === 0 ? (
             <p className="rounded-md border border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -176,7 +187,7 @@ export function DepartmentsSettingsPanel(props: {
                           <Input
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            disabled={busy}
+                            disabled={locked}
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -194,10 +205,10 @@ export function DepartmentsSettingsPanel(props: {
                       <TableCell className="text-right">
                         {editingId === row.id ? (
                           <div className="flex justify-end gap-2">
-                            <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={cancelEdit}>
+                            <Button type="button" size="sm" variant="secondary" disabled={locked} onClick={cancelEdit}>
                               Anulo
                             </Button>
-                            <Button type="button" size="sm" disabled={busy} onClick={() => void handleRename(row.id)}>
+                            <Button type="button" size="sm" disabled={locked} onClick={() => void handleRename(row.id)}>
                               Ruaj
                             </Button>
                           </div>
@@ -207,7 +218,7 @@ export function DepartmentsSettingsPanel(props: {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={locked}
                               aria-label={`Ndrysho ${row.name}`}
                               onClick={() => startEdit(row)}
                             >
@@ -217,7 +228,7 @@ export function DepartmentsSettingsPanel(props: {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={locked}
                               aria-label={`Fshi ${row.name}`}
                               onClick={() => setDeleteTarget(row)}
                             >
@@ -248,10 +259,10 @@ export function DepartmentsSettingsPanel(props: {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>
+            <Button type="button" variant="secondary" disabled={locked} onClick={() => setDeleteTarget(null)}>
               Anulo
             </Button>
-            <Button type="button" variant="destructive" disabled={busy} onClick={() => void handleDelete()}>
+            <Button type="button" variant="destructive" disabled={locked} onClick={() => void handleDelete()}>
               Fshi
             </Button>
           </DialogFooter>

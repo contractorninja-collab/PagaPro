@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useCan } from "@/components/layout/capability-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +22,15 @@ import {
  */
 export function WarningIssueTrigger({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+
+  /**
+   * Issuing a vërejtje is a disciplinary act against an employee record, so it
+   * is employees.write rather than documents.write — the document is a
+   * by-product. Gated here rather than at the mount so it holds wherever the
+   * trigger is placed.
+   */
+  const canIssueWarnings = useCan("employees.write");
+  if (!canIssueWarnings) return null;
 
   return (
     <>

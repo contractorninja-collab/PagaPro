@@ -9,6 +9,7 @@ import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { getEmployeeDetailAction, rehireEmployeeAction } from "@/modules/employees/actions/employee-actions";
@@ -400,6 +401,10 @@ function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
 }
 
 function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
+  // Generating a document is documents.write, not employees.write — an
+  // ACCOUNTANT holds both, but the two are separate capabilities and this tab
+  // must ask for the one it actually uses.
+  const canWriteDocuments = useCan("documents.write");
   const byCategory = useMemo(() => {
     const map = new Map<DocumentCategory, EmployeeGeneratedDocSummary[]>();
     for (const doc of bundle.generatedDocuments) {
@@ -431,7 +436,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
         title="Dokumentet"
         description="Dokumentet e gjeneruara nga moduli Dokumentet dhe PDF nga payroll-i."
         action={
-          bundle.employeeId ? (
+          bundle.employeeId && canWriteDocuments ? (
             <Button size="sm" asChild>
               <Link href={`/dokumentet/generate?category=CONTRACT&employeeId=${bundle.employeeId}`}>
                 Gjenero dokument
@@ -447,7 +452,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
 
   return (
     <div className="space-y-4">
-      {bundle.employeeId ? (
+      {bundle.employeeId && canWriteDocuments ? (
         <div className="flex justify-end">
           <Button size="sm" asChild>
             <Link href={`/dokumentet/generate?category=CONTRACT&employeeId=${bundle.employeeId}`}>
@@ -649,12 +654,21 @@ export function EmployeeProfileShell(props: {
     setEmployee(initial);
   }, [initial]);
 
+  /**
+   * Two separate reasons a profile may be uneditable, kept apart on purpose.
+   * `canEdit` is about the employee — a terminated profile is closed to
+   * everyone. `mayEdit` adds "and this member is allowed to". Folding them
+   * together would print "Profili është i mbyllur (i larguar)" at a read-only
+   * member looking at a perfectly active employee.
+   */
   const canEdit = employee.status !== "TERMINATED";
+  const canWriteEmployees = useCan("employees.write");
+  const mayEdit = canEdit && canWriteEmployees;
 
   useEffect(() => {
-    if (!openEditDocuments || !canEdit) return;
+    if (!openEditDocuments || !mayEdit) return;
     setSheetOpen(true);
-  }, [openEditDocuments, canEdit]);
+  }, [openEditDocuments, mayEdit]);
 
   useEffect(() => {
     if (!sheetOpen || !openEditDocuments) return;
@@ -706,13 +720,13 @@ export function EmployeeProfileShell(props: {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SalaryVisibilityToggle />
-            {canEdit ? (
+            {mayEdit ? (
               <Button type="button" onClick={() => setSheetOpen(true)}>
                 Ndrysho profilin
               </Button>
-            ) : (
+            ) : canWriteEmployees && !canEdit ? (
               <RehireControl employeeId={employee.id} onDone={reload} />
-            )}
+            ) : null}
           </div>
         }
       />
@@ -730,7 +744,7 @@ export function EmployeeProfileShell(props: {
                 </p>
               </div>
             </div>
-            {canEdit ? (
+            {mayEdit ? (
               <Button
                 type="button"
                 variant="outlinePrimary"
@@ -781,7 +795,7 @@ export function EmployeeProfileShell(props: {
             <SalaryHistoryCard rows={employee.salaryHistory} />
           </TabsContent>
           <TabsContent value="contracts" className="mt-5 space-y-5">
-            <AnnexPanel employeeId={employee.id} canEdit={canEdit} />
+            <AnnexPanel employeeId={employee.id} canEdit={mayEdit} />
             <ContractsTab rows={bundle.contracts} />
           </TabsContent>
           <TabsContent value="documents" className="mt-5">
@@ -796,14 +810,14 @@ export function EmployeeProfileShell(props: {
             </TabsContent>
           ) : null}
           <TabsContent value="warnings" className="mt-5">
-            <WarningsPanel employeeId={employee.id} canEdit={canEdit} />
+            <WarningsPanel employeeId={employee.id} canEdit={mayEdit} />
           </TabsContent>
           <TabsContent value="timeline" className="mt-5">
             <EmptyTab title="Timeline" body="Ngjarjet operative dhe auditimi." />
           </TabsContent>
         </Tabs>
 
-        {canEdit ? (
+        {mayEdit ? (
           <EmployeeFormSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}

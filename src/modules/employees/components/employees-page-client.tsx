@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
+import { useCan } from "@/components/layout/capability-provider";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -87,7 +88,7 @@ export function EmployeesPageClient(props: {
   /** Leavers kept out of the default view — stated, never silently dropped. */
   hiddenTerminated?: number;
   showAllHref?: string;
-  canImportEmployees?: boolean;
+
   timeClockEnabled?: boolean;
 }) {
   const {
@@ -98,7 +99,6 @@ export function EmployeesPageClient(props: {
     filters,
     hiddenTerminated = 0,
     showAllHref = "/punonjesit?status=ALL",
-    canImportEmployees = false,
   } = props;
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -120,16 +120,28 @@ export function EmployeesPageClient(props: {
 
   // `?shto=1` opens the new-employee wizard on arrival — deep-linked from the
   // Konfigurimet onboarding dead-ends ("+ Shto Punonjës" under Përfaqësuesit).
+  /**
+   * One question, one answer. `canImportEmployees` was threaded from the page as
+   * a prop and was literally `can(subject, "employees.write")` — the same
+   * capability every other control on this screen needs. The three import API
+   * routes still call that predicate server-side; only the duplicate journey to
+   * the UI is gone.
+   */
+  const canWriteEmployees = useCan("employees.write");
+
   const searchParams = useSearchParams();
   const autoOpened = useRef(false);
   useEffect(() => {
     if (autoOpened.current) return;
+    // Gated as well as the button: `?shto=1` opens the sheet without a click, so
+    // a link would otherwise hand a read-only member a form they cannot save.
+    if (!canWriteEmployees) return;
     if (searchParams.get("shto") === "1") {
       autoOpened.current = true;
       openCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, canWriteEmployees]);
 
   const openEdit = async (row: EmployeeListRowDto) => {
     if (row.status === "TERMINATED") {
@@ -192,15 +204,17 @@ export function EmployeesPageClient(props: {
           <div className="flex flex-wrap items-center gap-2">
             {loadingDetail ? <Skeleton className="h-9 w-36" /> : null}
             <SalaryVisibilityToggle />
-            {canImportEmployees ? (
-              <Button type="button" variant="outlinePrimary" onClick={() => setImportOpen(true)} disabled={loadingDetail}>
-                <Upload className="h-4 w-4" aria-hidden />
-                Importo CSV
-              </Button>
+            {canWriteEmployees ? (
+              <>
+                <Button type="button" variant="outlinePrimary" onClick={() => setImportOpen(true)} disabled={loadingDetail}>
+                  <Upload className="h-4 w-4" aria-hidden />
+                  Importo CSV
+                </Button>
+                <Button type="button" onClick={openCreate} disabled={loadingDetail}>
+                  Shto punonjës
+                </Button>
+              </>
             ) : null}
-            <Button type="button" onClick={openCreate} disabled={loadingDetail}>
-              Shto punonjës
-            </Button>
           </div>
         }
       />

@@ -3,7 +3,6 @@ import { EmployeesFilters, type EmployeesFilterValues } from "@/modules/employee
 import { EmployeesPageClient } from "@/modules/employees/components/employees-page-client";
 import type { EmployeeFiltersDto } from "@/modules/employees/types";
 import { getEmployeesPageData } from "@/modules/employees/services/employee-service";
-import { canImportEmployees } from "@/modules/employees/services/employee-import-access";
 import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { requireCompanyContextPage } from "@/server/company-context";
 
@@ -25,7 +24,7 @@ export default async function PunonjesitPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { companyId, role, user } = await requireCompanyContextPage();
+  const { companyId } = await requireCompanyContextPage();
 
   const sp = await searchParams;
   const q = first(sp.q);
@@ -148,7 +147,6 @@ export default async function PunonjesitPage({
       }
       showAllHref={cardHref({ status: "ALL" })}
       filters={<EmployeesFilters departments={data.departments} defaults={defaults} />}
-      canImportEmployees={canImportEmployees({ role, isPlatformAdmin: user.isPlatformAdmin })}
       timeClockEnabled={await isTimeClockEnabled(companyId)}
     />
   );
