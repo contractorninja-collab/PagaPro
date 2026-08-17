@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ export function LeaveMonthlyAccrualPanel() {
   const [yearStr, setYearStr] = useState(String(defaults.year));
   const [monthStr, setMonthStr] = useState(String(defaults.month));
   const [pending, startTransition] = useTransition();
+  const canWriteLeave = useCan("leave.write");
 
   function runPost() {
     const periodYear = Number(yearStr);
@@ -87,7 +89,7 @@ export function LeaveMonthlyAccrualPanel() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" disabled={pending} onClick={() => runPost()}>
+          <Button type="button" disabled={pending || !canWriteLeave} onClick={() => runPost()}>
             {pending ? "Duke u përpunuar…" : "Posto akumulimin për këtë muaj"}
           </Button>
           <p className="text-xs text-muted-foreground">

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   AlertCircle,
   AlertTriangle,
@@ -165,6 +166,7 @@ export function DashboardActionCenter(props: {
 }) {
   const router = useRouter();
 
+  const canWriteLeave = useCan("leave.write");
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -261,7 +263,10 @@ export function DashboardActionCenter(props: {
       chip: { label: LEAVE_STATUS_LABELS_SQ[row.status], tone: "warning" },
       detail: `${formatSqDate(row.startDateIso)} – ${formatSqDate(row.endDateIso)} · kërkesë pushimi`,
       anchorId: idx === 0 ? "leave-requests" : undefined,
-      action: (
+      // The row stays — it is the dashboard telling you a decision is waiting,
+      // which is worth knowing even if somebody else has to make it. Only the
+      // two buttons go.
+      action: canWriteLeave ? (
         <>
           <button
             type="button"
@@ -275,7 +280,7 @@ export function DashboardActionCenter(props: {
             Refuzo
           </button>
         </>
-      ),
+      ) : null,
     });
   });
 

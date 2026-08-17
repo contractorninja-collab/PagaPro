@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import { Plus } from "lucide-react";
 import type { LeaveSubtype, LeaveType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const FIELD =
 export function NewLeaveRequestButton({ employees }: { employees: PushimetEmployeeOptionDto[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const canWriteLeave = useCan("leave.write");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     employeeId: "",
@@ -133,6 +135,10 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
       setSaving(false);
     }
   }
+
+  // The dialog exists only to submit a request, so without leave.write the
+  // whole control goes rather than opening a form that cannot be sent.
+  if (!canWriteLeave) return null;
 
   return (
     <>

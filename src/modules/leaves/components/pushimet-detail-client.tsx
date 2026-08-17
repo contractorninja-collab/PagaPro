@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
 import {
@@ -87,6 +88,8 @@ export function PushimetDetailClient(props: {
   const router = useRouter();
   const { row } = props.detail;
 
+  const canWriteLeave = useCan("leave.write");
+  const canWriteDocuments = useCan("documents.write");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [revokeOpen, setRevokeOpen] = useState(false);
@@ -216,7 +219,7 @@ export function PushimetDetailClient(props: {
         }
         actions={
           <>
-            {row.status === "PENDING" ? (
+            {row.status === "PENDING" && canWriteLeave ? (
               <>
                 <button type="button" className={BTN_PRIMARY} onClick={() => void approve()}>
                   Mirato
@@ -226,19 +229,25 @@ export function PushimetDetailClient(props: {
                 </button>
               </>
             ) : null}
-            {row.status === "DRAFT" || row.status === "PENDING" ? (
+            {(row.status === "DRAFT" || row.status === "PENDING") && canWriteLeave ? (
               <button type="button" className={BTN_SECONDARY} onClick={() => void cancel()}>
                 Anulo
               </button>
             ) : null}
             {row.status === "APPROVED" ? (
               <>
-                <button type="button" className={BTN_PRIMARY} onClick={() => setGenOpen(true)}>
-                  Gjenero dokument
-                </button>
-                <button type="button" className={BTN_SECONDARY} onClick={() => setRevokeOpen(true)}>
-                  Revoko
-                </button>
+                {/* Two capabilities in one branch: the document is
+                    documents.write, revoking the leave is leave.write. */}
+                {canWriteDocuments ? (
+                  <button type="button" className={BTN_PRIMARY} onClick={() => setGenOpen(true)}>
+                    Gjenero dokument
+                  </button>
+                ) : null}
+                {canWriteLeave ? (
+                  <button type="button" className={BTN_SECONDARY} onClick={() => setRevokeOpen(true)}>
+                    Revoko
+                  </button>
+                ) : null}
               </>
             ) : null}
           </>
@@ -336,6 +345,7 @@ export function PushimetDetailClient(props: {
                     <button
                       type="button"
                       className={BTN_SECONDARY_DENSE}
+                      disabled={!canWriteLeave}
                       onClick={() => setLinkInterruptOpen(true)}
                     >
                       Lidh pushim mjekësor…

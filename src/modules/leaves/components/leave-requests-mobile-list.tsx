@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
+import { useCan } from "@/components/layout/capability-provider";
 import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 import { payrollImpactLabel } from "@/modules/leaves/helpers/payroll-impact-label";
@@ -27,6 +28,11 @@ export function LeaveRequestsMobileList(props: {
   onGenerate: (id: string) => void;
 }) {
   const { rows, flagsFor, busyId, onApprove, onReject, onCancel, onGenerate } = props;
+  // Hidden rather than disabled here: on a card the buttons are the row's own
+  // chrome, and a card of greyed-out buttons reads as broken rather than
+  // restricted.
+  const canWriteLeave = useCan("leave.write");
+  const canWriteDocs = useCan("documents.write");
 
   if (rows.length === 0) {
     return (
@@ -95,7 +101,7 @@ export function LeaveRequestsMobileList(props: {
                 Dokumenti{docCount > 1 ? ` (${docCount})` : ""}
               </Link>
             ) : null}
-            {row.status === "PENDING" ? (
+            {row.status === "PENDING" && canWriteLeave ? (
               <>
                 <button
                   type="button"
@@ -110,7 +116,7 @@ export function LeaveRequestsMobileList(props: {
                 </button>
               </>
             ) : null}
-            {row.status === "DRAFT" || row.status === "PENDING" ? (
+            {(row.status === "DRAFT" || row.status === "PENDING") && canWriteLeave ? (
               <button
                 type="button"
                 className={BTN_SECONDARY_DENSE}
@@ -120,7 +126,7 @@ export function LeaveRequestsMobileList(props: {
                 Anulo kërkesën
               </button>
             ) : null}
-            {row.status === "APPROVED" ? (
+            {row.status === "APPROVED" && canWriteDocs ? (
               <button type="button" className={BTN_SECONDARY_DENSE} onClick={() => onGenerate(row.id)}>
                 Gjenero dokument…
               </button>

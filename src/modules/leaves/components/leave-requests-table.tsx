@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FileText, MoreHorizontal } from "lucide-react";
 import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,7 @@ function LeaveDocumentCell({
   row: PushimetLeaveRowDto;
   onGenerate: (id: string) => void;
 }) {
+  const canWriteDocuments = useCan("documents.write");
   const docs = row.documents;
   if (docs === null) return <span className="text-[#cbd5e1]">—</span>;
 
@@ -61,7 +63,7 @@ function LeaveDocumentCell({
   }
 
   // Only an approved leave can be documented, so nothing else offers the action.
-  if (row.status === "APPROVED") {
+  if (row.status === "APPROVED" && canWriteDocuments) {
     return (
       <button
         type="button"
@@ -88,6 +90,13 @@ export function LeaveRequestsTable(props: {
   onGenerate: (id: string) => void;
 }) {
   const { rows, flagsFor, busyId, onApprove, onReject, onCancel, onGenerate } = props;
+  /**
+   * The menu keeps its two read links (the request and the employee profile),
+   * so its mutations are disabled rather than removed — a menu that changes
+   * length by role is harder to learn than one whose items grey out.
+   */
+  const canWriteLeave = useCan("leave.write");
+  const canWriteDocs = useCan("documents.write");
 
   if (rows.length === 0) {
     return (
@@ -178,19 +187,21 @@ export function LeaveRequestsTable(props: {
                         <DropdownMenuSeparator />
                         {row.status === "PENDING" ? (
                           <>
-                            <DropdownMenuItem disabled={busy} onClick={() => onApprove(row.id)}>
+                            <DropdownMenuItem disabled={busy || !canWriteLeave} onClick={() => onApprove(row.id)}>
                               Mirato
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onReject(row.id)}>Refuzo…</DropdownMenuItem>
+                            <DropdownMenuItem disabled={!canWriteLeave} onClick={() => onReject(row.id)}>
+                              Refuzo…
+                            </DropdownMenuItem>
                           </>
                         ) : null}
                         {row.status === "DRAFT" || row.status === "PENDING" ? (
-                          <DropdownMenuItem disabled={busy} onClick={() => onCancel(row.id)}>
+                          <DropdownMenuItem disabled={busy || !canWriteLeave} onClick={() => onCancel(row.id)}>
                             Anulo kërkesën
                           </DropdownMenuItem>
                         ) : null}
                         {row.status === "APPROVED" ? (
-                          <DropdownMenuItem onClick={() => onGenerate(row.id)}>
+                          <DropdownMenuItem disabled={!canWriteDocs} onClick={() => onGenerate(row.id)}>
                             Gjenero dokument…
                           </DropdownMenuItem>
                         ) : null}

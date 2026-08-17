@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LeaveWallchart } from "@/modules/leaves/wallchart/leave-wallchart";
 import { AnnualLeaveBalancePanel } from "@/modules/leaves/components/annual-leave-balance-panel";
 import { OtherLeaveBalancePanel } from "@/modules/leaves/components/other-leave-balance-panel";
+import { useCan } from "@/components/layout/capability-provider";
 import type { AttentionContext } from "@/modules/leaves/helpers/leave-balance-attention";
 import type { LeaveQueueDecision } from "@/modules/leaves/services/leave-queue-decision-service";
 import type { PayrollSyncSkipRow, LeaveBalanceTotals } from "@/modules/leaves/services/leave-query-service";
@@ -188,6 +189,8 @@ export function PushimetDashboardClient(props: {
    * when anything fails, stays open with the per-request account instead of
    * compressing five different failures into one toast.
    */
+  const canWriteLeave = useCan("leave.write");
+  const canWriteDocuments = useCan("documents.write");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRunning, setBulkRunning] = useState(false);
@@ -582,7 +585,7 @@ export function PushimetDashboardClient(props: {
                     Reflektohet menjëherë në payroll pas miratimit.
                   </p>
                 </div>
-                {props.pendingRows.length > 1 ? (
+                {props.pendingRows.length > 1 && canWriteLeave ? (
                   <div className="flex shrink-0 items-center gap-3">
                     <label className="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-[#64748b]">
                       <input
@@ -631,7 +634,7 @@ export function PushimetDashboardClient(props: {
                       className={`flex flex-col gap-3 border-l-[3px] px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center ${rail}`}
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-3">
-                        {props.pendingRows.length > 1 ? (
+                        {props.pendingRows.length > 1 && canWriteLeave ? (
                           <input
                             type="checkbox"
                             className="mt-2.5 h-4 w-4 shrink-0 accent-[#2563EB]"
@@ -700,21 +703,25 @@ export function PushimetDashboardClient(props: {
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                        <button
-                          type="button"
-                          className={BTN_PRIMARY_DENSE}
-                          disabled={busyId === row.id}
-                          onClick={() => void runApprove(row.id)}
-                        >
-                          Mirato
-                        </button>
-                        <button
-                          type="button"
-                          className={BTN_DESTRUCTIVE_DENSE}
-                          onClick={() => setRejectId(row.id)}
-                        >
-                          Refuzo
-                        </button>
+                        {canWriteLeave ? (
+                          <>
+                            <button
+                              type="button"
+                              className={BTN_PRIMARY_DENSE}
+                              disabled={busyId === row.id}
+                              onClick={() => void runApprove(row.id)}
+                            >
+                              Mirato
+                            </button>
+                            <button
+                              type="button"
+                              className={BTN_DESTRUCTIVE_DENSE}
+                              onClick={() => setRejectId(row.id)}
+                            >
+                              Refuzo
+                            </button>
+                          </>
+                        ) : null}
                         {/* One label for "open this request", everywhere. */}
                         <Link
                           href={`/pushimet/${row.id}`}
@@ -862,6 +869,7 @@ export function PushimetDashboardClient(props: {
         year={props.calendarYear}
         attention={attentionContext}
         action={
+          !canWriteLeave ? null : (
           <button
             type="button"
             className={BTN_SECONDARY_DENSE}
@@ -875,6 +883,7 @@ export function PushimetDashboardClient(props: {
             />
             Rifresko balancat
           </button>
+          )
         }
       />
 
