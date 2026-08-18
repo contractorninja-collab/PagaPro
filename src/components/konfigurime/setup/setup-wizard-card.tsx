@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, ChevronDown, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StepCircle } from "@/components/patterns/step-circle";
@@ -139,6 +140,15 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [openStep, setOpenStep] = useState<SetupStepId | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * Declared with the rest of the state, above the collapsed-summary early
+   * return. The wizard walks a new company through two different permissions:
+   * its job titles and employees are employees.write, while the company
+   * profile, parameters and logo are company.settings. A member holding one and
+   * not the other still gets the steps they can actually complete.
+   */
+  const canWriteSettings = useCan("company.settings");
+  const canWriteEmployees = useCan("employees.write");
 
   // Step-1 draft
   const [newTitle, setNewTitle] = useState("");
@@ -371,6 +381,8 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
   }
 
   const disabled = props.pending || busy;
+  const settingsLocked = disabled || !canWriteSettings;
+  const employeesLocked = disabled || !canWriteEmployees;
   const titlesNeedingDescription = jobTitles.filter(
     (j) => j.description === defaultJobDescriptionForTitle(j.title),
   ).length;
@@ -471,7 +483,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                         </span>
                         <Button
                           type="button"
-                          disabled={disabled || !newTitle.trim()}
+                          disabled={employeesLocked || !newTitle.trim()}
                           onClick={() => void addJobTitle()}
                         >
                           Shto pozitën
@@ -556,7 +568,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       </span>
                       <Button
                         type="button"
-                        disabled={disabled || !repEmployeeId}
+                        disabled={settingsLocked || !repEmployeeId}
                         onClick={() => void saveRepresentativeStep()}
                       >
                         {busy ? "Duke ruajtur…" : "Ruaj dhe vazhdo"}
@@ -659,7 +671,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
-                          disabled={disabled || !logoFile}
+                          disabled={settingsLocked || !logoFile}
                           onClick={() => void saveLogoStep()}
                         >
                           {busy ? "Duke ruajtur…" : "Ruaj logon"}

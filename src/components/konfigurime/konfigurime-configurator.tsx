@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
 import { HolidaySettingsPanel } from "@/components/konfigurime/holiday-settings-panel";
@@ -156,6 +157,15 @@ export function KonfigurimeConfigurator({
 }) {
   const router = useRouter();
   const { pending, submit } = useKonfigurimeSave();
+  /**
+   * `pending` means a save is in flight; `locked` adds "or this member may not
+   * change company settings". Every control in this form already carried
+   * disabled={locked}, so one derived name covers all of them rather than
+   * twenty-six separate conditions.
+   */
+  const canWriteSettings = useCan("company.settings");
+  const canWriteEmployees = useCan("employees.write");
+  const locked = pending || !canWriteSettings;
   const [mounted, setMounted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<KonfigurimeTabId>(initialTab);
@@ -403,7 +413,7 @@ export function KonfigurimeConfigurator({
         description="Parametra të kompanisë, përfaqësuesi ligjor, pagat, festat publike, dokumentet, pushimet dhe njoftimet — të izoluara për kompaninë aktive."
         actions={
           <div className="flex flex-col items-end gap-2">
-            <Button type="submit" form="konfigurime-form" className="hidden md:inline-flex" disabled={pending}>
+            <Button type="submit" form="konfigurime-form" className="hidden md:inline-flex" disabled={locked}>
               {pending ? "Duke ruajtur…" : "Ruaj ndryshimet"}
             </Button>
             {formError ? (
@@ -485,7 +495,7 @@ export function KonfigurimeConfigurator({
                       }}
                       placeholder="Shoqëria Shembull Sh.p.k."
                       autoComplete="organization"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                   <FormField label="NUI" hint="Numri unik identifikues (fiskal)." error={fieldErrors["company.fiscalNumber"]}>
@@ -499,7 +509,7 @@ export function KonfigurimeConfigurator({
                         setCompany((c) => ({ ...c, fiscalNumber: e.target.value || null }));
                       }}
                       placeholder="812345678"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                   <FormField label="Adresa" className="md:col-span-2" error={fieldErrors["company.addressLine"]}>
@@ -514,7 +524,7 @@ export function KonfigurimeConfigurator({
                       }}
                       placeholder="Rruga, numri, qyteti"
                       autoComplete="street-address"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                   <FormField label="Email" error={fieldErrors["company.email"]}>
@@ -530,7 +540,7 @@ export function KonfigurimeConfigurator({
                       }}
                       placeholder="info@kompania.com"
                       autoComplete="email"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                   <FormField label="Telefoni" error={fieldErrors["company.phone"]}>
@@ -546,7 +556,7 @@ export function KonfigurimeConfigurator({
                       }}
                       placeholder="+383 44 000 000"
                       autoComplete="tel"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                   <FormField label="Website" className="md:col-span-2" error={fieldErrors["company.website"]}>
@@ -562,7 +572,7 @@ export function KonfigurimeConfigurator({
                       }}
                       placeholder="https://www.kompania.com"
                       autoComplete="url"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                 </div>
@@ -577,7 +587,7 @@ export function KonfigurimeConfigurator({
                   <CardTitle>Përfaqësuesit e autorizuar</CardTitle>
                   <CardDescription>Personat që nënshkruajnë dokumentet zyrtare dhe kontratat.</CardDescription>
                 </div>
-                <Button type="button" variant="secondary" size="sm" onClick={addRep} disabled={pending} className="shrink-0">
+                <Button type="button" variant="secondary" size="sm" onClick={addRep} disabled={locked} className="shrink-0">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Shto përfaqësues
                 </Button>
@@ -601,7 +611,7 @@ export function KonfigurimeConfigurator({
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
-                          disabled={pending}
+                          disabled={locked}
                           onClick={() => removeRep(idx)}
                         >
                           Hiq
@@ -638,7 +648,7 @@ export function KonfigurimeConfigurator({
                                   position: emp?.jobTitle ?? null,
                                 });
                               }}
-                              disabled={pending}
+                              disabled={locked}
                             >
                               <option value="">Zgjidhni punonjësin</option>
                               {linkedButInactive ? (
@@ -657,12 +667,14 @@ export function KonfigurimeConfigurator({
                                 Nuk ka punonjës aktivë ende — shtojeni direkt me hapësirën më poshtë.
                               </p>
                             ) : null}
-                            <Link
-                              href="/punonjesit?shto=1"
-                              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline"
-                            >
-                              + Shto Punonjës
-                            </Link>
+                            {canWriteEmployees ? (
+                              <Link
+                                href="/punonjesit?shto=1"
+                                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                              >
+                                + Shto Punonjës
+                              </Link>
+                            ) : null}
                           </FormField>
                           <FormField label="Pozita" hint="Plotësohet automatikisht nga pozita e punonjësit.">
                             <Input
@@ -718,7 +730,7 @@ export function KonfigurimeConfigurator({
                           setCfg((c) => ({ ...c, minimumSalaryCurrent: e.target.value || null }));
                         }}
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         €
@@ -747,7 +759,7 @@ export function KonfigurimeConfigurator({
                           setCfg((c) => ({ ...c, trustContributionPercent: e.target.value || null }));
                         }}
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         %
@@ -768,7 +780,7 @@ export function KonfigurimeConfigurator({
                         setCfg((c) => ({ ...c, standardWeeklyHours: e.target.value || null }));
                       }}
                       inputMode="decimal"
-                      disabled={pending}
+                      disabled={locked}
                     />
                   </FormField>
                 </div>
@@ -818,7 +830,7 @@ export function KonfigurimeConfigurator({
                     </div>
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outlinePrimary" asChild disabled={pending}>
+                        <Button type="button" variant="outlinePrimary" asChild disabled={locked}>
                           <label htmlFor="company-logo" className="cursor-pointer">
                             <ImagePlus className="mr-2 h-4 w-4" />
                             {initial.companyLogoStorageKey && !removeCompanyLogo ? "Zëvendëso" : "Ngarko logon"}
@@ -829,7 +841,7 @@ export function KonfigurimeConfigurator({
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           className="sr-only"
-                          disabled={pending}
+                          disabled={locked}
                           onChange={(event) => {
                             const file = event.target.files?.[0] ?? null;
                             if (!file) return;
@@ -851,7 +863,7 @@ export function KonfigurimeConfigurator({
                           <Button
                             type="button"
                             variant="outlinePrimary"
-                            disabled={pending}
+                            disabled={locked}
                             onClick={() => {
                               setCompanyLogoFile(null);
                               setCompanyLogoPreview(null);
@@ -903,7 +915,7 @@ export function KonfigurimeConfigurator({
                           setCfg((c) => ({ ...c, annualLeaveDaysDefault: e.target.value || null }));
                         }}
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                     </FormField>
                     <FormField label="Leje personale" error={fieldErrors["configuration.personalLeaveDaysDefault"]}>
@@ -920,7 +932,7 @@ export function KonfigurimeConfigurator({
                           setCfg((c) => ({ ...c, personalLeaveDaysDefault: e.target.value || null }));
                         }}
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                     </FormField>
                     <FormField
@@ -942,7 +954,7 @@ export function KonfigurimeConfigurator({
                         }}
                         placeholder="5"
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                     </FormField>
                     <FormField
@@ -964,7 +976,7 @@ export function KonfigurimeConfigurator({
                         }}
                         placeholder="20"
                         inputMode="decimal"
-                        disabled={pending}
+                        disabled={locked}
                       />
                     </FormField>
                     <FormField
@@ -983,7 +995,7 @@ export function KonfigurimeConfigurator({
                           setCfg((c) => ({ ...c, medicalLeavePolicyNote: e.target.value || null }));
                         }}
                         placeholder="P.sh. procedura për lëndim në punë, raport mjekësor…"
-                        disabled={pending}
+                        disabled={locked}
                       />
                     </FormField>
                   </div>
@@ -1013,7 +1025,7 @@ export function KonfigurimeConfigurator({
                     title="Kontrata afër skadimit"
                     description="Sinjal kur kontratat qëndrojnë pa rinovim."
                     checked={cfg.notifyContractExpiring}
-                    disabled={pending}
+                    disabled={locked}
                     onCheckedChange={(v) => setCfg((c) => ({ ...c, notifyContractExpiring: v }))}
                   />
                   <NotificationToggle
@@ -1021,7 +1033,7 @@ export function KonfigurimeConfigurator({
                     title="Payroll reminders"
                     description="Para afateve të përpunimit të pagës."
                     checked={cfg.notifyPayrollReminders}
-                    disabled={pending}
+                    disabled={locked}
                     onCheckedChange={(v) => setCfg((c) => ({ ...c, notifyPayrollReminders: v }))}
                   />
                   <NotificationToggle
@@ -1029,7 +1041,7 @@ export function KonfigurimeConfigurator({
                     title="Leave approvals"
                     description="Kërkesat në pritje të vendimit."
                     checked={cfg.notifyLeaveApprovals}
-                    disabled={pending}
+                    disabled={locked}
                     onCheckedChange={(v) => setCfg((c) => ({ ...c, notifyLeaveApprovals: v }))}
                   />
                   <NotificationToggle
@@ -1037,7 +1049,7 @@ export function KonfigurimeConfigurator({
                     title="Employee warnings"
                     description="Për incidentet ose dokumentacionin e paplotë."
                     checked={cfg.notifyEmployeeWarnings}
-                    disabled={pending}
+                    disabled={locked}
                     onCheckedChange={(v) => setCfg((c) => ({ ...c, notifyEmployeeWarnings: v }))}
                   />
                 </div>
@@ -1048,7 +1060,7 @@ export function KonfigurimeConfigurator({
       </form>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-        <Button type="submit" form="konfigurime-form" className="w-full" size="lg" disabled={pending}>
+        <Button type="submit" form="konfigurime-form" className="w-full" size="lg" disabled={locked}>
           {pending ? "Duke ruajtur…" : "Ruaj ndryshimet"}
         </Button>
       </div>

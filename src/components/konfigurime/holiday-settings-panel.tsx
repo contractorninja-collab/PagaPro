@@ -4,6 +4,7 @@ import type { CompanyHolidayCategory } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,9 @@ export function HolidaySettingsPanel({
   const [year, setYear] = useState(defaultYear);
   const [holidays, setHolidays] = useState(initialHolidays);
   const [busy, setBusy] = useState(false);
+  // Holidays are company.settings — the whole panel is one setting surface.
+  const canWriteSettings = useCan("company.settings");
+  const locked = busy || !canWriteSettings;
 
   const [newDate, setNewDate] = useState("");
   const [newName, setNewName] = useState("");
@@ -149,15 +153,15 @@ export function HolidaySettingsPanel({
               min={2000}
               max={2100}
               value={year}
-              disabled={busy}
+              disabled={locked}
               onChange={(e) => setYear(Number(e.target.value))}
               onBlur={() => void refresh(year)}
             />
           </div>
-          <Button type="button" variant="secondary" disabled={busy} onClick={() => void refresh(year)}>
+          <Button type="button" variant="secondary" disabled={locked} onClick={() => void refresh(year)}>
             Ringarko
           </Button>
-          <Button type="button" disabled={busy} onClick={() => void handleSeed()}>
+          <Button type="button" disabled={locked} onClick={() => void handleSeed()}>
             Importo festat zyrtare (XK)
           </Button>
         </div>
@@ -189,7 +193,7 @@ export function HolidaySettingsPanel({
                         type="date"
                         className="h-9 w-[150px] font-mono text-xs"
                         value={h.observedOn}
-                        disabled={busy}
+                        disabled={locked}
                         onChange={(e) => {
                           const v = e.target.value;
                           setHolidays((prev) =>
@@ -205,13 +209,13 @@ export function HolidaySettingsPanel({
                     <td className="px-3 py-2">
                       <Switch
                         checked={h.isActive}
-                        disabled={busy}
+                        disabled={locked}
                         onCheckedChange={(v) => void handleToggle(h.id, v)}
                         aria-label={`Aktive ${h.observedOn}`}
                       />
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void handleDelete(h.id)}>
+                      <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void handleDelete(h.id)}>
                         Fshi
                       </Button>
                     </td>
@@ -228,7 +232,7 @@ export function HolidaySettingsPanel({
             <Input
               id="new-holiday-date"
               type="date"
-              disabled={busy}
+              disabled={locked}
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
             />
@@ -237,7 +241,7 @@ export function HolidaySettingsPanel({
             <Label htmlFor="new-holiday-name">Emërtimi</Label>
             <Input
               id="new-holiday-name"
-              disabled={busy}
+              disabled={locked}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="p.sh. Bajrami i madh"
@@ -247,7 +251,7 @@ export function HolidaySettingsPanel({
             <Label htmlFor="new-holiday-cat">Kategori</Label>
             <select
               id="new-holiday-cat"
-              disabled={busy}
+              disabled={locked}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value as CompanyHolidayCategory)}

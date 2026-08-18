@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { Input } from "@/components/ui/input";
 import { cn, randomClientId } from "@/lib/utils";
 import { createEmployeeAction } from "@/modules/employees/actions/employee-actions";
@@ -201,7 +202,9 @@ export function SetupEmployeeRows(props: {
     }
   }
 
-  const disabled = props.disabled || saving;
+  // Step 2 creates employees and departments — employees.write throughout.
+  const canWriteEmployees = useCan("employees.write");
+  const disabled = props.disabled || saving || !canWriteEmployees;
 
   return (
     <div className="space-y-3">
