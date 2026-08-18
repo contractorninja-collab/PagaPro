@@ -470,7 +470,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                           <Input
                             id="setup-title"
                             value={newTitle}
-                            disabled={disabled}
+                            disabled={employeesLocked}
                             placeholder="p.sh. Shitës"
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -526,7 +526,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                           <Input
                             id="setup-nui"
                             value={props.company.fiscalNumber ?? ""}
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchCompany((s) => ({ ...s, fiscalNumber: e.target.value }))
                             }
@@ -541,7 +541,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                           <Input
                             id="setup-address"
                             value={props.company.addressLine ?? ""}
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchCompany((s) => ({ ...s, addressLine: e.target.value }))
                             }
@@ -554,7 +554,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                           id="setup-rep"
                           className={SELECT_CLASS}
                           value={repEmployeeId}
-                          disabled={disabled}
+                          disabled={settingsLocked}
                           onChange={(e) => setRepEmployeeId(e.target.value)}
                         >
                           <option value="">Zgjidh punonjësin…</option>
@@ -585,7 +585,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                             id="setup-min"
                             inputMode="decimal"
                             value={props.cfg.minimumSalaryCurrent ?? ""}
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchConfiguration((s) => ({
                                 ...s,
@@ -603,7 +603,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                               props.cfg.standardWeeklyHours ??
                               SETUP_CONFIGURATION_DEFAULTS.standardWeeklyHours
                             }
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchConfiguration((s) => ({
                                 ...s,
@@ -621,7 +621,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                               props.cfg.workingDaysPerWeek ??
                               SETUP_CONFIGURATION_DEFAULTS.workingDaysPerWeek
                             }
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchConfiguration((s) => ({
                                 ...s,
@@ -639,7 +639,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                               props.cfg.annualLeaveDaysDefault ??
                               SETUP_CONFIGURATION_DEFAULTS.annualLeaveDaysDefault
                             }
-                            disabled={disabled}
+                            disabled={settingsLocked}
                             onChange={(e) =>
                               props.onPatchConfiguration((s) => ({
                                 ...s,
@@ -649,7 +649,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                           />
                         </span>
                       </div>
-                      <Button type="button" disabled={disabled} onClick={() => void saveParametersStep()}>
+                      <Button type="button" disabled={settingsLocked} onClick={() => void saveParametersStep()}>
                         {busy ? "Duke ruajtur…" : "Ruaj dhe vazhdo"}
                       </Button>
                     </div>
@@ -664,7 +664,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
-                        disabled={disabled}
+                        disabled={settingsLocked}
                         className="text-[13px]"
                         onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
                       />
