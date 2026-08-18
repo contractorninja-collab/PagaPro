@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import type { DocumentCategory } from "@prisma/client";
 import {
   AlertTriangle,
@@ -119,6 +120,7 @@ export function DocumentGenerateWizardClient(props: {
   initialCategory?: string;
 }) {
   const router = useRouter();
+  const canWriteDocuments = useCan("documents.write");
   const [pending, startTransition] = useTransition();
   const [category, setCategory] = useState<DocumentCategory | "">(
     workflowCategories.includes(props.initialCategory as DocumentCategory)
@@ -757,9 +759,11 @@ export function DocumentGenerateWizardClient(props: {
             <button type="button" className={docBtnSecondary} disabled={pending} onClick={loadPreview}>
               Kontrollo
             </button>
-            <button type="button" className={docBtnPrimary} disabled={pending} onClick={generate}>
-              {pending ? "Duke gjeneruar…" : `Gjenero (${selectedIds.size || 0})`}
-            </button>
+            {canWriteDocuments ? (
+              <button type="button" className={docBtnPrimary} disabled={pending} onClick={generate}>
+                {pending ? "Duke gjeneruar…" : `Gjenero (${selectedIds.size || 0})`}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

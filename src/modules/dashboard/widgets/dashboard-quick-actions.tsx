@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown, FileText, Palmtree, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
+import { type Capability } from "@/server/permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,16 +17,19 @@ const DASHBOARD_ACTIONS = [
   {
     href: "/punonjesit",
     label: "Shto punonjës",
+    capability: "employees.write" as Capability,
     icon: UserPlus,
   },
   {
     href: "/dokumentet/generate?category=CONTRACT",
     label: "Gjenero kontratë",
+    capability: "documents.write" as Capability,
     icon: FileText,
   },
   {
     href: "/dokumentet/templates",
     label: "Ngarko template",
+    capability: "documents.write" as Capability,
     icon: FileText,
   },
   {
@@ -33,16 +38,25 @@ const DASHBOARD_ACTIONS = [
     // quiet day. Pushimet lists them in every state.
     href: "/pushimet?status=PENDING&month=0",
     label: "Aprovo pushime",
+    capability: "leave.write" as Capability,
     icon: Palmtree,
   },
 ] as const;
 
 function ActionsMenu(props: { trigger: ReactNode; align?: "start" | "end" }) {
+  const held = {
+    "employees.write": useCan("employees.write"),
+    "documents.write": useCan("documents.write"),
+    "leave.write": useCan("leave.write"),
+  } as Partial<Record<Capability, boolean>>;
+  const actions = DASHBOARD_ACTIONS.filter((a) => held[a.capability]);
+  if (actions.length === 0) return null;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{props.trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align={props.align ?? "end"} className="w-52">
-        {DASHBOARD_ACTIONS.map(({ href, label, icon: Icon }) => (
+        {actions.map(({ href, label, icon: Icon }) => (
           <DropdownMenuItem key={href} asChild>
             <Link href={href} className="flex items-center gap-2">
               <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />

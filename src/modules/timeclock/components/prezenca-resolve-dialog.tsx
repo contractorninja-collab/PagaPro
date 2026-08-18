@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function PrezencaResolveDialog(props: {
 }) {
   const { target } = props;
 
+  const canWriteTimeclock = useCan("timeclock.write");
   const [busy, setBusy] = useState(false);
   const [direction, setDirection] = useState<"IN" | "OUT">("OUT");
   // The missing scan is usually the evening out — default to the day at 16:00.
@@ -172,7 +174,7 @@ export function PrezencaResolveDialog(props: {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={busy || voidReason.trim().length < 3}
+              disabled={busy || !canWriteTimeclock || voidReason.trim().length < 3}
               onClick={() => void submitVoid()}
             >
               {busy ? "Duke anuluar…" : "Anulo skanimin"}
@@ -216,7 +218,7 @@ export function PrezencaResolveDialog(props: {
             Mbyll
           </Button>
           {voidTargetId ? null : (
-            <Button type="button" disabled={busy} onClick={() => void submitManual()}>
+            <Button type="button" disabled={busy || !canWriteTimeclock} onClick={() => void submitManual()}>
               {busy ? "Duke ruajtur…" : "Shto skanimin"}
             </Button>
           )}

@@ -7,6 +7,7 @@ import type { DocumentCategory } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import { cn } from "@/lib/utils";
 import { docCard } from "@/modules/documents/components/doc-ui";
 import {
@@ -41,6 +42,7 @@ export interface DocumentDetailClientProps {
 
 export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
   const router = useRouter();
+  const canWriteDocuments = useCan("documents.write");
   const [pending, startTransition] = useTransition();
 
   const missingOrEmpty = useMemo(() => {
@@ -179,6 +181,7 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2 justify-end">
+              {canWriteDocuments ? (
               <Button
                 type="button"
                 variant="secondary"
@@ -188,6 +191,8 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
               >
                 Riprovo gjenerimin
               </Button>
+              ) : null}
+              {canWriteDocuments ? (
               <Button
                 type="button"
                 variant="secondary"
@@ -197,6 +202,7 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
               >
                 {artifact.isArchived ? "Hiq nga arkivi" : "Arkivo"}
               </Button>
+              ) : null}
             </div>
           </>
         }

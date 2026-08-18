@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import type { TemplateDetectionMode } from "@prisma/client";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export function TemplateMappingClient(props: {
   registry: RegistryOption[];
 }) {
   const router = useRouter();
+  const canWriteDocuments = useCan("documents.write");
   const [pending, startTransition] = useTransition();
 
   const defaultBlanks = useMemo((): BlankFieldMapping[] => {
@@ -238,7 +240,12 @@ export function TemplateMappingClient(props: {
       ) : null}
 
       <div className="flex gap-2">
-        <button type="button" className={docBtnPrimary} disabled={pending} onClick={save}>
+        <button
+          type="button"
+          className={docBtnPrimary}
+          disabled={pending || !canWriteDocuments}
+          onClick={save}
+        >
           {pending ? "Duke ruajtur…" : "Ruaj mapimin"}
         </button>
       </div>

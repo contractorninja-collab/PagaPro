@@ -12,13 +12,15 @@ import {
 } from "@/modules/documents/components/doc-ui";
 import { getDocumentTemplateDetail } from "@/modules/documents/services/document-queries";
 import { requireCompanyContextPage } from "@/server/company-context";
+import { can } from "@/server/permissions";
 
 export default async function TemplateDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { companyId } = await requireCompanyContextPage();
+  const { companyId, role, user } = await requireCompanyContextPage();
+  const canWriteDocuments = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
 
   const { id } = await params;
   const template = await getDocumentTemplateDetail(companyId, id);
@@ -83,7 +85,7 @@ export default async function TemplateDetailPage({
                         </DocChip>
                       </td>
                       <td className={cn(docTableCell, "text-right")}>
-                        {blankCount > 0 || v.detectionMode === "MIXED" ? (
+                        {(blankCount > 0 || v.detectionMode === "MIXED") && canWriteDocuments ? (
                           <Link
                             href={`/dokumentet/templates/${template.id}/mapping?versionId=${v.id}`}
                             className={docBtnSecondaryDense}

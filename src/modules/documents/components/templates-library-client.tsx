@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import type { DocumentCategory } from "@prisma/client";
 import { Upload } from "lucide-react";
 import { AppSubBar } from "@/components/layout/app-sub-bar";
@@ -63,6 +64,7 @@ export interface TemplateLibraryRow {
 }
 
 export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] }) {
+  const canWriteDocuments = useCan("documents.write");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -129,7 +131,7 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                   <span className="text-[12px] font-medium text-[#64748b]">Aktiv</span>
                   <Switch
                     checked={t.isActive}
-                    disabled={pending}
+                    disabled={pending || !canWriteDocuments}
                     onCheckedChange={(v) => setActive(t.id, v)}
                   />
                 </div>
@@ -185,7 +187,7 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                         </td>
                         <td className={cn(docTableCell, "text-right")}>
                           <div className="flex flex-wrap items-center justify-end gap-2">
-                            {!v.isMapped && v.blankCount > 0 ? (
+                            {!v.isMapped && v.blankCount > 0 && canWriteDocuments ? (
                               <Link
                                 href={`/dokumentet/templates/${t.id}/mapping?versionId=${v.id}`}
                                 className={docBtnSecondaryDense}
@@ -199,7 +201,7 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                               <button
                                 type="button"
                                 className={docBtnSecondaryDense}
-                                disabled={pending}
+                                disabled={pending || !canWriteDocuments}
                                 onClick={() => publish(t.id, v.id)}
                               >
                                 Publiko
@@ -225,6 +227,9 @@ function UploadTemplateDialog(props: {
   pending: boolean;
   startTransition: (fn: () => void) => void;
 }) {
+  const canWriteDocuments = useCan("documents.write");
+  if (!canWriteDocuments) return null;
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -309,6 +314,7 @@ function UploadTemplateDialog(props: {
 }
 
 function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: string | null }) {
+  const canWriteDocuments = useCan("documents.write");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(props.initialKey ?? "");
@@ -347,7 +353,7 @@ function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: stri
           <option value="MANUAL">MANUAL</option>
         </select>
       </div>
-      <button type="button" className={docBtnSecondaryDense} disabled={pending} onClick={save}>
+      <button type="button" className={docBtnSecondaryDense} disabled={pending || !canWriteDocuments} onClick={save}>
         Ruaj çelësin
       </button>
     </div>

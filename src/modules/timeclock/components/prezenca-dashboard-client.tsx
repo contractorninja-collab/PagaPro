@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useCan } from "@/components/layout/capability-provider";
 import { AlarmClock, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +58,13 @@ export function PrezencaDashboardClient(props: {
     reviewReason: string | null;
     punches: PresencePunchDto[];
   } | null>(null);
+  /**
+   * Resolving a punch is timeclock.write, but syncing the month into payroll is
+   * payroll.prepare — syncTimeClockMonthToPayrollAction asks for that one. The
+   * two sit on the same screen and are not the same permission.
+   */
+  const canWriteTimeclock = useCan("timeclock.write");
+  const canPreparePayroll = useCan("payroll.prepare");
   const [resolveLoading, setResolveLoading] = useState<string | null>(null);
 
   const [syncOpen, setSyncOpen] = useState(false);
@@ -230,7 +238,7 @@ export function PrezencaDashboardClient(props: {
                   </div>
                   <button
                     type="button"
-                    disabled={resolveLoading === key}
+                    disabled={resolveLoading === key || !canWriteTimeclock}
                     onClick={() => void openResolve(ex)}
                     className="inline-flex h-8 items-center rounded-lg border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:opacity-60"
                   >
@@ -490,7 +498,11 @@ export function PrezencaDashboardClient(props: {
               Mbyll
             </Button>
             {syncAccount ? null : (
-              <Button type="button" disabled={syncRunning} onClick={() => void runSync()}>
+              <Button
+                type="button"
+                disabled={syncRunning || !canPreparePayroll}
+                onClick={() => void runSync()}
+              >
                 {syncRunning ? "Duke sinkronizuar…" : "Sinkronizo"}
               </Button>
             )}

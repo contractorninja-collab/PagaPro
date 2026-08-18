@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useCan } from "@/components/layout/capability-provider";
 import {
   DOCUMENT_CATEGORY_LABELS,
   formatArtifactKind,
@@ -633,6 +634,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
  * anything.
  */
 function EmptyRegister({ filtersActive, bare }: { filtersActive: boolean; bare?: boolean }) {
+  const canWriteDocuments = useCan("documents.write");
   const body = (
     <div className="text-center">
       <FileText className="mx-auto h-6 w-6 text-[#cbd5e1]" aria-hidden />
@@ -644,7 +646,7 @@ function EmptyRegister({ filtersActive, bare }: { filtersActive: boolean; bare?:
           ? "Ndryshoni kriteret ose pastroni filtrat."
           : "Gjeneroni kontratën, pushimin ose largimin e parë dhe do të shfaqet këtu."}
       </p>
-      {filtersActive ? null : (
+      {filtersActive || !canWriteDocuments ? null : (
         <Link href="/dokumentet/generate" className={cn(docBtnPrimaryDense, "mt-4")}>
           Gjenero dokumente
         </Link>
