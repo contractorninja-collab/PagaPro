@@ -6,6 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /**
+   * Server actions reject bodies over 1MB by default — which silently killed
+   * every dossier upload bigger than that (the action promise rejects before
+   * our code runs). 12mb = the 10MB employee-document cap plus multipart
+   * overhead; the per-file cap itself is enforced in the upload service.
+   */
+  experimental: {
+    serverActions: { bodySizeLimit: "12mb" },
+  },
   /** Avoid picking parent-folder lockfile when multiple exist on the machine */
   outputFileTracingRoot: path.join(__dirname),
   /**

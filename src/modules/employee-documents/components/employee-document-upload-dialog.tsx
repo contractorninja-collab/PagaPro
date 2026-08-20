@@ -88,8 +88,17 @@ export function EmployeeDocumentUploadDialog({
       }),
     );
     fd.set("file", file);
-    const r = await uploadEmployeeDocumentAction(fd);
-    setBusy(false);
+    let r: Awaited<ReturnType<typeof uploadEmployeeDocumentAction>>;
+    try {
+      r = await uploadEmployeeDocumentAction(fd);
+    } catch {
+      // A thrown action (oversized body, dropped connection) must not leave
+      // the dialog spinning forever.
+      toast.error("Ngarkimi dështoi — kontrolloni lidhjen dhe madhësinë e skedarit.");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!r.ok) {
       toast.error(r.error);
       return;
