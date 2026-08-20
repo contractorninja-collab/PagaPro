@@ -12,6 +12,14 @@ function contentTypeForKey(key: string): string {
   return "application/octet-stream";
 }
 
+/**
+ * Only the two branding prefixes are servable here. The company prefix alone
+ * is not enough: `companies/{companyId}/employees/…/documents/` now holds
+ * personnel files whose sensitive categories are role-gated on their own
+ * route — a generic key-to-bytes endpoint must not become a bypass for that.
+ */
+const SERVABLE_PREFIXES = ["branding/", "authorized-reps/"];
+
 /** Streams an authorized-representative asset after tenant + prefix checks. */
 export async function GET(req: NextRequest) {
   const result = await getCompanyContext();
@@ -28,6 +36,10 @@ export async function GET(req: NextRequest) {
   try {
     assertCompanyScopedStorageKey(companyId, key);
   } catch {
+    return new Response("Forbidden", { status: 403 });
+  }
+  const rest = key.slice(`companies/${companyId}/`.length);
+  if (!SERVABLE_PREFIXES.some((p) => rest.startsWith(p))) {
     return new Response("Forbidden", { status: 403 });
   }
 

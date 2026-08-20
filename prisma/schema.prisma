@@ -496,6 +496,7 @@ model Company {
   payrollCorrections      PayrollCorrection[]
   documentGenerationArtifacts DocumentGenerationArtifact[]
   documentTimelineEvents      DocumentTimelineEvent[]
+  employeeDocuments           EmployeeDocument[]
   leavePolicyParameterSets    LeavePolicyParameterSet[]
   leaveAccrualLedgerEntries   LeaveAccrualLedger[]
   payrollAtkExports           PayrollATKExport[]
@@ -709,6 +710,7 @@ model User {
   documentTemplateVersionsUploaded DocumentTemplateVersion[] @relation("DocumentTemplateVersionUploadedBy")
   documentArtifactsCreated DocumentGenerationArtifact[] @relation("DocumentArtifactCreatedBy")
   documentTimelineEventsCreated DocumentTimelineEvent[] @relation("DocumentTimelineCreatedBy")
+  employeeDocumentsUploaded EmployeeDocument[] @relation("EmployeeDocumentUploadedBy")
   timelineActorEvents     EmployeeTimelineEvent[]       @relation("TimelineActor")
   salaryChangesMade       EmployeeSalaryChange[]        @relation("SalaryChangeBy")
   contractAnnexesCreated  EmployeeContractAnnex[]       @relation("ContractAnnexBy")
@@ -969,6 +971,7 @@ model Employee {
   payrollCorrections   PayrollCorrection[]
   documentGenerationArtifacts DocumentGenerationArtifact[]
   documentTimelineEvents      DocumentTimelineEvent[]
+  employeeDocuments           EmployeeDocument[]
   leaveAccrualLedgerEntries   LeaveAccrualLedger[]
   authorizedRepresentatives   AuthorizedRepresentative[]
 
@@ -2679,4 +2682,68 @@ model AuditLog {
   @@index([companyId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Employee documents — the uploaded half of the personnel file ("dosja")
+// -----------------------------------------------------------------------------
+
+/// HR folder taxonomy for uploaded employee files. Generated documents keep
+/// their own DocumentCategory; these are the papers a company COLLECTS.
+enum EmployeeDocumentCategory {
+  IDENTIFIKIM // letërnjoftim, pasaportë, leje qëndrimi, leje pune
+  KONTRATA_TE_NENSHKRUARA // scans of signed contracts and annexes
+  KUALIFIKIME // diploma, certifikata, licenca
+  MJEKESORE // sensitive — gated by documents.sensitive
+  DISIPLINORE // sensitive — gated by documents.sensitive
+  DEKLARATA_PELQIME // GDPR/LMDhP pëlqime, deklarata të brendshme
+  TJERA
+}
+
+model EmployeeDocument {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  category EmployeeDocumentCategory
+  title    String
+  note     String? @db.Text
+
+  /// Sanitized original filename, for display and Content-Disposition only.
+  /// The storage key never contains user input.
+  displayFilename String
+
+  /// companies/{companyId}/employees/{employeeId}/documents/{uuid}.{ext} —
+  /// the prefix assertCompanyScopedStorageKey() guards.
+  storageKey  String @unique
+  contentType String
+  sizeBytes   Int
+  sha256      String
+
+  issuedAt  DateTime?
+  /// Non-null makes the document part of the 60-day expiry alert sweep.
+  expiresAt DateTime?
+
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  supersedesId String?
+  supersedes   EmployeeDocument?  @relation("EmployeeDocumentSupersedesChain", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy EmployeeDocument[] @relation("EmployeeDocumentSupersedesChain")
+
+  uploadedByUserId String?
+  uploadedBy       User?   @relation("EmployeeDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, employeeId, isArchived, category])
+  @@index([companyId, expiresAt])
+  @@index([companyId, createdAt])
+  @@index([supersedesId])
+  @@map("employee_documents")
 }

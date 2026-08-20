@@ -25,6 +25,10 @@ export type AlertBuilderInput = Pick<
   expiringResidencePermits: number;
   /** Subset of the above already past their expiry date. */
   expiredResidencePermits: number;
+  /** Uploaded employee documents whose expiresAt falls within 60 days (incl. already expired). */
+  expiringEmployeeDocuments: number;
+  /** Subset of the above already past their expiry date. */
+  expiredEmployeeDocuments: number;
   payrollRowExists: boolean;
   registerPdfGenerated: boolean;
 };
@@ -73,6 +77,27 @@ export function buildOperationalAlerts(input: AlertBuilderInput): OperationalAle
             : `${n} leje qëndrimi në skadencë (60 ditë)`,
       detail:
         "Punësimi i shtetasve të huaj pa leje të vlefshme qëndrimi është shkelje ligjore — rinovoni lejet.",
+      href: "/punonjesit",
+      actionLabel: "Shiko punonjësit",
+    });
+  }
+
+  if (input.expiringEmployeeDocuments > 0) {
+    const n = input.expiringEmployeeDocuments;
+    const expired = input.expiredEmployeeDocuments;
+    alerts.push({
+      id: "employee-documents-expiring",
+      severity: expired > 0 ? "critical" : "warning",
+      title:
+        expired > 0
+          ? expired === 1
+            ? "1 dokument i dosjes i skaduar"
+            : `${expired} dokumente të dosjes të skaduara`
+          : n === 1
+            ? "1 dokument i dosjes në skadencë (60 ditë)"
+            : `${n} dokumente të dosjes në skadencë (60 ditë)`,
+      detail:
+        "Dokumente të ngarkuara me datë skadence — rinovoni ose ngarkoni versionin e ri në dosjen e punonjësit.",
       href: "/punonjesit",
       actionLabel: "Shiko punonjësit",
     });

@@ -41,6 +41,9 @@ import {
   sortBalancesForDisplay,
   type EmployeeLeaveBundle,
 } from "@/modules/leaves/helpers/employee-leave-view";
+import { EmployeeDocumentUploadDialog } from "@/modules/employee-documents/components/employee-document-upload-dialog";
+import { EmployeeDocumentsFolders } from "@/modules/employee-documents/components/employee-documents-folders";
+import type { EmployeeDossierBundle } from "@/modules/employee-documents/types/employee-document-types";
 
 export interface EmployeeGeneratedDocSummary {
   id: string;
@@ -792,6 +795,8 @@ export function EmployeeProfileShell(props: {
   departments: DepartmentOptionDto[];
   jobTitles: JobTitleOptionDto[];
   documentCenter?: EmployeeProfileDocumentsBundle;
+  dossier?: EmployeeDossierBundle;
+  todayIso?: string;
   leaveCenter?: EmployeeLeaveBundle;
   timelineEntries?: EmployeeTimelineEntry[];
   openEditDocuments?: boolean;
@@ -802,6 +807,8 @@ export function EmployeeProfileShell(props: {
     departments,
     jobTitles,
     documentCenter,
+    dossier,
+    todayIso,
     leaveCenter,
     timelineEntries,
     openEditDocuments = false,
@@ -824,6 +831,7 @@ export function EmployeeProfileShell(props: {
    */
   const canEdit = employee.status !== "TERMINATED";
   const canWriteEmployees = useCan("employees.write");
+  const canWriteDocumentsTab = useCan("documents.write");
   const mayEdit = canEdit && canWriteEmployees;
 
   useEffect(() => {
@@ -960,7 +968,28 @@ export function EmployeeProfileShell(props: {
             <ContractsTab rows={bundle.contracts} />
           </TabsContent>
           <TabsContent value="documents" className="mt-5">
-            <DocumentsCenterTab {...bundle} />
+            <div className="space-y-5">
+              {dossier ? (
+                <SectionCard
+                  title="Dosja e punonjësit"
+                  description="Dokumentet e ngarkuara — identifikim, kontrata të nënshkruara, kualifikime."
+                  action={
+                    canWriteDocumentsTab ? (
+                      <EmployeeDocumentUploadDialog
+                        employeeId={dossier.employeeId}
+                        canSeeSensitive={dossier.viewerSeesSensitive}
+                      />
+                    ) : null
+                  }
+                >
+                  <EmployeeDocumentsFolders
+                    bundle={dossier}
+                    todayIso={todayIso ?? new Date().toISOString()}
+                  />
+                </SectionCard>
+              ) : null}
+              <DocumentsCenterTab {...bundle} />
+            </div>
           </TabsContent>
           <TabsContent value="leave" className="mt-5">
             <LeaveTab bundle={leaveCenter} />

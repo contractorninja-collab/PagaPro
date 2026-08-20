@@ -16,15 +16,15 @@ const member = (role: CompanyMembershipRole) => ({ role, isPlatformAdmin: false 
  */
 const EXPECTED: Record<CompanyMembershipRole, Capability[]> = {
   OWNER: [
-    "employees.write", "leave.write", "documents.write", "timeclock.write",
+    "employees.write", "leave.write", "documents.write", "documents.sensitive", "timeclock.write",
     "payroll.prepare", "payroll.signoff", "company.settings",
   ],
   ADMIN: [
-    "employees.write", "leave.write", "documents.write", "timeclock.write",
+    "employees.write", "leave.write", "documents.write", "documents.sensitive", "timeclock.write",
     "payroll.prepare", "payroll.signoff", "company.settings",
   ],
   HR_MANAGER: [
-    "employees.write", "leave.write", "documents.write", "timeclock.write",
+    "employees.write", "leave.write", "documents.write", "documents.sensitive", "timeclock.write",
     "payroll.prepare",
   ],
   ACCOUNTANT: [

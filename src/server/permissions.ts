@@ -9,10 +9,12 @@ import type { CompanyMembershipRole } from "@prisma/client";
  * This module is the single place that answers "may they?", so the answer
  * cannot drift between the server action, the API route and the button.
  *
- * Reading is deliberately NOT gated. A member of a company may see everything
- * in it, salaries included — the roles separate who can *change* things.
- * Anything narrower would need per-surface read rules and a story for reports,
- * exports and documents, which is a different feature.
+ * Reading is deliberately NOT gated, with ONE exception. A member of a company
+ * may see everything in it, salaries included — the roles separate who can
+ * *change* things. The exception is `documents.sensitive`: medical and
+ * disciplinary files in an employee's dossier are special-category personal
+ * data under the Kosovo LMDhP (06/L-082), so seeing them requires the
+ * capability — enforced in the list service, the download route and the UI.
  */
 
 export type Capability =
@@ -20,8 +22,10 @@ export type Capability =
   | "employees.write"
   /** Request, approve, revoke leave; balance adjustments. */
   | "leave.write"
-  /** Generate, regenerate and archive documents, contracts, annexes, warnings. */
+  /** Generate, regenerate and archive documents, contracts, annexes, warnings; upload employee files. */
   | "documents.write"
+  /** See and download MJEKESORE/DISIPLINORE employee documents — the one read gate. */
+  | "documents.sensitive"
   /** Kiosk pairing, punch corrections, attendance resolution. */
   | "timeclock.write"
   /** Draft, recalculate, correct and export a payroll period. */
@@ -46,6 +50,7 @@ const ROLE_CAPABILITIES: Record<CompanyMembershipRole, ReadonlySet<Capability>> 
     "employees.write",
     "leave.write",
     "documents.write",
+    "documents.sensitive",
     "timeclock.write",
     "payroll.prepare",
     "payroll.signoff",
@@ -55,6 +60,7 @@ const ROLE_CAPABILITIES: Record<CompanyMembershipRole, ReadonlySet<Capability>> 
     "employees.write",
     "leave.write",
     "documents.write",
+    "documents.sensitive",
     "timeclock.write",
     "payroll.prepare",
     "payroll.signoff",
@@ -64,6 +70,7 @@ const ROLE_CAPABILITIES: Record<CompanyMembershipRole, ReadonlySet<Capability>> 
     "employees.write",
     "leave.write",
     "documents.write",
+    "documents.sensitive",
     "timeclock.write",
     "payroll.prepare",
   ]),
@@ -103,6 +110,7 @@ export const ALL_CAPABILITIES: readonly Capability[] = [
   "employees.write",
   "leave.write",
   "documents.write",
+  "documents.sensitive",
   "timeclock.write",
   "payroll.prepare",
   "payroll.signoff",
@@ -118,6 +126,7 @@ const CAPABILITY_DENIAL_SQ: Record<Capability, string> = {
   "employees.write": "Nuk keni leje të ndryshoni të dhënat e punonjësve.",
   "leave.write": "Nuk keni leje të ndryshoni pushimet.",
   "documents.write": "Nuk keni leje të gjeneroni ose ndryshoni dokumente.",
+  "documents.sensitive": "Nuk keni leje të shihni dokumentet mjekësore ose disiplinore.",
   "timeclock.write": "Nuk keni leje të ndryshoni prezencën.",
   "payroll.prepare": "Nuk keni leje të përgatitni pagat.",
   "payroll.signoff": "Nuk keni leje të miratoni ose mbyllni pagat.",

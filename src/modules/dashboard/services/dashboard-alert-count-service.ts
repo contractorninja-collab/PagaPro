@@ -42,6 +42,8 @@ export const countOperationalAlerts = cache(async (companyId: string): Promise<n
     documentsMissingSample,
     expiringResidencePermits,
     expiredResidencePermits,
+    expiringEmployeeDocuments,
+    expiredEmployeeDocuments,
   ] = await Promise.all([
     prisma.payroll.findUnique({
       where: { companyId_year_month: { companyId, year: filters.year, month: filters.month } },
@@ -83,6 +85,22 @@ export const countOperationalAlerts = cache(async (companyId: string): Promise<n
         isForeignNational: true,
         status: { not: "TERMINATED" },
         residencePermitExpiryDate: { not: null, lt: today },
+      },
+    }),
+    prisma.employeeDocument.count({
+      where: {
+        companyId,
+        isArchived: false,
+        expiresAt: { not: null, lte: permitHorizon },
+        employee: { status: { not: "TERMINATED" } },
+      },
+    }),
+    prisma.employeeDocument.count({
+      where: {
+        companyId,
+        isArchived: false,
+        expiresAt: { not: null, lt: today },
+        employee: { status: { not: "TERMINATED" } },
       },
     }),
   ]);
@@ -146,6 +164,8 @@ export const countOperationalAlerts = cache(async (companyId: string): Promise<n
     expiringContractsTotal,
     expiringResidencePermits,
     expiredResidencePermits,
+    expiringEmployeeDocuments,
+    expiredEmployeeDocuments,
     payrollRowExists: payrollRow != null,
     registerPdfGenerated: registerPdfCount > 0,
   }).length;

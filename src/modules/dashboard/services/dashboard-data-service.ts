@@ -681,6 +681,27 @@ async function loadDashboardOperationalDataUncached(
     (r) => r.residencePermitExpiryDate != null && r.residencePermitExpiryDate < permitNow,
   ).length;
 
+  // Uploaded dossier documents with an expiry date — same 60-day compliance
+  // sweep as the permits, same company-wide scope.
+  const [expiringEmployeeDocuments, expiredEmployeeDocuments] = await Promise.all([
+    prisma.employeeDocument.count({
+      where: {
+        companyId,
+        isArchived: false,
+        expiresAt: { not: null, lte: permitHorizon },
+        employee: { status: { not: "TERMINATED" } },
+      },
+    }),
+    prisma.employeeDocument.count({
+      where: {
+        companyId,
+        isArchived: false,
+        expiresAt: { not: null, lt: permitNow },
+        employee: { status: { not: "TERMINATED" } },
+      },
+    }),
+  ]);
+
   const alerts = buildOperationalAlerts({
     ...payloadWithoutAlerts,
     payrollSettingsPresent: settingsRow != null,
@@ -691,6 +712,8 @@ async function loadDashboardOperationalDataUncached(
     expiringContractsTotal: contractsExpiringWithin30Days,
     expiringResidencePermits: permitRows.length,
     expiredResidencePermits,
+    expiringEmployeeDocuments,
+    expiredEmployeeDocuments,
     payrollRowExists: payrollRow != null,
     registerPdfGenerated,
   });

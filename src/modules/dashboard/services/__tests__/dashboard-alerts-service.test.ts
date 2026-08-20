@@ -39,9 +39,42 @@ const alertExtras: Omit<AlertBuilderInput, keyof typeof basePayload> = {
   expiringContractsTotal: 0,
   expiringResidencePermits: 0,
   expiredResidencePermits: 0,
+  expiringEmployeeDocuments: 0,
+  expiredEmployeeDocuments: 0,
   payrollRowExists: true,
   registerPdfGenerated: true,
 };
+
+describe("buildOperationalAlerts employee document expiry", () => {
+  it("emits nothing when no dossier document is near expiry", () => {
+    const alerts = buildOperationalAlerts({ ...basePayload, ...alertExtras });
+    expect(alerts.find((a) => a.id === "employee-documents-expiring")).toBeUndefined();
+  });
+
+  it("warns when documents approach expiry and none are past it", () => {
+    const alerts = buildOperationalAlerts({
+      ...basePayload,
+      ...alertExtras,
+      expiringEmployeeDocuments: 3,
+      expiredEmployeeDocuments: 0,
+    });
+    const alert = alerts.find((a) => a.id === "employee-documents-expiring");
+    expect(alert?.severity).toBe("warning");
+    expect(alert?.title).toBe("3 dokumente të dosjes në skadencë (60 ditë)");
+  });
+
+  it("escalates to critical with expired-count wording when any document is past expiry", () => {
+    const alerts = buildOperationalAlerts({
+      ...basePayload,
+      ...alertExtras,
+      expiringEmployeeDocuments: 2,
+      expiredEmployeeDocuments: 1,
+    });
+    const alert = alerts.find((a) => a.id === "employee-documents-expiring");
+    expect(alert?.severity).toBe("critical");
+    expect(alert?.title).toBe("1 dokument i dosjes i skaduar");
+  });
+});
 
 describe("buildOperationalAlerts missing docs routing", () => {
   it("links to employee profile with edit=documents when one employee is flagged", () => {

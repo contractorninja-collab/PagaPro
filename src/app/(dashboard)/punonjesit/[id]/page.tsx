@@ -19,6 +19,10 @@ import {
   listLeaveHistoryForEmployee,
 } from "@/modules/leaves/services/leave-query-service";
 import type { EmployeeLeaveBundle } from "@/modules/leaves/helpers/employee-leave-view";
+import { listEmployeeDocumentsForEmployee } from "@/modules/employee-documents/services/employee-document-service";
+import { isInlinePreviewable } from "@/modules/employee-documents/services/employee-document-file";
+import type { EmployeeDossierBundle } from "@/modules/employee-documents/types/employee-document-types";
+import { can } from "@/server/permissions";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
@@ -50,7 +54,11 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   const { id } = await params;
   const sp = await searchParams;
   const openEditDocuments = first(sp.edit) === "documents";
-  const { companyId } = await requireCompanyContextPage();
+  const { companyId, user, role } = await requireCompanyContextPage();
+  const viewerSeesSensitive = can(
+    { role, isPlatformAdmin: user.isPlatformAdmin },
+    "documents.sensitive",
+  );
 
   const balanceYear = new Date().getUTCFullYear();
 
@@ -63,8 +71,9 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   let leaveRequests;
   let leaveBalances;
   let timelineRows;
+  let uploadedDocs;
   try {
-    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows] =
+    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
       await Promise.all([
         getEmployeeById(companyId, id),
         listDepartmentsForCompany(companyId),
@@ -75,6 +84,12 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
         listLeaveHistoryForEmployee(companyId, id),
         listLeaveBalancesForEmployee(companyId, id, balanceYear),
         listTimelineForEmployee(companyId, id),
+        listEmployeeDocumentsForEmployee({
+          companyId,
+          employeeId: id,
+          includeSensitive: viewerSeesSensitive,
+          includeArchived: true,
+        }),
       ]);
   } catch (err) {
     console.error("[pagapro] EmployeeProfilePage: load failed", err);
@@ -139,6 +154,27 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
     })),
   };
 
+  const dossier: EmployeeDossierBundle = {
+    employeeId: id,
+    viewerSeesSensitive,
+    documents: uploadedDocs.map((d) => ({
+      id: d.id,
+      category: d.category,
+      title: d.title,
+      note: d.note,
+      displayFilename: d.displayFilename,
+      contentType: d.contentType,
+      sizeBytes: d.sizeBytes,
+      issuedAtIso: d.issuedAt?.toISOString() ?? null,
+      expiresAtIso: d.expiresAt?.toISOString() ?? null,
+      isArchived: d.isArchived,
+      createdAtIso: d.createdAt.toISOString(),
+      createdAtLabel: d.createdAt.toLocaleDateString("sq-AL", { dateStyle: "medium" }),
+      uploadedByName: d.uploadedBy?.displayName ?? d.uploadedBy?.email ?? null,
+      inlinePreviewable: isInlinePreviewable(d.contentType),
+    })),
+  };
+
   const timelineEntries = timelineRows.map((t) => ({
     id: t.id,
     occurredAtIso: t.occurredAt.toISOString(),
@@ -161,6 +197,8 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       departments={departments}
       jobTitles={jobTitles}
       documentCenter={documentCenter}
+      dossier={dossier}
+      todayIso={new Date().toISOString()}
       leaveCenter={leaveCenter}
       timelineEntries={timelineEntries}
       openEditDocuments={openEditDocuments}
