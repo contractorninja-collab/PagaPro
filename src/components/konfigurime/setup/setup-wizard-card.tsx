@@ -730,7 +730,19 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
                       ) : null}
 
                       {progress.complete ? (
-                        <Button type="button" variant="secondary" onClick={props.onFinished}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            // router.refresh() alone cannot collapse the card —
+                            // `expanded` is client state and survives a refresh,
+                            // so the click looked like it did nothing.
+                            setExpanded(false);
+                            setOpenStep(null);
+                            toast.success("Konfigurimi fillestar u përfundua.");
+                            props.onFinished();
+                          }}
+                        >
                           Përfundo konfigurimin
                         </Button>
                       ) : null}
