@@ -89,26 +89,26 @@ export function EmployeeImportDialog(props: {
 
         {result ? (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 border-y border-[#e2e8f0] py-4">
+            <div className="flex items-start gap-3 border-y border-line py-4">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#15803d]" aria-hidden />
               <div>
-                <p className="text-sm font-semibold text-[#0f172a]">Importi përfundoi</p>
-                <p className="mt-1 text-sm text-[#64748b]">
+                <p className="text-sm font-semibold text-ink-900">Importi përfundoi</p>
+                <p className="mt-1 text-sm text-ink-500">
                   {result.imported} u importuan · {result.skipped} u anashkaluan
                 </p>
               </div>
             </div>
             {result.skipped > 0 ? (
-              <div className="max-h-64 overflow-auto border-y border-[#e2e8f0]">
+              <div className="max-h-64 overflow-auto border-y border-line">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-[#f8fafc] text-[#64748b]">
+                  <thead className="sticky top-0 bg-fill-faint text-ink-500">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Rreshti</th>
                       <th className="px-3 py-2 font-semibold">Nr personal</th>
                       <th className="px-3 py-2 font-semibold">Arsyeja</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#eef2f7]">
+                  <tbody className="divide-y divide-line-soft">
                     {result.rows.filter((row) => !row.imported).map((row) => (
                       <tr key={row.rowNumber}>
                         <td className="px-3 py-2 tabular-nums">{row.rowNumber}</td>
@@ -123,7 +123,7 @@ export function EmployeeImportDialog(props: {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 border-y border-[#e2e8f0] py-4">
+            <div className="flex flex-wrap items-center gap-2 border-y border-line py-4">
               <Button asChild variant="outlinePrimary">
                 <a href="/api/employees/import/template" download>
                   <Download className="h-4 w-4" aria-hidden />
@@ -145,14 +145,14 @@ export function EmployeeImportDialog(props: {
                 Zgjidh CSV
               </Button>
               {file ? (
-                <span className="inline-flex min-w-0 items-center gap-2 text-sm text-[#475569]">
+                <span className="inline-flex min-w-0 items-center gap-2 text-sm text-ink-600">
                   <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="max-w-64 truncate">{file.name}</span>
                 </span>
               ) : null}
             </div>
 
-            {pending ? <p className="py-6 text-center text-sm text-[#64748b]">Duke përpunuar CSV-në…</p> : null}
+            {pending ? <p className="py-6 text-center text-sm text-ink-500">Duke përpunuar CSV-në…</p> : null}
             {error ? (
               <div className="flex items-start gap-2 border-l-4 border-[#dc2626] bg-[#fef2f2] px-3 py-2.5 text-sm text-[#991b1b]">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -163,13 +163,13 @@ export function EmployeeImportDialog(props: {
             {preview && !pending ? (
               <>
                 <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                  <span className="font-semibold text-[#0f172a]">{preview.totals.total} rreshta</span>
+                  <span className="font-semibold text-ink-900">{preview.totals.total} rreshta</span>
                   <span className="font-semibold text-[#15803d]">{preview.totals.valid} të vlefshëm</span>
                   <span className="font-semibold text-[#b91c1c]">{preview.totals.invalid} me gabime</span>
                 </div>
-                <div className="max-h-[420px] overflow-auto border-y border-[#e2e8f0]">
+                <div className="max-h-[420px] overflow-auto border-y border-line">
                   <table className="w-full min-w-[760px] text-left text-xs">
-                    <thead className="sticky top-0 bg-[#f8fafc] text-[#64748b]">
+                    <thead className="sticky top-0 bg-fill-faint text-ink-500">
                       <tr>
                         <th className="px-3 py-2 font-semibold">Rreshti</th>
                         <th className="px-3 py-2 font-semibold">Punonjësi</th>
@@ -180,11 +180,11 @@ export function EmployeeImportDialog(props: {
                         <th className="px-3 py-2 font-semibold">Validimi</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#eef2f7]">
+                    <tbody className="divide-y divide-line-soft">
                       {preview.rows.map((row) => (
                         <tr key={row.rowNumber} className={row.errors.length ? "bg-[#fffafa]" : undefined}>
                           <td className="px-3 py-2 tabular-nums">{row.rowNumber}</td>
-                          <td className="px-3 py-2 font-medium text-[#0f172a]">{`${row.firstName} ${row.lastName}`.trim() || "—"}</td>
+                          <td className="px-3 py-2 font-medium text-ink-900">{`${row.firstName} ${row.lastName}`.trim() || "—"}</td>
                           <td className="px-3 py-2">{row.personalId || "—"}</td>
                           <td className="px-3 py-2 tabular-nums">{row.hireDateIso || "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{row.baseSalaryMonthly}</td>

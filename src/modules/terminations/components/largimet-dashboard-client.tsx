@@ -93,18 +93,18 @@ function fmtDate(iso: string) {
 /* ── 1b design primitives (module-local) ─────────────────────────────── */
 
 const CARD =
-  "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+  "rounded-[12px] border border-line bg-white shadow-card";
 
 const BTN_PRIMARY = buttonVariants({ size: "lg" });
 const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "lg" });
 const BTN_DENSE_PRIMARY = buttonVariants({ size: "sm" });
 const BTN_DENSE_SECONDARY = buttonVariants({ variant: "secondary", size: "sm" });
 
-const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 const FIELD_SELECT =
-  "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+  "h-9 rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue";
 const FIELD_INPUT =
-  "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-brand-blue";
+  "h-9 rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none transition-colors placeholder:text-ink-400 focus:border-brand-blue";
 
 type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
 
@@ -256,9 +256,9 @@ export function LargimetDashboardClient(props: {
         <LargimetFiltersClient filters={props.filters} employees={props.employees} />
 
         {rows.length === 0 ? (
-          <div className="rounded-[12px] border border-[#e2e8f0] bg-white px-6 py-16 text-center">
-            <p className="text-sm font-semibold text-[#0f172a]">Nuk ka largime për këta filtra.</p>
-            <p className="mt-1.5 text-[13px] text-[#64748b]">
+          <div className="rounded-[12px] border border-line bg-white px-6 py-16 text-center">
+            <p className="text-sm font-semibold text-ink-900">Nuk ka largime për këta filtra.</p>
+            <p className="mt-1.5 text-[13px] text-ink-500">
               Ndryshoni kriteret e filtrimit ose krijoni një largim të ri.
             </p>
           </div>
@@ -269,7 +269,7 @@ export function LargimetDashboardClient(props: {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] border-collapse text-[13px]">
                   <thead>
-                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                    <tr className="border-b border-line-soft bg-fill-faint text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                       <th className="px-4 py-2.5 font-bold">Punonjësi</th>
                       <th className="px-4 py-2.5 font-bold">Lloji</th>
                       <th className="px-4 py-2.5 font-bold">Datat</th>
@@ -286,7 +286,7 @@ export function LargimetDashboardClient(props: {
                         <tr
                           key={r.id}
                           className={cn(
-                            "border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]",
+                            "border-b border-fill transition-colors last:border-0 hover:bg-fill-faint",
                             closed && "opacity-60",
                           )}
                         >
@@ -296,21 +296,21 @@ export function LargimetDashboardClient(props: {
                               <div className="min-w-0">
                                 <Link
                                   href={`/punonjesit/${r.employee.id}`}
-                                  className="block truncate font-semibold text-[#0f172a] transition-colors hover:text-brand-blue"
+                                  className="block truncate font-semibold text-ink-900 transition-colors hover:text-brand-blue"
                                 >
                                   {r.employee.firstName} {r.employee.lastName}
                                 </Link>
-                                <p className="truncate text-[12px] text-[#94a3b8]">
+                                <p className="truncate text-[12px] text-ink-400">
                                   {r.employee.personalId}
                                   {r.employee.jobTitle ? ` · ${r.employee.jobTitle}` : ""}
                                 </p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-[#334155]">{TERMINATION_TYPE_LABELS[r.type]}</td>
+                          <td className="px-4 py-3 text-ink-700">{TERMINATION_TYPE_LABELS[r.type]}</td>
                           <td className="px-4 py-3">
                             <p className="font-medium tabular-nums text-[#111827]">{fmtDate(r.terminationDate)}</p>
-                            <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">
+                            <p className="mt-0.5 text-[12px] tabular-nums text-ink-400">
                               Dita e fundit: {fmtDate(r.lastWorkingDay)}
                             </p>
                           </td>
@@ -332,7 +332,7 @@ export function LargimetDashboardClient(props: {
                                 Hap
                               </Link>
                             ) : (
-                              <span className="text-[12px] text-[#94a3b8]">—</span>
+                              <span className="text-[12px] text-ink-400">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -361,11 +361,11 @@ export function LargimetDashboardClient(props: {
                         <div>
                           <Link
                             href={`/punonjesit/${r.employee.id}`}
-                            className="font-semibold text-[#0f172a] hover:text-brand-blue"
+                            className="font-semibold text-ink-900 hover:text-brand-blue"
                           >
                             {r.employee.firstName} {r.employee.lastName}
                           </Link>
-                          <p className="text-[12px] text-[#94a3b8]">
+                          <p className="text-[12px] text-ink-400">
                             {r.employee.personalId}
                             {r.employee.jobTitle ? ` · ${r.employee.jobTitle}` : ""}
                           </p>
@@ -377,24 +377,24 @@ export function LargimetDashboardClient(props: {
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12.5px]">
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Lloji</dt>
-                        <dd className="mt-0.5 text-[#334155]">{TERMINATION_TYPE_LABELS[r.type]}</dd>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Lloji</dt>
+                        <dd className="mt-0.5 text-ink-700">{TERMINATION_TYPE_LABELS[r.type]}</dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Datat</dt>
-                        <dd className="mt-0.5 tabular-nums text-[#334155]">
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Datat</dt>
+                        <dd className="mt-0.5 tabular-nums text-ink-700">
                           {fmtDate(r.terminationDate)}
-                          <span className="text-[#94a3b8]"> → {fmtDate(r.lastWorkingDay)}</span>
+                          <span className="text-ink-400"> → {fmtDate(r.lastWorkingDay)}</span>
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Payroll</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Payroll</dt>
                         <dd className="mt-0.5">
                           <PayrollCell row={r} />
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Dokumenti</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Dokumenti</dt>
                         <dd className="mt-0.5">
                           {r.generatedDocument ? (
                             <Link
@@ -405,12 +405,12 @@ export function LargimetDashboardClient(props: {
                               Hap
                             </Link>
                           ) : (
-                            <span className="text-[12px] text-[#94a3b8]">—</span>
+                            <span className="text-[12px] text-ink-400">—</span>
                           )}
                         </dd>
                       </div>
                     </dl>
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[#f1f5f9] pt-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-fill pt-3">
                       <Link href={`/largimet/${r.id}`} className={BTN_DENSE_SECONDARY}>
                         Hap
                       </Link>
@@ -435,8 +435,8 @@ function StatCard(props: { label: string; value: number; icon: ReactNode; tile: 
         {props.icon}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{props.label}</p>
-        <p className="text-[24px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+        <p className="truncate text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">{props.label}</p>
+        <p className="text-[24px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-ink-900">
           {props.value}
         </p>
       </div>
@@ -588,7 +588,7 @@ function LargimetFiltersClient(props: {
           value={month}
           onChange={(event) => setMonth(event.target.value)}
           disabled={!year}
-          className={cn(FIELD_SELECT, "w-36 disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]")}
+          className={cn(FIELD_SELECT, "w-36 disabled:cursor-not-allowed disabled:bg-fill-faint disabled:text-ink-400")}
         >
           <option value="">{year ? "Të gjithë muajt" : "Zgjidhni vitin"}</option>
           {eligibleMonths.map((eligibleMonth) => (
@@ -626,7 +626,7 @@ function PayrollCell({ row }: { row: LargimetRowSerialized }) {
   if (row.finalPayrollRequired) {
     return <StatusChip tone="warning">Kërkohet</StatusChip>;
   }
-  return <span className="text-[12px] text-[#94a3b8]">—</span>;
+  return <span className="text-[12px] text-ink-400">—</span>;
 }
 
 function useRowRunner(startTransition: (fn: () => void) => void) {
@@ -800,7 +800,7 @@ function RowActionsMenu(props: {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-[#94a3b8] transition-colors hover:bg-[#eef2f7] hover:text-[#475569] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-400 transition-colors hover:bg-fill-hover hover:text-ink-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
           aria-label="Veprime"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -941,7 +941,7 @@ function CreateTerminationDialogContent(props: {
         <div className="space-y-1.5">
           <label className={FIELD_LABEL}>Arsyeja</label>
           <textarea
-            className="min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue"
+            className="min-h-[72px] w-full rounded-[8px] border border-line bg-white px-3 py-2 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             disabled={props.pending}
@@ -950,13 +950,13 @@ function CreateTerminationDialogContent(props: {
         <div className="space-y-1.5">
           <label className={FIELD_LABEL}>Detaje</label>
           <textarea
-            className="min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue"
+            className="min-h-[72px] w-full rounded-[8px] border border-line bg-white px-3 py-2 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
             disabled={props.pending}
           />
         </div>
-        <label className="flex items-center gap-2 text-[13px] text-[#334155]">
+        <label className="flex items-center gap-2 text-[13px] text-ink-700">
           <input
             type="checkbox"
             className="h-4 w-4 accent-[#2563EB]"

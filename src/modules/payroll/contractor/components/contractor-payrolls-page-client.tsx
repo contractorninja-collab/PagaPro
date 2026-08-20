@@ -59,7 +59,7 @@ export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodList
           !canPreparePayroll ? null : (
           <Button
             type="button"
-            className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
+            className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-brand-blue-strong"
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />
@@ -73,16 +73,16 @@ export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodList
         <PayrollModeSwitch mode="kontraktor" />
 
         {props.rows.length === 0 ? (
-          <div className="rounded-[12px] border border-dashed border-[#e2e8f0] bg-white p-10 text-center">
+          <div className="rounded-[12px] border border-dashed border-line bg-white p-10 text-center">
             <p className="text-sm text-muted-foreground">
               Ende asnjë periudhë kontraktorësh. Krijoni të parën me butonin lart djathtas.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-[#e2e8f0] bg-white">
+          <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e2e8f0] text-left text-[12px] uppercase tracking-wide text-[#94a3b8]">
+                <tr className="border-b border-line text-left text-[12px] uppercase tracking-wide text-ink-400">
                   <th className="px-4 py-3 font-semibold">Periudha</th>
                   <th className="px-4 py-3 font-semibold">Statusi</th>
                   <th className="px-4 py-3 text-center font-semibold">Kontraktorë</th>
@@ -94,8 +94,8 @@ export function ContractorPayrollsPageClient(props: { rows: ContractorPeriodList
                 {props.rows.map((r) => {
                   const status = STATUS_LABELS[r.status] ?? STATUS_LABELS.DRAFT!;
                   return (
-                    <tr key={r.id} className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc]">
-                      <td className="px-4 py-3 font-semibold text-[#0f172a]">
+                    <tr key={r.id} className="border-b border-fill last:border-0 hover:bg-fill-faint">
+                      <td className="px-4 py-3 font-semibold text-ink-900">
                         {payrollMonthLabel(r.year, r.month)}
                       </td>
                       <td className="px-4 py-3">

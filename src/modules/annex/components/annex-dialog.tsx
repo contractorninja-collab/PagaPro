@@ -17,7 +17,7 @@ import { getAnnexDiffAction, createAnnexAction } from "@/modules/annex/actions/a
 import type { ContractTermType } from "@prisma/client";
 
 const FIELD =
-  "h-9 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-brand-blue";
+  "h-9 w-full rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none transition-colors placeholder:text-ink-400 focus:border-brand-blue";
 const BTN_PRIMARY = buttonVariants({ size: "default" });
 const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
 
@@ -119,7 +119,7 @@ export function AnnexDialog(props: {
         </DialogHeader>
 
         {loading ? (
-          <p className="py-8 text-center text-[13px] text-[#64748b]">Duke ngarkuar…</p>
+          <p className="py-8 text-center text-[13px] text-ink-500">Duke ngarkuar…</p>
         ) : (
           <div className="-mr-1 flex-1 space-y-4 overflow-y-auto pr-1">
             <div className="space-y-2">
@@ -128,7 +128,7 @@ export function AnnexDialog(props: {
                   key={r.category}
                   className={cn(
                     "rounded-[10px] border p-3",
-                    r.include ? "border-brand-blue/40 bg-brand-blue/[0.03]" : "border-[#e2e8f0]",
+                    r.include ? "border-brand-blue/40 bg-brand-blue/[0.03]" : "border-line",
                   )}
                 >
                   <label className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export function AnnexDialog(props: {
                       checked={r.include}
                       onChange={(e) => patchRow(i, { include: e.target.checked })}
                     />
-                    <span className="text-[13px] font-semibold text-[#0f172a]">{r.label}</span>
+                    <span className="text-[13px] font-semibold text-ink-900">{r.label}</span>
                     {r.fromUnknown ? (
                       <span className="text-[11px] font-medium text-[#b45309]">
                         konfirmo vlerën paraprake
@@ -147,7 +147,7 @@ export function AnnexDialog(props: {
                   </label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div>
-                      <span className="text-[11px] text-[#94a3b8]">Nga</span>
+                      <span className="text-[11px] text-ink-400">Nga</span>
                       <input
                         className={FIELD}
                         value={r.from}
@@ -155,7 +155,7 @@ export function AnnexDialog(props: {
                       />
                     </div>
                     <div>
-                      <span className="text-[11px] text-[#94a3b8]">Në</span>
+                      <span className="text-[11px] text-ink-400">Në</span>
                       <input
                         className={FIELD}
                         value={r.to}
@@ -167,9 +167,9 @@ export function AnnexDialog(props: {
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 border-t border-[#eef2f7] pt-3">
+            <div className="grid grid-cols-2 gap-3 border-t border-line-soft pt-3">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                   Data e hyrjes në fuqi
                 </span>
                 <input
@@ -180,7 +180,7 @@ export function AnnexDialog(props: {
                 />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                   Lloji i kontratës
                 </span>
                 <select
@@ -197,7 +197,7 @@ export function AnnexDialog(props: {
               </div>
               {contractType !== "INDEFINITE" ? (
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                     Data e skadimit
                   </span>
                   <input
@@ -212,7 +212,7 @@ export function AnnexDialog(props: {
           </div>
         )}
 
-        <DialogFooter className="shrink-0 border-t border-[#eef2f7] pt-3">
+        <DialogFooter className="shrink-0 border-t border-line-soft pt-3">
           <button type="button" className={BTN_SECONDARY} onClick={() => props.onOpenChange(false)}>
             Anulo
           </button>

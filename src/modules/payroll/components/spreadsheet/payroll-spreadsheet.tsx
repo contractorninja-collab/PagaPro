@@ -63,10 +63,10 @@ const CELL_BASE =
   "box-border h-[26px] w-full min-w-[52px] rounded-md border px-2 text-right text-xs leading-tight outline-none transition-colors [font-variant-numeric:tabular-nums] focus:border-brand-blue focus:bg-white disabled:cursor-not-allowed disabled:opacity-60";
 
 function cellTone(state: CellState, deviates: boolean): string {
-  if (state === "saving") return "border-brand-blue bg-white text-[#334155]";
+  if (state === "saving") return "border-brand-blue bg-white text-ink-700";
   if (state === "saved") return "border-[#6ee7b7] bg-[#ecfdf5] text-[#047857]";
   if (deviates) return "border-[#fde68a] bg-[#fffbeb] text-[#b45309]";
-  return "border-[#e2e8f0] bg-[#f8fafc] text-[#475569]";
+  return "border-line bg-fill-faint text-ink-600";
 }
 
 /** Holds the "just saved" tint briefly, then clears it. */
@@ -231,7 +231,7 @@ function LeaveHoursCell(props: {
         }}
       />
       {hasFixed ? (
-        <p className="mt-0.5 whitespace-nowrap text-right text-[9px] leading-tight text-[#94a3b8]" aria-hidden>
+        <p className="mt-0.5 whitespace-nowrap text-right text-[9px] leading-tight text-ink-400" aria-hidden>
           {sickN > 0 ? `M ${props.sick}` : null}
           {sickN > 0 && unpaidN > 0 ? " · " : null}
           {unpaidN > 0 ? `PP ${props.unpaid}` : null}
@@ -324,11 +324,11 @@ export function PayrollSpreadsheet(props: {
   const trust2Header = trustHeaderLabel("Trust 2", props.pensionEmployerPercent);
 
   const thNum =
-    "min-w-[84px] w-auto whitespace-nowrap border-b border-[#e2e8f0] px-1.5 py-[7px] text-right text-[10.5px] font-semibold leading-tight text-[#64748b]";
+    "min-w-[84px] w-auto whitespace-nowrap border-b border-line px-1.5 py-[7px] text-right text-[10.5px] font-semibold leading-tight text-ink-500";
   const thBand =
-    "border-b border-[#e2e8f0] px-1.5 py-[5px] text-left text-[9.5px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]";
+    "border-b border-line px-1.5 py-[5px] text-left text-[9.5px] font-bold uppercase tracking-[0.08em] text-ink-400";
   const tdNum =
-    "min-w-[84px] w-auto whitespace-nowrap px-1.5 py-1.5 text-right text-xs text-[#64748b] [font-variant-numeric:tabular-nums]";
+    "min-w-[84px] w-auto whitespace-nowrap px-1.5 py-1.5 text-right text-xs text-ink-500 [font-variant-numeric:tabular-nums]";
   const tdInput = "min-w-[84px] w-auto px-1 py-[5px] align-middle";
   const stickyShadow = "shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)]";
   const stickyShadowRight = "shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)]";
@@ -337,9 +337,9 @@ export function PayrollSpreadsheet(props: {
 
   if (props.entries.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white px-6 py-14 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-        <p className="text-sm font-semibold text-[#0f172a]">Nuk ka rreshta në këtë payroll.</p>
-        <p className="mx-auto mt-2 max-w-md text-[13px] text-[#64748b]">
+      <div className="rounded-xl border border-line bg-white px-6 py-14 text-center shadow-card">
+        <p className="text-sm font-semibold text-ink-900">Nuk ka rreshta në këtë payroll.</p>
+        <p className="mx-auto mt-2 max-w-md text-[13px] text-ink-500">
           {editable
             ? "Shtypni „Llogarit Pagat” për t'i gjeneruar rreshtat nga lista e punonjësve aktivë."
             : "Ky payroll u mbyll pa rreshta. Rreshtat gjenerohen vetëm kur payroll-i është në DRAFT."}
@@ -366,17 +366,17 @@ export function PayrollSpreadsheet(props: {
       ) : null}
 
       <div className="hidden md:block">
-        <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+        <div className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
           <div className="relative max-h-[min(70vh,720px)] overflow-x-auto overflow-y-auto">
             <table className="w-full min-w-[1560px] border-collapse text-xs">
               {/* Two header rows: the band names what a group of columns is for, so
                   it is obvious which side you type into and which side is computed. */}
-              <thead className="sticky top-0 z-30 bg-[#f1f5f9]">
+              <thead className="sticky top-0 z-30 bg-fill">
                 <tr>
                   <th
                     rowSpan={2}
                     className={cn(
-                      "sticky left-0 z-40 min-w-[180px] max-w-[220px] border-b border-[#e2e8f0] bg-[#f1f5f9] px-2.5 py-[9px] text-left text-[10.5px] font-semibold leading-tight text-[#64748b]",
+                      "sticky left-0 z-40 min-w-[180px] max-w-[220px] border-b border-line bg-fill px-2.5 py-[9px] text-left text-[10.5px] font-semibold leading-tight text-ink-500",
                       stickyShadow,
                     )}
                   >
@@ -385,13 +385,13 @@ export function PayrollSpreadsheet(props: {
                   <th className={thBand} colSpan={INPUT_COLUMNS.length}>
                     Orët &amp; shtesat {editable ? "· redaktueshme" : "· vetëm lexim"}
                   </th>
-                  <th className={cn(thBand, "border-l border-[#e2e8f0]")} colSpan={6}>
+                  <th className={cn(thBand, "border-l border-line")} colSpan={6}>
                     Llogaritja · nga motori
                   </th>
                   <th
                     rowSpan={2}
                     className={cn(
-                      "sticky right-0 z-40 min-w-[100px] border-b border-l border-[#e2e8f0] bg-[#f1f5f9] px-1.5 py-[9px] text-right text-[10.5px] font-bold leading-tight text-[#0f172a]",
+                      "sticky right-0 z-40 min-w-[100px] border-b border-l border-line bg-fill px-1.5 py-[9px] text-right text-[10.5px] font-bold leading-tight text-ink-900",
                       stickyShadowRight,
                     )}
                   >
@@ -404,7 +404,7 @@ export function PayrollSpreadsheet(props: {
                       {c.label}
                     </th>
                   ))}
-                  <th className={cn(thNum, "border-l border-[#e2e8f0]")}>Bruto</th>
+                  <th className={cn(thNum, "border-l border-line")}>Bruto</th>
                   <th className={thNum}>Çmimi/orë</th>
                   <th className={thNum}>{trust1Header}</th>
                   <th className={thNum}>{trust2Header}</th>
@@ -414,17 +414,17 @@ export function PayrollSpreadsheet(props: {
               </thead>
               <tbody>
                 {props.entries.map((e) => (
-                  <tr key={e.id} className="group border-b border-[#f1f5f9] transition-colors hover:bg-[#f8fafc]">
+                  <tr key={e.id} className="group border-b border-fill transition-colors hover:bg-fill-faint">
                     <td
                       className={cn(
-                        "sticky left-0 z-20 min-w-[180px] max-w-[220px] bg-white px-2.5 py-2 align-middle transition-colors group-hover:bg-[#f8fafc]",
+                        "sticky left-0 z-20 min-w-[180px] max-w-[220px] bg-white px-2.5 py-2 align-middle transition-colors group-hover:bg-fill-faint",
                         stickyShadow,
                       )}
                     >
-                      <div className="truncate text-[12.5px] font-semibold leading-tight text-[#0f172a]">
+                      <div className="truncate text-[12.5px] font-semibold leading-tight text-ink-900">
                         {e.employeeName}
                       </div>
-                      <div className="truncate text-[9.5px] font-normal leading-tight text-[#94a3b8]">{e.jobTitle}</div>
+                      <div className="truncate text-[9.5px] font-normal leading-tight text-ink-400">{e.jobTitle}</div>
                     </td>
 
                     {/* Inputs — all eight together, so a row is filled without
@@ -457,7 +457,7 @@ export function PayrollSpreadsheet(props: {
                     ))}
 
                     {/* Derived */}
-                    <td className={cn(tdNum, "border-l border-[#eef2f7]")}>€{e.grossSalary}</td>
+                    <td className={cn(tdNum, "border-l border-line-soft")}>€{e.grossSalary}</td>
                     <td className={tdNum}>{formatHourlyRateDisplay(e.hourlyRate)}</td>
                     <td className={tdNum}>€{e.pensionEmployee}</td>
                     <td className={tdNum}>€{e.pensionEmployer}</td>
@@ -466,7 +466,7 @@ export function PayrollSpreadsheet(props: {
 
                     <td
                       className={cn(
-                        "sticky right-0 z-20 min-w-[100px] whitespace-nowrap border-l border-[#eef2f7] bg-white px-1.5 py-1.5 text-right text-xs font-bold text-[#0f172a] transition-colors [font-variant-numeric:tabular-nums] group-hover:bg-[#f8fafc]",
+                        "sticky right-0 z-20 min-w-[100px] whitespace-nowrap border-l border-line-soft bg-white px-1.5 py-1.5 text-right text-xs font-bold text-ink-900 transition-colors [font-variant-numeric:tabular-nums] group-hover:bg-fill-faint",
                         stickyShadowRight,
                       )}
                     >
@@ -475,26 +475,26 @@ export function PayrollSpreadsheet(props: {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="sticky bottom-0 z-30 bg-[#f1f5f9]">
-                <tr className="border-t border-[#e2e8f0]">
+              <tfoot className="sticky bottom-0 z-30 bg-fill">
+                <tr className="border-t border-line">
                   <td
                     className={cn(
-                      "sticky left-0 z-40 min-w-[180px] max-w-[220px] bg-[#f1f5f9] px-2.5 py-[9px] text-xs font-bold text-[#0f172a]",
+                      "sticky left-0 z-40 min-w-[180px] max-w-[220px] bg-fill px-2.5 py-[9px] text-xs font-bold text-ink-900",
                       stickyShadow,
                     )}
                   >
                     Totalet ({props.entries.length} rreshta)
                   </td>
                   <td className={footCell} colSpan={INPUT_COLUMNS.length} />
-                  <td className={cn(footCell, "border-l border-[#e2e8f0] font-bold text-[#0f172a]")}>€{footGross}</td>
+                  <td className={cn(footCell, "border-l border-line font-bold text-ink-900")}>€{footGross}</td>
                   <td className={footCell} />
-                  <td className={cn(footCell, "font-bold text-[#0f172a]")}>€{footPenE}</td>
-                  <td className={cn(footCell, "font-bold text-[#0f172a]")}>€{footPenEr}</td>
-                  <td className={cn(footCell, "font-bold text-[#0f172a]")}>€{footPit}</td>
-                  <td className={cn(footCell, "font-bold text-[#0f172a]")}>€{footTaxable}</td>
+                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenE}</td>
+                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenEr}</td>
+                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPit}</td>
+                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footTaxable}</td>
                   <td
                     className={cn(
-                      "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-[#e2e8f0] bg-[#f1f5f9] px-1.5 py-[9px] text-right text-xs font-extrabold text-[#1d4ed8] [font-variant-numeric:tabular-nums]",
+                      "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-[#1d4ed8] [font-variant-numeric:tabular-nums]",
                       stickyShadowRight,
                     )}
                   >
@@ -506,7 +506,7 @@ export function PayrollSpreadsheet(props: {
           </div>
         </div>
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 px-0.5 text-[11.5px] text-[#94a3b8]">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 px-0.5 text-[11.5px] text-ink-400">
           <span>{props.entries.length} rreshta · kontraktorët përjashtohen</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-[3px] border border-[#fde68a] bg-[#fffbeb]" aria-hidden />
@@ -519,7 +519,7 @@ export function PayrollSpreadsheet(props: {
             </span>
           ) : null}
           <details className="ml-auto">
-            <summary className="cursor-pointer select-none text-[#64748b] hover:text-[#334155]">
+            <summary className="cursor-pointer select-none text-ink-500 hover:text-ink-700">
               Si llogariten orët?
             </summary>
             <p className="mt-1.5 max-w-2xl text-[11.5px] leading-relaxed">
@@ -534,35 +534,35 @@ export function PayrollSpreadsheet(props: {
 
       <div className="space-y-2 md:hidden">
         {props.entries.map((e) => (
-          <div key={e.id} className="rounded-xl border border-[#e2e8f0] bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <div key={e.id} className="rounded-xl border border-line bg-white p-3 shadow-card">
             <div>
-              <p className="text-sm font-semibold leading-tight text-[#0f172a]">{e.employeeName}</p>
-              <p className="text-[11px] text-[#94a3b8]">{e.jobTitle}</p>
+              <p className="text-sm font-semibold leading-tight text-ink-900">{e.employeeName}</p>
+              <p className="text-[11px] text-ink-400">{e.jobTitle}</p>
             </div>
             <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs [font-variant-numeric:tabular-nums]">
-              <dt className="text-[#64748b]">Bruto</dt>
-              <dd className="text-right font-semibold text-[#0f172a]">€{e.grossSalary}</dd>
-              <dt className="text-[#64748b]">Trust 1</dt>
-              <dd className="text-right text-[#334155]">€{e.pensionEmployee}</dd>
-              <dt className="text-[#64748b]">Baza tatimore</dt>
-              <dd className="text-right text-[#334155]">€{e.taxableIncome}</dd>
-              <dt className="text-[#64748b]">Tatimi</dt>
-              <dd className="text-right text-[#334155]">€{e.pitWithheld}</dd>
-              <dt className="text-[#64748b]">Neto</dt>
+              <dt className="text-ink-500">Bruto</dt>
+              <dd className="text-right font-semibold text-ink-900">€{e.grossSalary}</dd>
+              <dt className="text-ink-500">Trust 1</dt>
+              <dd className="text-right text-ink-700">€{e.pensionEmployee}</dd>
+              <dt className="text-ink-500">Baza tatimore</dt>
+              <dd className="text-right text-ink-700">€{e.taxableIncome}</dd>
+              <dt className="text-ink-500">Tatimi</dt>
+              <dd className="text-right text-ink-700">€{e.pitWithheld}</dd>
+              <dt className="text-ink-500">Neto</dt>
               <dd className="text-right font-bold text-[#1d4ed8]">€{e.netPay}</dd>
-              <dt className="text-[#64748b]">Trust 2</dt>
-              <dd className="text-right text-[#334155]">€{e.pensionEmployer}</dd>
+              <dt className="text-ink-500">Trust 2</dt>
+              <dd className="text-right text-ink-700">€{e.pensionEmployer}</dd>
             </dl>
             {editable ? (
               // All eight inputs — the four that used to be desktop-only affect pay,
               // and dropping them silently meant a phone could not finish the job.
-              <div className="mt-2 grid gap-1.5 border-t border-[#eef2f7] pt-2">
+              <div className="mt-2 grid gap-1.5 border-t border-line-soft pt-2">
                 {INPUT_COLUMNS.map((c) => (
                   <div
                     key={c.key}
                     className="grid grid-cols-[1fr_minmax(4rem,5.5rem)] items-center gap-x-2 gap-y-1 text-[11px]"
                   >
-                    <span className="leading-tight text-[#64748b]">{c.label}</span>
+                    <span className="leading-tight text-ink-500">{c.label}</span>
                     {c.leave ? (
                       <LeaveHoursCell
                         payrollId={props.payrollId}

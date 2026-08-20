@@ -69,12 +69,12 @@ export type PushimetBalanceSerialized = {
   carryOverDays: string;
 };
 
-const CARD_TITLE = "text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]";
-const HAIRLINE = "my-4 border-t border-[#eef2f7]";
-const DT = "text-[12px] text-[#94a3b8]";
+const CARD_TITLE = "text-[13.5px] font-bold tracking-[-0.01em] text-ink-900";
+const HAIRLINE = "my-4 border-t border-line-soft";
+const DT = "text-[12px] text-ink-400";
 const DD = "text-[13px] font-medium text-[#111827]";
-const DD_MUTED = "text-[13px] text-[#64748b]";
-const BAL_TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+const DD_MUTED = "text-[13px] text-ink-500";
+const BAL_TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 const BAL_TD = "px-4 py-2.5 tabular-nums";
 
 export function PushimetDetailClient(props: {
@@ -324,10 +324,10 @@ export function PushimetDetailClient(props: {
               </div>
             </dl>
             {row.type === "PUSHIM_VJETOR" && row.status === "APPROVED" ? (
-              <div className="mt-4 space-y-2 border-t border-[#eef2f7] pt-4">
+              <div className="mt-4 space-y-2 border-t border-line-soft pt-4">
                 <p className={MICRO_LABEL}>Ndërprerje gjatë pushimit vjetor (Art 34.2)</p>
                 {row.interruptedByLeaveRequestId ? (
-                  <p className="text-[13px] text-[#64748b]">
+                  <p className="text-[13px] text-ink-500">
                     I lidhur me pushimin mjekësor:{" "}
                     <Link
                       href={`/pushimet/${row.interruptedByLeaveRequestId}`}
@@ -338,7 +338,7 @@ export function PushimetDetailClient(props: {
                   </p>
                 ) : (
                   <>
-                    <p className="text-[12px] leading-relaxed text-[#64748b]">
+                    <p className="text-[12px] leading-relaxed text-ink-500">
                       Nëse punonjësi është përfshirë nga pushimi mjekësor gjatë këtij intervali, lidhni kërkesën
                       mjekësore për të shmangur dyfishimin e orëve në payroll.
                     </p>
@@ -355,11 +355,11 @@ export function PushimetDetailClient(props: {
               </div>
             ) : null}
             {row.status === "APPROVED" ? (
-              <p className="mt-4 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-3 text-[12px] leading-relaxed text-[#64748b]">
+              <p className="mt-4 rounded-[10px] border border-line bg-fill-faint p-3 text-[12px] leading-relaxed text-ink-500">
                 {payrollNarrative}
               </p>
             ) : (
-              <p className="mt-4 rounded-[10px] border border-[#e2e8f0] p-3 text-[12px] leading-relaxed text-[#64748b]">
+              <p className="mt-4 rounded-[10px] border border-line p-3 text-[12px] leading-relaxed text-ink-500">
                 {payrollNarrative}
               </p>
             )}
@@ -369,7 +369,7 @@ export function PushimetDetailClient(props: {
             <h2 className={CARD_TITLE}>Dokumentet e gjeneruara</h2>
             <div className={HAIRLINE} />
             {props.detail.documents.length === 0 ? (
-              <p className="text-[13px] text-[#64748b]">
+              <p className="text-[13px] text-ink-500">
                 Ende pa dokument. Pas miratimit, gjeneroni nga shabllonet LEAVE dhe arkiva përditësohet
                 automatikisht.
               </p>
@@ -378,11 +378,11 @@ export function PushimetDetailClient(props: {
                 {props.detail.documents.map((d) => (
                   <li
                     key={d.leaveDocumentId}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#eef2f7] px-3 py-2 transition-colors hover:bg-[#f8fafc]"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-line-soft px-3 py-2 transition-colors hover:bg-fill-faint"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold text-[#0f172a]">{d.title ?? "Dokument"}</p>
-                      <p className="text-[11.5px] tabular-nums text-[#94a3b8]">
+                      <p className="truncate text-[13px] font-semibold text-ink-900">{d.title ?? "Dokument"}</p>
+                      <p className="text-[11.5px] tabular-nums text-ink-400">
                         {d.createdAtIso.slice(0, 19).replace("T", " ")}
                       </p>
                     </div>
@@ -399,23 +399,23 @@ export function PushimetDetailClient(props: {
         <section className="space-y-3">
           <div>
             <h2 className={CARD_TITLE}>Gjendje ditësh sipas vitit</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-[#64748b]">
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
               Akumuluar tregon ditët e pushimit të fituara deri në periudhën e zgjedhur. Festat zyrtare dhe
               pushimi mjekësor i aprovuar gjatë pushimit vjetor nuk zbriten nga bilanci i pushimit vjetor.
             </p>
           </div>
           {props.balancesByYear.length === 0 ? (
-            <p className="text-[13px] text-[#64748b]">Nuk ka të dhëna balancë për punonjësin.</p>
+            <p className="text-[13px] text-ink-500">Nuk ka të dhëna balancë për punonjësin.</p>
           ) : (
             props.balancesByYear.map((group) => (
               <div key={group.year} className={`overflow-hidden ${LEAVE_CARD}`}>
-                <div className="border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-2 text-[12px] font-bold tabular-nums text-[#0f172a]">
+                <div className="border-b border-line-soft bg-fill-faint px-4 py-2 text-[12px] font-bold tabular-nums text-ink-900">
                   Viti {group.year}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] border-collapse text-[13px] text-[#111827]">
                     <thead>
-                      <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                      <tr className="border-b border-line-soft bg-fill-faint">
                         <th className={BAL_TH}>Lloji</th>
                         <th className={`${BAL_TH} text-right`}>Kuota vjetore</th>
                         <th className={`${BAL_TH} text-right`}>Akumuluar</th>
@@ -429,9 +429,9 @@ export function PushimetDetailClient(props: {
                       {group.rows.map((b) => (
                         <tr
                           key={b.id}
-                          className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                          className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                         >
-                          <td className="px-4 py-2.5 font-medium text-[#0f172a]">
+                          <td className="px-4 py-2.5 font-medium text-ink-900">
                             {LEAVE_TYPE_LABELS_SQ[b.leaveType]}
                           </td>
                           <td className={`${BAL_TD} text-right`}>{b.yearlyQuota}</td>
@@ -467,21 +467,21 @@ export function PushimetDetailClient(props: {
             <h2 className={CARD_TITLE}>Pushimet në vijim</h2>
             <div className={HAIRLINE} />
             {props.upcoming.length === 0 ? (
-              <p className="text-[13px] text-[#64748b]">Nuk ka pushime aktive në horizont.</p>
+              <p className="text-[13px] text-ink-500">Nuk ka pushime aktive në horizont.</p>
             ) : (
               <ul className="space-y-2">
                 {props.upcoming.map((u) => (
                   <li key={u.id}>
                     <Link
                       href={`/pushimet/${u.id}`}
-                      className={`flex flex-col rounded-[10px] border px-3 py-2 transition-colors hover:bg-[#f8fafc] ${
-                        u.id === row.id ? "border-brand-blue/50 bg-[#eff6ff]" : "border-[#eef2f7]"
+                      className={`flex flex-col rounded-[10px] border px-3 py-2 transition-colors hover:bg-fill-faint ${
+                        u.id === row.id ? "border-brand-blue/50 bg-[#eff6ff]" : "border-line-soft"
                       }`}
                     >
-                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                      <span className="text-[13px] font-semibold text-ink-900">
                         {LEAVE_TYPE_LABELS_SQ[u.type]} · {LEAVE_STATUS_LABELS_SQ[u.status]}
                       </span>
-                      <span className="text-[11.5px] tabular-nums text-[#64748b]">
+                      <span className="text-[11.5px] tabular-nums text-ink-500">
                         {formatSqDate(u.startDateIso)} → {formatSqDate(u.endDateIso)}
                       </span>
                     </Link>
@@ -495,19 +495,19 @@ export function PushimetDetailClient(props: {
             <h2 className={CARD_TITLE}>Historiku i shkurtër</h2>
             <div className={HAIRLINE} />
             {props.history.length === 0 ? (
-              <p className="text-[13px] text-[#64748b]">Nuk ka historik.</p>
+              <p className="text-[13px] text-ink-500">Nuk ka historik.</p>
             ) : (
               <ul className="space-y-2">
                 {props.history.map((h) => (
                   <li key={h.id}>
                     <Link
                       href={`/pushimet/${h.id}`}
-                      className="block rounded-[10px] border border-[#eef2f7] px-3 py-2 transition-colors hover:bg-[#f8fafc]"
+                      className="block rounded-[10px] border border-line-soft px-3 py-2 transition-colors hover:bg-fill-faint"
                     >
-                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                      <span className="text-[13px] font-semibold text-ink-900">
                         {LEAVE_TYPE_LABELS_SQ[h.type]} · {LEAVE_STATUS_LABELS_SQ[h.status]}
                       </span>
-                      <span className="block text-[11.5px] tabular-nums text-[#64748b]">
+                      <span className="block text-[11.5px] tabular-nums text-ink-500">
                         {formatSqDate(h.startDateIso)} → {formatSqDate(h.endDateIso)}
                       </span>
                     </Link>
@@ -520,35 +520,35 @@ export function PushimetDetailClient(props: {
 
         <section className={`p-5 ${LEAVE_CARD}`}>
           <h2 className={CARD_TITLE}>Kronologjia & aktiviteti</h2>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-ink-500">
             Ngjarjet e lidhura me këtë kërkesë (timeline HR + metadata për audit).
           </p>
           <div className={HAIRLINE} />
           {props.timeline.length === 0 ? (
-            <p className="text-[13px] text-[#64748b]">Ende pa ngjarje të lidhura.</p>
+            <p className="text-[13px] text-ink-500">Ende pa ngjarje të lidhura.</p>
           ) : (
             <ul className="space-y-4">
               {props.timeline.map((ev) => (
                 <li key={ev.id} className="border-l-2 border-[#bfdbfe] pl-4">
-                  <p className="text-[11.5px] tabular-nums text-[#94a3b8]">
+                  <p className="text-[11.5px] tabular-nums text-ink-400">
                     {formatSqDate(ev.occurredAtIso)}
                   </p>
-                  <p className="text-[13.5px] font-semibold text-[#0f172a]">{ev.title}</p>
+                  <p className="text-[13.5px] font-semibold text-ink-900">{ev.title}</p>
                   <p className={MICRO_LABEL}>{leaveEventLabelSq(ev.eventType)}</p>
                   {ev.actorLabel ? (
-                    <p className="text-[12px] text-[#64748b]">Aktori: {ev.actorLabel}</p>
+                    <p className="text-[12px] text-ink-500">Aktori: {ev.actorLabel}</p>
                   ) : null}
                   {ev.body ? (
-                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-[#64748b]">{ev.body}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-ink-500">{ev.body}</p>
                   ) : null}
                   {/* The raw JSON is audit material, not reading material — it
                       stays available but folded away instead of dumped inline. */}
                   {ev.metadataJson ? (
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-[11.5px] font-semibold text-[#64748b] hover:text-brand-blue">
+                      <summary className="cursor-pointer text-[11.5px] font-semibold text-ink-500 hover:text-brand-blue">
                         Të dhëna teknike
                       </summary>
-                      <pre className="mt-1.5 max-h-40 overflow-auto rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] p-2 text-[11px] leading-snug text-[#64748b]">
+                      <pre className="mt-1.5 max-h-40 overflow-auto rounded-[10px] border border-line-soft bg-fill-faint p-2 text-[11px] leading-snug text-ink-500">
                         {ev.metadataJson}
                       </pre>
                     </details>

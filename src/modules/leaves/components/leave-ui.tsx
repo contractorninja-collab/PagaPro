@@ -21,10 +21,10 @@ export const BTN_DESTRUCTIVE_DENSE = buttonVariants({ variant: "destructiveOutli
 
 /** 1b form control (select/input) look for filter pills and dialog fields. */
 export const FIELD_CONTROL =
-  "h-10 w-full rounded-[10px] border border-[#e2e8f0] bg-white px-3 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus-visible:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue/25";
+  "h-10 w-full rounded-[10px] border border-line bg-white px-3 text-[13px] text-ink-700 outline-none transition-colors placeholder:text-ink-400 focus-visible:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue/25";
 
 /** Uppercase micro-label used on filters, table headers and stat tiles. */
-export const MICRO_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+export const MICRO_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 
 export type SemanticTone = "info" | "success" | "warning" | "destructive" | "neutral";
 
@@ -105,16 +105,16 @@ export const LEAVE_TYPE_TONES: Record<
     dot: "bg-[#0d9488]",
   },
   PUSHIM_PA_PAGESE: {
-    text: "text-[#64748b]",
-    bg: "bg-[#f1f5f9]",
-    border: "border-[#e2e8f0]",
-    dot: "bg-[#64748b]",
+    text: "text-ink-500",
+    bg: "bg-fill",
+    border: "border-line",
+    dot: "bg-ink-500",
   },
   TJETER: {
-    text: "text-[#475569]",
-    bg: "bg-[#f1f5f9]",
-    border: "border-[#e2e8f0]",
-    dot: "bg-[#94a3b8]",
+    text: "text-ink-600",
+    bg: "bg-fill",
+    border: "border-line",
+    dot: "bg-ink-400",
   },
 };
 

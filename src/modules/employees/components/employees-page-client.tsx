@@ -51,29 +51,29 @@ function StatCard({ card }: { card: EmployeeStatCard }) {
       href={card.href}
       aria-current={card.active ? "true" : undefined}
       className={cn(
-        "rounded-xl border bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-colors",
+        "rounded-xl border bg-white px-4 py-3.5 shadow-card transition-colors",
         warning && "shadow-[inset_3px_0_0_#d97706,0_1px_3px_rgba(15,23,42,0.05)]",
         card.active
           ? warning
             ? "border-[#fbbf24] bg-[#fffbeb]"
             : "border-brand-blue bg-[#f5f8ff]"
           : warning
-            ? "border-[#e2e8f0] hover:bg-[#fffbeb]"
-            : "border-[#e2e8f0] hover:bg-[#f8fafc]",
+            ? "border-line hover:bg-[#fffbeb]"
+            : "border-line hover:bg-fill-faint",
       )}
     >
       <p
         className={cn(
           "text-[11px] font-bold uppercase tracking-[0.04em]",
-          warning ? "text-[#b45309]" : "text-[#94a3b8]",
+          warning ? "text-[#b45309]" : "text-ink-400",
         )}
       >
         {card.label}
       </p>
-      <p className="mt-1.5 text-[24px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-[#0f172a]">
+      <p className="mt-1.5 text-[24px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-ink-900">
         {card.value}
       </p>
-      <p className="mt-1.5 text-[11px] font-medium text-[#94a3b8]">{card.hint}</p>
+      <p className="mt-1.5 text-[11px] font-medium text-ink-400">{card.hint}</p>
     </Link>
   );
 }
@@ -229,7 +229,7 @@ export function EmployeesPageClient(props: {
         {filters}
 
         {hiddenTerminated > 0 ? (
-          <p className="text-[11.5px] text-[#94a3b8]">
+          <p className="text-[11.5px] text-ink-400">
             {hiddenTerminated === 1
               ? "1 punonjës i larguar nuk shfaqet në këtë listë."
               : `${hiddenTerminated} punonjës të larguar nuk shfaqen në këtë listë.`}{" "}

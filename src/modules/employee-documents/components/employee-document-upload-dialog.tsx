@@ -137,7 +137,7 @@ export function EmployeeDocumentUploadDialog({
               ref={fileRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.webp,.docx"
-              className="block w-full text-sm text-[#64748b] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+              className="block w-full text-sm text-ink-500 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
               onChange={(e) => stageFile(e.target.files?.[0] ?? null)}
             />
           </div>

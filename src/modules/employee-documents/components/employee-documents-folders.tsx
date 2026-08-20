@@ -67,15 +67,15 @@ function DocRow({
   const Icon = doc.contentType.startsWith("image/") ? ImageIcon : FileText;
   return (
     <li className="flex items-start gap-3 px-5 py-2.5">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#94a3b8]" aria-hidden />
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className={`text-[13px] font-semibold ${doc.isArchived ? "text-[#94a3b8] line-through" : "text-[#0f172a]"}`}>
+          <span className={`text-[13px] font-semibold ${doc.isArchived ? "text-ink-400 line-through" : "text-ink-900"}`}>
             {doc.title}
           </span>
           <ExpiryBadge expiresAtIso={doc.expiresAtIso} todayIso={todayIso} />
         </div>
-        <p className="text-xs text-[#64748b]">
+        <p className="text-xs text-ink-500">
           {doc.displayFilename} · {fmtSize(doc.sizeBytes)} · {doc.createdAtLabel}
           {doc.uploadedByName ? ` · ${doc.uploadedByName}` : ""}
           {doc.note ? ` · ${doc.note}` : ""}
@@ -104,7 +104,7 @@ function DocRow({
         {canWrite ? (
           <button
             type="button"
-            className="text-[#64748b] underline-offset-2 hover:text-[#0f172a] hover:underline"
+            className="text-ink-500 underline-offset-2 hover:text-ink-900 hover:underline"
             onClick={() => onArchiveToggle(doc)}
           >
             {doc.isArchived ? "Rikthe" : "Arkivo"}
@@ -123,7 +123,7 @@ function DocRow({
               </button>
               <button
                 type="button"
-                className="text-[#64748b] underline-offset-2 hover:underline"
+                className="text-ink-500 underline-offset-2 hover:underline"
                 onClick={() => setArmed(false)}
               >
                 Jo
@@ -199,7 +199,7 @@ export function EmployeeDocumentsFolders({
 
   if (bundle.documents.length === 0) {
     return (
-      <p className="text-[13px] text-[#64748b]">
+      <p className="text-[13px] text-ink-500">
         Asnjë dokument i ngarkuar deri tani. Ngarkoni letërnjoftime, kontrata të nënshkruara,
         kualifikime dhe dokumente të tjera të dosjes.
       </p>
@@ -211,7 +211,7 @@ export function EmployeeDocumentsFolders({
       {archivedCount > 0 ? (
         <button
           type="button"
-          className="text-[12.5px] font-medium text-[#64748b] underline-offset-2 hover:text-[#0f172a] hover:underline"
+          className="text-[12.5px] font-medium text-ink-500 underline-offset-2 hover:text-ink-900 hover:underline"
           aria-expanded={showArchived}
           onClick={() => setShowArchived((v) => !v)}
         >
@@ -221,17 +221,17 @@ export function EmployeeDocumentsFolders({
       {EMPLOYEE_DOCUMENT_CATEGORY_ORDER.filter((c) => grouped.has(c)).map((c) => (
         <section
           key={c}
-          className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white"
+          className="overflow-hidden rounded-xl border border-line bg-white"
           aria-label={EMPLOYEE_DOCUMENT_CATEGORY_LABELS[c]}
         >
-          <div className="border-b border-[#eef2f7] bg-[#f8fafc] px-5 py-2.5">
-            <h4 className="text-[12.5px] font-semibold text-[#0f172a]">
+          <div className="border-b border-line-soft bg-fill-faint px-5 py-2.5">
+            <h4 className="text-[12.5px] font-semibold text-ink-900">
               {EMPLOYEE_DOCUMENT_CATEGORY_LABELS[c]}
-              <span className="ml-2 font-normal text-[#94a3b8]">{grouped.get(c)?.length}</span>
+              <span className="ml-2 font-normal text-ink-400">{grouped.get(c)?.length}</span>
             </h4>
-            <p className="text-[11.5px] text-[#94a3b8]">{EMPLOYEE_DOCUMENT_CATEGORY_HINTS[c]}</p>
+            <p className="text-[11.5px] text-ink-400">{EMPLOYEE_DOCUMENT_CATEGORY_HINTS[c]}</p>
           </div>
-          <ul className="divide-y divide-[#f1f5f9]">
+          <ul className="divide-y divide-fill">
             {grouped.get(c)?.map((d) => (
               <DocRow
                 key={d.id}

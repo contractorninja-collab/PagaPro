@@ -93,14 +93,14 @@ export function LeaveBalanceList({
   const searchResults = useMemo(() => [...matched].sort(compareAttention), [matched]);
 
   if (rows.length === 0) {
-    return <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">{emptyText}</p>;
+    return <p className="px-4 py-6 text-center text-[13px] text-ink-500">{emptyText}</p>;
   }
 
   return (
     <div>
       <div className="relative px-4 pb-3 pt-1">
         <Search
-          className="pointer-events-none absolute left-[26px] top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]"
+          className="pointer-events-none absolute left-[26px] top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400"
           aria-hidden
         />
         <input
@@ -115,13 +115,13 @@ export function LeaveBalanceList({
 
       {searching ? (
         searchResults.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-[#94a3b8]">Asnjë përputhje për kërkimin.</p>
+          <p className="px-4 py-6 text-center text-[13px] text-ink-400">Asnjë përputhje për kërkimin.</p>
         ) : (
           <>
             <p className={`px-4 pb-1.5 ${MICRO_LABEL}`}>
               {searchResults.length} {searchResults.length === 1 ? "rezultat" : "rezultate"}
             </p>
-            <ul className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]">
+            <ul className="divide-y divide-fill border-t border-fill">
               {searchResults.map((e) => (
                 <LeaveBalanceRow key={e.row.id} row={e.row} verdict={e.verdict} showTypePill={showTypePill} />
               ))}
@@ -135,7 +135,7 @@ export function LeaveBalanceList({
               {cohorts.map((cohort) => (
                 <li
                   key={cohort.key}
-                  className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[#f8fafc] px-3 py-2 text-[12.5px] text-[#334155]"
+                  className="flex flex-wrap items-center gap-2 rounded-[10px] bg-fill-faint px-3 py-2 text-[12.5px] text-ink-700"
                 >
                   <TonePill tone={cohort.tone} size="sm">
                     {cohort.count}
@@ -151,7 +151,7 @@ export function LeaveBalanceList({
               <p className={`px-4 pb-1.5 ${MICRO_LABEL}`}>
                 Kanë nevojë për vëmendje ({sortedAttention.length})
               </p>
-              <ul className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]">
+              <ul className="divide-y divide-fill border-t border-fill">
                 {sortedAttention.map((e) => (
                   <LeaveBalanceRow key={e.row.id} row={e.row} verdict={e.verdict} showTypePill={showTypePill} />
                 ))}
@@ -161,18 +161,18 @@ export function LeaveBalanceList({
             // Naming what was checked turns "nothing here" into a result rather
             // than a panel that looks broken. On a healthy company in the middle
             // of the year this is the normal state, and it should read that way.
-            <p className="px-4 pb-3 text-[13px] leading-relaxed text-[#64748b]">
+            <p className="px-4 pb-3 text-[13px] leading-relaxed text-ink-500">
               Asnjë punonjës nuk kërkon vëmendje.
-              <span className="mt-0.5 block text-[11.5px] text-[#94a3b8]">
+              <span className="mt-0.5 block text-[11.5px] text-ink-400">
                 Kontrolluar: bilanc negativ, kërkesa mbi kuotën vjetore, ditë të bartura që skadojnë.
               </span>
             </p>
           ) : null}
 
           {hidden.length > 0 ? (
-            <div className="border-t border-[#f1f5f9]">
+            <div className="border-t border-fill">
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                <p className="text-[12.5px] text-[#64748b]">
+                <p className="text-[12.5px] text-ink-500">
                   {cohorts.length > 0
                     ? `${hidden.length} ${hidden.length === 1 ? `${unit.one} tjetër` : `${unit.many} të tjerë`}`
                     : `${hidden.length} ${
@@ -197,7 +197,7 @@ export function LeaveBalanceList({
               <ul
                 id={listId}
                 hidden={!showAll}
-                className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]"
+                className="divide-y divide-fill border-t border-fill"
               >
                 {hidden.map((e) => (
                   <LeaveBalanceRow key={e.row.id} row={e.row} verdict={e.verdict} showTypePill={showTypePill} />

@@ -34,11 +34,11 @@ export function OtherLeaveBalancePanel({
 
   return (
     <div className={`overflow-hidden ${LEAVE_CARD}`}>
-      <div className="border-b border-[#eef2f7] px-4 py-3.5">
-        <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+      <div className="border-b border-line-soft px-4 py-3.5">
+        <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
           Lloje të tjera (kuotë vjetore)
         </h2>
-        <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#94a3b8]">
+        <p className="mt-0.5 text-[11.5px] leading-relaxed text-ink-400">
           Pushimi personal dhe mjekësor · {rows.length} rreshta
         </p>
       </div>

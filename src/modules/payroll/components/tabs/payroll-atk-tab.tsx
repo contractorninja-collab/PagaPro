@@ -40,10 +40,10 @@ export function PayrollAtkTab(props: {
     <div className="space-y-4">
       <section className={CARD}>
         <h3 className={CARD_TITLE}>Eksporti ATK (Excel — shablloni zyrtar)</h3>
-        <div className="space-y-3 px-5 py-4 text-[13px] leading-relaxed text-[#64748b]">
+        <div className="space-y-3 px-5 py-4 text-[13px] leading-relaxed text-ink-500">
           <p>
             Workbook-u gjenerohet nga shablloni zyrtar{" "}
-            <strong className="font-semibold text-[#0f172a]">Mostra Pagave ATK.xlsx</strong>. Kontraktorët
+            <strong className="font-semibold text-ink-900">Mostra Pagave ATK.xlsx</strong>. Kontraktorët
             përjashtohen automatikisht.
           </p>
 
@@ -55,7 +55,7 @@ export function PayrollAtkTab(props: {
               Gjenerimi bëhet vetëm pasi payroll-i të jetë <strong>i miratuar</strong>.
             </p>
           ) : frozen && active ? (
-            <p className="flex items-start gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-xs text-[#475569]">
+            <p className="flex items-start gap-2 rounded-lg border border-line bg-fill-faint px-3 py-2 text-xs text-ink-600">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               Shumat janë të ngrira — eksporti gjenerohet një herë. Përdorni shkarkimin më poshtë.
             </p>
@@ -65,10 +65,10 @@ export function PayrollAtkTab(props: {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#cddcf4] bg-[#f5f8ff] px-4 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-[13px] font-semibold text-[#0f172a]">{active.filename}</p>
+                  <p className="truncate text-[13px] font-semibold text-ink-900">{active.filename}</p>
                   <Badge variant="success">Aktiv</Badge>
                 </div>
-                <p className="mt-0.5 text-xs text-[#64748b] [font-variant-numeric:tabular-nums]">
+                <p className="mt-0.5 text-xs text-ink-500 [font-variant-numeric:tabular-nums]">
                   {new Date(active.generatedAt).toLocaleString("sq-XK")}
                   {active.generatedByLabel ? ` · ${active.generatedByLabel}` : ""} ·{" "}
                   <span className="font-mono">{active.snapshotHashPrefix}</span>
@@ -94,7 +94,7 @@ export function PayrollAtkTab(props: {
               </div>
             </div>
           ) : (
-            <p className="rounded-lg border border-[#e2e8f0] px-4 py-6 text-center text-[13px] text-[#64748b]">
+            <p className="rounded-lg border border-line px-4 py-6 text-center text-[13px] text-ink-500">
               Ende nuk ka eksport aktiv për këtë payroll.
             </p>
           )}
@@ -105,7 +105,7 @@ export function PayrollAtkTab(props: {
             </Button>
           ) : null}
           {props.canGenerate && active ? (
-            <p className="text-xs text-[#94a3b8]">Rigjenerimi arkivon automatikisht eksportin aktual.</p>
+            <p className="text-xs text-ink-400">Rigjenerimi arkivon automatikisht eksportin aktual.</p>
           ) : null}
         </div>
       </section>
@@ -116,7 +116,7 @@ export function PayrollAtkTab(props: {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+                <tr className="border-b border-line-soft bg-fill-faint text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                   <th className="px-5 py-3 font-bold">Koha</th>
                   <th className="px-3 py-3 font-bold">Nga</th>
                   <th className="px-3 py-3 font-bold">Hash (prefiks)</th>
@@ -128,13 +128,13 @@ export function PayrollAtkTab(props: {
                 {previous.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                    className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                   >
-                    <td className="whitespace-nowrap px-5 py-2.5 text-[13px] text-[#64748b] [font-variant-numeric:tabular-nums]">
+                    <td className="whitespace-nowrap px-5 py-2.5 text-[13px] text-ink-500 [font-variant-numeric:tabular-nums]">
                       {new Date(row.generatedAt).toLocaleString("sq-XK")}
                     </td>
-                    <td className="px-3 py-2.5 text-[13px] text-[#334155]">{row.generatedByLabel ?? "—"}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-[#334155]">{row.snapshotHashPrefix}</td>
+                    <td className="px-3 py-2.5 text-[13px] text-ink-700">{row.generatedByLabel ?? "—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink-700">{row.snapshotHashPrefix}</td>
                     <td className="px-3 py-2.5">
                       <Badge variant="secondary">{row.isArchived ? "I arkivuar" : "Jo aktiv"}</Badge>
                     </td>

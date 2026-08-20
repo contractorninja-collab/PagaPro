@@ -106,11 +106,11 @@ export function PrezencaResolveDialog(props: {
 
         {/* The day's punches, voids included — the full audit picture. */}
         <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
             Skanimet përreth ditës
           </p>
           {target.punches.length === 0 ? (
-            <p className="text-[13px] text-[#64748b]">Asnjë skanim i regjistruar.</p>
+            <p className="text-[13px] text-ink-500">Asnjë skanim i regjistruar.</p>
           ) : (
             <ul className="max-h-44 space-y-1 overflow-y-auto">
               {target.punches.map((p) => (
@@ -118,8 +118,8 @@ export function PrezencaResolveDialog(props: {
                   key={p.id}
                   className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12.5px] ${
                     p.voidedAtIso
-                      ? "border-[#f1f5f9] bg-[#f8fafc] text-[#94a3b8] line-through"
-                      : "border-[#eef2f7]"
+                      ? "border-fill bg-fill-faint text-ink-400 line-through"
+                      : "border-line-soft"
                   }`}
                 >
                   <span
@@ -131,11 +131,11 @@ export function PrezencaResolveDialog(props: {
                   >
                     {p.direction === "IN" ? "HYRJE" : "DALJE"}
                   </span>
-                  <span className="tabular-nums font-medium text-[#0f172a]">
+                  <span className="tabular-nums font-medium text-ink-900">
                     {p.occurredAtIso.slice(0, 10).split("-").reverse().join(".")}{" "}
                     {p.occurredAtIso.slice(11, 16)}
                   </span>
-                  <span className="text-[#94a3b8]">
+                  <span className="text-ink-400">
                     {p.source === "MANUAL" ? "manual" : p.deviceLabel ?? "kiosk"}
                   </span>
                   {p.voidedAtIso ? (
@@ -181,14 +181,14 @@ export function PrezencaResolveDialog(props: {
             </Button>
           </div>
         ) : (
-          <div className="space-y-2 rounded-lg border border-[#eef2f7] p-3">
-            <p className="text-[11.5px] font-semibold text-[#0f172a]">Shto skanimin që mungon</p>
+          <div className="space-y-2 rounded-lg border border-line-soft p-3">
+            <p className="text-[11.5px] font-semibold text-ink-900">Shto skanimin që mungon</p>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={direction}
                 onChange={(e) => setDirection(e.target.value === "IN" ? "IN" : "OUT")}
                 aria-label="Drejtimi"
-                className="h-9 rounded-lg border border-[#e2e8f0] bg-white px-2 text-[13px]"
+                className="h-9 rounded-lg border border-line bg-white px-2 text-[13px]"
               >
                 <option value="OUT">Dalje</option>
                 <option value="IN">Hyrje</option>
@@ -198,9 +198,9 @@ export function PrezencaResolveDialog(props: {
                 value={timeValue}
                 onChange={(e) => setTimeValue(e.target.value)}
                 aria-label="Ora"
-                className="h-9 rounded-lg border border-[#e2e8f0] bg-white px-2 text-[13px] tabular-nums"
+                className="h-9 rounded-lg border border-line bg-white px-2 text-[13px] tabular-nums"
               />
-              <span className="text-[12px] text-[#94a3b8]">
+              <span className="text-[12px] text-ink-400">
                 më {target.workDateIso.split("-").reverse().join(".")} (UTC)
               </span>
             </div>
@@ -208,7 +208,7 @@ export function PrezencaResolveDialog(props: {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Shënim (opsional) — p.sh. harroi të skanojë në dalje"
-              className="h-9 w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 text-[13px]"
+              className="h-9 w-full rounded-lg border border-line bg-white px-2.5 text-[13px]"
             />
           </div>
         )}

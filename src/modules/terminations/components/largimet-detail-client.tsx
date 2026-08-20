@@ -105,20 +105,20 @@ function fmtDateTime(iso: string) {
 /* ── 1b design primitives (module-local) ─────────────────────────────── */
 
 const CARD =
-  "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
-const CARD_TITLE = "text-[14px] font-bold tracking-[-0.01em] text-[#0f172a]";
+  "rounded-[12px] border border-line bg-white shadow-card";
+const CARD_TITLE = "text-[14px] font-bold tracking-[-0.01em] text-ink-900";
 
 const BTN_PRIMARY = buttonVariants({ size: "default" });
 const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
 const BTN_DESTRUCTIVE = buttonVariants({ variant: "destructiveOutline", size: "default" });
 
-const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 const FIELD_SELECT =
-  "h-10 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+  "h-10 w-full rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue";
 const FIELD_INPUT =
-  "h-10 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+  "h-10 w-full rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue";
 const FIELD_TEXTAREA =
-  "min-h-[72px] w-full rounded-[8px] border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
+  "min-h-[72px] w-full rounded-[8px] border border-line bg-white px-3 py-2 text-[13px] text-ink-700 outline-none transition-colors focus:border-brand-blue";
 
 type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
 
@@ -191,7 +191,7 @@ function StagePipeline({ status }: { status: TerminationStatus }) {
                       "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
                       done && "bg-brand-blue text-white",
                       active && "border-2 border-brand-blue bg-[#eff6ff] text-brand-blue",
-                      !done && !active && "border border-[#e2e8f0] bg-white text-[#94a3b8]",
+                      !done && !active && "border border-line bg-white text-ink-400",
                     )}
                     aria-hidden
                   >
@@ -200,7 +200,7 @@ function StagePipeline({ status }: { status: TerminationStatus }) {
                   <span
                     className={cn(
                       "whitespace-nowrap text-[12.5px] font-semibold",
-                      done || active ? "text-[#0f172a]" : "text-[#94a3b8]",
+                      done || active ? "text-ink-900" : "text-ink-400",
                     )}
                   >
                     {stage.label}
@@ -208,7 +208,7 @@ function StagePipeline({ status }: { status: TerminationStatus }) {
                 </div>
                 {i < PIPELINE_STAGES.length - 1 ? (
                   <span
-                    className={cn("h-[2px] min-w-[24px] flex-1 rounded-full", done ? "bg-brand-blue" : "bg-[#e2e8f0]")}
+                    className={cn("h-[2px] min-w-[24px] flex-1 rounded-full", done ? "bg-brand-blue" : "bg-line")}
                     aria-hidden
                   />
                 ) : null}
@@ -296,14 +296,14 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                 <Link
                   href={`/punonjesit/${t.employee.id}`}
-                  className="text-[18px] font-bold tracking-[-0.02em] text-[#0f172a] transition-colors hover:text-brand-blue"
+                  className="text-[18px] font-bold tracking-[-0.02em] text-ink-900 transition-colors hover:text-brand-blue"
                 >
                   {t.employee.firstName} {t.employee.lastName}
                 </Link>
                 <Chip tone={EMPLOYEE_STATUS_TONE[t.employee.status] ?? "neutral"}>{employeeStatusLabel}</Chip>
                 <Chip tone="neutral">{TERMINATION_TYPE_LABELS[t.type]}</Chip>
               </div>
-              <p className="mt-1 text-[13px] text-[#64748b]">
+              <p className="mt-1 text-[13px] text-ink-500">
                 {t.employee.jobTitle ?? "—"} · {t.employee.department?.name ?? "—"} ·{" "}
                 <span className="tabular-nums">Punësuar {formatSqDate(t.employee.hireDate)}</span> ·{" "}
                 <span className="tabular-nums">{t.employee.personalId}</span>
@@ -341,7 +341,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
                       Pagë {t.finalPayroll.month}/{t.finalPayroll.year}
                     </Link>
                     {props.payrollEntry ? (
-                      <p className="mt-0.5 text-[12.5px] text-[#64748b]">
+                      <p className="mt-0.5 text-[12.5px] text-ink-500">
                         Rreshti: {props.payrollEntry.status} · Bruto{" "}
                         <span className="font-semibold tabular-nums text-[#111827]">
                           {formatEur(props.payrollEntry.grossSalary)}
@@ -360,10 +360,10 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
                   </Chip>
                 </div>
               ) : (
-                <p className="mt-3 text-[13px] text-[#64748b]">Nuk është lidhur ende.</p>
+                <p className="mt-3 text-[13px] text-ink-500">Nuk është lidhur ende.</p>
               )}
-              <div className="mt-4 flex items-center justify-between border-t border-[#f1f5f9] pt-3 text-[13px]">
-                <span className="text-[#64748b]">Severanca</span>
+              <div className="mt-4 flex items-center justify-between border-t border-fill pt-3 text-[13px]">
+                <span className="text-ink-500">Severanca</span>
                 <span className="font-semibold tabular-nums text-[#111827]">
                   {t.severanceAmount != null ? formatEur(t.severanceAmount) : "—"}
                 </span>
@@ -377,20 +377,20 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
                 <Chip tone="neutral">{props.artifacts.length}</Chip>
               </div>
               {props.artifacts.length === 0 ? (
-                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka dokumente të gjeneruara.</p>
+                <p className="mt-3 text-[13px] text-ink-500">Nuk ka dokumente të gjeneruara.</p>
               ) : (
                 <ul className="mt-2">
                   {props.artifacts.map((a) => (
                     <li
                       key={a.id}
-                      className="flex flex-wrap items-center gap-3 border-b border-[#f1f5f9] py-3 last:border-0 last:pb-0"
+                      className="flex flex-wrap items-center gap-3 border-b border-fill py-3 last:border-0 last:pb-0"
                     >
-                      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-[#f1f5f9] text-[#475569]">
+                      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-fill text-ink-600">
                         <FileText className="h-4 w-4" aria-hidden />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-semibold text-[#111827]">{a.displayFilename}</p>
-                        <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(a.createdAt)}</p>
+                        <p className="mt-0.5 text-[12px] tabular-nums text-ink-400">{fmtDateTime(a.createdAt)}</p>
                       </div>
                       <Chip tone={a.kind === "PREVIEW" ? "warning" : "success"} className="uppercase tracking-[0.03em]">
                         {formatArtifactKind(a.kind)}
@@ -414,32 +414,32 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
                 <h2 className={CARD_TITLE}>Datat & arsyeja ligjore</h2>
               </div>
               <dl className="mt-4 grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2">
-                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
-                  <dt className="text-[#64748b]">Data e largimit</dt>
+                <div className="flex items-center justify-between gap-3 border-b border-fill pb-2">
+                  <dt className="text-ink-500">Data e largimit</dt>
                   <dd className="font-semibold tabular-nums text-[#111827]">{formatSqDate(t.terminationDate)}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
-                  <dt className="text-[#64748b]">Dita e fundit e punës</dt>
+                <div className="flex items-center justify-between gap-3 border-b border-fill pb-2">
+                  <dt className="text-ink-500">Dita e fundit e punës</dt>
                   <dd className="font-semibold tabular-nums text-[#111827]">{formatSqDate(t.lastWorkingDay)}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
-                  <dt className="text-[#64748b]">Njoftimi</dt>
+                <div className="flex items-center justify-between gap-3 border-b border-fill pb-2">
+                  <dt className="text-ink-500">Njoftimi</dt>
                   <dd className="font-semibold tabular-nums text-[#111827]">
                     {t.noticeDate ? formatSqDate(t.noticeDate) : "—"}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-b border-[#f1f5f9] pb-2">
-                  <dt className="text-[#64748b]">Ditë njoftimi</dt>
+                <div className="flex items-center justify-between gap-3 border-b border-fill pb-2">
+                  <dt className="text-ink-500">Ditë njoftimi</dt>
                   <dd className="font-semibold tabular-nums text-[#111827]">{t.noticeDays ?? "—"}</dd>
                 </div>
               </dl>
               <div className="mt-4">
                 <p className={FIELD_LABEL}>Arsyeja</p>
-                <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">{t.reason ?? "—"}</p>
+                <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-700">{t.reason ?? "—"}</p>
                 {t.details ? (
                   <>
                     <p className={cn(FIELD_LABEL, "mt-4")}>Detaje</p>
-                    <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[#334155]">{t.details}</p>
+                    <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-700">{t.details}</p>
                   </>
                 ) : null}
               </div>
@@ -452,43 +452,43 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
               <h2 className={CARD_TITLE}>Përmbledhje</h2>
               <dl className="mt-3 space-y-2.5 text-[13px]">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-[#64748b]">Statusi</dt>
+                  <dt className="text-ink-500">Statusi</dt>
                   <dd>
                     <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>
                       {TERMINATION_STATUS_LABELS[t.status] ?? t.status}
                     </Chip>
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Lloji</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Lloji</dt>
                   <dd className="font-medium text-[#111827]">{TERMINATION_TYPE_LABELS[t.type]}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Krijuar nga</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Krijuar nga</dt>
                   <dd className="truncate font-medium text-[#111827]">
                     {t.createdBy?.displayName ?? t.createdBy?.email ?? "—"}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Miratuar nga</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Miratuar nga</dt>
                   <dd className="truncate font-medium text-[#111827]">
                     {t.approvedBy?.displayName ?? t.approvedBy?.email ?? "—"}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Miratuar më</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Miratuar më</dt>
                   <dd className="font-medium tabular-nums text-[#111827]">
                     {t.approvedAt ? fmtDateTime(t.approvedAt) : "—"}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Përfunduar më</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Përfunduar më</dt>
                   <dd className="font-medium tabular-nums text-[#111827]">
                     {t.completedAt ? fmtDateTime(t.completedAt) : "—"}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-2.5">
-                  <dt className="text-[#64748b]">Final payroll</dt>
+                <div className="flex items-center justify-between gap-3 border-t border-fill pt-2.5">
+                  <dt className="text-ink-500">Final payroll</dt>
                   <dd className="font-medium text-[#111827]">{t.finalPayrollRequired ? "Po" : "Jo"}</dd>
                 </div>
               </dl>
@@ -498,18 +498,18 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
             <div className={cn(CARD, "p-5")}>
               <h2 className={CARD_TITLE}>Aktiviteti</h2>
               {props.activities.length === 0 ? (
-                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka aktivitet të regjistruar.</p>
+                <p className="mt-3 text-[13px] text-ink-500">Nuk ka aktivitet të regjistruar.</p>
               ) : (
                 <ul className="mt-3">
                   {props.activities.map((a, i) => (
                     <li key={a.id} className="relative flex gap-3 pb-4 last:pb-0">
                       {i < props.activities.length - 1 ? (
-                        <span className="absolute left-[5px] top-4 h-full w-px bg-[#eef2f7]" aria-hidden />
+                        <span className="absolute left-[5px] top-4 h-full w-px bg-fill-hover" aria-hidden />
                       ) : null}
                       <span className="relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white bg-brand-blue shadow-[0_0_0_1px_#dbeafe]" aria-hidden />
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium leading-snug text-[#111827]">{a.summary}</p>
-                        <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+                        <p className="mt-0.5 text-[12px] text-ink-400">
                           <span className="tabular-nums">{fmtDateTime(a.occurredAt)}</span> ·{" "}
                           {a.actor?.displayName ?? a.actor?.email ?? "—"}
                         </p>
@@ -523,15 +523,15 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
             <div className={cn(CARD, "p-5")}>
               <h2 className={CARD_TITLE}>Timeline (punonjësi)</h2>
               {props.timeline.length === 0 ? (
-                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka ngjarje.</p>
+                <p className="mt-3 text-[13px] text-ink-500">Nuk ka ngjarje.</p>
               ) : (
                 <ul className="mt-2">
                   {props.timeline.map((ev) => (
-                    <li key={ev.id} className="border-b border-[#f1f5f9] py-2.5 last:border-0 last:pb-0">
+                    <li key={ev.id} className="border-b border-fill py-2.5 last:border-0 last:pb-0">
                       <p className="text-[13px] font-medium text-[#111827]">{ev.title}</p>
-                      <p className="mt-0.5 text-[12px] tabular-nums text-[#94a3b8]">{fmtDateTime(ev.occurredAt)}</p>
+                      <p className="mt-0.5 text-[12px] tabular-nums text-ink-400">{fmtDateTime(ev.occurredAt)}</p>
                       {ev.body ? (
-                        <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-[#64748b]">{ev.body}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-500">{ev.body}</p>
                       ) : null}
                     </li>
                   ))}
@@ -542,13 +542,13 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
             <div className={cn(CARD, "p-5")}>
               <h2 className={CARD_TITLE}>Audit log</h2>
               {props.audits.length === 0 ? (
-                <p className="mt-3 text-[13px] text-[#64748b]">Nuk ka regjistrime.</p>
+                <p className="mt-3 text-[13px] text-ink-500">Nuk ka regjistrime.</p>
               ) : (
                 <ul className="mt-2">
                   {props.audits.map((a) => (
-                    <li key={a.id} className="border-b border-[#f1f5f9] py-2.5 last:border-0 last:pb-0">
+                    <li key={a.id} className="border-b border-fill py-2.5 last:border-0 last:pb-0">
                       <p className="text-[12.5px] font-semibold text-[#111827]">{a.action}</p>
-                      <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+                      <p className="mt-0.5 text-[12px] text-ink-400">
                         <span className="tabular-nums">{a.createdAt ? fmtDateTime(a.createdAt) : "—"}</span> ·{" "}
                         {a.actor?.displayName ?? "—"}
                       </p>
@@ -562,7 +562,7 @@ export function LargimetDetailClient(props: LargimetDetailProps) {
       </div>
 
       {/* Sticky action bar */}
-      <div className="sticky bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] z-30 -mx-4 mt-6 border-t border-[#e2e8f0] bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:bottom-0 md:-mx-10 md:px-10">
+      <div className="sticky bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] z-30 -mx-4 mt-6 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:bottom-0 md:-mx-10 md:px-10">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="mr-auto flex items-center gap-2">
             <Chip tone={STATUS_TONE[t.status] ?? "neutral"}>{TERMINATION_STATUS_LABELS[t.status] ?? t.status}</Chip>
@@ -706,7 +706,7 @@ function EditTerminationDialog(props: {
             <label className={FIELD_LABEL}>Detaje</label>
             <textarea className={FIELD_TEXTAREA} value={details} onChange={(e) => setDetails(e.target.value)} />
           </div>
-          <label className="flex items-center gap-2 text-[13px] text-[#334155]">
+          <label className="flex items-center gap-2 text-[13px] text-ink-700">
             <input
               type="checkbox"
               className="h-4 w-4 accent-[#2563EB]"

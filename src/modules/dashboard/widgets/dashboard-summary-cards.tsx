@@ -24,7 +24,7 @@ function Delta({ text, tone }: { text: string; tone: Tone }) {
     <p
       className={cn(
         "mt-1 text-[11.5px] font-medium",
-        tone === "up" ? "text-[#b45309]" : tone === "down" ? "text-[#15803d]" : "text-[#94a3b8]",
+        tone === "up" ? "text-[#b45309]" : tone === "down" ? "text-[#15803d]" : "text-ink-400",
       )}
     >
       {text}
@@ -47,17 +47,17 @@ function Tile({
 }) {
   const body = (
     <>
-      <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">{label}</p>
       <p className="mt-1.5 text-[22px] font-extrabold leading-none tracking-[-0.02em] text-brand-navy tabular-nums">
         {value}
       </p>
       {delta ? <Delta text={delta.text} tone={delta.tone} /> : null}
-      {hint ? <p className="mt-1 text-[11.5px] text-[#94a3b8]">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[11.5px] text-ink-400">{hint}</p> : null}
     </>
   );
 
   const base =
-    "flex min-h-[104px] flex-col justify-center rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+    "flex min-h-[104px] flex-col justify-center rounded-xl border border-line bg-white px-4 py-3.5 shadow-card";
 
   if (!href) return <div className={base}>{body}</div>;
 
@@ -66,7 +66,7 @@ function Tile({
       href={href}
       className={cn(
         base,
-        "group transition-colors hover:border-[#cbd5e1] hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group transition-colors hover:border-ink-300 hover:bg-fill-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
     >
       {body}
@@ -113,7 +113,7 @@ export function DashboardKpiCards({
           employerCost != null ? (
             <MaskedAmount value={formatEur(employerCost)} />
           ) : (
-            <span className="text-[#cbd5e1]">—</span>
+            <span className="text-ink-300">—</span>
           )
         }
         delta={
@@ -149,7 +149,7 @@ export function DashboardKpiCards({
           metrics.averageEmployerCostPerEmployee != null ? (
             <MaskedAmount value={formatEur(metrics.averageEmployerCostPerEmployee)} />
           ) : (
-            <span className="text-[#cbd5e1]">—</span>
+            <span className="text-ink-300">—</span>
           )
         }
         hint={
@@ -165,7 +165,7 @@ export function DashboardKpiCards({
           metrics.ytd.months > 0 ? (
             <MaskedAmount value={formatEur(metrics.ytd.employerCost)} />
           ) : (
-            <span className="text-[#cbd5e1]">—</span>
+            <span className="text-ink-300">—</span>
           )
         }
         hint={

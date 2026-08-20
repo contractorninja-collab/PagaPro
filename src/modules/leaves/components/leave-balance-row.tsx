@@ -48,23 +48,23 @@ export function LeaveBalanceRow({
         ? "text-[#b45309]"
         : remaining < 0
           ? "text-[#dc2626]"
-          : "text-[#0f172a]";
+          : "text-ink-900";
 
   return (
     <li
-      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 bg-white py-2 pl-3 pr-4 transition-colors hover:bg-[#f8fafc] ${edge}`}
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 bg-white py-2 pl-3 pr-4 transition-colors hover:bg-fill-faint ${edge}`}
     >
       <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-semibold leading-tight text-[#0f172a]">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-semibold leading-tight text-ink-900">
           <span className="truncate">{row.employeeName}</span>
           {showTypePill ? (
             <LeaveTypePill type={row.leaveType as LeaveType} label={LEAVE_TYPE_LABELS_SQ[row.leaveType]} />
           ) : null}
-          <span className="truncate text-[11px] font-normal text-[#94a3b8]">
+          <span className="truncate text-[11px] font-normal text-ink-400">
             {row.departmentName ?? "Pa departament"}
           </span>
         </p>
-        <p className="truncate text-[11px] leading-tight text-[#64748b] [font-variant-numeric:tabular-nums]">
+        <p className="truncate text-[11px] leading-tight text-ink-500 [font-variant-numeric:tabular-nums]">
           {balanceStatSegments(row).join(" · ")}
         </p>
       </div>
@@ -73,7 +73,7 @@ export function LeaveBalanceRow({
         className={`shrink-0 text-right text-[14px] font-bold leading-tight [font-variant-numeric:tabular-nums] ${valueColor}`}
       >
         {fmtDays(remaining)}
-        <span className="ml-1 text-[10.5px] font-medium text-[#94a3b8]">ditë</span>
+        <span className="ml-1 text-[10.5px] font-medium text-ink-400">ditë</span>
       </p>
 
       {verdict.reasons.length > 0 ? (

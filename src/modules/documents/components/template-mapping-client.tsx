@@ -28,7 +28,7 @@ export interface RegistryOption {
   category: string;
 }
 
-const fieldLabelClass = "text-[12px] font-semibold text-[#64748b]";
+const fieldLabelClass = "text-[12px] font-semibold text-ink-500";
 
 export function TemplateMappingClient(props: {
   templateId: string;
@@ -108,20 +108,20 @@ export function TemplateMappingClient(props: {
       <div className="space-y-5">
       {blankFields.length > 0 ? (
         <section className={docCard}>
-          <div className="border-b border-[#eef2f7] px-4 py-3">
-            <h2 className="text-[13.5px] font-bold text-[#0f172a]">
+          <div className="border-b border-line-soft px-4 py-3">
+            <h2 className="text-[13.5px] font-bold text-ink-900">
               Fushat bosh ({blankFields.length})
             </h2>
-            <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+            <p className="mt-0.5 text-[12px] text-ink-400">
               Çdo vijë (_) mapohet me një çelës të dhënash nga regjistri — pa hamendësime automatike.
             </p>
           </div>
           <div className="space-y-4 p-4">
             {props.detectedBlanks.map((detected, i) => (
-              <div key={detected.index} className="space-y-3 rounded-[10px] border border-[#eef2f7] p-4">
+              <div key={detected.index} className="space-y-3 rounded-[10px] border border-line-soft p-4">
                 <div>
-                  <p className="text-[13px] font-bold text-[#0f172a]">Fusha {detected.index}</p>
-                  <p className="mt-1 rounded-md bg-[#f8fafc] px-2.5 py-1.5 text-[12px] italic text-[#64748b]">
+                  <p className="text-[13px] font-bold text-ink-900">Fusha {detected.index}</p>
+                  <p className="mt-1 rounded-md bg-fill-faint px-2.5 py-1.5 text-[12px] italic text-ink-500">
                     {detected.paragraphPreview}
                   </p>
                 </div>
@@ -180,7 +180,7 @@ export function TemplateMappingClient(props: {
                       }
                     />
                   </div>
-                  <label className="flex items-center gap-2 self-end pb-2 text-[13px] font-medium text-[#334155]">
+                  <label className="flex items-center gap-2 self-end pb-2 text-[13px] font-medium text-ink-700">
                     <input
                       type="checkbox"
                       className="h-4 w-4 accent-[#2563EB]"
@@ -204,8 +204,8 @@ export function TemplateMappingClient(props: {
 
       {placeholders.length > 0 ? (
         <section className={docCard}>
-          <div className="border-b border-[#eef2f7] px-4 py-3">
-            <h2 className="text-[13.5px] font-bold text-[#0f172a]">
+          <div className="border-b border-line-soft px-4 py-3">
+            <h2 className="text-[13.5px] font-bold text-ink-900">
               Placeholder {"{{tags}}"} ({placeholders.length})
             </h2>
           </div>
@@ -213,12 +213,12 @@ export function TemplateMappingClient(props: {
             {placeholders.map((ph, i) => (
               <div
                 key={ph.key}
-                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[#eef2f7] px-3 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-soft px-3 py-2.5 transition-colors hover:bg-fill-faint"
               >
                 <code className="rounded-md bg-[#eff6ff] px-2 py-0.5 font-mono text-[12px] font-semibold text-brand-blue">
                   {`{{${ph.key}}}`}
                 </code>
-                <label className="ml-auto flex items-center gap-2 text-[13px] font-medium text-[#334155]">
+                <label className="ml-auto flex items-center gap-2 text-[13px] font-medium text-ink-700">
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-[#2563EB]"

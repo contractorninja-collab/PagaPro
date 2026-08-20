@@ -35,20 +35,20 @@ export function AppSubBar({
   return (
     <div
       className={cn(
-        "-mx-4 -mt-4 mb-6 border-b border-[#e2e8f0] bg-white px-4 md:-mx-10 md:-mt-6 md:px-10",
+        "-mx-4 -mt-4 mb-6 border-b border-line bg-white px-4 md:-mx-10 md:-mt-6 md:px-10",
         dense ? "pb-[18px] pt-4" : "py-[22px]",
       )}
     >
       {backHref ? (
         <Link
           href={backHref}
-          className="mb-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#94a3b8] transition-colors hover:text-[#475569]"
+          className="mb-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-400 transition-colors hover:text-ink-600"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           {backLabel ?? "Kthehu"}
         </Link>
       ) : eyebrow ? (
-        <p className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#94a3b8]">
+        <p className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-400">
           {eyebrow}
         </p>
       ) : null}
@@ -67,7 +67,7 @@ export function AppSubBar({
             {status}
           </div>
           {description ? (
-            <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-[#64748b]">{description}</p>
+            <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-ink-500">{description}</p>
           ) : null}
         </div>
 

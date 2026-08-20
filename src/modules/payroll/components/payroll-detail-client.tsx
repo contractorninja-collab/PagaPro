@@ -33,7 +33,7 @@ import { canGenerateAtkExport } from "@/modules/payroll/atk/atk-export-eligibili
 import { cn } from "@/lib/utils";
 
 const SEG_TRIGGER =
-  "rounded-[7px] px-[15px] py-[7px] text-[13px] font-medium text-[#64748b] transition-colors hover:text-[#334155] data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-[#0f172a] data-[state=active]:shadow-[0_1px_2px_rgba(15,23,42,0.08)]";
+  "rounded-[7px] px-[15px] py-[7px] text-[13px] font-medium text-ink-500 transition-colors hover:text-ink-700 data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-ink-900 data-[state=active]:shadow-[0_1px_2px_rgba(15,23,42,0.08)]";
 
 /** Plain payroll decimal string → EUR display (e.g. €999,999.99) without clipping large amounts. */
 function formatPayrollEuro(amountStr: string): string {
@@ -76,12 +76,12 @@ function PayrollTotalsStrip({ data }: { data: PayrollDetailDto }) {
       {cells.map((cell) => (
         <div
           key={cell.label}
-          className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+          className="rounded-xl border border-line bg-white px-4 py-3.5 shadow-card"
         >
-          <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{cell.label}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">{cell.label}</p>
           <p
             className={cn(
-              "mt-1.5 truncate text-[20px] font-extrabold leading-none tracking-[-0.02em] text-[#0f172a] [font-variant-numeric:tabular-nums]",
+              "mt-1.5 truncate text-[20px] font-extrabold leading-none tracking-[-0.02em] text-ink-900 [font-variant-numeric:tabular-nums]",
               cell.accent && "text-[#1d4ed8]",
             )}
             title={cell.display}
@@ -362,7 +362,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         <PayrollTotalsStrip data={data} />
 
         {payroll.validationWarnings.length > 0 ? (
-          <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-card">
             <h2 className="mb-2 text-[13px] font-bold text-[#b45309]">Sinjalizime validimi</h2>
             <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-[#92400e]">
               {payroll.validationWarnings.map((w, i) => (
@@ -373,7 +373,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         ) : null}
 
         {data.restrictedToEmployeeCount > 0 ? (
-          <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <section className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-5 py-4 shadow-card">
             <h2 className="mb-2 text-[13px] font-bold text-[#b45309]">
               Ky payroll është i kufizuar te {data.restrictedToEmployeeCount} punonjës
             </h2>
@@ -405,7 +405,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
             <summary className={cn(CARD_TITLE, "cursor-pointer select-none list-none")}>
               Parametrat e llogaritjes
             </summary>
-            <div className="grid gap-x-4 gap-y-2 px-5 py-4 text-xs leading-relaxed text-[#64748b] sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-x-4 gap-y-2 px-5 py-4 text-xs leading-relaxed text-ink-500 sm:grid-cols-2 lg:grid-cols-4">
               <p>Minimalja (bazë): €{data.operationalSettings.minimumSalaryMonthly}</p>
               <p>
                 Minimalja e planifikuar:{" "}
@@ -443,7 +443,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         ) : null}
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="h-auto w-fit max-w-full justify-start gap-[3px] rounded-[10px] border-0 bg-[#eef2f7] p-1 text-[#64748b]">
+          <TabsList className="h-auto w-fit max-w-full justify-start gap-[3px] rounded-[10px] border-0 bg-fill-hover p-1 text-ink-500">
             <TabsTrigger className={SEG_TRIGGER} value="spreadsheet">
               Spreadsheet
             </TabsTrigger>
@@ -525,7 +525,7 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
         </Tabs>
 
         {workflowActions.length > 0 ? (
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e2e8f0] bg-white/95 p-3 backdrop-blur lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 backdrop-blur lg:hidden">
             <div className="mx-auto flex max-w-lg flex-wrap gap-2">
               {workflowActions.map((a) => (
                 <Button

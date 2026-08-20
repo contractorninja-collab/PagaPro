@@ -165,7 +165,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
           <div className="flex flex-wrap items-center gap-2.5">
             <a
               href={`/api/pagat/kontraktor/${detail.id}/csv`}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#e2e8f0] bg-white px-[15px] text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7]"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-line bg-white px-[15px] text-[13px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover"
             >
               <Download className="h-4 w-4" aria-hidden />
               Shkarko CSV
@@ -189,7 +189,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                 </Button>
                 <Button
                   type="button"
-                  className="h-10 gap-1.5 rounded-[10px] bg-brand-blue text-white hover:bg-[#1d4ed8]"
+                  className="h-10 gap-1.5 rounded-[10px] bg-brand-blue text-white hover:bg-brand-blue-strong"
                   disabled={busyGlobal || !canSignOffPayroll}
                   onClick={() =>
                     void runGlobal(
@@ -227,7 +227,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/pagat/kontraktor"
-            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748b] hover:text-[#334155]"
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-500 hover:text-ink-700"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Kthehu te periudhat
@@ -249,10 +249,10 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
           </div>
         ) : null}
 
-        <div className="overflow-x-auto rounded-[12px] border border-[#e2e8f0] bg-white">
+        <div className="overflow-x-auto rounded-[12px] border border-line bg-white">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="border-b border-[#e2e8f0] text-left text-[12px] uppercase tracking-wide text-[#94a3b8]">
+              <tr className="border-b border-line text-left text-[12px] uppercase tracking-wide text-ink-400">
                 <th className="px-4 py-3 font-semibold">Kontraktori</th>
                 <th className="px-3 py-3 text-left font-semibold">Baza</th>
                 <th className="px-3 py-3 text-right font-semibold">Tarifa / Paga</th>
@@ -272,9 +272,9 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                 const busy = busyRow === e.id;
                 const flat = e.payBasis === "MONTHLY_FLAT";
                 return (
-                  <tr key={e.id} className="border-b border-[#f1f5f9] last:border-0">
+                  <tr key={e.id} className="border-b border-fill last:border-0">
                     <td className="px-4 py-2.5">
-                      <p className="font-semibold text-[#0f172a]">
+                      <p className="font-semibold text-ink-900">
                         {e.lastName}, {e.firstName}
                       </p>
                       <p className="text-xs text-muted-foreground">{e.personalId}</p>
@@ -283,7 +283,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                          flat ? "bg-[#eef2ff] text-[#4338ca]" : "bg-[#f1f5f9] text-[#475569]",
+                          flat ? "bg-[#eef2ff] text-[#4338ca]" : "bg-fill text-ink-600",
                         )}
                       >
                         {flat ? "Mujore fikse" : "Orë"}
@@ -314,7 +314,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                         {/* Hours are recorded for attendance on a flat fee but never
                             priced — an editable box here would imply otherwise. */}
                         {flat ? (
-                          <span className="tabular-nums text-[#cbd5e1]" title="Nuk ndikon në pagesë">
+                          <span className="tabular-nums text-ink-300" title="Nuk ndikon në pagesë">
                             —
                           </span>
                         ) : editable ? (
@@ -375,8 +375,8 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-[#e2e8f0] bg-[#f8fafc]">
-                <td className="px-4 py-3 text-[13px] font-bold uppercase tracking-wide text-[#334155]">
+              <tr className="border-t border-line bg-fill-faint">
+                <td className="px-4 py-3 text-[13px] font-bold uppercase tracking-wide text-ink-700">
                   Totali
                 </td>
                 <td />
@@ -392,7 +392,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                   </td>
                 ))}
                 <td />
-                <td className="px-3 py-3 text-right text-[15px] font-extrabold tabular-nums text-[#0f172a]">
+                <td className="px-3 py-3 text-right text-[15px] font-extrabold tabular-nums text-ink-900">
                   {formatEuro(detail.totalGross)}
                 </td>
                 {editable ? <td /> : null}

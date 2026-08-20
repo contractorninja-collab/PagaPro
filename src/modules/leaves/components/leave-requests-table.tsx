@@ -22,7 +22,7 @@ import {
 } from "@/modules/leaves/components/leave-ui";
 import type { PushimetLeaveRowDto } from "@/modules/leaves/types/pushimet";
 
-const TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+const TH = "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 const TD = "px-4 py-3 align-middle";
 
 /**
@@ -44,7 +44,7 @@ function LeaveDocumentCell({
 }) {
   const canWriteDocuments = useCan("documents.write");
   const docs = row.documents;
-  if (docs === null) return <span className="text-[#cbd5e1]">—</span>;
+  if (docs === null) return <span className="text-ink-300">—</span>;
 
   const newest = docs[0];
   if (newest) {
@@ -56,7 +56,7 @@ function LeaveDocumentCell({
         <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Hape
         {docs.length > 1 ? (
-          <span className="font-medium text-[#94a3b8]">+{docs.length - 1}</span>
+          <span className="font-medium text-ink-400">+{docs.length - 1}</span>
         ) : null}
       </Link>
     );
@@ -68,14 +68,14 @@ function LeaveDocumentCell({
       <button
         type="button"
         onClick={() => onGenerate(row.id)}
-        className="whitespace-nowrap text-[12.5px] font-medium text-[#64748b] underline-offset-2 transition-colors hover:text-brand-blue hover:underline"
+        className="whitespace-nowrap text-[12.5px] font-medium text-ink-500 underline-offset-2 transition-colors hover:text-brand-blue hover:underline"
       >
         Gjenero
       </button>
     );
   }
 
-  return <span className="text-[#cbd5e1]">—</span>;
+  return <span className="text-ink-300">—</span>;
 }
 
 export function LeaveRequestsTable(props: {
@@ -100,7 +100,7 @@ export function LeaveRequestsTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-12 text-center text-[13px] text-[#64748b]">
+      <div className="rounded-xl border border-line bg-white px-4 py-12 text-center text-[13px] text-ink-500">
         Nuk u gjet asnjë kërkesë për filtrat e zgjedhur.
       </div>
     );
@@ -111,7 +111,7 @@ export function LeaveRequestsTable(props: {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1020px] border-collapse text-[13px] text-[#111827]">
           <thead>
-            <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+            <tr className="border-b border-line-soft bg-fill-faint">
               <th className={TH}>Punonjësi</th>
               <th className={TH}>Lloji</th>
               <th className={TH}>Nën-lloji</th>
@@ -132,13 +132,13 @@ export function LeaveRequestsTable(props: {
               return (
                 <tr
                   key={row.id}
-                  className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                 >
                   <td className={TD}>
                     <div className="flex flex-col">
-                      <span className="font-semibold text-[#0f172a]">{row.employeeName}</span>
+                      <span className="font-semibold text-ink-900">{row.employeeName}</span>
                       {row.departmentName ? (
-                        <span className="text-xs text-[#64748b]">{row.departmentName}</span>
+                        <span className="text-xs text-ink-500">{row.departmentName}</span>
                       ) : null}
                       <LeaveFlagPills flags={flags} className="mt-1.5" />
                     </div>
@@ -149,18 +149,18 @@ export function LeaveRequestsTable(props: {
                       {LEAVE_TYPE_LABELS_SQ[row.type]}
                     </span>
                   </td>
-                  <td className={`${TD} max-w-[160px] text-xs text-[#64748b]`}>
+                  <td className={`${TD} max-w-[160px] text-xs text-ink-500`}>
                     {LEAVE_SUBTYPE_LABELS_SQ[row.subtype]}
                   </td>
                   <td className={`${TD} tabular-nums`}>{formatSqDate(row.startDateIso)}</td>
                   <td className={`${TD} tabular-nums`}>{formatSqDate(row.endDateIso)}</td>
-                  <td className={`${TD} text-right tabular-nums text-[#64748b]`}>
+                  <td className={`${TD} text-right tabular-nums text-ink-500`}>
                     {row.workingDays ?? row.totalDays ?? "—"}
                   </td>
                   <td className={TD}>
                     <LeaveStatusBadge status={row.status} />
                   </td>
-                  <td className={`${TD} max-w-[140px] text-xs leading-snug text-[#64748b]`}>
+                  <td className={`${TD} max-w-[140px] text-xs leading-snug text-ink-500`}>
                     {payrollImpactLabel(row)}
                   </td>
                   <td className={TD}>
@@ -172,7 +172,7 @@ export function LeaveRequestsTable(props: {
                         <button
                           type="button"
                           aria-label="Veprime"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#64748b] transition-colors hover:bg-[#eef2f7] hover:text-[#0f172a]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-fill-hover hover:text-ink-900"
                         >
                           <MoreHorizontal className="h-4 w-4" aria-hidden />
                         </button>

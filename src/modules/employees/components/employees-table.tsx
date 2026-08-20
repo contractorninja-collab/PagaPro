@@ -37,7 +37,7 @@ import { MaskedAmount } from "@/modules/employees/components/salary-visibility";
 import { TerminateEmployeeDialog } from "@/modules/employees/components/terminate-employee-dialog";
 
 const TH =
-  "h-10 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+  "h-10 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 
 function EmployeeAvatar({ row }: { row: EmployeeListRowDto }) {
   const initials = `${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase();
@@ -208,23 +208,23 @@ export function EmployeesTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white px-6 py-16 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-        <p className="text-sm font-semibold text-[#0f172a]">Nuk ka punonjës për filtrat aktualë.</p>
-        <p className="mt-2 text-[13px] text-[#64748b]">Shtoni punonjës të rinj ose ndryshoni kriteret e kërkimit.</p>
+      <div className="rounded-xl border border-line bg-white px-6 py-16 text-center shadow-card">
+        <p className="text-sm font-semibold text-ink-900">Nuk ka punonjës për filtrat aktualë.</p>
+        <p className="mt-2 text-[13px] text-ink-500">Shtoni punonjës të rinj ose ndryshoni kriteret e kërkimit.</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)] md:block">
+      <div className="hidden rounded-xl border border-line bg-white shadow-card md:block">
         <div className="overflow-x-auto">
           {/* Six columns rather than eight: Pozita sits under the name and the
               status badge already carries the employment type, which kills the
               horizontal scroll on a laptop. */}
           <table className="w-full min-w-[720px] caption-bottom">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+              <tr className="border-b border-line-soft bg-fill-faint">
                 <th className={TH}>Punonjësi</th>
                 <th className={TH}>Pozita &amp; departamenti</th>
                 <th className={TH}>Statusi</th>
@@ -240,7 +240,7 @@ export function EmployeesTable(props: {
                 <tr
                   key={row.id}
                   onClick={() => router.push(`/punonjesit/${row.id}`)}
-                  className="cursor-pointer border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  className="cursor-pointer border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                 >
                   <td className="px-4 py-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -249,17 +249,17 @@ export function EmployeesTable(props: {
                         <Link
                           href={`/punonjesit/${row.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="block truncate text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                          className="block truncate text-[13.5px] font-semibold text-ink-900 hover:text-brand-blue"
                         >
                           {row.firstName} {row.lastName}
                         </Link>
-                        <p className="truncate text-xs tabular-nums text-[#94a3b8]">{row.personalId}</p>
+                        <p className="truncate text-xs tabular-nums text-ink-400">{row.personalId}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="truncate text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</p>
-                    <p className="truncate text-xs text-[#94a3b8]">{row.departmentName ?? "—"}</p>
+                    <p className="truncate text-[13px] text-ink-700">{row.jobTitle ?? "—"}</p>
+                    <p className="truncate text-xs text-ink-400">{row.departmentName ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -269,10 +269,10 @@ export function EmployeesTable(props: {
                       ) : null}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-[#0f172a]">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-ink-900">
                     <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-[#64748b]">
+                  <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-ink-500">
                     {formatSqDate(row.hireDate)}
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -283,9 +283,9 @@ export function EmployeesTable(props: {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-[#eef2f7] px-4 py-3">
-          <p className="text-[12.5px] text-[#64748b]">
-            Shfaqen <span className="font-semibold text-[#0f172a]">{rows.length}</span> punonjës
+        <div className="flex items-center justify-between border-t border-line-soft px-4 py-3">
+          <p className="text-[12.5px] text-ink-500">
+            Shfaqen <span className="font-semibold text-ink-900">{rows.length}</span> punonjës
           </p>
         </div>
       </div>
@@ -294,7 +294,7 @@ export function EmployeesTable(props: {
         {rows.map((row) => (
           <div
             key={row.id}
-            className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+            className="rounded-xl border border-line bg-white p-4 shadow-card"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
@@ -302,53 +302,53 @@ export function EmployeesTable(props: {
                 <div className="min-w-0">
                   <Link
                     href={`/punonjesit/${row.id}`}
-                    className="block truncate text-[15px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                    className="block truncate text-[15px] font-semibold text-ink-900 hover:text-brand-blue"
                   >
                     {row.firstName} {row.lastName}
                   </Link>
-                  <p className="truncate text-xs tabular-nums text-[#94a3b8]">{row.personalId}</p>
+                  <p className="truncate text-xs tabular-nums text-ink-400">{row.personalId}</p>
                 </div>
               </div>
               <RowActions row={row} onEdit={onEdit} onRefresh={() => router.refresh()} />
             </div>
-            <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-[#f1f5f9] pt-3 text-sm">
+            <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-fill pt-3 text-sm">
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Pozita</dt>
-                <dd className="text-[13px] text-[#334155]">{row.jobTitle ?? "—"}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Pozita</dt>
+                <dd className="text-[13px] text-ink-700">{row.jobTitle ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Departamenti</dt>
-                <dd className="text-[13px] text-[#334155]">{row.departmentName ?? "—"}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Departamenti</dt>
+                <dd className="text-[13px] text-ink-700">{row.departmentName ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Statusi</dt>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Statusi</dt>
                 <dd className="mt-1">
                   <EmployeeStatusBadge status={row.status} employmentType={row.employmentType} />
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Lloji</dt>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Lloji</dt>
                 <dd className="mt-1">
                   <EmployeeTypeBadge employmentType={row.employmentType} />
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto</dt>
-                <dd className="text-[13px] font-semibold tabular-nums text-[#0f172a]">
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Paga bruto</dt>
+                <dd className="text-[13px] font-semibold tabular-nums text-ink-900">
                   <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">
                   Data e punësimit
                 </dt>
-                <dd className="text-[13px] tabular-nums text-[#334155]">{formatSqDate(row.hireDate)}</dd>
+                <dd className="text-[13px] tabular-nums text-ink-700">{formatSqDate(row.hireDate)}</dd>
               </div>
             </dl>
           </div>
         ))}
-        <p className="px-1 text-[12.5px] text-[#64748b]">
-          Shfaqen <span className="font-semibold text-[#0f172a]">{rows.length}</span> punonjës
+        <p className="px-1 text-[12.5px] text-ink-500">
+          Shfaqen <span className="font-semibold text-ink-900">{rows.length}</span> punonjës
         </p>
       </div>
     </>

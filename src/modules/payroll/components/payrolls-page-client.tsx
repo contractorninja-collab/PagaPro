@@ -162,7 +162,7 @@ export function PayrollsPageClient(props: {
               </Label>
               <select
                 id="payroll-year"
-                className="flex h-10 w-[110px] cursor-pointer rounded-[10px] border border-[#e2e8f0] bg-white px-3.5 text-[13.5px] font-semibold text-[#334155] outline-none transition-colors hover:bg-[#f8fafc] focus-visible:border-brand-blue"
+                className="flex h-10 w-[110px] cursor-pointer rounded-[10px] border border-line bg-white px-3.5 text-[13.5px] font-semibold text-ink-700 outline-none transition-colors hover:bg-fill-faint focus-visible:border-brand-blue"
                 value={String(yearFilter)}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setYearFilter(Number(e.target.value))}
               >
@@ -176,7 +176,7 @@ export function PayrollsPageClient(props: {
             {canPreparePayroll ? (
               <Button
                 type="button"
-                className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-[#1d4ed8]"
+                className="h-10 gap-[7px] rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white hover:bg-brand-blue-strong"
                 onClick={() => setCreateOpen(true)}
               >
                 <Plus className="h-4 w-4" strokeWidth={2.2} aria-hidden />

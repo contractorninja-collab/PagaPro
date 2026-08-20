@@ -57,8 +57,8 @@ const TONE_STYLES: Record<QueueTone, { rail: string; tile: string; chip: string 
   },
   neutral: {
     rail: "border-l-[#cbd5e1]",
-    tile: "bg-[#f1f5f9] text-[#475569]",
-    chip: "bg-[#f1f5f9] text-[#64748b]",
+    tile: "bg-fill text-ink-600",
+    chip: "bg-fill text-ink-500",
   },
 };
 
@@ -104,7 +104,7 @@ function QueueRow({ item }: { item: QueueItem }) {
     <li
       id={item.anchorId}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-[#e2e8f0] border-l-[3px] bg-white px-[18px] py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center sm:gap-[15px]",
+        "flex flex-col gap-3 rounded-xl border border-line border-l-[3px] bg-white px-[18px] py-4 shadow-card sm:flex-row sm:items-center sm:gap-[15px]",
         t.rail,
         item.anchorId ? "scroll-mt-24" : undefined,
       )}
@@ -120,7 +120,7 @@ function QueueRow({ item }: { item: QueueItem }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="text-[14.5px] font-bold leading-snug text-[#0f172a]">{item.title}</span>
+            <span className="text-[14.5px] font-bold leading-snug text-ink-900">{item.title}</span>
             {item.chip ? (
               <span
                 className={cn(
@@ -133,7 +133,7 @@ function QueueRow({ item }: { item: QueueItem }) {
             ) : null}
           </div>
           {item.detail ? (
-            <p className="text-[12.5px] leading-relaxed text-[#64748b]">{item.detail}</p>
+            <p className="text-[12.5px] leading-relaxed text-ink-500">{item.detail}</p>
           ) : null}
         </div>
       </div>
@@ -315,12 +315,12 @@ export function DashboardActionCenter(props: {
         <h2 className="text-[17px] font-bold tracking-[-0.01em] text-brand-navy">
           Qendra e veprimeve
         </h2>
-        <p className="text-[12.5px] text-[#64748b]">
+        <p className="text-[12.5px] text-ink-500">
           Renditur sipas urgjencës ·{" "}
-          <span className="font-semibold text-[#0f172a]">{items.length} gjithsej</span>
+          <span className="font-semibold text-ink-900">{items.length} gjithsej</span>
           {props.today.approved + props.today.rejected > 0 ? (
             <>
-              <span className="mx-1.5 text-[#cbd5e1]" aria-hidden>
+              <span className="mx-1.5 text-ink-300" aria-hidden>
                 ·
               </span>
               Vendime sot: {props.today.approved} miratuar · {props.today.rejected} refuzuar
@@ -330,13 +330,13 @@ export function DashboardActionCenter(props: {
       </div>
 
       {items.length === 0 ? (
-        <div className="flex items-center gap-[15px] rounded-xl border border-[#e2e8f0] bg-white px-[18px] py-5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+        <div className="flex items-center gap-[15px] rounded-xl border border-line bg-white px-[18px] py-5 shadow-card">
           <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#ecfdf5] text-[#16a34a]">
             <CheckCircle2 className="h-[18px] w-[18px]" aria-hidden />
           </div>
           <div>
-            <p className="text-[14.5px] font-bold text-[#0f172a]">Gjithçka në rregull</p>
-            <p className="text-[12.5px] text-[#64748b]">
+            <p className="text-[14.5px] font-bold text-ink-900">Gjithçka në rregull</p>
+            <p className="text-[12.5px] text-ink-500">
               Nuk ka çështje që kërkojnë vëmendje për momentin.
             </p>
           </div>
@@ -349,7 +349,7 @@ export function DashboardActionCenter(props: {
             ))}
           </ul>
           {hidden > 0 ? (
-            <p className="mt-3 text-[12.5px] text-[#64748b]">
+            <p className="mt-3 text-[12.5px] text-ink-500">
               edhe {hidden} çështje të tjera me përparësi më të ulët —{" "}
               <Link href="/pushimet" className="font-semibold text-brand-blue hover:underline">
                 Pushimet

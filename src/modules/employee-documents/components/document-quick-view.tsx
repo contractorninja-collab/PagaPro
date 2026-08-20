@@ -42,7 +42,7 @@ export function DocumentQuickView({
             ) : null}
           </DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-line bg-fill-faint">
           {target?.kind === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob served by our own authed route; next/image cannot optimize it
             <img src={target.url} alt={target.title} className="mx-auto max-h-full max-w-full object-contain p-2" />

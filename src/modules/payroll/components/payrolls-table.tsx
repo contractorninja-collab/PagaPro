@@ -88,7 +88,7 @@ function StageRail({ status }: { status: PayrollPeriodStatus }) {
           <Fragment key={step.key}>
             {i > 0 ? (
               <div
-                className={cn("mt-[11px] h-[2px] flex-1", i <= currentIndex ? "bg-[#86efac]" : "bg-[#e2e8f0]")}
+                className={cn("mt-[11px] h-[2px] flex-1", i <= currentIndex ? "bg-[#86efac]" : "bg-line")}
                 aria-hidden
               />
             ) : null}
@@ -102,7 +102,7 @@ function StageRail({ status }: { status: PayrollPeriodStatus }) {
                   "flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[11px] font-semibold",
                   isDone && "border-[#86efac] bg-[#ecfdf5] text-[#15803d]",
                   isActive && "border-[#93c5fd] bg-[#eff6ff] font-bold text-[#1d4ed8] shadow-[0_0_0_3px_#dbeafe]",
-                  !isDone && !isActive && "border-[#e2e8f0] bg-[#f1f5f9] text-[#94a3b8]",
+                  !isDone && !isActive && "border-line bg-fill text-ink-400",
                 )}
               >
                 {isDone ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : <span>{i + 1}</span>}
@@ -112,7 +112,7 @@ function StageRail({ status }: { status: PayrollPeriodStatus }) {
                   "text-center text-[10.5px] leading-tight",
                   isDone && "font-semibold text-[#15803d]",
                   isActive && "font-bold text-[#1d4ed8]",
-                  !isDone && !isActive && "font-medium text-[#94a3b8]",
+                  !isDone && !isActive && "font-medium text-ink-400",
                 )}
               >
                 {step.label}
@@ -150,10 +150,10 @@ type RowHandlers = {
 function HeroStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className="text-right">
-      <div className="mb-[3px] text-[11.5px] text-[#94a3b8]">{label}</div>
+      <div className="mb-[3px] text-[11.5px] text-ink-400">{label}</div>
       <div
         className={cn(
-          "text-[19px] font-bold leading-tight text-[#0f172a] [font-variant-numeric:tabular-nums]",
+          "text-[19px] font-bold leading-tight text-ink-900 [font-variant-numeric:tabular-nums]",
           accent && "font-extrabold text-[#1d4ed8]",
         )}
       >
@@ -170,7 +170,7 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
   const primary = canSignOffPayroll ? getPrimaryAction(row.status, handlers) : null;
 
   return (
-    <section className="overflow-hidden rounded-[14px] border border-[#dbe4f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+    <section className="overflow-hidden rounded-[14px] border border-[#dbe4f0] bg-white shadow-card">
       <div className="flex flex-col gap-4 px-5 pb-4 pt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-5 sm:px-6">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-x-[11px] gap-y-1.5">
@@ -179,7 +179,7 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
             </span>
             <PayrollStatusBadge status={row.status} />
           </div>
-          <h2 className="m-0 text-[22px] font-bold leading-tight tracking-[-0.02em] text-[#0f172a]">
+          <h2 className="m-0 text-[22px] font-bold leading-tight tracking-[-0.02em] text-ink-900">
             <Link href={`/pagat/${row.id}`} className="hover:underline">
               {row.monthLabel}
             </Link>
@@ -194,7 +194,7 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
 
       <StageRail status={row.status} />
 
-      <div className="flex flex-wrap items-center gap-2.5 border-t border-[#eef2f7] bg-[#fbfcfe] px-5 py-3.5 sm:px-6">
+      <div className="flex flex-wrap items-center gap-2.5 border-t border-line-soft bg-[#fbfcfe] px-5 py-3.5 sm:px-6">
         <Link href={`/pagat/${row.id}`} className={BTN_PRIMARY}>
           Vazhdo shqyrtimin
           <ArrowRight className="h-[15px] w-[15px]" aria-hidden />
@@ -214,7 +214,7 @@ function ActiveRunHero({ row, handlers }: { row: PayrollListRow; handlers: RowHa
             Gjenero PDF
           </button>
         ) : null}
-        <span className="ml-auto text-[12.5px] text-[#94a3b8] [font-variant-numeric:tabular-nums]">
+        <span className="ml-auto text-[12.5px] text-ink-400 [font-variant-numeric:tabular-nums]">
           Krijuar {formatIsoDateUtcDdMmYyyy(row.createdAt)}
         </span>
       </div>
@@ -233,28 +233,28 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
     <div
       className={cn(
         REGISTER_GRID,
-        "border-b border-[#f1f5f9] px-5 py-3.5 transition-colors last:border-b-0 hover:bg-[#f8fafc]",
+        "border-b border-fill px-5 py-3.5 transition-colors last:border-b-0 hover:bg-fill-faint",
       )}
     >
       <Link
         href={`/pagat/${row.id}`}
-        className="truncate text-[13.5px] font-semibold text-[#0f172a] hover:underline"
+        className="truncate text-[13.5px] font-semibold text-ink-900 hover:underline"
       >
         {row.monthLabel}
       </Link>
       <span>
         <PayrollStatusBadge status={row.status} />
       </span>
-      <span className="text-right text-[13px] text-[#334155] [font-variant-numeric:tabular-nums]">
+      <span className="text-right text-[13px] text-ink-700 [font-variant-numeric:tabular-nums]">
         {row.employeeCount}
       </span>
-      <span className="whitespace-nowrap text-right text-[13px] font-semibold text-[#0f172a] [font-variant-numeric:tabular-nums]">
+      <span className="whitespace-nowrap text-right text-[13px] font-semibold text-ink-900 [font-variant-numeric:tabular-nums]">
         {formatListEuro(row.totalGross)}
       </span>
-      <span className="whitespace-nowrap text-right text-[13px] text-[#334155] [font-variant-numeric:tabular-nums]">
+      <span className="whitespace-nowrap text-right text-[13px] text-ink-700 [font-variant-numeric:tabular-nums]">
         {formatListEuro(row.totalNet)}
       </span>
-      <span className="whitespace-nowrap text-[12.5px] text-[#94a3b8] [font-variant-numeric:tabular-nums]">
+      <span className="whitespace-nowrap text-[12.5px] text-ink-400 [font-variant-numeric:tabular-nums]">
         {formatIsoDateUtcDdMmYyyy(row.createdAt)}
       </span>
       <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
@@ -270,7 +270,7 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
         {row.status === "DRAFT" && canPreparePayroll ? (
           <button
             type="button"
-            className="whitespace-nowrap text-[12.5px] font-semibold text-[#64748b] hover:text-[#334155] hover:underline"
+            className="whitespace-nowrap text-[12.5px] font-semibold text-ink-500 hover:text-ink-700 hover:underline"
             onClick={() => handlers.onRegenerate(row.id)}
           >
             Llogarit Pagat
@@ -287,7 +287,7 @@ function RegisterRow({ row, handlers }: { row: PayrollListRow; handlers: RowHand
         ) : null}
         <Link
           href={`/pagat/${row.id}`}
-          className="whitespace-nowrap text-[12.5px] font-semibold text-[#64748b] hover:text-[#334155] hover:underline"
+          className="whitespace-nowrap text-[12.5px] font-semibold text-ink-500 hover:text-ink-700 hover:underline"
         >
           Hap detajet
         </Link>
@@ -309,7 +309,7 @@ export function PayrollsTable(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white py-12 text-center text-sm text-[#64748b]">
+      <div className="rounded-xl border border-line bg-white py-12 text-center text-sm text-ink-500">
         Nuk ka periudha pagë. Krijoni një payroll për të filluar.
       </div>
     );
@@ -325,16 +325,16 @@ export function PayrollsTable(props: {
 
       {rest.length > 0 ? (
         <section>
-          <h2 className="mb-3 text-[13px] font-bold text-[#0f172a]">
+          <h2 className="mb-3 text-[13px] font-bold text-ink-900">
             {hero ? "Periudhat e mëparshme" : "Periudhat"}
           </h2>
-          <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
             <div className="overflow-x-auto">
               <div className="min-w-[880px]">
                 <div
                   className={cn(
                     REGISTER_GRID,
-                    "border-b border-[#eef2f7] bg-[#f8fafc] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]",
+                    "border-b border-line-soft bg-fill-faint px-5 py-3 text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400",
                   )}
                 >
                   <span>Periudha</span>

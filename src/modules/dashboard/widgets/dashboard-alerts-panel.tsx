@@ -44,7 +44,7 @@ function OperationalAlertRow({ alert }: { alert: OperationalAlert }) {
   return (
     <li
       className={cn(
-        "flex flex-col gap-3 rounded-lg border border-[#e2e8f0] border-l-4 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between",
+        "flex flex-col gap-3 rounded-lg border border-line border-l-4 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between",
         accent.border,
       )}
     >
@@ -75,7 +75,7 @@ export function DashboardAlertsPanelSkeleton() {
       </div>
       <div className="surface-card-body space-y-3">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-[#e2e8f0] p-4">
+          <div key={i} className="rounded-lg border border-line p-4">
             <div className="mb-2 h-4 w-3/4 rounded bg-muted" />
             <div className="h-3 w-full rounded bg-muted" />
           </div>

@@ -32,11 +32,11 @@ export default async function PrezencaPage({
           title="Prezenca"
           description="Ditët e punës të derivuara nga skanimet e kartelave."
         />
-        <div className="rounded-xl border border-[#e2e8f0] bg-white px-5 py-8 text-center">
-          <p className="text-sm font-semibold text-[#0f172a]">
+        <div className="rounded-xl border border-line bg-white px-5 py-8 text-center">
+          <p className="text-sm font-semibold text-ink-900">
             Ora e punës nuk është e aktivizuar për këtë kompani.
           </p>
-          <p className="mx-auto mt-1 max-w-md text-[13px] text-[#64748b]">
+          <p className="mx-auto mt-1 max-w-md text-[13px] text-ink-500">
             Moduli aktivizohet nga administratori i platformës. Pas aktivizimit, skanimet nga
             kiosku në <span className="font-medium">/skano</span> shfaqen këtu si ditë pune.
           </p>

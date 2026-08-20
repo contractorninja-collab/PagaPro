@@ -14,7 +14,7 @@ export interface EmployeesFilterValues {
 }
 
 const SELECT_PILL =
-  "h-10 shrink-0 rounded-[10px] border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#334155] transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30";
+  "h-10 shrink-0 rounded-[10px] border border-line bg-white px-3 text-[13px] font-medium text-ink-700 transition-colors hover:bg-fill-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30";
 
 /**
  * Server-side filtering through a plain GET form — still works without
@@ -38,7 +38,7 @@ export function EmployeesFilters(props: {
     <form
       action="/punonjesit"
       method="get"
-      className="rounded-xl border border-[#e2e8f0] bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+      className="rounded-xl border border-line bg-white p-3 shadow-card"
     >
       {defaults.documentsMissing ? (
         <input type="hidden" name="documentsMissing" value="1" />
@@ -47,7 +47,7 @@ export function EmployeesFilters(props: {
       <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center">
         <div className="relative min-w-0 flex-1 lg:min-w-[220px]">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
             aria-hidden
           />
           <input
@@ -57,7 +57,7 @@ export function EmployeesFilters(props: {
             aria-label="Kërko punonjës"
             placeholder="Kërko: emër, numër personal, email…"
             defaultValue={defaults.q}
-            className="h-10 w-full rounded-[10px] border border-[#e2e8f0] bg-white pl-9 pr-3 text-[13.5px] text-[#111827] placeholder:text-[#94a3b8] focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
+            className="h-10 w-full rounded-[10px] border border-line bg-white pl-9 pr-3 text-[13.5px] text-[#111827] placeholder:text-ink-400 focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
           />
         </div>
 
@@ -120,7 +120,7 @@ export function EmployeesFilters(props: {
           </noscript>
           <Link
             href="/punonjesit"
-            className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#e2e8f0] bg-white px-4 text-[13.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7]"
+            className="inline-flex h-10 items-center justify-center rounded-[10px] border border-line bg-white px-4 text-[13.5px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover"
           >
             Pastro
           </Link>

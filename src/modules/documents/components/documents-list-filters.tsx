@@ -54,7 +54,7 @@ export function DocumentsListFilters(props: DocumentsListFiltersProps) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full min-w-[180px] sm:w-auto sm:flex-1 sm:max-w-[280px]">
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
             aria-hidden
           />
           <label htmlFor="dq" className="sr-only">
@@ -110,7 +110,7 @@ export function DocumentsListFilters(props: DocumentsListFiltersProps) {
       </div>
 
       <details className="group" open={secondaryActiveCount > 0}>
-        <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-[12.5px] font-semibold text-[#64748b] transition-colors hover:text-[#334155]">
+        <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-[12.5px] font-semibold text-ink-500 transition-colors hover:text-ink-700">
           <ChevronDown
             className="h-3.5 w-3.5 transition-transform group-open:rotate-180"
             aria-hidden
@@ -118,7 +118,7 @@ export function DocumentsListFilters(props: DocumentsListFiltersProps) {
           Më shumë filtra
           {secondaryActiveCount > 0 ? ` (${secondaryActiveCount})` : ""}
         </summary>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-[#eef2f7] pt-2.5">
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-2.5">
           <label htmlFor="dm" className="sr-only">
             Muaji
           </label>

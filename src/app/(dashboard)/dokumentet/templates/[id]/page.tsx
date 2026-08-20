@@ -39,13 +39,13 @@ export default async function TemplateDetailPage({
       />
       <div className="space-y-5">
         <div className={cn(docCard, "overflow-hidden")}>
-          <div className="border-b border-[#eef2f7] px-4 py-3">
-            <h2 className="text-[13.5px] font-bold text-[#0f172a]">Versionet</h2>
+          <div className="border-b border-line-soft px-4 py-3">
+            <h2 className="text-[13.5px] font-bold text-ink-900">Versionet</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <tr className="border-b border-line-soft bg-fill-faint">
                   <th className={docTableHead}>Versioni</th>
                   <th className={docTableHead}>Detektimi</th>
                   <th className={docTableHead}>Mapuar</th>
@@ -61,14 +61,14 @@ export default async function TemplateDetailPage({
                   return (
                     <tr
                       key={v.id}
-                      className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                      className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                     >
-                      <td className={cn(docTableCell, "text-[13px] font-semibold tabular-nums text-[#0f172a]")}>
+                      <td className={cn(docTableCell, "text-[13px] font-semibold tabular-nums text-ink-900")}>
                         v{v.versionNumber}
                       </td>
-                      <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
+                      <td className={cn(docTableCell, "text-[13px] text-ink-700")}>
                         {v.detectionMode ?? "—"}
-                        <span className="mt-0.5 block text-[12px] text-[#94a3b8]">
+                        <span className="mt-0.5 block text-[12px] text-ink-400">
                           {blankCount} bosh ·{" "}
                           {Array.isArray(v.detectedPlaceholders) ? v.detectedPlaceholders.length : 0}{" "}
                           tags
@@ -93,7 +93,7 @@ export default async function TemplateDetailPage({
                             Mapo fushat
                           </Link>
                         ) : (
-                          <span className="text-[12px] text-[#94a3b8]">—</span>
+                          <span className="text-[12px] text-ink-400">—</span>
                         )}
                       </td>
                     </tr>

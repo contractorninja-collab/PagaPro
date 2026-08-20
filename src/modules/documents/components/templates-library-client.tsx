@@ -108,17 +108,17 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
       />
       <div className="space-y-5">
         {props.templates.length === 0 ? (
-          <div className={cn(docCard, "p-8 text-center text-[13px] text-[#64748b]")}>
+          <div className={cn(docCard, "p-8 text-center text-[13px] text-ink-500")}>
             Nuk ka shabllon ende — ngarkoni një DOCX.
           </div>
         ) : (
           props.templates.map((t) => (
             <div key={t.id} className={cn(docCard, "overflow-hidden")}>
-              <div className="flex flex-col gap-3 border-b border-[#eef2f7] p-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-3 border-b border-line-soft p-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Link
                     href={`/dokumentet/templates/${t.id}`}
-                    className="text-[14px] font-bold text-[#0f172a] hover:text-brand-blue"
+                    className="text-[14px] font-bold text-ink-900 hover:text-brand-blue"
                   >
                     {t.name}
                   </Link>
@@ -128,7 +128,7 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                   </DocChip>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[12px] font-medium text-[#64748b]">Aktiv</span>
+                  <span className="text-[12px] font-medium text-ink-500">Aktiv</span>
                   <Switch
                     checked={t.isActive}
                     disabled={pending || !canWriteDocuments}
@@ -142,7 +142,7 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                    <tr className="border-b border-line-soft bg-fill-faint">
                       <th className={docTableHead}>Ver.</th>
                       <th className={docTableHead}>Skedari</th>
                       <th className={cn(docTableHead, "text-right")}>Placeholderë</th>
@@ -156,18 +156,18 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                     {t.versions.map((v) => (
                       <tr
                         key={v.id}
-                        className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                        className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                       >
-                        <td className={cn(docTableCell, "text-[13px] font-semibold tabular-nums text-[#0f172a]")}>
+                        <td className={cn(docTableCell, "text-[13px] font-semibold tabular-nums text-ink-900")}>
                           v{v.versionNumber}
                         </td>
-                        <td className={cn(docTableCell, "max-w-[220px] truncate text-[13px] text-[#334155]")}>
+                        <td className={cn(docTableCell, "max-w-[220px] truncate text-[13px] text-ink-700")}>
                           {v.originalFilename ?? "—"}
                         </td>
-                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-[#334155]")}>
+                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-ink-700")}>
                           {v.placeholderCount}
                         </td>
-                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-[#334155]")}>
+                        <td className={cn(docTableCell, "text-right text-[13px] tabular-nums text-ink-700")}>
                           {v.blankCount}
                         </td>
                         <td className={docTableCell}>
@@ -176,10 +176,10 @@ export function TemplatesLibraryClient(props: { templates: TemplateLibraryRow[] 
                           ) : v.blankCount > 0 || v.detectionMode === "MIXED" ? (
                             <DocChip tone="warning">Duhet mapping</DocChip>
                           ) : (
-                            <span className="text-[12px] text-[#94a3b8]">—</span>
+                            <span className="text-[12px] text-ink-400">—</span>
                           )}
                         </td>
-                        <td className={cn(docTableCell, "whitespace-nowrap text-[12.5px] tabular-nums text-[#64748b]")}>
+                        <td className={cn(docTableCell, "whitespace-nowrap text-[12.5px] tabular-nums text-ink-500")}>
                           {new Date(v.uploadedAt).toLocaleString("sq-AL", {
                             dateStyle: "short",
                             timeStyle: "short",
@@ -334,9 +334,9 @@ function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: stri
   }
 
   return (
-    <div className="flex flex-col gap-2 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3 md:flex-row md:items-end md:gap-4">
+    <div className="flex flex-col gap-2 border-b border-line-soft bg-fill-faint px-4 py-3 md:flex-row md:items-end md:gap-4">
       <div className="flex-1 space-y-1">
-        <Label className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+        <Label className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
           Çelësi Largimet (workflow)
         </Label>
         <select

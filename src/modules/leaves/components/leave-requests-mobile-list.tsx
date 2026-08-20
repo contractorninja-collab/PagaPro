@@ -36,7 +36,7 @@ export function LeaveRequestsMobileList(props: {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-10 text-center text-[13px] text-[#64748b] md:hidden">
+      <div className="rounded-xl border border-line bg-white px-4 py-10 text-center text-[13px] text-ink-500 md:hidden">
         Nuk ka të dhëna për këtë pamje.
       </div>
     );
@@ -53,44 +53,44 @@ export function LeaveRequestsMobileList(props: {
         <div key={row.id} className={`overflow-hidden p-4 ${LEAVE_CARD}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-[13.5px] font-semibold text-[#0f172a]">{row.employeeName}</p>
+              <p className="truncate text-[13.5px] font-semibold text-ink-900">{row.employeeName}</p>
               {row.departmentName ? (
-                <p className="truncate text-xs text-[#64748b]">{row.departmentName}</p>
+                <p className="truncate text-xs text-ink-500">{row.departmentName}</p>
               ) : null}
             </div>
             <LeaveStatusBadge status={row.status} />
           </div>
           <LeaveFlagPills flags={flags} className="mt-2.5" />
-          <div className="my-3 border-t border-[#eef2f7]" />
+          <div className="my-3 border-t border-line-soft" />
           <dl className="grid grid-cols-2 gap-x-2 gap-y-2 text-xs">
             <div>
-              <dt className="text-[#94a3b8]">Lloji</dt>
+              <dt className="text-ink-400">Lloji</dt>
               <dd className="font-medium text-[#111827]">{LEAVE_TYPE_LABELS_SQ[row.type]}</dd>
             </div>
             <div>
-              <dt className="text-[#94a3b8]">Ditë pune</dt>
+              <dt className="text-ink-400">Ditë pune</dt>
               <dd className="font-medium tabular-nums text-[#111827]">
                 {row.workingDays ?? row.totalDays ?? "—"}
               </dd>
             </div>
             {row.subtype !== "NONE" ? (
               <div className="col-span-2">
-                <dt className="text-[#94a3b8]">Nën-lloji</dt>
+                <dt className="text-ink-400">Nën-lloji</dt>
                 <dd className="font-medium text-[#111827]">{LEAVE_SUBTYPE_LABELS_SQ[row.subtype]}</dd>
               </div>
             ) : null}
             <div className="col-span-2">
-              <dt className="text-[#94a3b8]">Periudha</dt>
+              <dt className="text-ink-400">Periudha</dt>
               <dd className="font-medium tabular-nums text-[#111827]">
                 {formatSqDate(row.startDateIso)} → {formatSqDate(row.endDateIso)}
               </dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-[#94a3b8]">Ndikimi në payroll</dt>
-              <dd className="text-[#64748b]">{payrollImpactLabel(row)}</dd>
+              <dt className="text-ink-400">Ndikimi në payroll</dt>
+              <dd className="text-ink-500">{payrollImpactLabel(row)}</dd>
             </div>
           </dl>
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eef2f7] pt-4">
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-line-soft pt-4">
             <Link href={`/pushimet/${row.id}`} className={BTN_SECONDARY_DENSE}>
               Shiko detajet
             </Link>

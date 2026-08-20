@@ -388,14 +388,14 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
   ).length;
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#eef2f7] bg-[#f8fafc] px-5 py-4">
+    <div className="mb-6 overflow-hidden rounded-xl border border-line bg-white shadow-card">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line-soft bg-fill-faint px-5 py-4">
         <Rocket className="h-5 w-5 text-brand-blue" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h2 className="text-[14px] font-bold tracking-[-0.01em] text-[#0f172a]">
+          <h2 className="text-[14px] font-bold tracking-[-0.01em] text-ink-900">
             Konfigurimi fillestar
           </h2>
-          <p className="mt-0.5 text-[12.5px] text-[#64748b]">
+          <p className="mt-0.5 text-[12.5px] text-ink-500">
             {progress.complete
               ? "Të gjitha hapat e domosdoshëm janë plotësuar."
               : `${progress.doneCount} nga ${progress.requiredCount} hapa — pa dalë nga kjo faqe.`}
@@ -409,12 +409,12 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
       </div>
 
       {/* Already prepared, so the client does not go hunting for it. */}
-      <p className="border-b border-[#eef2f7] px-5 py-2.5 text-[12px] text-[#64748b]">
+      <p className="border-b border-line-soft px-5 py-2.5 text-[12px] text-ink-500">
         Tashmë të përgatitura nga ne: festat zyrtare, parametrat bazë të pagës, politika e
         pushimeve dhe shabllonet e dokumenteve.
       </p>
 
-      <div className="divide-y divide-[#f1f5f9]">
+      <div className="divide-y divide-fill">
         {steps.map((step, idx) => {
           const isOpen = step.id === activeId && !step.blocked;
           const state = step.done
@@ -429,34 +429,34 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
             <div key={step.id} className={cn(step.blocked && "opacity-60")}>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-fill-faint disabled:cursor-not-allowed"
                 disabled={step.blocked}
                 onClick={() => setOpenStep(isOpen ? null : step.id)}
               >
                 <StepCircle state={state} index={idx} />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold text-[#0f172a]">
+                  <span className="block text-[13px] font-semibold text-ink-900">
                     {step.label}
                     {step.optional ? (
-                      <span className="ml-2 text-[11px] font-medium text-[#94a3b8]">
+                      <span className="ml-2 text-[11px] font-medium text-ink-400">
                         opsionale
                       </span>
                     ) : null}
                   </span>
-                  <span className="block text-[12px] text-[#64748b]">
+                  <span className="block text-[12px] text-ink-500">
                     {step.blocked ? step.blockedReason : step.hint}
                   </span>
                 </span>
                 {!step.blocked ? (
                   <ChevronDown
-                    className={cn("h-4 w-4 shrink-0 text-[#94a3b8]", isOpen && "rotate-180")}
+                    className={cn("h-4 w-4 shrink-0 text-ink-400", isOpen && "rotate-180")}
                     aria-hidden
                   />
                 ) : null}
               </button>
 
               {isOpen ? (
-                <div className="border-t border-[#f1f5f9] bg-[#fcfdff] px-5 py-4">
+                <div className="border-t border-fill bg-[#fcfdff] px-5 py-4">
                   {step.id === "pozitat" ? (
                     <div className="space-y-3">
                       <p className="text-[12.5px] text-muted-foreground">
@@ -744,7 +744,7 @@ export function SetupWizardCard(props: SetupWizardCardProps) {
       </div>
 
       {titlesNeedingDescription > 0 ? (
-        <p className="border-t border-[#eef2f7] px-5 py-2.5 text-[12px] text-[#64748b]">
+        <p className="border-t border-line-soft px-5 py-2.5 text-[12px] text-ink-500">
           {titlesNeedingDescription} pozita përdorin ende një përshkrim të përgjithshëm.{" "}
           <button
             type="button"

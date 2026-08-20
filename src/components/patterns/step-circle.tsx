@@ -20,7 +20,7 @@ export function StepCircle({ state, index }: { state: StepCircleState; index: nu
   }
   if (state === "blocked") {
     return (
-      <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#f1f5f9] text-[#cbd5e1]">
+      <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-fill text-ink-300">
         <Lock className="h-3 w-3" aria-hidden />
       </span>
     );
@@ -31,7 +31,7 @@ export function StepCircle({ state, index }: { state: StepCircleState; index: nu
         "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
         state === "active"
           ? "border-2 border-brand-blue bg-[#eff6ff] text-brand-blue"
-          : "bg-[#f1f5f9] text-[#94a3b8]",
+          : "bg-fill text-ink-400",
       )}
     >
       {index + 1}

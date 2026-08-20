@@ -22,13 +22,13 @@ export const docBtnSecondary = buttonVariants({ variant: "secondary", size: "lg"
 export const docBtnSecondaryDense = buttonVariants({ variant: "secondary", size: "default" });
 
 export const docSelect =
-  "h-9 rounded-lg border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#334155] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "h-9 rounded-lg border border-line bg-white px-3 text-[13px] font-medium text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const docInput =
-  "h-9 w-full rounded-lg border border-[#e2e8f0] bg-white px-3 text-[13px] text-[#111827] placeholder:text-[#94a3b8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "h-9 w-full rounded-lg border border-line bg-white px-3 text-[13px] text-[#111827] placeholder:text-ink-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const docTableHead =
-  "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
+  "px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
 
 export const docTableCell = "px-4 py-3 align-top";
 

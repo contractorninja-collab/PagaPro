@@ -44,8 +44,8 @@ export function DocumentPreviewSheet({
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                  <FileWarning className="h-8 w-8 text-[#cbd5e1]" aria-hidden />
-                  <p className="text-[13.5px] font-semibold text-[#0f172a]">
+                  <FileWarning className="h-8 w-8 text-ink-300" aria-hidden />
+                  <p className="text-[13.5px] font-semibold text-ink-900">
                     Ky dokument s&apos;ka version PDF.
                   </p>
                   <p className="max-w-xs text-[13px] text-muted-foreground">
@@ -72,7 +72,7 @@ export function DocumentPreviewSheet({
               </a>
               <a
                 href={`/dokumentet/${artifact.id}`}
-                className={cn(docBtnSecondaryDense, "border-transparent bg-transparent hover:bg-[#eef2f7]")}
+                className={cn(docBtnSecondaryDense, "border-transparent bg-transparent hover:bg-fill-hover")}
               >
                 Hap faqen e detajeve
               </a>

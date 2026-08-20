@@ -45,14 +45,14 @@ export function DashboardFiltersBar(props: {
         type="button"
         onClick={() => setEditing(true)}
         aria-label={`Ndrysho filtrat e panelit — periudha ${periodLabel}, departamenti ${departmentLabel}`}
-        className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#e2e8f0] bg-white px-[15px] text-[13.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-line bg-white px-[15px] text-[13.5px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="whitespace-nowrap">{periodLabel}</span>
-        <span className="text-[#cbd5e1]" aria-hidden>
+        <span className="text-ink-300" aria-hidden>
           ·
         </span>
         <span className="max-w-[140px] truncate">{departmentLabel}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-[#94a3b8]" aria-hidden />
+        <ChevronDown className="h-3.5 w-3.5 text-ink-400" aria-hidden />
       </button>
     );
   }
@@ -133,7 +133,7 @@ export function DashboardFiltersBar(props: {
 export function DashboardFiltersBarSkeleton() {
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      <div className="h-10 w-48 rounded-[10px] border border-[#e2e8f0] bg-muted" />
+      <div className="h-10 w-48 rounded-[10px] border border-line bg-muted" />
     </div>
   );
 }

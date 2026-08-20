@@ -83,11 +83,11 @@ export interface EmployeeProfileDocumentsBundle {
 /* ---------------------------------- 1b design primitives (local) ---------------------------------- */
 
 const TH =
-  "h-9 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
-const TD = "px-4 py-2.5 align-middle text-[13px] text-[#334155]";
+  "h-9 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400";
+const TD = "px-4 py-2.5 align-middle text-[13px] text-ink-700";
 
 const TAB_TRIGGER =
-  "rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-[#64748b] transition-colors hover:text-[#0f172a] data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-[#0f172a] data-[state=active]:shadow-[0_1px_3px_rgba(15,23,42,0.08)]";
+  "rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-ink-500 transition-colors hover:text-ink-900 data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-ink-900 data-[state=active]:shadow-[0_1px_3px_rgba(15,23,42,0.08)]";
 
 /** Kartë e stilit "1b": bardhë, kufi #e2e8f0, radius 12px, hije e sheshtë. */
 function SectionCard({
@@ -109,15 +109,15 @@ function SectionCard({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]",
+        "overflow-hidden rounded-xl border border-line bg-white shadow-card",
         className,
       )}
     >
       {title || action ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
           <div className="min-w-0">
-            <h3 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[#0f172a]">{title}</h3>
-            {description ? <p className="mt-0.5 text-[12px] text-[#64748b]">{description}</p> : null}
+            <h3 className="text-[13.5px] font-semibold tracking-[-0.01em] text-ink-900">{title}</h3>
+            {description ? <p className="mt-0.5 text-[12px] text-ink-500">{description}</p> : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
@@ -181,8 +181,8 @@ function Row({
   className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 border-b border-[#f1f5f9] pb-2.5 last:border-0 last:pb-0">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">{label}</span>
+    <div className="flex flex-col gap-0.5 border-b border-fill pb-2.5 last:border-0 last:pb-0">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">{label}</span>
       <span className={cn("text-[13.5px] text-[#111827]", className)}>{value}</span>
     </div>
   );
@@ -198,12 +198,12 @@ function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
       flush={rows.length > 0}
     >
       {rows.length === 0 ? (
-        <p className="text-[13px] text-[#64748b]">Nuk ka ndryshime të regjistruara të pagës.</p>
+        <p className="text-[13px] text-ink-500">Nuk ka ndryshime të regjistruara të pagës.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px]">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+              <tr className="border-b border-line-soft bg-fill-faint">
                 <th className={TH}>Data efektive</th>
                 <th className={cn(TH, "text-right")}>Nga</th>
                 <th className={cn(TH, "text-right")}>Në</th>
@@ -212,19 +212,19 @@ function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]">
+                <tr key={r.id} className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint">
                   <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.effectiveFromIso)}</td>
-                  <td className={cn(TD, "text-right tabular-nums text-[#64748b]")}>
+                  <td className={cn(TD, "text-right tabular-nums text-ink-500")}>
                     {r.previousBaseSalary ? (
                       <MaskedAmount value={formatEur(r.previousBaseSalary)} />
                     ) : (
                       "—"
                     )}
                   </td>
-                  <td className={cn(TD, "text-right font-semibold tabular-nums text-[#0f172a]")}>
+                  <td className={cn(TD, "text-right font-semibold tabular-nums text-ink-900")}>
                     <MaskedAmount value={formatEur(r.newBaseSalary)} />
                   </td>
-                  <td className={cn(TD, "text-[#64748b]")}>{r.reason ?? "—"}</td>
+                  <td className={cn(TD, "text-ink-500")}>{r.reason ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -242,28 +242,28 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
       {/* Left rail */}
       <div className="grid gap-4">
         <SectionCard title="Pagat & banka">
-          <div className="mb-4 rounded-[10px] bg-[#f8fafc] px-4 py-3">
+          <div className="mb-4 rounded-[10px] bg-fill-faint px-4 py-3">
             {e.employmentType === "CONTRACTOR" ? (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Tarifa orare</p>
-                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Tarifa orare</p>
+                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-ink-900">
                   <MaskedAmount value={e.hourlyRate ? `${formatEur(e.hourlyRate)}/orë` : "—"} />
                 </p>
               </>
             ) : e.compensationBasis === "HOURLY_GROSS" ? (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto orare</p>
-                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Paga bruto orare</p>
+                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-ink-900">
                   <MaskedAmount value={e.hourlyRate ? `${formatEur(e.hourlyRate)}/orë` : "—"} />
                 </p>
-                <p className="mt-0.5 text-[11px] text-[#94a3b8]">
+                <p className="mt-0.5 text-[11px] text-ink-400">
                   ≈ <MaskedAmount value={formatEur(e.baseSalaryMonthly)} /> bruto/muaj referencë
                 </p>
               </>
             ) : (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">Paga bruto mujore</p>
-                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Paga bruto mujore</p>
+                <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-ink-900">
                   <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
                 </p>
               </>
@@ -373,7 +373,7 @@ function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
   if (rows.length === 0) {
     return (
       <SectionCard title="Kontratat" description="Regjistrimi i kontratave në sistem.">
-        <p className="text-[13px] text-[#64748b]">Nuk ka kontrata të regjistruara.</p>
+        <p className="text-[13px] text-ink-500">Nuk ka kontrata të regjistruara.</p>
       </SectionCard>
     );
   }
@@ -383,7 +383,7 @@ function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[480px]">
           <thead>
-            <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+            <tr className="border-b border-line-soft bg-fill-faint">
               <th className={TH}>Referenca</th>
               <th className={TH}>Statusi</th>
               <th className={TH}>Efektive nga</th>
@@ -391,7 +391,7 @@ function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
           </thead>
           <tbody>
             {rows.map((c) => (
-              <tr key={c.id} className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]">
+              <tr key={c.id} className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint">
                 <td className={cn(TD, "font-mono text-xs")}>{c.referenceCode ?? c.id.slice(0, 10)}</td>
                 <td className={TD}>{c.status}</td>
                 <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(c.effectiveDateIso)}</td>
@@ -450,7 +450,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
           ) : null
         }
       >
-        <p className="text-[13px] text-[#64748b]">Nuk ka dokumente për këtë punonjës.</p>
+        <p className="text-[13px] text-ink-500">Nuk ka dokumente për këtë punonjës.</p>
       </SectionCard>
     );
   }
@@ -471,7 +471,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px]">
               <thead>
-                <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <tr className="border-b border-line-soft bg-fill-faint">
                   <th className={TH}>Titulli</th>
                   <th className={TH}>Shablloni</th>
                   <th className={TH}>Data</th>
@@ -482,17 +482,17 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                 {docs.map((doc) => (
                   <tr
                     key={doc.id}
-                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                    className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                   >
                     <td className={TD}>
                       <Link
                         href={`/dokumentet/${doc.id}`}
-                        className="font-semibold text-[#0f172a] hover:text-brand-blue"
+                        className="font-semibold text-ink-900 hover:text-brand-blue"
                       >
                         {doc.title}
                       </Link>
                       {doc.isArchived ? (
-                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.05em] text-[#94a3b8]">
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.05em] text-ink-400">
                           Arkiv
                         </span>
                       ) : null}
@@ -500,7 +500,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                     <td className={TD}>
                       {doc.templateName} v{doc.templateVersionNumber}
                     </td>
-                    <td className={cn(TD, "whitespace-nowrap tabular-nums text-[#64748b]")}>{doc.createdAtLabel}</td>
+                    <td className={cn(TD, "whitespace-nowrap tabular-nums text-ink-500")}>{doc.createdAtLabel}</td>
                     <td className={cn(TD, "space-x-2 text-right")}>
                       <Button variant="secondary" size="sm" asChild>
                         <a href={`/api/dokumentet/artifacts/${doc.id}/docx`}>DOCX</a>
@@ -541,16 +541,16 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
             <Link
               key={`${item.a.id}-${idx}`}
               href={`/dokumentet/${item.a.id}`}
-              className="block rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+              className="block rounded-xl border border-line bg-white p-4 shadow-card"
             >
-              <p className="text-[13.5px] font-semibold text-[#0f172a]">{item.a.title}</p>
-              <p className="mt-1 text-xs text-[#64748b]">
+              <p className="text-[13.5px] font-semibold text-ink-900">{item.a.title}</p>
+              <p className="mt-1 text-xs text-ink-500">
                 {DOCUMENT_CATEGORY_LABELS[item.a.documentCategory]} ·{" "}
                 {item.a.kind === "PREVIEW" ? "Parapamje" : "Final"}
                 {item.a.isArchived ? " · Arkiv" : ""}
               </p>
-              <p className="mt-1 text-xs text-[#64748b]">{item.a.templateName}</p>
-              <p className="mt-2 text-[11px] tabular-nums text-[#94a3b8]">
+              <p className="mt-1 text-xs text-ink-500">{item.a.templateName}</p>
+              <p className="mt-2 text-[11px] tabular-nums text-ink-400">
                 {new Date(item.a.createdAtIso).toLocaleString("sq-AL")}
               </p>
             </Link>
@@ -558,12 +558,12 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
             <a
               key={`${item.p.id}-${idx}`}
               href={`/api/payroll-documents/${item.p.id}`}
-              className="block rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+              className="block rounded-xl border border-line bg-white p-4 shadow-card"
             >
-              <p className="text-[13.5px] font-semibold text-[#0f172a]">PDF pagë</p>
-              <p className="mt-1 text-xs text-[#64748b]">{item.p.periodLabel}</p>
-              <p className="mt-1 font-mono text-xs text-[#334155]">{item.p.filename}</p>
-              <p className="mt-2 text-[11px] tabular-nums text-[#94a3b8]">
+              <p className="text-[13.5px] font-semibold text-ink-900">PDF pagë</p>
+              <p className="mt-1 text-xs text-ink-500">{item.p.periodLabel}</p>
+              <p className="mt-1 font-mono text-xs text-ink-700">{item.p.filename}</p>
+              <p className="mt-2 text-[11px] tabular-nums text-ink-400">
                 {new Date(item.p.generatedAtIso).toLocaleString("sq-AL")}
               </p>
             </a>
@@ -580,7 +580,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px]">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+              <tr className="border-b border-line-soft bg-fill-faint">
                 <th className={TH}>Burimi</th>
                 <th className={TH}>Përshkrimi</th>
                 <th className={TH}>Data</th>
@@ -592,18 +592,18 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                 item.k === "artifact" ? (
                   <tr
                     key={`${item.a.id}-${idx}`}
-                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                    className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                   >
                     <td className={TD}>Dokumentet</td>
                     <td className={TD}>
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-[#0f172a]">{item.a.title}</span>
-                        <span className="text-xs text-[#64748b]">
+                        <span className="font-semibold text-ink-900">{item.a.title}</span>
+                        <span className="text-xs text-ink-500">
                           {DOCUMENT_CATEGORY_LABELS[item.a.documentCategory]} · {item.a.templateName}
                         </span>
                       </div>
                     </td>
-                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-[#64748b]")}>
+                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-ink-500")}>
                       {new Date(item.a.createdAtIso).toLocaleString("sq-AL")}
                     </td>
                     <td className={cn(TD, "text-right")}>
@@ -615,16 +615,16 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                 ) : (
                   <tr
                     key={`${item.p.id}-${idx}`}
-                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                    className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                   >
                     <td className={TD}>Payroll PDF</td>
                     <td className={TD}>
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-[#0f172a]">{item.p.periodLabel}</span>
-                        <span className="font-mono text-xs text-[#64748b]">{item.p.filename}</span>
+                        <span className="font-semibold text-ink-900">{item.p.periodLabel}</span>
+                        <span className="font-mono text-xs text-ink-500">{item.p.filename}</span>
                       </div>
                     </td>
-                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-[#64748b]")}>
+                    <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-ink-500")}>
                       {new Date(item.p.generatedAtIso).toLocaleString("sq-AL")}
                     </td>
                     <td className={cn(TD, "space-x-2 text-right")}>
@@ -665,7 +665,7 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
   if (balances.length === 0 && requests.length === 0) {
     return (
       <SectionCard title="Pushimet" description="Kërkesat dhe bilanci i lejeve.">
-        <p className="text-[13px] text-[#64748b]">
+        <p className="text-[13px] text-ink-500">
           Asnjë kërkesë pushimi dhe asnjë bilanc i llogaritur për këtë punonjës. Kërkesat krijohen te{" "}
           <Link href="/pushimet" className="font-medium text-brand-blue hover:underline">
             Pushimet
@@ -689,10 +689,10 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
           <ul className="space-y-2">
             {balances.map((b) => (
               <li key={b.leaveType} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px]">
-                <span className="min-w-[132px] font-semibold text-[#0f172a]">{typeLabel(b.leaveType)}</span>
-                <span className="tabular-nums text-[#475569]">{balanceLineSegments(b).join(" · ")}</span>
+                <span className="min-w-[132px] font-semibold text-ink-900">{typeLabel(b.leaveType)}</span>
+                <span className="tabular-nums text-ink-600">{balanceLineSegments(b).join(" · ")}</span>
                 {b.carryExpiresAtIso ? (
-                  <span className="text-xs text-[#94a3b8]">bartja skadon {formatSqDate(b.carryExpiresAtIso)}</span>
+                  <span className="text-xs text-ink-400">bartja skadon {formatSqDate(b.carryExpiresAtIso)}</span>
                 ) : null}
               </li>
             ))}
@@ -702,12 +702,12 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
 
       <SectionCard title="Kërkesat" description="Kronologjikisht, më e fundit sipër." flush>
         {requests.length === 0 ? (
-          <p className="px-5 py-4 text-[13px] text-[#64748b]">Asnjë kërkesë pushimi deri tani.</p>
+          <p className="px-5 py-4 text-[13px] text-ink-500">Asnjë kërkesë pushimi deri tani.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                <tr className="border-b border-line-soft bg-fill-faint">
                   <th className={TH}>Lloji</th>
                   <th className={TH}>Fillimi</th>
                   <th className={TH}>Mbarimi</th>
@@ -720,19 +720,19 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
                 {requests.map((r) => (
                   <tr
                     key={r.id}
-                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                    className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint"
                   >
                     <td className={TD}>
                       <div className="flex flex-col">
-                        <span className="font-medium text-[#0f172a]">{typeLabel(r.type)}</span>
+                        <span className="font-medium text-ink-900">{typeLabel(r.type)}</span>
                         {r.subtype !== "NONE" && subtypeLabel(r.subtype) ? (
-                          <span className="text-xs text-[#64748b]">{subtypeLabel(r.subtype)}</span>
+                          <span className="text-xs text-ink-500">{subtypeLabel(r.subtype)}</span>
                         ) : null}
                       </div>
                     </td>
                     <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.startIso)}</td>
                     <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.endIso)}</td>
-                    <td className={cn(TD, "text-right tabular-nums text-[#475569]")}>
+                    <td className={cn(TD, "text-right tabular-nums text-ink-600")}>
                       {r.days === null ? "—" : fmtDays(r.days)}
                     </td>
                     <td className={TD}>
@@ -780,7 +780,7 @@ function TimelineTab({ entries }: { entries?: EmployeeTimelineEntry[] }) {
   if (rows.length === 0) {
     return (
       <SectionCard title="Timeline" description="Ngjarjet operative dhe auditimi.">
-        <p className="text-[13px] text-[#64748b]">
+        <p className="text-[13px] text-ink-500">
           Asnjë ngjarje e regjistruar për këtë punonjës deri tani. Ngjarjet shtohen automatikisht nga
           kontratat, pushimet, pagat dhe ndryshimet e profilit.
         </p>
@@ -790,23 +790,23 @@ function TimelineTab({ entries }: { entries?: EmployeeTimelineEntry[] }) {
 
   return (
     <SectionCard title="Timeline" description="Ngjarjet operative dhe auditimi — më e fundit sipër." flush>
-      <ol className="divide-y divide-[#f1f5f9]">
+      <ol className="divide-y divide-fill">
         {rows.map((e) => (
           <li key={e.id} className="flex gap-3 px-5 py-3">
             <span
               className={cn(
                 "mt-[7px] h-2 w-2 shrink-0 rounded-full",
-                e.severity ? TIMELINE_DOT[e.severity] : "bg-[#cbd5e1]",
+                e.severity ? TIMELINE_DOT[e.severity] : "bg-ink-300",
               )}
               aria-hidden
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="text-[13px] font-semibold text-[#0f172a]">{e.title}</span>
-                <span className="text-xs tabular-nums text-[#94a3b8]">{e.occurredAtLabel}</span>
+                <span className="text-[13px] font-semibold text-ink-900">{e.title}</span>
+                <span className="text-xs tabular-nums text-ink-400">{e.occurredAtLabel}</span>
               </div>
-              {e.body ? <p className="mt-0.5 text-[12.5px] leading-snug text-[#64748b]">{e.body}</p> : null}
-              {e.actorName ? <p className="mt-0.5 text-xs text-[#94a3b8]">nga {e.actorName}</p> : null}
+              {e.body ? <p className="mt-0.5 text-[12.5px] leading-snug text-ink-500">{e.body}</p> : null}
+              {e.actorName ? <p className="mt-0.5 text-xs text-ink-400">nga {e.actorName}</p> : null}
             </div>
           </li>
         ))}
@@ -939,8 +939,8 @@ export function EmployeeProfileShell(props: {
             <div className="flex min-w-0 gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" aria-hidden />
               <div className="min-w-0 space-y-1">
-                <p className="text-sm font-semibold text-[#0f172a]">Dokumentacion i paplotë</p>
-                <p className="text-xs text-[#64748b]">
+                <p className="text-sm font-semibold text-ink-900">Dokumentacion i paplotë</p>
+                <p className="text-xs text-ink-500">
                   Ky punonjës është shënuar me dokumentacion të paplotë. Përditësoni statusin ose ngarkoni dokumentet
                   e nevojshme.
                 </p>
@@ -961,7 +961,7 @@ export function EmployeeProfileShell(props: {
         ) : null}
 
         <Tabs defaultValue="summary" className="w-full">
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-[10px] border-[#e2e8f0] bg-[#eef2f7] p-1">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-[10px] border-line bg-fill-hover p-1">
             <TabsTrigger className={TAB_TRIGGER} value="summary">
               Përmbledhje
             </TabsTrigger>

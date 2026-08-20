@@ -17,7 +17,7 @@ const DARK_PILL: Record<PayrollPeriodStatus, { chip: string; dot: string }> = {
   REVIEWED: { chip: "bg-[rgba(59,130,246,0.2)] text-[#93c5fd]", dot: "bg-[#60a5fa]" },
   APPROVED: { chip: "bg-[rgba(34,197,94,0.16)] text-[#4ade80]", dot: "bg-[#4ade80]" },
   LOCKED: { chip: "bg-white text-brand-navy", dot: "" },
-  ARCHIVED: { chip: "bg-white/10 text-[#cbd5e1]", dot: "bg-[#94a3b8]" },
+  ARCHIVED: { chip: "bg-white/10 text-ink-300", dot: "bg-ink-400" },
 };
 
 const STAGE_ORDER: PayrollPeriodStatus[] = ["DRAFT", "REVIEWED", "APPROVED", "LOCKED"];
@@ -27,8 +27,8 @@ function StatusPill({ status }: { status: PayrollPeriodStatus | null }) {
   const pill = status ? DARK_PILL[status] : null;
   if (!status || !pill) {
     return (
-      <span className="inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-2.5 text-[11.5px] font-semibold text-[#cbd5e1]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" aria-hidden />
+      <span className="inline-flex h-[23px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/10 px-2.5 text-[11.5px] font-semibold text-ink-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-ink-400" aria-hidden />
         Pa payroll
       </span>
     );
@@ -64,7 +64,7 @@ export function DashboardPayrollCollapsedBar({ payroll }: { payroll: DashboardPa
   return (
     <section
       aria-labelledby="dashboard-payroll-hero-title"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-brand-navy px-[18px] py-3 text-[#e8edf5] shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-brand-navy px-[18px] py-3 text-[#e8edf5] shadow-card"
     >
       <h2
         id="dashboard-payroll-hero-title"
@@ -123,13 +123,13 @@ export function DashboardPayrollPrompt({
   return (
     <section
       aria-labelledby="dashboard-payroll-prompt-title"
-      className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-[#e2e8f0] bg-white px-[18px] py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+      className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-line bg-white px-[18px] py-3.5 shadow-card"
     >
       <div className="min-w-0">
-        <h2 id="dashboard-payroll-prompt-title" className="text-[14.5px] font-bold text-[#0f172a]">
+        <h2 id="dashboard-payroll-prompt-title" className="text-[14.5px] font-bold text-ink-900">
           Ende s&apos;ka payroll për {payrollMonthLabel(year, month)}
         </h2>
-        <p className="text-[12.5px] text-[#64748b]">
+        <p className="text-[12.5px] text-ink-500">
           {atkDeadline
             ? atkDeadline.detail
             : "Krijoni ciklin kur të jeni gati — deri atëherë nuk ka çfarë të raportohet."}
@@ -137,7 +137,7 @@ export function DashboardPayrollPrompt({
       </div>
       <Link
         href="/pagat"
-        className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[9px] bg-brand-blue px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-[9px] bg-brand-blue px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-brand-blue-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         Krijo payroll
         <ArrowRight className="h-4 w-4" aria-hidden />
@@ -178,7 +178,7 @@ export function DashboardPayrollPanel({
   return (
     <section
       aria-labelledby="dashboard-payroll-hero-title"
-      className="rounded-2xl bg-brand-navy p-[22px] text-[#e8edf5] shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
+      className="rounded-2xl bg-brand-navy p-[22px] text-[#e8edf5] shadow-card"
     >
       <div className="mb-[18px] flex flex-wrap items-center justify-between gap-2">
         <h2
@@ -219,7 +219,7 @@ export function DashboardPayrollPanel({
         Bruto totale · {payroll.employeeCount} punonjës
       </p>
       {hasPayroll && employeesOutsideCycle > 0 ? (
-        <p className="mt-1 text-[11.5px] text-[#cbd5e1]">
+        <p className="mt-1 text-[11.5px] text-ink-300">
           {employeesOutsideCycle} pa u përfshirë në këtë cikël pagese
         </p>
       ) : null}
@@ -267,13 +267,13 @@ export function DashboardPayrollPanel({
               <p
                 className={cn(
                   "mt-1.5 truncate text-[10.5px] font-semibold",
-                  done ? "text-[#cbd5e1]" : "text-[#64748b]",
+                  done ? "text-ink-300" : "text-ink-500",
                 )}
               >
                 {PAYROLL_STATUS_LABELS_SQ[stage]}
               </p>
               {stamp ? (
-                <p className="truncate text-[10px] text-[#64748b] tabular-nums">{stamp}</p>
+                <p className="truncate text-[10px] text-ink-500 tabular-nums">{stamp}</p>
               ) : null}
             </li>
           );
@@ -288,7 +288,7 @@ export function DashboardPayrollPanel({
               ? "bg-[rgba(220,38,38,0.18)] text-[#fca5a5]"
               : atkDeadline.severity === "warning"
                 ? "bg-[rgba(245,158,11,0.16)] text-[#fbbf24]"
-                : "bg-white/[0.07] text-[#cbd5e1]",
+                : "bg-white/[0.07] text-ink-300",
           )}
         >
           <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -298,7 +298,7 @@ export function DashboardPayrollPanel({
 
       <Link
         href={hasPayroll ? `/pagat/${payroll.payrollId}` : "/pagat"}
-        className="flex h-[42px] w-full items-center justify-center rounded-[10px] bg-brand-blue text-[14px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+        className="flex h-[42px] w-full items-center justify-center rounded-[10px] bg-brand-blue text-[14px] font-semibold text-white transition-colors hover:bg-brand-blue-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         {hasPayroll ? (
           <>

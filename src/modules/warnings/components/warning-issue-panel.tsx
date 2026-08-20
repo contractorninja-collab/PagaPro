@@ -101,10 +101,10 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
 
   return (
     <section className={docCard}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
         <div>
-          <h2 className="text-[13.5px] font-bold text-[#0f172a]">Lësho vërejtje</h2>
-          <p className="mt-0.5 text-[12px] text-[#64748b]">
+          <h2 className="text-[13.5px] font-bold text-ink-900">Lësho vërejtje</h2>
+          <p className="mt-0.5 text-[12px] text-ink-500">
             Zgjidhni punonjësit, masën sipas nenit 85 dhe përshkrimin e shkeljes.
           </p>
         </div>
@@ -115,13 +115,13 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
 
       <div className="space-y-3 p-4">
         {employees.length === 0 ? (
-          <p className="text-[13px] text-[#64748b]">Nuk ka punonjës aktivë.</p>
+          <p className="text-[13px] text-ink-500">Nuk ka punonjës aktivë.</p>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative min-w-[180px] flex-1">
                 <Search
-                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
                   aria-hidden
                 />
                 <input
@@ -137,11 +137,11 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
               </button>
             </div>
 
-            <div className="max-h-56 overflow-auto rounded-[10px] border border-[#eef2f7]">
+            <div className="max-h-56 overflow-auto rounded-[10px] border border-line-soft">
               {filtered.length === 0 ? (
-                <p className="px-3 py-4 text-[13px] text-[#94a3b8]">Asnjë përputhje për kërkimin.</p>
+                <p className="px-3 py-4 text-[13px] text-ink-400">Asnjë përputhje për kërkimin.</p>
               ) : (
-                <ul className="m-0 list-none divide-y divide-[#f1f5f9] p-0">
+                <ul className="m-0 list-none divide-y divide-fill p-0">
                   {filtered.map((e) => {
                     const checked = selected.has(e.id);
                     return (
@@ -149,7 +149,7 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
                         <label
                           className={cn(
                             "flex cursor-pointer items-center gap-3 px-3 py-2.5 text-[13px] transition-colors",
-                            checked ? "bg-[#eff6ff]/60" : "hover:bg-[#f8fafc]",
+                            checked ? "bg-[#eff6ff]/60" : "hover:bg-fill-faint",
                           )}
                         >
                           <input
@@ -160,7 +160,7 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
                           />
                           <span
                             className={cn(
-                              checked ? "font-semibold text-[#0f172a]" : "font-medium text-[#334155]",
+                              checked ? "font-semibold text-ink-900" : "font-medium text-ink-700",
                             )}
                           >
                             {e.label}
@@ -173,9 +173,9 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
               )}
             </div>
 
-            <div className="grid gap-3 border-t border-[#eef2f7] pt-4 sm:grid-cols-3">
+            <div className="grid gap-3 border-t border-line-soft pt-4 sm:grid-cols-3">
               <label className="grid gap-1.5">
-                <span className="text-[12px] font-semibold text-[#64748b]">Masa</span>
+                <span className="text-[12px] font-semibold text-ink-500">Masa</span>
                 <select
                   className={docSelect}
                   value={measure}
@@ -189,7 +189,7 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
                 </select>
               </label>
               <label className="grid gap-1.5">
-                <span className="text-[12px] font-semibold text-[#64748b]">Data e konstatimit</span>
+                <span className="text-[12px] font-semibold text-ink-500">Data e konstatimit</span>
                 <input
                   type="date"
                   className={cn(docInput, "tabular-nums")}
@@ -198,7 +198,7 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
                 />
               </label>
               <label className="grid gap-1.5">
-                <span className="text-[12px] font-semibold text-[#64748b]">
+                <span className="text-[12px] font-semibold text-ink-500">
                   Afati për përmirësim{measure === "ME_SHKRIM" ? "" : " (opsional)"}
                 </span>
                 <input
@@ -211,11 +211,11 @@ export function WarningIssuePanel({ employees }: { employees: WarningEmployeeOpt
             </div>
 
             <label className="grid gap-1.5">
-              <span className="text-[12px] font-semibold text-[#64748b]">
+              <span className="text-[12px] font-semibold text-ink-500">
                 Përshkrimi i shkeljes / performancës së pakënaqshme
               </span>
               <textarea
-                className="min-h-[86px] rounded-[10px] border border-[#e2e8f0] bg-white p-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue"
+                className="min-h-[86px] rounded-[10px] border border-line bg-white p-2.5 text-[13px] text-ink-700 outline-none focus:border-brand-blue"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 placeholder="Përshkruani faktet, datën dhe rrethanat e shkeljes."

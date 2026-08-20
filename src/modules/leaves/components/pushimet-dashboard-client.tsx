@@ -76,7 +76,7 @@ const STAT_TONES: Record<SemanticTone, string> = {
   success: "bg-[#ecfdf5] text-[#15803d]",
   warning: "bg-[#fffbeb] text-[#b45309]",
   destructive: "bg-[#fef2f2] text-[#dc2626]",
-  neutral: "bg-[#f1f5f9] text-[#64748b]",
+  neutral: "bg-fill text-ink-500",
 };
 
 /**
@@ -106,7 +106,7 @@ function StatCard({
       </span>
       <div className="min-w-0">
         <p className={`truncate ${MICRO_LABEL}`}>{label}</p>
-        <p className="mt-0.5 text-[24px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
+        <p className="mt-0.5 text-[24px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-ink-900">
           {value}
         </p>
       </div>
@@ -119,7 +119,7 @@ function StatCard({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3.5 p-4 transition-colors hover:bg-[#f8fafc] ${LEAVE_CARD}`}
+      className={`flex items-center gap-3.5 p-4 transition-colors hover:bg-fill-faint ${LEAVE_CARD}`}
     >
       {body}
     </Link>
@@ -486,7 +486,7 @@ export function PushimetDashboardClient(props: {
             href={statusHref("DRAFT", false)}
           />
         </div>
-        <p className="text-[11.5px] text-[#94a3b8]">
+        <p className="text-[11.5px] text-ink-400">
           Shifrat janë për gjithë kompaninë dhe nuk ndikohen nga filtrat më poshtë. Klikoni një kuti
           për ta filtruar listën.
         </p>
@@ -504,10 +504,10 @@ export function PushimetDashboardClient(props: {
             <AlertTriangle className="h-4 w-4 text-[#b45309]" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-bold text-[#0f172a]">
+            <p className="text-[13.5px] font-bold text-ink-900">
               {props.health.payrollSyncSkips} ndryshime pushimi nuk arritën te payroll-i
             </p>
-            <p className="text-[12.5px] text-[#64748b]">
+            <p className="text-[12.5px] text-ink-500">
               Orët e pushimit në ato payroll-e janë të vjetruara.
             </p>
           </div>
@@ -525,16 +525,16 @@ export function PushimetDashboardClient(props: {
         <div
           className={`flex items-center gap-3.5 border-l-[3px] border-l-[#94a3b8] px-4 py-3 ${LEAVE_CARD}`}
         >
-          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[#f1f5f9]">
-            <Info className="h-4 w-4 text-[#64748b]" aria-hidden />
+          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-fill">
+            <Info className="h-4 w-4 text-ink-500" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-bold text-[#0f172a]">
+            <p className="text-[13.5px] font-bold text-ink-900">
               {props.health.lastAccrual
                 ? `Akumulimi mujor u postua së fundi për ${String(props.health.lastAccrual.month).padStart(2, "0")}/${props.health.lastAccrual.year}`
                 : "Akumulimi mujor nuk është postuar asnjëherë"}
             </p>
-            <p className="text-[12.5px] text-[#64748b]">Postimi bëhet manualisht te Konfigurimet.</p>
+            <p className="text-[12.5px] text-ink-500">Postimi bëhet manualisht te Konfigurimet.</p>
           </div>
           <Link href="/konfigurime" className={BTN_SECONDARY_DENSE}>
             Hap Konfigurimet →
@@ -549,16 +549,16 @@ export function PushimetDashboardClient(props: {
             <SheetTitle>Ndryshime që nuk arritën te payroll-i</SheetTitle>
           </SheetHeader>
           {props.payrollSyncSkips.length === 0 ? (
-            <p className="px-1 py-6 text-[13px] text-[#64748b]">
+            <p className="px-1 py-6 text-[13px] text-ink-500">
               Asgjë për të shfaqur në 60 ditët e fundit.
             </p>
           ) : (
-            <ul className="mt-2 divide-y divide-[#f1f5f9] overflow-y-auto">
+            <ul className="mt-2 divide-y divide-fill overflow-y-auto">
               {props.payrollSyncSkips.map((s) => (
                 <li key={s.id} className="py-3">
-                  <p className="text-[13px] font-semibold text-[#0f172a]">{s.employeeName}</p>
-                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#64748b]">{s.reason}</p>
-                  <p className="mt-1 text-[11.5px] tabular-nums text-[#94a3b8]">
+                  <p className="text-[13px] font-semibold text-ink-900">{s.employeeName}</p>
+                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-500">{s.reason}</p>
+                  <p className="mt-1 text-[11.5px] tabular-nums text-ink-400">
                     {formatSqDate(s.occurredAtIso)}
                   </p>
                 </li>
@@ -573,21 +573,21 @@ export function PushimetDashboardClient(props: {
         <div className="min-w-0 space-y-6">
           {props.pendingRows.length > 0 ? (
             <div className={`overflow-hidden ${LEAVE_CARD}`}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4">
                 <div className="min-w-0">
-                  <h2 className="flex items-center gap-2 text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+                  <h2 className="flex items-center gap-2 text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
                     Presin miratim
                     <TonePill tone="warning" size="sm">
                       {props.pendingRows.length}
                     </TonePill>
                   </h2>
-                  <p className="mt-0.5 text-[12px] text-[#64748b]">
+                  <p className="mt-0.5 text-[12px] text-ink-500">
                     Reflektohet menjëherë në payroll pas miratimit.
                   </p>
                 </div>
                 {props.pendingRows.length > 1 && canWriteLeave ? (
                   <div className="flex shrink-0 items-center gap-3">
-                    <label className="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-[#64748b]">
+                    <label className="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-ink-500">
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-[#2563EB]"
@@ -617,7 +617,7 @@ export function PushimetDashboardClient(props: {
                   </div>
                 ) : null}
               </div>
-              <ul className="divide-y divide-[#f1f5f9]">
+              <ul className="divide-y divide-fill">
                 {props.pendingRows.map((row) => {
                   const flags = conflictFlags(row);
                   const d = props.queueDecisions[row.id];
@@ -631,7 +631,7 @@ export function PushimetDashboardClient(props: {
                   return (
                     <li
                       key={row.id}
-                      className={`flex flex-col gap-3 border-l-[3px] px-5 py-3.5 transition-colors hover:bg-[#f8fafc] sm:flex-row sm:items-center ${rail}`}
+                      className={`flex flex-col gap-3 border-l-[3px] px-5 py-3.5 transition-colors hover:bg-fill-faint sm:flex-row sm:items-center ${rail}`}
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         {props.pendingRows.length > 1 && canWriteLeave ? (
@@ -648,13 +648,13 @@ export function PushimetDashboardClient(props: {
                           <div className="flex flex-wrap items-center gap-2">
                             <Link
                               href={`/pushimet/${row.id}`}
-                              className="truncate text-[13.5px] font-semibold text-[#0f172a] transition-colors hover:text-brand-blue"
+                              className="truncate text-[13.5px] font-semibold text-ink-900 transition-colors hover:text-brand-blue"
                             >
                               {row.employeeName}
                             </Link>
                             <LeaveTypePill type={row.type} label={LEAVE_TYPE_LABELS_SQ[row.type]} />
                           </div>
-                          <p className="mt-0.5 text-[12px] tabular-nums text-[#64748b]">
+                          <p className="mt-0.5 text-[12px] tabular-nums text-ink-500">
                             {formatSqDate(row.startDateIso)} → {formatSqDate(row.endDateIso)}
                             {row.workingDays ?? row.totalDays
                               ? ` · ${row.workingDays ?? row.totalDays} ditë`
@@ -725,7 +725,7 @@ export function PushimetDashboardClient(props: {
                         {/* One label for "open this request", everywhere. */}
                         <Link
                           href={`/pushimet/${row.id}`}
-                          className="text-[12.5px] font-semibold text-[#64748b] transition-colors hover:text-brand-blue"
+                          className="text-[12.5px] font-semibold text-ink-500 transition-colors hover:text-brand-blue"
                         >
                           Shiko detajet
                         </Link>
@@ -739,11 +739,11 @@ export function PushimetDashboardClient(props: {
 
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
                 {props.pendingRows.length > 0 ? "Të vendosura" : "Kërkesat"}
               </h2>
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-[12px] text-[#94a3b8]">
+                <p className="text-[12px] text-ink-400">
                   {props.page.total} kërkesa · filtrimi aplikon edhe për kalendarin
                 </p>
                 <a href={exportHref} className={BTN_SECONDARY_DENSE} download>
@@ -773,7 +773,7 @@ export function PushimetDashboardClient(props: {
 
             {props.page.pageCount > 1 ? (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[12px] text-[#94a3b8]">
+                <p className="text-[12px] text-ink-400">
                   Faqja {props.page.page} nga {props.page.pageCount}
                 </p>
                 <div className="flex items-center gap-2">
@@ -819,8 +819,8 @@ export function PushimetDashboardClient(props: {
             the page below this section. */}
         <div className="min-w-0 space-y-6">
           <div className={`overflow-hidden ${LEAVE_CARD}`}>
-            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
-              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">Sot në pushim</h2>
+            <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
+              <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">Sot në pushim</h2>
               {todayOff.length > 0 ? (
                 <TonePill tone="info" size="sm">
                   {todayOff.length}
@@ -828,25 +828,25 @@ export function PushimetDashboardClient(props: {
               ) : null}
             </div>
             {todayOff.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-[#64748b]">
+              <p className="px-4 py-6 text-center text-[13px] text-ink-500">
                 Askush nuk është në pushim sot.
               </p>
             ) : (
-              <ul className="divide-y divide-[#f1f5f9]">
+              <ul className="divide-y divide-fill">
                 {todayOff.map((c) => {
                   const tone = LEAVE_TYPE_TONES[c.type];
                   return (
                     <li key={c.id}>
                       <Link
                         href={`/pushimet/${c.id}`}
-                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-fill-faint"
                       >
                         <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-semibold text-[#0f172a]">
+                          <span className="block truncate text-[13px] font-semibold text-ink-900">
                             {c.employeeName}
                           </span>
-                          <span className="block truncate text-[11.5px] text-[#64748b]">
+                          <span className="block truncate text-[11.5px] text-ink-500">
                             {LEAVE_TYPE_LABELS_SQ[c.type]} · deri më {formatSqDate(c.endDateIso)}
                           </span>
                         </span>
@@ -944,13 +944,13 @@ export function PushimetDashboardClient(props: {
                   );
                 })}
               </ul>
-              <p className="text-[12px] text-[#64748b]">
+              <p className="text-[12px] text-ink-500">
                 Kërkesat e dështuara mbeten të zgjedhura në listë — trajtojini një nga një.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-[#334155]">
+              <p className="text-sm text-ink-700">
                 Çdo kërkesë miratohet veç e veç, në radhë — bilanci dhe mbivendosjet validohen për
                 secilën. Nëse ndonjëra bllokohet, të tjerat vazhdojnë.
               </p>
@@ -959,9 +959,9 @@ export function PushimetDashboardClient(props: {
                   const d = props.queueDecisions[row.id];
                   return (
                     <li key={row.id} className="flex items-center justify-between gap-2 text-[12.5px]">
-                      <span className="min-w-0 truncate font-medium text-[#0f172a]">
+                      <span className="min-w-0 truncate font-medium text-ink-900">
                         {row.employeeName}
-                        <span className="text-[#94a3b8]">
+                        <span className="text-ink-400">
                           {" "}
                           · {formatSqDate(row.startDateIso)} → {formatSqDate(row.endDateIso)}
                         </span>

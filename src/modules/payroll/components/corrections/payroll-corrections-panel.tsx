@@ -30,7 +30,7 @@ const KIND_LABELS: Record<PayrollCorrectionKind, string> = {
 };
 
 const SELECT =
-  "h-10 w-full rounded-md border border-[#e2e8f0] bg-white px-3 text-sm text-[#334155] focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30";
+  "h-10 w-full rounded-md border border-line bg-white px-3 text-sm text-ink-700 focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30";
 
 /** A correction can add or take away; the sign has to be unmissable. */
 function signedAmount(raw: string): { text: string; negative: boolean } {
@@ -111,17 +111,17 @@ export function PayrollCorrectionsPanel(props: {
         </div>
 
         {props.corrections.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-[#64748b]">
+          <p className="px-5 py-8 text-center text-sm text-ink-500">
             Nuk ka korrigjime për këtë payroll.
           </p>
         ) : (
-          <ul className="divide-y divide-[#f1f5f9]">
+          <ul className="divide-y divide-fill">
             {props.corrections.map((c) => {
               const amt = signedAmount(c.amount);
               return (
                 <li key={c.id} className="px-5 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-[#0f172a]">{c.employeeName}</span>
+                    <span className="text-[13px] font-semibold text-ink-900">{c.employeeName}</span>
                     <span
                       className={cn(
                         "text-[13px] font-bold [font-variant-numeric:tabular-nums]",
@@ -131,13 +131,13 @@ export function PayrollCorrectionsPanel(props: {
                       {amt.text}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-[#94a3b8]">
+                  <p className="mt-0.5 text-xs text-ink-400">
                     {KIND_LABELS[c.kind as PayrollCorrectionKind] ?? c.kind} · {c.personalId} ·{" "}
                     <span className="[font-variant-numeric:tabular-nums]">
                       {new Date(c.createdAt).toLocaleString("sq-XK")}
                     </span>
                   </p>
-                  {c.reason ? <p className="mt-1 text-[13px] text-[#475569]">{c.reason}</p> : null}
+                  {c.reason ? <p className="mt-1 text-[13px] text-ink-600">{c.reason}</p> : null}
                 </li>
               );
             })}

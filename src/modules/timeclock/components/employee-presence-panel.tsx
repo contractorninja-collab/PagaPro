@@ -6,7 +6,7 @@ import { getEmployeePresenceMonthAction } from "@/modules/timeclock/actions/time
 import type { PresenceEmployeeDto } from "@/modules/timeclock/services/timeclock-presence-service";
 
 const NAV_BTN =
-  "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#334155] transition-colors hover:bg-[#eef2f7]";
+  "inline-flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-white text-ink-700 transition-colors hover:bg-fill-hover";
 
 const h = (minutes: number): string => (minutes / 60).toFixed(1).replace(/\.0$/, "");
 const hhmm = (iso: string | null): string => (iso ? iso.slice(11, 16) : "—");
@@ -56,13 +56,13 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
   });
 
   return (
-    <div className="rounded-xl border border-[#e2e8f0] bg-white shadow-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-4 py-3">
+    <div className="rounded-xl border border-line bg-white shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-4 py-3">
         <div className="flex items-center gap-2">
           <button type="button" aria-label="Muaji paraprak" className={NAV_BTN} onClick={() => step(-1)}>
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
-          <h3 className="min-w-[120px] text-center text-[13px] font-bold capitalize text-[#0f172a]">
+          <h3 className="min-w-[120px] text-center text-[13px] font-bold capitalize text-ink-900">
             {monthLabel}
           </h3>
           <button type="button" aria-label="Muaji tjetër" className={NAV_BTN} onClick={() => step(1)}>
@@ -70,7 +70,7 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
           </button>
         </div>
         {data ? (
-          <p className="text-[12px] tabular-nums text-[#64748b]">
+          <p className="text-[12px] tabular-nums text-ink-500">
             {h(data.totals.workedMinutes)} orë të punuara
             {data.totals.overtimeMinutes > 0 ? ` · ${h(data.totals.overtimeMinutes)} shtesë` : ""}
             {data.totals.reviewDays > 0 ? ` · ${data.totals.reviewDays} për rishikim` : ""}
@@ -79,7 +79,7 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
       </div>
 
       {data && data.flags.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 border-b border-[#eef2f7] px-4 py-2.5">
+        <div className="flex flex-wrap gap-1.5 border-b border-line-soft px-4 py-2.5">
           {data.flags.map((f, i) => (
             <span
               key={i}
@@ -95,18 +95,18 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
       ) : null}
 
       {loading ? (
-        <p className="px-4 py-8 text-center text-[13px] text-[#64748b]">Duke ngarkuar…</p>
+        <p className="px-4 py-8 text-center text-[13px] text-ink-500">Duke ngarkuar…</p>
       ) : error ? (
         <p className="px-4 py-8 text-center text-[13px] text-[#dc2626]">{error}</p>
       ) : !data || data.days.length === 0 ? (
-        <p className="px-4 py-8 text-center text-[13px] text-[#64748b]">
+        <p className="px-4 py-8 text-center text-[13px] text-ink-500">
           Asnjë skanim për këtë muaj.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-[12.5px]">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+              <tr className="border-b border-line-soft bg-fill-faint text-left text-[10.5px] font-bold uppercase tracking-[0.04em] text-ink-400">
                 <th className="px-4 py-2">Data</th>
                 <th className="px-2 py-2">Hyrja</th>
                 <th className="px-2 py-2">Dalja</th>
@@ -119,7 +119,7 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
             <tbody>
               {data.days.map((d) => (
                 <tr key={d.workDateIso} className="border-b border-[#f6f8fb] last:border-0">
-                  <td className="px-4 py-2 tabular-nums font-medium text-[#0f172a]">
+                  <td className="px-4 py-2 tabular-nums font-medium text-ink-900">
                     {d.workDateIso.split("-").reverse().join(".")}
                   </td>
                   <td className="px-2 py-2 tabular-nums">{hhmm(d.firstInAtIso)}</td>

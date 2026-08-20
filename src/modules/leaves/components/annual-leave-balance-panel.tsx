@@ -47,7 +47,7 @@ export function AnnualLeaveBalancePanel({
 
   if (annual.length === 0) {
     return (
-      <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-8 text-center text-[13px] text-[#64748b]">
+      <div className="rounded-xl border border-line bg-white px-4 py-8 text-center text-[13px] text-ink-500">
         <p>
           Nuk ka balanca të pushimit vjetor për vitin {year} — do të popullohet kur regjistrohen
           punonjës dhe pushime.
@@ -59,19 +59,19 @@ export function AnnualLeaveBalancePanel({
 
   return (
     <div className={`overflow-hidden ${LEAVE_CARD}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#eef2f7] px-4 py-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line-soft px-4 py-3.5">
         <div className="min-w-0">
-          <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-[#0f172a]">
+          <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
             Pushimi vjetor — bilanci {year}
           </h2>
-          <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#94a3b8]">
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-ink-400">
             {companyTotals.employees} punonjës · shfaqen ata që kërkojnë vendim
           </p>
         </div>
         {action}
       </div>
 
-      <div className="grid grid-cols-2 gap-px border-b border-[#eef2f7] bg-[#eef2f7] lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border-b border-line-soft bg-fill-hover lg:grid-cols-4">
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Disponueshme tani</p>
           <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#15803d]">
@@ -80,13 +80,13 @@ export function AnnualLeaveBalancePanel({
         </div>
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Përdorur {year}</p>
-          <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
+          <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-ink-900">
             {fmtDays(companyTotals.usedDays)}
           </p>
         </div>
         <div className="bg-white px-4 py-3">
           <p className={MICRO_LABEL}>Në pritje</p>
-          <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
+          <p className="mt-0.5 text-[20px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-ink-900">
             {fmtDays(companyTotals.pendingDays)}
           </p>
         </div>
@@ -107,7 +107,7 @@ export function AnnualLeaveBalancePanel({
         </div>
       </div>
 
-      <div className="border-b border-[#eef2f7] pt-2">
+      <div className="border-b border-line-soft pt-2">
         <LeaveBalanceList
           rows={annual}
           attention={attention}
@@ -118,34 +118,34 @@ export function AnnualLeaveBalancePanel({
       {/* The company position. Read from the database rather than added up from
           the rows above, which are capped — a company past the ceiling would
           otherwise see a total that silently excluded everyone off the end. */}
-      <div className="border-t-2 border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+      <div className="border-t-2 border-line bg-fill-faint px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#334155]">
+          <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-ink-700">
             Totali · {companyTotals.employees} punonjës
           </p>
           <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12px] tabular-nums">
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Kuota</dt>
-              <dd className="font-semibold text-[#0f172a]">{companyTotals.yearlyQuota}</dd>
+              <dt className="text-ink-400">Kuota</dt>
+              <dd className="font-semibold text-ink-900">{companyTotals.yearlyQuota}</dd>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Bartur</dt>
-              <dd className="font-semibold text-[#0f172a]">{companyTotals.carryOverDays}</dd>
+              <dt className="text-ink-400">Bartur</dt>
+              <dd className="font-semibold text-ink-900">{companyTotals.carryOverDays}</dd>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Akumuluar</dt>
-              <dd className="font-semibold text-[#0f172a]">{companyTotals.accruedYtd}</dd>
+              <dt className="text-ink-400">Akumuluar</dt>
+              <dd className="font-semibold text-ink-900">{companyTotals.accruedYtd}</dd>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Përdorur</dt>
-              <dd className="font-semibold text-[#0f172a]">{companyTotals.usedDays}</dd>
+              <dt className="text-ink-400">Përdorur</dt>
+              <dd className="font-semibold text-ink-900">{companyTotals.usedDays}</dd>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Në pritje</dt>
-              <dd className="font-semibold text-[#0f172a]">{companyTotals.pendingDays}</dd>
+              <dt className="text-ink-400">Në pritje</dt>
+              <dd className="font-semibold text-ink-900">{companyTotals.pendingDays}</dd>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <dt className="text-[#94a3b8]">Disponueshme</dt>
+              <dt className="text-ink-400">Disponueshme</dt>
               <dd className="text-[14px] font-extrabold text-[#15803d]">{companyTotals.remainingDays}</dd>
             </div>
           </dl>
@@ -165,13 +165,13 @@ export function AnnualLeaveBalancePanel({
             an incomplete list matters most when somebody is looking for one
             person and not finding them. */}
         {companyTotals.employees > annual.length ? (
-          <p className="mt-2 text-[11.5px] text-[#94a3b8]">
+          <p className="mt-2 text-[11.5px] text-ink-400">
             Po shfaqen {annual.length} nga {companyTotals.employees} punonjës — kërkimi mbulon vetëm këta.
           </p>
         ) : null}
       </div>
 
-      <p className="border-t border-[#eef2f7] bg-[#f8fafc] px-4 py-3 text-[11px] leading-relaxed text-[#94a3b8]">
+      <p className="border-t border-line-soft bg-fill-faint px-4 py-3 text-[11px] leading-relaxed text-ink-400">
         &quot;Disponueshme tani&quot; = ditët e akumuluara deri sot minus të përdorurat (plus ditët e bartura,
         nëse aktive). &quot;Fund viti&quot; është projeksioni deri më 31 dhjetor. Festat zyrtare dhe pushimi
         mjekësor gjatë pushimit vjetor nuk zbriten (Art 34).

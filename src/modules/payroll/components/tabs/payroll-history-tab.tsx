@@ -35,7 +35,7 @@ const TONE_STYLES: Record<PayrollTimelineTone, { dot: string; icon: typeof Circl
   status: { dot: "border-[#86efac] bg-[#dcfce7] text-[#166534]", icon: CheckCircle2 },
   document: { dot: "border-[#bfdbfe] bg-[#dbeafe] text-[#1e40af]", icon: FileText },
   atk: { dot: "border-[#fde68a] bg-[#fef3c7] text-[#92400e]", icon: Sheet },
-  neutral: { dot: "border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b]", icon: Circle },
+  neutral: { dot: "border-line bg-fill text-ink-500", icon: Circle },
 };
 
 /** "Sot" / "Dje" / a date — a wall of identical timestamps is unreadable. */
@@ -115,8 +115,8 @@ export function PayrollHistoryTab(props: {
               className={cn(
                 "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
                 filter === c.key
-                  ? "bg-[#0f172a] text-white"
-                  : "bg-[#f1f5f9] text-[#64748b] hover:bg-[#e2e8f0]",
+                  ? "bg-ink-900 text-white"
+                  : "bg-fill text-ink-500 hover:bg-line",
               )}
             >
               {c.label} {c.count}
@@ -126,15 +126,15 @@ export function PayrollHistoryTab(props: {
       </div>
 
       {visible.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-[#64748b]">Nuk ka ngjarje ende.</p>
+        <p className="px-5 py-8 text-center text-sm text-ink-500">Nuk ka ngjarje ende.</p>
       ) : (
         <div className="px-5 py-4">
           {groups.map((g) => (
             <div key={g.heading} className="mb-4 last:mb-0">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                 {g.heading}
               </p>
-              <ul className="relative space-y-3 border-l border-[#e2e8f0] pl-5">
+              <ul className="relative space-y-3 border-l border-line pl-5">
                 {g.rows.map((item) => {
                   const tone = TONE_STYLES[item.tone];
                   const Icon = tone.icon;
@@ -150,18 +150,18 @@ export function PayrollHistoryTab(props: {
                         <Icon className="h-2.5 w-2.5" />
                       </span>
                       <div className="flex flex-wrap items-baseline gap-x-2">
-                        <span className="text-[13px] font-semibold text-[#0f172a]">{item.label}</span>
+                        <span className="text-[13px] font-semibold text-ink-900">{item.label}</span>
                         {item.source === "audit" ? (
-                          <span className="rounded bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                          <span className="rounded bg-fill px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
                             Audit
                           </span>
                         ) : null}
-                        <span className="text-xs text-[#94a3b8] [font-variant-numeric:tabular-nums]">
+                        <span className="text-xs text-ink-400 [font-variant-numeric:tabular-nums]">
                           {timeOnly(item.at)}
                         </span>
                       </div>
                       {item.detail ? (
-                        <p className="mt-0.5 text-[13px] leading-relaxed text-[#475569]">{item.detail}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-ink-600">{item.detail}</p>
                       ) : null}
                     </li>
                   );
@@ -171,7 +171,7 @@ export function PayrollHistoryTab(props: {
           ))}
 
           {capped ? (
-            <p className="border-t border-[#f1f5f9] pt-3 text-xs text-[#94a3b8]">
+            <p className="border-t border-fill pt-3 text-xs text-ink-400">
               Shfaqen {SERVER_CAP} ngjarjet e fundit.
             </p>
           ) : null}

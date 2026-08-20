@@ -29,18 +29,18 @@ const MovementChart = dynamic(
 );
 
 const EMPTY_CARD =
-  "rounded-xl border border-[#e2e8f0] bg-white px-4 py-10 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+  "rounded-xl border border-line bg-white px-4 py-10 text-center shadow-card";
 
 function MiniList({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
   if (rows.length === 0) return null;
   return (
     <div>
-      <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{title}</h4>
+      <h4 className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">{title}</h4>
       <dl className="mt-2 space-y-1.5">
         {rows.map((r) => (
           <div key={r.label} className="flex items-baseline justify-between gap-3">
-            <dt className="truncate text-[12.5px] text-[#334155]">{r.label}</dt>
-            <dd className="text-[13px] font-semibold tabular-nums text-[#0f172a]">{r.count}</dd>
+            <dt className="truncate text-[12.5px] text-ink-700">{r.label}</dt>
+            <dd className="text-[13px] font-semibold tabular-nums text-ink-900">{r.count}</dd>
           </div>
         ))}
       </dl>
@@ -78,7 +78,7 @@ export function DashboardEmployeeDistribution({
 
   return (
     <section className="space-y-4">
-      <h3 className="text-[15px] font-bold text-[#0f172a]">Fuqia punëtore</h3>
+      <h3 className="text-[15px] font-bold text-ink-900">Fuqia punëtore</h3>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {departmentData.length > 0 ? (
@@ -90,7 +90,7 @@ export function DashboardEmployeeDistribution({
           </ChartFrame>
         ) : (
           <div className={EMPTY_CARD}>
-            <p className="text-[13px] text-[#64748b]">Ende asnjë punonjës i regjistruar.</p>
+            <p className="text-[13px] text-ink-500">Ende asnjë punonjës i regjistruar.</p>
           </div>
         )}
 
@@ -103,14 +103,14 @@ export function DashboardEmployeeDistribution({
           </ChartFrame>
         ) : (
           <div className={EMPTY_CARD}>
-            <p className="text-[13px] text-[#64748b]">
+            <p className="text-[13px] text-ink-500">
               Pa punësime apo largime të regjistruara në {year}.
             </p>
           </div>
         )}
       </div>
 
-      <div className="grid gap-x-8 gap-y-4 rounded-xl border border-[#e2e8f0] bg-white px-[18px] py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)] sm:grid-cols-2">
+      <div className="grid gap-x-8 gap-y-4 rounded-xl border border-line bg-white px-[18px] py-4 shadow-card sm:grid-cols-2">
         <MiniList title="Sipas statusit" rows={statusRows} />
         <MiniList title="Sipas llojit të punësimit" rows={typeRows} />
       </div>

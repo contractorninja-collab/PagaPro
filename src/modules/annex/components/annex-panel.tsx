@@ -16,11 +16,11 @@ import {
 import type { AnnexPanelData } from "@/modules/annex/services/annex-service";
 import { AnnexDialog } from "./annex-dialog";
 
-const CARD = "rounded-[12px] border border-[#e2e8f0] bg-white p-4";
+const CARD = "rounded-[12px] border border-line bg-white p-4";
 const BTN_PRIMARY = buttonVariants({ size: "default" });
 const BTN_DENSE = buttonVariants({ variant: "secondary", size: "sm" });
 const FIELD =
-  "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue";
+  "h-9 rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none focus:border-brand-blue";
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
@@ -146,8 +146,8 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
       <div className={CARD}>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h3 className="text-[14px] font-bold text-[#0f172a]">Anekset e kontratës</h3>
-            <p className="text-[12.5px] text-[#64748b]">
+            <h3 className="text-[14px] font-bold text-ink-900">Anekset e kontratës</h3>
+            <p className="text-[12.5px] text-ink-500">
               Ndryshimet e kontratës sipas Ligjit Nr. 03/L-212 (Neni 10, 11, 17-19).
             </p>
           </div>
@@ -160,19 +160,19 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
         </div>
 
         {data.annexes.length === 0 ? (
-          <p className="text-[13px] text-[#64748b]">Nuk ka anekse të lëshuara.</p>
+          <p className="text-[13px] text-ink-500">Nuk ka anekse të lëshuara.</p>
         ) : (
-          <ul className="divide-y divide-[#f1f5f9]">
+          <ul className="divide-y divide-fill">
             {data.annexes.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-[#0f172a]">
+                  <p className="text-[13px] font-semibold text-ink-900">
                     Aneks nr. {a.annexNumber}
-                    <span className="ml-2 font-normal text-[#94a3b8]">
+                    <span className="ml-2 font-normal text-ink-400">
                       efektiv nga {fmt(a.effectiveDate)}
                     </span>
                   </p>
-                  <p className="truncate text-[12px] text-[#64748b]">
+                  <p className="truncate text-[12px] text-ink-500">
                     {a.changeCategories
                       .map((c) => ANNEX_CATEGORY_LABELS[c as AnnexChangeCategory] ?? c)
                       .join(", ")}
@@ -242,7 +242,7 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
                       <>
                         <button
                           type="button"
-                          className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-brand-blue")}
+                          className={cn(BTN_DENSE, "px-2 text-ink-400 hover:text-brand-blue")}
                           aria-label="Ndrysho datën e hyrjes në fuqi"
                           onClick={() => startEditDate(a.id, a.effectiveDate)}
                         >
@@ -250,7 +250,7 @@ export function AnnexPanel(props: { employeeId: string; canEdit: boolean }) {
                         </button>
                         <button
                           type="button"
-                          className={cn(BTN_DENSE, "px-2 text-[#94a3b8] hover:text-destructive")}
+                          className={cn(BTN_DENSE, "px-2 text-ink-400 hover:text-destructive")}
                           aria-label="Fshij aneksin"
                           onClick={() => setConfirmDeleteId(a.id)}
                         >
@@ -310,7 +310,7 @@ function ContractTermCard(props: {
   return (
     <div className={CARD}>
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold text-[#0f172a]">Të dhënat e kontratës</h3>
+        <h3 className="text-[14px] font-bold text-ink-900">Të dhënat e kontratës</h3>
         {canEdit && !editing ? (
           <button type="button" className={BTN_DENSE} onClick={() => setEditing(true)}>
             Ndrysho afatin
@@ -321,7 +321,7 @@ function ContractTermCard(props: {
       {editing ? (
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Lloji</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Lloji</span>
             <select className={FIELD} value={type} onChange={(e) => setType(e.target.value as ContractTermType)}>
               {(["INDEFINITE", "FIXED_TERM", "SPECIFIC_TASK"] as ContractTermType[]).map((t) => (
                 <option key={t} value={t}>
@@ -332,7 +332,7 @@ function ContractTermCard(props: {
           </label>
           {type !== "INDEFINITE" ? (
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
+              <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                 Data e skadimit
               </span>
               <input type="date" className={FIELD} value={end} onChange={(e) => setEnd(e.target.value)} />
@@ -359,8 +359,8 @@ function ContractTermCard(props: {
 function Term({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{label}</dt>
-      <dd className="mt-0.5 tabular-nums text-[#334155]">{value}</dd>
+      <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">{label}</dt>
+      <dd className="mt-0.5 tabular-nums text-ink-700">{value}</dd>
     </div>
   );
 }

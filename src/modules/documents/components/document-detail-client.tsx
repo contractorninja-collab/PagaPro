@@ -210,28 +210,28 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
       <div className="space-y-5 pb-24 md:pb-8">
         <div className={cn(docCard, "flex flex-wrap gap-x-8 gap-y-3 px-4 py-3.5")}>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Shablloni</p>
-            <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Shablloni</p>
+            <p className="mt-0.5 text-[13px] font-semibold text-ink-900">
               {artifact.templateName}{" "}
-              <span className="font-medium text-[#64748b]">v{artifact.templateVersion}</span>
+              <span className="font-medium text-ink-500">v{artifact.templateVersion}</span>
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Gjeneruar</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Gjeneruar</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-ink-900">
               {artifact.createdAtLabel}
             </p>
           </div>
           {artifact.employeeLabel ? (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Punonjësi</p>
-              <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">{artifact.employeeLabel}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Punonjësi</p>
+              <p className="mt-0.5 text-[13px] font-semibold text-ink-900">{artifact.employeeLabel}</p>
             </div>
           ) : null}
           {artifact.payrollLabel ? (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Pasqyra</p>
-              <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">Pasqyra</p>
+              <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-ink-900">
                 {artifact.payrollLabel}
               </p>
             </div>
@@ -265,15 +265,15 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
       ) : null}
 
       <div className={docCard}>
-        <div className="border-b border-[#eef2f7] px-4 py-3">
-          <h2 className="text-[13.5px] font-bold text-[#0f172a]">Snapshot i placeholderëve</h2>
-          <p className="mt-0.5 text-[12px] text-[#94a3b8]">Të dhënat e përça për dokumentin (readonly).</p>
+        <div className="border-b border-line-soft px-4 py-3">
+          <h2 className="text-[13.5px] font-bold text-ink-900">Snapshot i placeholderëve</h2>
+          <p className="mt-0.5 text-[12px] text-ink-400">Të dhënat e përça për dokumentin (readonly).</p>
         </div>
         <div className="p-4">
           <dl className="grid gap-x-8 gap-y-2.5 md:grid-cols-2">
             {Object.entries(artifact.mergedPayload).map(([k, v]) => (
-              <div key={k} className="border-b border-[#f1f5f9] pb-2.5">
-                <dt className="font-mono text-[11px] text-[#94a3b8]">{k}</dt>
+              <div key={k} className="border-b border-fill pb-2.5">
+                <dt className="font-mono text-[11px] text-ink-400">{k}</dt>
                 <dd className="m-0 mt-0.5 break-words text-[13px] font-medium text-[#111827]">
                   {v || "—"}
                 </dd>

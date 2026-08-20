@@ -16,11 +16,11 @@ import {
   type WarningRow,
 } from "@/modules/warnings/types";
 
-const CARD = "rounded-[12px] border border-[#e2e8f0] bg-white p-4";
+const CARD = "rounded-[12px] border border-line bg-white p-4";
 const BTN_PRIMARY = buttonVariants({ size: "default" });
 const BTN_DENSE = buttonVariants({ variant: "secondary", size: "sm" });
 const FIELD =
-  "h-9 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue";
+  "h-9 w-full rounded-[8px] border border-line bg-white px-2.5 text-[13px] text-ink-700 outline-none focus:border-brand-blue";
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
@@ -109,8 +109,8 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
     <section className={CARD}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-[14px] font-bold text-[#0f172a]">Vërejtjet disiplinore</h3>
-          <p className="mt-0.5 text-[12.5px] text-[#64748b]">
+          <h3 className="text-[14px] font-bold text-ink-900">Vërejtjet disiplinore</h3>
+          <p className="mt-0.5 text-[12.5px] text-ink-500">
             Masat sipas nenit 85 të Ligjit të Punës. Dokumenti printohet nga shablloni përkatës.
           </p>
         </div>
@@ -123,10 +123,10 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
       </div>
 
       {formOpen ? (
-        <div className="mt-4 space-y-3 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-3">
+        <div className="mt-4 space-y-3 rounded-[10px] border border-line bg-fill-faint p-3">
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="grid gap-1.5">
-              <span className="text-[12px] font-semibold text-[#64748b]">Masa</span>
+              <span className="text-[12px] font-semibold text-ink-500">Masa</span>
               <select
                 className={FIELD}
                 value={measure}
@@ -140,7 +140,7 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
               </select>
             </label>
             <label className="grid gap-1.5">
-              <span className="text-[12px] font-semibold text-[#64748b]">Data e konstatimit</span>
+              <span className="text-[12px] font-semibold text-ink-500">Data e konstatimit</span>
               <input
                 type="date"
                 className={cn(FIELD, "tabular-nums")}
@@ -149,7 +149,7 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="text-[12px] font-semibold text-[#64748b]">
+              <span className="text-[12px] font-semibold text-ink-500">
                 Afati për përmirësim{measure === "ME_SHKRIM" ? "" : " (opsional)"}
               </span>
               <input
@@ -161,11 +161,11 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
             </label>
           </div>
           <label className="grid gap-1.5">
-            <span className="text-[12px] font-semibold text-[#64748b]">
+            <span className="text-[12px] font-semibold text-ink-500">
               Përshkrimi i shkeljes / performancës së pakënaqshme
             </span>
             <textarea
-              className="min-h-[92px] rounded-[8px] border border-[#e2e8f0] bg-white p-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue"
+              className="min-h-[92px] rounded-[8px] border border-line bg-white p-2.5 text-[13px] text-ink-700 outline-none focus:border-brand-blue"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Përshkruani faktet, datën dhe rrethanat e shkeljes."
@@ -199,19 +199,19 @@ export function WarningsPanel({ employeeId, canEdit }: { employeeId: string; can
 
       <div className="mt-4">
         {rows.length === 0 ? (
-          <p className="text-[13px] text-[#64748b]">Nuk ka vërejtje të lëshuara.</p>
+          <p className="text-[13px] text-ink-500">Nuk ka vërejtje të lëshuara.</p>
         ) : (
-          <ul className="m-0 list-none divide-y divide-[#f1f5f9] p-0">
+          <ul className="m-0 list-none divide-y divide-fill p-0">
             {rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-start gap-3 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#0f172a]">
+                  <p className="text-[13px] font-semibold text-ink-900">
                     {measureLabel(row.measure)}
                   </p>
-                  <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-[#475569]">
+                  <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-ink-600">
                     {row.summary}
                   </p>
-                  <p className="mt-1 text-[12px] text-[#94a3b8]">
+                  <p className="mt-1 text-[12px] text-ink-400">
                     Konstatuar {fmt(row.issuedAt)}
                     {row.improvementDeadline
                       ? ` · afati për përmirësim ${fmt(row.improvementDeadline)}`

@@ -259,7 +259,7 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
             {/* What this request would mean, before it is sent. Renders a
                 sentence in every state rather than collapsing, so the dialog
                 does not jump as dates are picked. */}
-            <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5">
+            <div className="rounded-md border border-line bg-fill-faint px-3 py-2.5">
               {preview == null ? (
                 <p className="text-xs text-muted-foreground">
                   Zgjidhni punonjësin dhe datat për të parë ditët, festat dhe bilancin.
@@ -270,7 +270,7 @@ export function NewLeaveRequestButton({ employees }: { employees: PushimetEmploy
                 </p>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-xs tabular-nums text-[#334155]">
+                  <p className="text-xs tabular-nums text-ink-700">
                     <span className="font-semibold">{preview.workingDays} ditë pune</span>
                     {` (${preview.calendarDays} kalendarike · ${preview.totalHours} orë)`}
                     {preview.holidayNames.length > 0

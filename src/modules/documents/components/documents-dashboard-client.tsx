@@ -122,7 +122,7 @@ const CATEGORY_TILE_META: Record<DocumentCategory, { icon: LucideIcon; tile: str
   TERMINATION: { icon: UserMinus, tile: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
   WARNING: { icon: AlertTriangle, tile: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
   PAYROLL: { icon: Wallet, tile: "bg-[#f5f3ff]", iconColor: "text-[#7c3aed]" },
-  OTHER: { icon: FileIcon, tile: "bg-[#f1f5f9]", iconColor: "text-[#64748b]" },
+  OTHER: { icon: FileIcon, tile: "bg-fill", iconColor: "text-ink-500" },
 };
 
 export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
@@ -221,10 +221,10 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                 <Icon className={cn("h-4 w-4", meta.iconColor)} aria-hidden />
               </span>
               <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-[12.5px] font-semibold text-[#0f172a]">
+                <span className="block truncate text-[12.5px] font-semibold text-ink-900">
                   {DOCUMENT_CATEGORY_LABELS[category]}
                 </span>
-                <span className="block text-[11px] text-[#94a3b8]">
+                <span className="block text-[11px] text-ink-400">
                   {props.counts.monthByCategory[category]} këtë muaj
                 </span>
               </span>
@@ -400,16 +400,16 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                   )}
                   <div className="min-w-0 flex-1">
                     {mobileSelectMode ? (
-                      <p className="truncate text-[13.5px] font-semibold text-[#0f172a]">{a.title}</p>
+                      <p className="truncate text-[13.5px] font-semibold text-ink-900">{a.title}</p>
                     ) : (
                       <Link
                         href={`/dokumentet/${a.id}`}
-                        className="block truncate text-[13.5px] font-semibold text-[#0f172a]"
+                        className="block truncate text-[13.5px] font-semibold text-ink-900"
                       >
                         {a.title}
                       </Link>
                     )}
-                    <p className="mt-0.5 truncate text-[12px] text-[#94a3b8]">{a.displayFilename}</p>
+                    <p className="mt-0.5 truncate text-[12px] text-ink-400">{a.displayFilename}</p>
                   </div>
                   <CategoryChip category={a.documentCategory} />
                 </div>
@@ -420,16 +420,16 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                   ) : null}
                   {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
                   {a.employeeLabel ? (
-                    <span className="text-[12px] text-[#64748b]">{a.employeeLabel}</span>
+                    <span className="text-[12px] text-ink-500">{a.employeeLabel}</span>
                   ) : null}
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#eef2f7] pt-3">
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line-soft pt-3">
                   <div className="min-w-0">
-                    <span className="block text-[11.5px] tabular-nums text-[#64748b]">
+                    <span className="block text-[11.5px] tabular-nums text-ink-500">
                       {a.createdAtLabel}
                     </span>
                     {a.authorLabel ? (
-                      <span className="block text-[11px] text-[#94a3b8]">{a.authorLabel}</span>
+                      <span className="block text-[11px] text-ink-400">{a.authorLabel}</span>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
@@ -464,9 +464,9 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
 
       {/* Register — desktop table */}
       <div className={cn(docCard, "hidden overflow-hidden md:block")}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
-          <h2 className="text-[13.5px] font-bold text-[#0f172a]">Regjistri i dokumenteve</h2>
-          <p className="text-[12px] text-[#94a3b8]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
+          <h2 className="text-[13.5px] font-bold text-ink-900">Regjistri i dokumenteve</h2>
+          <p className="text-[12px] text-ink-400">
             {props.counts.total} gjithsej · {props.counts.final} finale ·{" "}
             {props.counts.preview} parapamje · {props.counts.archived} në arkiv
           </p>
@@ -474,7 +474,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+              <tr className="border-b border-line-soft bg-fill-faint">
                 <th className={cn(docTableHead, "w-10")}>
                   <input
                     type="checkbox"
@@ -505,7 +505,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                     <tr
                       key={a.id}
                       className={cn(
-                        "border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]",
+                        "border-b border-fill transition-colors last:border-0 hover:bg-fill-faint",
                         selected.has(a.id) && "bg-[#f5f8ff]",
                       )}
                     >
@@ -525,7 +525,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                             <div className="flex flex-wrap items-center gap-1.5">
                               <Link
                                 href={`/dokumentet/${a.id}`}
-                                className="text-[13.5px] font-semibold text-[#0f172a] hover:text-brand-blue"
+                                className="text-[13.5px] font-semibold text-ink-900 hover:text-brand-blue"
                               >
                                 {a.title}
                               </Link>
@@ -536,26 +536,26 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
                               ) : null}
                               {a.isArchived ? <DocChip tone="locked">Arkiv</DocChip> : null}
                             </div>
-                            <span className="block truncate text-[12px] text-[#94a3b8]">
+                            <span className="block truncate text-[12px] text-ink-400">
                               {a.displayFilename}
                             </span>
                             {templateDiffersFromTitle ? (
-                              <span className="block truncate text-[11px] text-[#cbd5e1]">
+                              <span className="block truncate text-[11px] text-ink-300">
                                 Shablloni: {a.templateName}
                               </span>
                             ) : null}
                           </div>
                         </div>
                       </td>
-                      <td className={cn(docTableCell, "text-[13px] text-[#334155]")}>
+                      <td className={cn(docTableCell, "text-[13px] text-ink-700")}>
                         {a.employeeLabel ?? "—"}
                       </td>
                       <td className={cn(docTableCell, "whitespace-nowrap")}>
-                        <span className="block text-[12.5px] tabular-nums text-[#64748b]">
+                        <span className="block text-[12.5px] tabular-nums text-ink-500">
                           {a.createdAtLabel}
                         </span>
                         {a.authorLabel ? (
-                          <span className="mt-0.5 block text-[11.5px] text-[#94a3b8]">
+                          <span className="mt-0.5 block text-[11.5px] text-ink-400">
                             {a.authorLabel}
                           </span>
                         ) : null}
@@ -590,8 +590,8 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
         </div>
 
         {props.page.pageCount > 1 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#eef2f7] px-4 py-3">
-            <p className="text-[12px] text-[#94a3b8]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft px-4 py-3">
+            <p className="text-[12px] text-ink-400">
               Faqja {props.page.page} nga {props.page.pageCount} · {props.page.total} dokumente
             </p>
             <div className="flex items-center gap-2">
@@ -637,11 +637,11 @@ function EmptyRegister({ filtersActive, bare }: { filtersActive: boolean; bare?:
   const canWriteDocuments = useCan("documents.write");
   const body = (
     <div className="text-center">
-      <FileText className="mx-auto h-6 w-6 text-[#cbd5e1]" aria-hidden />
-      <p className="mt-3 text-[13.5px] font-semibold text-[#0f172a]">
+      <FileText className="mx-auto h-6 w-6 text-ink-300" aria-hidden />
+      <p className="mt-3 text-[13.5px] font-semibold text-ink-900">
         {filtersActive ? "Nuk ka dokumente për filtrat aktualë." : "Ende asnjë dokument."}
       </p>
-      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-[#64748b]">
+      <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink-500">
         {filtersActive
           ? "Ndryshoni kriteret ose pastroni filtrat."
           : "Gjeneroni kontratën, pushimin ose largimin e parë dhe do të shfaqet këtu."}

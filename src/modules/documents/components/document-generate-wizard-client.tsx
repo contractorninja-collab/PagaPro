@@ -101,8 +101,8 @@ function SectionCard({
 }) {
   return (
     <section className={docCard}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
-        <h2 className="text-[13.5px] font-bold text-[#0f172a]">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
+        <h2 className="text-[13.5px] font-bold text-ink-900">{title}</h2>
         {aside}
       </div>
       <div className="p-4">{children}</div>
@@ -364,7 +364,7 @@ export function DocumentGenerateWizardClient(props: {
                   key={step.label}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5",
-                    state === "active" && "bg-[#f8fafc]",
+                    state === "active" && "bg-fill-faint",
                   )}
                 >
                   <StepCircle state={state} index={i} />
@@ -372,10 +372,10 @@ export function DocumentGenerateWizardClient(props: {
                     className={cn(
                       "text-[13px]",
                       state === "active"
-                        ? "font-semibold text-[#0f172a]"
+                        ? "font-semibold text-ink-900"
                         : state === "done"
-                          ? "font-medium text-[#334155]"
-                          : "font-medium text-[#94a3b8]",
+                          ? "font-medium text-ink-700"
+                          : "font-medium text-ink-400",
                     )}
                   >
                     {step.label}
@@ -403,7 +403,7 @@ export function DocumentGenerateWizardClient(props: {
                       "inline-flex h-[34px] items-center rounded-[9px] px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       active
                         ? "bg-brand-blue text-white"
-                        : "border border-[#e2e8f0] bg-white text-[#334155] hover:bg-[#eef2f7]",
+                        : "border border-line bg-white text-ink-700 hover:bg-fill-hover",
                     )}
                   >
                     {DOCUMENT_CATEGORY_LABELS[c]}
@@ -417,13 +417,13 @@ export function DocumentGenerateWizardClient(props: {
             <SectionCard
               title="2. Shablloni"
               aside={
-                <span className="text-[12px] text-[#94a3b8]">
+                <span className="text-[12px] text-ink-400">
                   Vetëm versione të publikuara dhe të mapuara.
                 </span>
               }
             >
               {categoryTemplates.length === 0 ? (
-                <p className="text-[13px] text-[#64748b]">
+                <p className="text-[13px] text-ink-500">
                   Nuk ka shabllone të gatshëm — ngarkoni dhe maponi te{" "}
                   <Link href="/dokumentet/templates" className="font-semibold text-brand-blue hover:underline">
                     Shabllonet
@@ -447,10 +447,10 @@ export function DocumentGenerateWizardClient(props: {
                   {selectedTemplate ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#dbeafe] bg-[#eff6ff] px-3 py-2.5">
                       <FileText className="h-4 w-4 text-brand-blue" aria-hidden />
-                      <span className="text-[13px] font-semibold text-[#0f172a]">
+                      <span className="text-[13px] font-semibold text-ink-900">
                         {selectedTemplate.templateName}
                       </span>
-                      <span className="text-[12px] font-medium text-[#64748b]">
+                      <span className="text-[12px] font-medium text-ink-500">
                         v{selectedTemplate.versionNumber}
                         {selectedTemplate.templateSubtype ? ` · ${selectedTemplate.templateSubtype}` : ""}
                       </span>
@@ -477,7 +477,7 @@ export function DocumentGenerateWizardClient(props: {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative min-w-[180px] flex-1">
                     <Search
-                      className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]"
+                      className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
                       aria-hidden
                     />
                     <input
@@ -495,13 +495,13 @@ export function DocumentGenerateWizardClient(props: {
                 </div>
 
                 {subjectOptions.length === 0 ? (
-                  <p className="text-[13px] text-[#64748b]">{emptySubjectsHint(category)}</p>
+                  <p className="text-[13px] text-ink-500">{emptySubjectsHint(category)}</p>
                 ) : (
-                  <div className="max-h-72 overflow-auto rounded-[10px] border border-[#eef2f7]">
+                  <div className="max-h-72 overflow-auto rounded-[10px] border border-line-soft">
                     {filteredSubjects.length === 0 ? (
-                      <p className="px-3 py-4 text-[13px] text-[#94a3b8]">Asnjë përputhje për kërkimin.</p>
+                      <p className="px-3 py-4 text-[13px] text-ink-400">Asnjë përputhje për kërkimin.</p>
                     ) : (
-                      <ul className="m-0 list-none divide-y divide-[#f1f5f9] p-0">
+                      <ul className="m-0 list-none divide-y divide-fill p-0">
                         {filteredSubjects.map((s) => {
                           const checked = selectedIds.has(s.id);
                           return (
@@ -513,7 +513,7 @@ export function DocumentGenerateWizardClient(props: {
                                     ? "cursor-not-allowed opacity-60"
                                     : checked
                                       ? "cursor-pointer bg-[#eff6ff]/60"
-                                      : "cursor-pointer hover:bg-[#f8fafc]",
+                                      : "cursor-pointer hover:bg-fill-faint",
                                 )}
                               >
                                 <input
@@ -526,15 +526,15 @@ export function DocumentGenerateWizardClient(props: {
                                 <span
                                   className={cn(
                                     s.disabled
-                                      ? "font-medium text-[#94a3b8]"
+                                      ? "font-medium text-ink-400"
                                       : checked
-                                        ? "font-semibold text-[#0f172a]"
-                                        : "font-medium text-[#334155]",
+                                        ? "font-semibold text-ink-900"
+                                        : "font-medium text-ink-700",
                                   )}
                                 >
                                   {s.label}
                                   {s.disabled && s.disabledHint ? (
-                                    <span className="ml-2 text-[12px] font-normal text-[#94a3b8]">
+                                    <span className="ml-2 text-[12px] font-normal text-ink-400">
                                       — {s.disabledHint}
                                     </span>
                                   ) : null}
@@ -548,9 +548,9 @@ export function DocumentGenerateWizardClient(props: {
                   </div>
                 )}
 
-                <div className="grid gap-3 border-t border-[#eef2f7] pt-4 sm:grid-cols-2">
+                <div className="grid gap-3 border-t border-line-soft pt-4 sm:grid-cols-2">
                   <div className="grid gap-1.5">
-                    <label className="text-[12px] font-semibold text-[#64748b]">Data e dokumentit</label>
+                    <label className="text-[12px] font-semibold text-ink-500">Data e dokumentit</label>
                     <input
                       type="date"
                       className={cn(docInput, "tabular-nums")}
@@ -561,7 +561,7 @@ export function DocumentGenerateWizardClient(props: {
                   {category === "CONTRACT" ? (
                     <>
                       <div className="grid gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#64748b]">Fillimi i kontratës</label>
+                        <label className="text-[12px] font-semibold text-ink-500">Fillimi i kontratës</label>
                         <input
                           type="date"
                           className={cn(docInput, "tabular-nums")}
@@ -571,7 +571,7 @@ export function DocumentGenerateWizardClient(props: {
                       </div>
                       {["AFAT_I_CAKTUAR", "PRAKTIKANT"].includes(selectedTemplate.templateSubtype ?? "") ? (
                         <div className="grid gap-1.5">
-                          <label className="text-[12px] font-semibold text-[#64748b]">Mbarimi i kontratës</label>
+                          <label className="text-[12px] font-semibold text-ink-500">Mbarimi i kontratës</label>
                           <input
                             type="date"
                             className={cn(docInput, "tabular-nums")}
@@ -591,7 +591,7 @@ export function DocumentGenerateWizardClient(props: {
             <SectionCard
               title="Rezultati i gjenerimit"
               aside={
-                <span className="text-[12px] text-[#94a3b8]">
+                <span className="text-[12px] text-ink-400">
                   {artifactIds.length} dokument(e) të krijuara · {failures.length} dështime
                 </span>
               }
@@ -639,8 +639,8 @@ export function DocumentGenerateWizardClient(props: {
         {/* Right — live preview + readiness */}
         <div className="min-w-0 space-y-5">
           <section className={docCard}>
-            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
-              <h2 className="text-[13.5px] font-bold text-[#0f172a]">Parapamja e vlerave</h2>
+            <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
+              <h2 className="text-[13.5px] font-bold text-ink-900">Parapamja e vlerave</h2>
               {focusedPreview ? (
                 <DocChip tone={focusedPreview.errors.length === 0 ? "success" : "warning"}>
                   {focusedPreview.errors.length === 0 ? "Gati" : "Me mungesa"}
@@ -649,9 +649,9 @@ export function DocumentGenerateWizardClient(props: {
             </div>
             <div className="p-4">
               {previewRows.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center">
-                  <FileText className="h-6 w-6 text-[#cbd5e1]" aria-hidden />
-                  <p className="text-[12.5px] text-[#94a3b8]">
+                <div className="flex flex-col items-center gap-2 rounded-[10px] border border-line bg-fill-faint px-4 py-8 text-center">
+                  <FileText className="h-6 w-6 text-ink-300" aria-hidden />
+                  <p className="text-[12.5px] text-ink-400">
                     Shtypni «Kontrollo» për të parë vlerat e zgjidhura të shabllonit.
                   </p>
                 </div>
@@ -670,14 +670,14 @@ export function DocumentGenerateWizardClient(props: {
                       ))}
                     </select>
                   ) : (
-                    <p className="text-[13px] font-semibold text-[#0f172a]">{focusedPreview?.subject}</p>
+                    <p className="text-[13px] font-semibold text-ink-900">{focusedPreview?.subject}</p>
                   )}
-                  <div className="max-h-[340px] overflow-auto rounded-[10px] border border-[#eef2f7] bg-white p-3">
+                  <div className="max-h-[340px] overflow-auto rounded-[10px] border border-line-soft bg-white p-3">
                     {focusedPreview && Object.keys(focusedPreview.values).length > 0 ? (
                       <dl className="m-0 space-y-2">
                         {Object.entries(focusedPreview.values).map(([k, v]) => (
-                          <div key={k} className="border-b border-[#f1f5f9] pb-2 last:border-0 last:pb-0">
-                            <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[#94a3b8]">
+                          <div key={k} className="border-b border-fill pb-2 last:border-0 last:pb-0">
+                            <dt className="font-mono text-[10.5px] uppercase tracking-wide text-ink-400">
                               {k}
                             </dt>
                             <dd
@@ -692,7 +692,7 @@ export function DocumentGenerateWizardClient(props: {
                         ))}
                       </dl>
                     ) : (
-                      <p className="text-[12.5px] text-[#94a3b8]">Nuk u zgjidh asnjë vlerë.</p>
+                      <p className="text-[12.5px] text-ink-400">Nuk u zgjidh asnjë vlerë.</p>
                     )}
                   </div>
                 </div>
@@ -701,17 +701,17 @@ export function DocumentGenerateWizardClient(props: {
           </section>
 
           <section className={docCard}>
-            <div className="flex items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3">
-              <h2 className="text-[13.5px] font-bold text-[#0f172a]">Gatishmëria</h2>
+            <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
+              <h2 className="text-[13.5px] font-bold text-ink-900">Gatishmëria</h2>
               {previewRows.length > 0 ? (
-                <span className="text-[12px] font-semibold text-[#64748b]">
+                <span className="text-[12px] font-semibold text-ink-500">
                   {readyCount} gati · {blockedCount} me mungesa
                 </span>
               ) : null}
             </div>
             <div className="p-4">
               {previewRows.length === 0 ? (
-                <p className="text-[12.5px] text-[#94a3b8]">
+                <p className="text-[12.5px] text-ink-400">
                   Kontrolli tregon për çdo marrës nëse të dhënat janë të plota para gjenerimit.
                 </p>
               ) : (
@@ -724,7 +724,7 @@ export function DocumentGenerateWizardClient(props: {
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" aria-hidden />
                       )}
                       <div className="min-w-0">
-                        <p className="text-[13px] font-semibold text-[#0f172a]">{r.subject}</p>
+                        <p className="text-[13px] font-semibold text-ink-900">{r.subject}</p>
                         {r.errors.length === 0 ? (
                           <p className="text-[12px] text-[#15803d]">Gati për gjenerim.</p>
                         ) : (
@@ -748,10 +748,10 @@ export function DocumentGenerateWizardClient(props: {
 
       {/* Sticky footer — Kontrollo / Gjenero */}
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-5 md:bottom-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#e2e8f0] bg-white/95 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.07)] backdrop-blur">
-          <p className="text-[13px] font-semibold text-[#0f172a]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-line bg-white/95 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.07)] backdrop-blur">
+          <p className="text-[13px] font-semibold text-ink-900">
             {selectedIds.size} dokument(e)
-            <span className="ml-1.5 font-medium text-[#94a3b8]">
+            <span className="ml-1.5 font-medium text-ink-400">
               → {selectedIds.size > 1 ? "ZIP / PDF" : "PDF"}
             </span>
           </p>
