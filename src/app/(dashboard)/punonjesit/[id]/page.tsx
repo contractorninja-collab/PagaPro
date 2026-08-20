@@ -10,6 +10,11 @@ import {
   listContractsForEmployee,
   listPayrollGeneratedDocsForEmployee,
 } from "@/modules/documents/services/document-queries";
+import {
+  listLeaveBalancesForEmployee,
+  listLeaveHistoryForEmployee,
+} from "@/modules/leaves/services/leave-query-service";
+import type { EmployeeLeaveBundle } from "@/modules/leaves/helpers/employee-leave-view";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
@@ -43,21 +48,28 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   const openEditDocuments = first(sp.edit) === "documents";
   const { companyId } = await requireCompanyContextPage();
 
+  const balanceYear = new Date().getUTCFullYear();
+
   let employee;
   let departments;
   let genDocs;
   let contracts;
   let payrollDocs;
   let jobTitles;
+  let leaveRequests;
+  let leaveBalances;
   try {
-    [employee, departments, genDocs, contracts, payrollDocs, jobTitles] = await Promise.all([
-      getEmployeeById(companyId, id),
-      listDepartmentsForCompany(companyId),
-      listArtifactsForEmployee(companyId, id),
-      listContractsForEmployee(companyId, id),
-      listPayrollGeneratedDocsForEmployee(companyId, id),
-      listActiveJobTitleOptions(companyId),
-    ]);
+    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances] =
+      await Promise.all([
+        getEmployeeById(companyId, id),
+        listDepartmentsForCompany(companyId),
+        listArtifactsForEmployee(companyId, id),
+        listContractsForEmployee(companyId, id),
+        listPayrollGeneratedDocsForEmployee(companyId, id),
+        listActiveJobTitleOptions(companyId),
+        listLeaveHistoryForEmployee(companyId, id),
+        listLeaveBalancesForEmployee(companyId, id, balanceYear),
+      ]);
   } catch (err) {
     console.error("[pagapro] EmployeeProfilePage: load failed", err);
     return (
@@ -99,12 +111,35 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
     })),
   };
 
+  const leaveCenter: EmployeeLeaveBundle = {
+    year: balanceYear,
+    balances: leaveBalances.map((b) => ({
+      leaveType: b.leaveType,
+      quota: b.yearlyQuota.toFixed(2),
+      used: b.usedDays.toFixed(2),
+      pending: b.pendingDays.toFixed(2),
+      remaining: b.remainingDays.toFixed(2),
+      carryIn: b.carryIn.toFixed(2),
+      carryExpiresAtIso: b.carryExpiresAt?.toISOString() ?? null,
+    })),
+    requests: leaveRequests.map((r) => ({
+      id: r.id,
+      type: r.type,
+      subtype: r.subtype,
+      status: r.status,
+      startIso: r.startDate.toISOString(),
+      endIso: r.endDate.toISOString(),
+      days: r.workingDays?.toFixed(2) ?? r.totalDays?.toFixed(2) ?? null,
+    })),
+  };
+
   return (
     <EmployeeProfileShell
       employee={employee}
       departments={departments}
       jobTitles={jobTitles}
       documentCenter={documentCenter}
+      leaveCenter={leaveCenter}
       openEditDocuments={openEditDocuments}
       timeClockEnabled={await isTimeClockEnabled(companyId)}
     />

@@ -585,3 +585,9 @@ export async function listLeaveHistoryForEmployee(companyId: string, employeeId:
     take: 40,
   });
 }
+
+export async function listLeaveBalancesForEmployee(companyId: string, employeeId: string, year: number) {
+  return prisma.leaveBalance.findMany({
+    where: { companyId, employeeId, year, leaveType: { in: leaveTypesWithBalance() } },
+  });
+}

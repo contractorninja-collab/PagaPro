@@ -33,6 +33,14 @@ import {
 } from "@/modules/employees/components/employees-labels";
 import { EmployeeStatusBadge, EmployeeTypeBadge } from "@/modules/employees/components/employee-status-badge";
 import { DOCUMENT_CATEGORY_LABELS } from "@/modules/documents/components/document-labels";
+import { LeaveStatusBadge } from "@/modules/leaves/components/leave-status-badge";
+import { LEAVE_TYPE_LABELS_SQ, LEAVE_SUBTYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
+import { fmtDays } from "@/modules/leaves/helpers/leave-balance-view";
+import {
+  balanceLineSegments,
+  sortBalancesForDisplay,
+  type EmployeeLeaveBundle,
+} from "@/modules/leaves/helpers/employee-leave-view";
 
 export interface EmployeeGeneratedDocSummary {
   id: string;
@@ -622,6 +630,105 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
   );
 }
 
+function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
+  const balances = bundle ? sortBalancesForDisplay(bundle.balances) : [];
+  const requests = bundle?.requests ?? [];
+
+  if (balances.length === 0 && requests.length === 0) {
+    return (
+      <SectionCard title="Pushimet" description="Kërkesat dhe bilanci i lejeve.">
+        <p className="text-[13px] text-[#64748b]">
+          Asnjë kërkesë pushimi dhe asnjë bilanc i llogaritur për këtë punonjës. Kërkesat krijohen te{" "}
+          <Link href="/pushimet" className="font-medium text-brand-blue hover:underline">
+            Pushimet
+          </Link>
+          .
+        </p>
+      </SectionCard>
+    );
+  }
+
+  const typeLabel = (t: string) => (LEAVE_TYPE_LABELS_SQ as Record<string, string>)[t] ?? t;
+  const subtypeLabel = (s: string) => (LEAVE_SUBTYPE_LABELS_SQ as Record<string, string>)[s] ?? null;
+
+  return (
+    <div className="space-y-5">
+      {balances.length > 0 ? (
+        <SectionCard
+          title={`Bilanci ${bundle?.year ?? ""}`.trim()}
+          description="Vetëm llojet me kuotë vjetore mbajnë bilanc."
+        >
+          <ul className="space-y-2">
+            {balances.map((b) => (
+              <li key={b.leaveType} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px]">
+                <span className="min-w-[132px] font-semibold text-[#0f172a]">{typeLabel(b.leaveType)}</span>
+                <span className="tabular-nums text-[#475569]">{balanceLineSegments(b).join(" · ")}</span>
+                {b.carryExpiresAtIso ? (
+                  <span className="text-xs text-[#94a3b8]">bartja skadon {formatSqDate(b.carryExpiresAtIso)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      ) : null}
+
+      <SectionCard title="Kërkesat" description="Kronologjikisht, më e fundit sipër." flush>
+        {requests.length === 0 ? (
+          <p className="px-5 py-4 text-[13px] text-[#64748b]">Asnjë kërkesë pushimi deri tani.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="border-b border-[#eef2f7] bg-[#f8fafc]">
+                  <th className={TH}>Lloji</th>
+                  <th className={TH}>Fillimi</th>
+                  <th className={TH}>Mbarimi</th>
+                  <th className={cn(TH, "text-right")}>Ditë</th>
+                  <th className={TH}>Statusi</th>
+                  <th className={cn(TH, "text-right")}>&nbsp;</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-b border-[#f1f5f9] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className={TD}>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-[#0f172a]">{typeLabel(r.type)}</span>
+                        {r.subtype !== "NONE" && subtypeLabel(r.subtype) ? (
+                          <span className="text-xs text-[#64748b]">{subtypeLabel(r.subtype)}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.startIso)}</td>
+                    <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(r.endIso)}</td>
+                    <td className={cn(TD, "text-right tabular-nums text-[#475569]")}>
+                      {r.days === null ? "—" : fmtDays(r.days)}
+                    </td>
+                    <td className={TD}>
+                      <LeaveStatusBadge status={r.status as Parameters<typeof LeaveStatusBadge>[0]["status"]} />
+                    </td>
+                    <td className={cn(TD, "text-right")}>
+                      <Link
+                        href={`/pushimet/${r.id}`}
+                        className="text-[12.5px] font-medium text-brand-blue hover:underline"
+                      >
+                        Shiko
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
 const STATUS_TONE: Record<EmploymentStatus, "success" | "warning" | "destructive" | "neutral"> = {
   ACTIVE: "success",
   ON_LEAVE: "warning",
@@ -635,6 +742,7 @@ export function EmployeeProfileShell(props: {
   departments: DepartmentOptionDto[];
   jobTitles: JobTitleOptionDto[];
   documentCenter?: EmployeeProfileDocumentsBundle;
+  leaveCenter?: EmployeeLeaveBundle;
   openEditDocuments?: boolean;
   timeClockEnabled?: boolean;
 }) {
@@ -643,6 +751,7 @@ export function EmployeeProfileShell(props: {
     departments,
     jobTitles,
     documentCenter,
+    leaveCenter,
     openEditDocuments = false,
     timeClockEnabled = false,
   } = props;
@@ -802,7 +911,7 @@ export function EmployeeProfileShell(props: {
             <DocumentsCenterTab {...bundle} />
           </TabsContent>
           <TabsContent value="leave" className="mt-5">
-            <EmptyTab title="Pushimet" body="Kërkesat dhe bilanci i lejeve." />
+            <LeaveTab bundle={leaveCenter} />
           </TabsContent>
           {timeClockEnabled ? (
             <TabsContent value="prezenca" className="mt-5">
