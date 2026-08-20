@@ -958,3 +958,15 @@ export async function deleteEmployeeHard(
 
   return { ok: true };
 }
+
+export async function listTimelineForEmployee(companyId: string, employeeId: string) {
+  return prisma.employeeTimelineEvent.findMany({
+    where: { companyId, employeeId },
+    orderBy: { occurredAt: "desc" },
+    take: 60,
+    include: {
+      actor: { select: { displayName: true, email: true } },
+      actorMembership: { select: { user: { select: { displayName: true, email: true } } } },
+    },
+  });
+}

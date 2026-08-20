@@ -123,14 +123,6 @@ function SectionCard({
   );
 }
 
-function EmptyTab({ title, body }: { title: string; body: string }) {
-  return (
-    <SectionCard title={title} description={body}>
-      <p className="text-[13px] text-[#64748b]">Nuk ka të dhëna për momentin.</p>
-    </SectionCard>
-  );
-}
-
 function RehireControl({
   employeeId,
   onDone,
@@ -729,6 +721,64 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
   );
 }
 
+export interface EmployeeTimelineEntry {
+  id: string;
+  occurredAtIso: string;
+  /** Pre-rendered on the server — toLocaleString in the client would drift with the viewer's locale. */
+  occurredAtLabel: string;
+  eventType: string;
+  title: string;
+  body: string | null;
+  severity: "INFO" | "WARNING" | "CRITICAL" | null;
+  actorName: string | null;
+}
+
+const TIMELINE_DOT: Record<"INFO" | "WARNING" | "CRITICAL", string> = {
+  INFO: "bg-[#2563eb]",
+  WARNING: "bg-[#d97706]",
+  CRITICAL: "bg-[#dc2626]",
+};
+
+function TimelineTab({ entries }: { entries?: EmployeeTimelineEntry[] }) {
+  const rows = entries ?? [];
+  if (rows.length === 0) {
+    return (
+      <SectionCard title="Timeline" description="Ngjarjet operative dhe auditimi.">
+        <p className="text-[13px] text-[#64748b]">
+          Asnjë ngjarje e regjistruar për këtë punonjës deri tani. Ngjarjet shtohen automatikisht nga
+          kontratat, pushimet, pagat dhe ndryshimet e profilit.
+        </p>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard title="Timeline" description="Ngjarjet operative dhe auditimi — më e fundit sipër." flush>
+      <ol className="divide-y divide-[#f1f5f9]">
+        {rows.map((e) => (
+          <li key={e.id} className="flex gap-3 px-5 py-3">
+            <span
+              className={cn(
+                "mt-[7px] h-2 w-2 shrink-0 rounded-full",
+                e.severity ? TIMELINE_DOT[e.severity] : "bg-[#cbd5e1]",
+              )}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span className="text-[13px] font-semibold text-[#0f172a]">{e.title}</span>
+                <span className="text-xs tabular-nums text-[#94a3b8]">{e.occurredAtLabel}</span>
+              </div>
+              {e.body ? <p className="mt-0.5 text-[12.5px] leading-snug text-[#64748b]">{e.body}</p> : null}
+              {e.actorName ? <p className="mt-0.5 text-xs text-[#94a3b8]">nga {e.actorName}</p> : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </SectionCard>
+  );
+}
+
 const STATUS_TONE: Record<EmploymentStatus, "success" | "warning" | "destructive" | "neutral"> = {
   ACTIVE: "success",
   ON_LEAVE: "warning",
@@ -743,6 +793,7 @@ export function EmployeeProfileShell(props: {
   jobTitles: JobTitleOptionDto[];
   documentCenter?: EmployeeProfileDocumentsBundle;
   leaveCenter?: EmployeeLeaveBundle;
+  timelineEntries?: EmployeeTimelineEntry[];
   openEditDocuments?: boolean;
   timeClockEnabled?: boolean;
 }) {
@@ -752,6 +803,7 @@ export function EmployeeProfileShell(props: {
     jobTitles,
     documentCenter,
     leaveCenter,
+    timelineEntries,
     openEditDocuments = false,
     timeClockEnabled = false,
   } = props;
@@ -922,7 +974,7 @@ export function EmployeeProfileShell(props: {
             <WarningsPanel employeeId={employee.id} canEdit={mayEdit} />
           </TabsContent>
           <TabsContent value="timeline" className="mt-5">
-            <EmptyTab title="Timeline" body="Ngjarjet operative dhe auditimi." />
+            <TimelineTab entries={timelineEntries} />
           </TabsContent>
         </Tabs>
 

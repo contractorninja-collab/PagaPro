@@ -4,7 +4,11 @@ import {
   EmployeeProfileShell,
   type EmployeeProfileDocumentsBundle,
 } from "@/modules/employees/components/employee-profile-shell";
-import { getEmployeeById, listDepartmentsForCompany } from "@/modules/employees/services/employee-service";
+import {
+  getEmployeeById,
+  listDepartmentsForCompany,
+  listTimelineForEmployee,
+} from "@/modules/employees/services/employee-service";
 import {
   listArtifactsForEmployee,
   listContractsForEmployee,
@@ -58,8 +62,9 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   let jobTitles;
   let leaveRequests;
   let leaveBalances;
+  let timelineRows;
   try {
-    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances] =
+    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows] =
       await Promise.all([
         getEmployeeById(companyId, id),
         listDepartmentsForCompany(companyId),
@@ -69,6 +74,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
         listActiveJobTitleOptions(companyId),
         listLeaveHistoryForEmployee(companyId, id),
         listLeaveBalancesForEmployee(companyId, id, balanceYear),
+        listTimelineForEmployee(companyId, id),
       ]);
   } catch (err) {
     console.error("[pagapro] EmployeeProfilePage: load failed", err);
@@ -133,6 +139,22 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
     })),
   };
 
+  const timelineEntries = timelineRows.map((t) => ({
+    id: t.id,
+    occurredAtIso: t.occurredAt.toISOString(),
+    occurredAtLabel: t.occurredAt.toLocaleString("sq-AL", { dateStyle: "medium", timeStyle: "short" }),
+    eventType: t.eventType,
+    title: t.title,
+    body: t.body,
+    severity: t.severity,
+    actorName:
+      t.actor?.displayName ??
+      t.actor?.email ??
+      t.actorMembership?.user.displayName ??
+      t.actorMembership?.user.email ??
+      null,
+  }));
+
   return (
     <EmployeeProfileShell
       employee={employee}
@@ -140,6 +162,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       jobTitles={jobTitles}
       documentCenter={documentCenter}
       leaveCenter={leaveCenter}
+      timelineEntries={timelineEntries}
       openEditDocuments={openEditDocuments}
       timeClockEnabled={await isTimeClockEnabled(companyId)}
     />
