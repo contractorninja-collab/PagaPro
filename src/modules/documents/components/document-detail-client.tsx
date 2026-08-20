@@ -210,27 +210,27 @@ export function DocumentDetailClient({ artifact }: DocumentDetailClientProps) {
       <div className="space-y-5 pb-24 md:pb-8">
         <div className={cn(docCard, "flex flex-wrap gap-x-8 gap-y-3 px-4 py-3.5")}>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Shablloni</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Shablloni</p>
             <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">
               {artifact.templateName}{" "}
               <span className="font-medium text-[#64748b]">v{artifact.templateVersion}</span>
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Gjeneruar</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Gjeneruar</p>
             <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
               {artifact.createdAtLabel}
             </p>
           </div>
           {artifact.employeeLabel ? (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Punonjësi</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Punonjësi</p>
               <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">{artifact.employeeLabel}</p>
             </div>
           ) : null}
           {artifact.payrollLabel ? (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">Pasqyra</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Pasqyra</p>
               <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-[#0f172a]">
                 {artifact.payrollLabel}
               </p>

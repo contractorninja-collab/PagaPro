@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { useCan } from "@/components/layout/capability-provider";
 import type { PayrollPeriodStatus } from "@prisma/client";
@@ -30,10 +31,8 @@ const STATUS_ORDER: Record<PayrollPeriodStatus, number> = {
   ARCHIVED: 4,
 };
 
-const BTN_PRIMARY =
-  "inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-brand-blue px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8]";
-const BTN_SECONDARY =
-  "inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[9px] border border-[#e2e8f0] bg-white px-[15px] text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7]";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
 
 type PrimaryAction = {
   label: string;

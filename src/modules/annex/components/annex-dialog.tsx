@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -17,10 +18,8 @@ import type { ContractTermType } from "@prisma/client";
 
 const FIELD =
   "h-9 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-brand-blue";
-const BTN_PRIMARY =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] bg-brand-blue px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
-const BTN_SECONDARY =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-[#e2e8f0] bg-white px-4 text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7]";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
 
 interface Row extends AnnexChangeSuggestion {
   include: boolean;
@@ -170,7 +169,7 @@ export function AnnexDialog(props: {
 
             <div className="grid grid-cols-2 gap-3 border-t border-[#eef2f7] pt-3">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                   Data e hyrjes në fuqi
                 </span>
                 <input
@@ -181,7 +180,7 @@ export function AnnexDialog(props: {
                 />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                   Lloji i kontratës
                 </span>
                 <select
@@ -198,7 +197,7 @@ export function AnnexDialog(props: {
               </div>
               {contractType !== "INDEFINITE" ? (
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                     Data e skadimit
                   </span>
                   <input

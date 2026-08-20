@@ -106,7 +106,7 @@ export function PrezencaResolveDialog(props: {
 
         {/* The day's punches, voids included — the full audit picture. */}
         <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
             Skanimet përreth ditës
           </p>
           {target.punches.length === 0 ? (

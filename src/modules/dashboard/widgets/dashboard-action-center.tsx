@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -78,14 +79,11 @@ const ALERT_ICONS: Record<OperationalAlert["severity"], LucideIcon> = {
   info: Info,
 };
 
-const BTN_PRIMARY =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-[9px] bg-brand-blue px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8]";
-const BTN_SECONDARY =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-[9px] border border-[#e2e8f0] bg-white px-4 text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7]";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
 const BTN_APPROVE =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-[9px] border border-[#dcfce7] bg-[#f0fdf4] px-3.5 text-[13px] font-semibold text-[#16a34a] transition-colors hover:bg-[#dcfce7]";
-const BTN_REJECT =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-[9px] border border-[#fee2e2] bg-white px-3.5 text-[13px] font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2]";
+  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-btn border border-[#dcfce7] bg-[#f0fdf4] px-3.5 text-[13px] font-semibold text-tone-success-dot transition-colors hover:bg-[#dcfce7]";
+const BTN_REJECT = buttonVariants({ variant: "destructiveOutline", size: "default" });
 
 interface QueueItem {
   key: string;

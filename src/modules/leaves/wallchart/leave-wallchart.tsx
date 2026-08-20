@@ -253,7 +253,7 @@ export function LeaveWallchart(props: {
         </div>
         <dl className="flex items-stretch divide-x divide-[#eef2f7]">
           <div className="px-4 first:pl-0">
-            <dt className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Jashtë sot</dt>
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Jashtë sot</dt>
             <dd className="mt-0.5 text-[19px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
               {offOn(props.todayIso)}
               {offOn(props.todayIso) !== "—" ? (
@@ -262,13 +262,13 @@ export function LeaveWallchart(props: {
             </dd>
           </div>
           <div className="px-4">
-            <dt className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Nesër</dt>
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Nesër</dt>
             <dd className="mt-0.5 text-[19px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#0f172a]">
               {offOn(tomorrowIso)}
             </dd>
           </div>
           <div className="px-4 last:pr-0">
-            <dt className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
               Kulmi (i miratuar)
             </dt>
             <dd className="mt-0.5 text-[19px] font-extrabold leading-none tabular-nums tracking-[-0.02em] text-[#b45309]">
@@ -367,7 +367,7 @@ export function LeaveWallchart(props: {
             style={{ gridTemplateColumns: cols }}
           >
             <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-white px-3">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                 Punonjësi
               </span>
             </div>
@@ -397,7 +397,7 @@ export function LeaveWallchart(props: {
             style={{ gridTemplateColumns: cols }}
           >
             <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-[#fcfdff] px-3">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                 Jashtë / ditë
               </span>
             </div>
@@ -437,7 +437,7 @@ export function LeaveWallchart(props: {
                     className="grid h-[26px] border-b border-[#f1f5f9] bg-[#f8fafc]"
                     style={{ gridTemplateColumns: cols }}
                   >
-                    <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-[#f8fafc] px-3 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#64748b]">
+                    <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-[#f8fafc] px-3 text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#64748b]">
                       {emp.departmentName ?? "Pa departament"}
                     </div>
                     {days.map((d) => (

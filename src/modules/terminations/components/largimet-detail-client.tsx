@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
 import { Banknote, CalendarDays, Check, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "@/components/patterns/status-pill";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import {
   Dialog,
@@ -106,14 +108,11 @@ const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
 const CARD_TITLE = "text-[14px] font-bold tracking-[-0.01em] text-[#0f172a]";
 
-const BTN_PRIMARY =
-  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-blue px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
-const BTN_SECONDARY =
-  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#e2e8f0] bg-white px-[18px] text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
-const BTN_DESTRUCTIVE =
-  "inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#fee2e2] bg-white px-[18px] text-[13px] font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dc2626]/30 disabled:pointer-events-none disabled:opacity-50";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "default" });
+const BTN_DESTRUCTIVE = buttonVariants({ variant: "destructiveOutline", size: "default" });
 
-const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 const FIELD_SELECT =
   "h-10 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
 const FIELD_INPUT =
@@ -123,28 +122,11 @@ const FIELD_TEXTAREA =
 
 type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
 
-const CHIP_TONES: Record<ChipTone, { chip: string; dot: string }> = {
-  info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
-  success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
-  warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
-  destructive: { chip: "bg-[#fef2f2] text-[#dc2626]", dot: "bg-[#dc2626]" },
-  neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
-  locked: { chip: "bg-brand-navy text-white", dot: "bg-white" },
-};
-
 function Chip({ tone, children, className }: { tone: ChipTone; children: ReactNode; className?: string }) {
-  const t = CHIP_TONES[tone];
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12px] font-semibold",
-        t.chip,
-        className,
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full", t.dot)} aria-hidden />
+    <StatusPill tone={tone} className={className}>
       {children}
-    </span>
+    </StatusPill>
   );
 }
 

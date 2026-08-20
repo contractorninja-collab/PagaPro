@@ -78,7 +78,7 @@ function PayrollTotalsStrip({ data }: { data: PayrollDetailDto }) {
           key={cell.label}
           className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
         >
-          <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">{cell.label}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{cell.label}</p>
           <p
             className={cn(
               "mt-1.5 truncate text-[20px] font-extrabold leading-none tracking-[-0.02em] text-[#0f172a] [font-variant-numeric:tabular-nums]",

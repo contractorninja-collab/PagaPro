@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * the chart serves both.
  */
 
-const CARD = "rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+import { CARD } from "@/components/patterns/surface";
 
 /** Placeholder with the same footprint as the chart, so nothing jumps on load. */
 export function ChartSkeleton({ height }: { height: number }) {

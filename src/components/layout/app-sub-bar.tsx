@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "@/components/patterns/status-pill";
 
 /**
  * 1b sub-bar — the white breadcrumb/title/actions strip between the top-nav and the
@@ -84,24 +85,5 @@ export function SubBarStatus({
   tone?: "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
   children: ReactNode;
 }) {
-  const tones = {
-    info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
-    success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
-    warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
-    destructive: { chip: "bg-[#fef2f2] text-destructive", dot: "bg-destructive" },
-    neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
-    locked: { chip: "bg-brand-navy text-white", dot: "bg-white" },
-  } satisfies Record<string, { chip: string; dot: string }>;
-  const t = tones[tone];
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-full px-[11px] text-[12px] font-semibold",
-        t.chip,
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full", t.dot)} aria-hidden />
-      {children}
-    </span>
-  );
+  return <StatusPill tone={tone}>{children}</StatusPill>;
 }

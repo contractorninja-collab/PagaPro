@@ -28,7 +28,7 @@ import { PrezencaResolveDialog } from "@/modules/timeclock/components/prezenca-r
 const CARD = "rounded-xl border border-[#e2e8f0] bg-white shadow-card";
 const NAV_BTN =
   "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#334155] transition-colors hover:bg-[#eef2f7]";
-const MICRO = "text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const MICRO = "text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 
 const h = (minutes: number): string => (minutes / 60).toFixed(1).replace(/\.0$/, "");
 

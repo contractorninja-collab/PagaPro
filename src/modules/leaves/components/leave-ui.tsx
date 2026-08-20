@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import type { LeaveType } from "@prisma/client";
+import { StatusPill } from "@/components/patterns/status-pill";
 
 /**
  * Shared presentational tokens for the Pushimet module (design handoff "1b", screens 5a/5b).
@@ -7,22 +9,15 @@ import type { LeaveType } from "@prisma/client";
  */
 
 /** Standard 1b card shell: white, 1px #e2e8f0 border, radius 12px, flat shadow. */
-export const LEAVE_CARD =
-  "rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+export { CARD as LEAVE_CARD } from "@/components/patterns/surface";
 
 /** Buttons per the handoff (primary accent / secondary white / destructive outline). */
-export const BTN_PRIMARY =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
-export const BTN_PRIMARY_DENSE =
-  "inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-brand-blue px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
-export const BTN_SECONDARY =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] border border-[#e2e8f0] bg-white px-4 text-[13px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
-export const BTN_SECONDARY_DENSE =
-  "inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
-export const BTN_DESTRUCTIVE =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] border border-[#fee2e2] bg-white px-4 text-[13px] font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2] disabled:pointer-events-none disabled:opacity-50";
-export const BTN_DESTRUCTIVE_DENSE =
-  "inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#fee2e2] bg-white px-3 text-[12.5px] font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2] disabled:pointer-events-none disabled:opacity-50";
+export const BTN_PRIMARY = buttonVariants({ size: "lg" });
+export const BTN_PRIMARY_DENSE = buttonVariants({ size: "sm" });
+export const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "lg" });
+export const BTN_SECONDARY_DENSE = buttonVariants({ variant: "secondary", size: "sm" });
+export const BTN_DESTRUCTIVE = buttonVariants({ variant: "destructiveOutline", size: "lg" });
+export const BTN_DESTRUCTIVE_DENSE = buttonVariants({ variant: "destructiveOutline", size: "sm" });
 
 /** 1b form control (select/input) look for filter pills and dialog fields. */
 export const FIELD_CONTROL =
@@ -33,15 +28,7 @@ export const MICRO_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] te
 
 export type SemanticTone = "info" | "success" | "warning" | "destructive" | "neutral";
 
-const PILL_TONES: Record<SemanticTone, { chip: string; dot: string }> = {
-  info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
-  success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
-  warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
-  destructive: { chip: "bg-[#fef2f2] text-[#dc2626]", dot: "bg-[#dc2626]" },
-  neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
-};
-
-/** Full-radius semantic pill with status dot (chips/badges spec). */
+/** Full-radius semantic pill with status dot — delegates to THE StatusPill. */
 export function TonePill({
   tone,
   children,
@@ -51,16 +38,10 @@ export function TonePill({
   children: ReactNode;
   size?: "sm" | "md";
 }) {
-  const t = PILL_TONES[tone];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ${t.chip} ${
-        size === "sm" ? "h-5 px-2 text-[11px]" : "h-6 px-[11px] text-[12px]"
-      }`}
-    >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.dot}`} aria-hidden />
+    <StatusPill tone={tone} size={size}>
       {children}
-    </span>
+    </StatusPill>
   );
 }
 

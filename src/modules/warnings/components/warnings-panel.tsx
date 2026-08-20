@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import { AlertTriangle, Download, Plus, Printer, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,10 +17,8 @@ import {
 } from "@/modules/warnings/types";
 
 const CARD = "rounded-[12px] border border-[#e2e8f0] bg-white p-4";
-const BTN_PRIMARY =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] bg-brand-blue px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
-const BTN_DENSE =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_DENSE = buttonVariants({ variant: "secondary", size: "sm" });
 const FIELD =
   "h-9 w-full rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue";
 

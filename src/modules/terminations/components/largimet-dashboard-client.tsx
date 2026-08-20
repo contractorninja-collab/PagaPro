@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import type { ReactNode } from "react";
 import type { TerminationStatus, TerminationType } from "@prisma/client";
 import { Banknote, Check, ChevronDown, Clock, Download, FileText, MoreHorizontal, UserMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "@/components/patterns/status-pill";
 import {
   Dialog,
   DialogContent,
@@ -93,31 +95,18 @@ function fmtDate(iso: string) {
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
 
-const BTN_PRIMARY =
-  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] bg-brand-blue px-[18px] text-[13.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
-const BTN_SECONDARY =
-  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border border-[#e2e8f0] bg-white px-[18px] text-[13.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
-const BTN_DENSE_PRIMARY =
-  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-[8px] bg-brand-blue px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
-const BTN_DENSE_SECONDARY =
-  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-[8px] border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40 disabled:pointer-events-none disabled:opacity-50";
+const BTN_PRIMARY = buttonVariants({ size: "lg" });
+const BTN_SECONDARY = buttonVariants({ variant: "secondary", size: "lg" });
+const BTN_DENSE_PRIMARY = buttonVariants({ size: "sm" });
+const BTN_DENSE_SECONDARY = buttonVariants({ variant: "secondary", size: "sm" });
 
-const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+const FIELD_LABEL = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 const FIELD_SELECT =
   "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors focus:border-brand-blue";
 const FIELD_INPUT =
   "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-brand-blue";
 
 type ChipTone = "info" | "success" | "warning" | "destructive" | "neutral" | "locked";
-
-const CHIP_TONES: Record<ChipTone, { chip: string; dot: string }> = {
-  info: { chip: "bg-[#eff6ff] text-brand-blue", dot: "bg-brand-blue" },
-  success: { chip: "bg-[#ecfdf5] text-[#15803d]", dot: "bg-[#16a34a]" },
-  warning: { chip: "bg-[#fffbeb] text-[#b45309]", dot: "bg-[#d97706]" },
-  destructive: { chip: "bg-[#fef2f2] text-[#dc2626]", dot: "bg-[#dc2626]" },
-  neutral: { chip: "bg-[#f1f5f9] text-[#64748b]", dot: "bg-[#94a3b8]" },
-  locked: { chip: "bg-brand-navy text-white", dot: "bg-white" },
-};
 
 function StatusChip({
   tone,
@@ -128,18 +117,10 @@ function StatusChip({
   children: ReactNode;
   className?: string;
 }) {
-  const t = CHIP_TONES[tone];
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12px] font-semibold",
-        t.chip,
-        className,
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full", t.dot)} aria-hidden />
+    <StatusPill tone={tone} className={className}>
       {children}
-    </span>
+    </StatusPill>
   );
 }
 
@@ -288,7 +269,7 @@ export function LargimetDashboardClient(props: {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] border-collapse text-[13px]">
                   <thead>
-                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+                    <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                       <th className="px-4 py-2.5 font-bold">Punonjësi</th>
                       <th className="px-4 py-2.5 font-bold">Lloji</th>
                       <th className="px-4 py-2.5 font-bold">Datat</th>
@@ -396,24 +377,24 @@ export function LargimetDashboardClient(props: {
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12.5px]">
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Lloji</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Lloji</dt>
                         <dd className="mt-0.5 text-[#334155]">{TERMINATION_TYPE_LABELS[r.type]}</dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Datat</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Datat</dt>
                         <dd className="mt-0.5 tabular-nums text-[#334155]">
                           {fmtDate(r.terminationDate)}
                           <span className="text-[#94a3b8]"> → {fmtDate(r.lastWorkingDay)}</span>
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Payroll</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Payroll</dt>
                         <dd className="mt-0.5">
                           <PayrollCell row={r} />
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Dokumenti</dt>
+                        <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Dokumenti</dt>
                         <dd className="mt-0.5">
                           {r.generatedDocument ? (
                             <Link
@@ -454,7 +435,7 @@ function StatCard(props: { label: string; value: number; icon: ReactNode; tile: 
         {props.icon}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">{props.label}</p>
+        <p className="truncate text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{props.label}</p>
         <p className="text-[24px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-[#0f172a]">
           {props.value}
         </p>

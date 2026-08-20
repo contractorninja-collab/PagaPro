@@ -131,7 +131,7 @@ export function PayrollHistoryTab(props: {
         <div className="px-5 py-4">
           {groups.map((g) => (
             <div key={g.heading} className="mb-4 last:mb-0">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                 {g.heading}
               </p>
               <ul className="relative space-y-3 border-l border-[#e2e8f0] pl-5">

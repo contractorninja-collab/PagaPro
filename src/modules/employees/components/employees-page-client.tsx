@@ -64,7 +64,7 @@ function StatCard({ card }: { card: EmployeeStatCard }) {
     >
       <p
         className={cn(
-          "text-[11px] font-bold uppercase tracking-[0.05em]",
+          "text-[11px] font-bold uppercase tracking-[0.04em]",
           warning ? "text-[#b45309]" : "text-[#94a3b8]",
         )}
       >

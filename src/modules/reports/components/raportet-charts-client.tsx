@@ -23,7 +23,7 @@ import type {
  * a phone is worse than the number it replaced.
  */
 
-const CARD = "rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]";
+import { CARD } from "@/components/patterns/surface";
 const MICRO = "text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 
 const PayrollCostChart = dynamic(

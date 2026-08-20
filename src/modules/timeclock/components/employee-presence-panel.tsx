@@ -106,7 +106,7 @@ export function EmployeePresencePanel({ employeeId }: { employeeId: string }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-[12.5px]">
             <thead>
-              <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+              <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-left text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                 <th className="px-4 py-2">Data</th>
                 <th className="px-2 py-2">Hyrja</th>
                 <th className="px-2 py-2">Dalja</th>

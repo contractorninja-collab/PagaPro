@@ -336,7 +336,7 @@ function TerminationWorkflowKeyRow(props: { templateId: string; initialKey: stri
   return (
     <div className="flex flex-col gap-2 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3 md:flex-row md:items-end md:gap-4">
       <div className="flex-1 space-y-1">
-        <Label className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#94a3b8]">
+        <Label className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
           Çelësi Largimet (workflow)
         </Label>
         <select

@@ -2,20 +2,26 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-/** Pill status badges — consistent across payroll, HR, contracts, and leaves. */
+/**
+ * Text-only pill badge, in the same semantic palette as StatusPill (the tone.*
+ * tokens) so a state can never be two colors on two screens.
+ *
+ * @deprecated for STATUS use — statuses get the dot; render StatusPill from
+ * `@/components/patterns/status-pill`. Badge stays for pure-text labels.
+ */
 const badgeVariants = cva(
   "inline-flex h-6 items-center rounded-full border-0 px-2.5 text-xs font-semibold whitespace-nowrap",
   {
     variants: {
       variant: {
-        default: "bg-[#0f172a] text-white",
-        secondary: "bg-[#f1f5f9] text-[#475569]",
-        muted: "bg-[#f1f5f9] text-[#475569]",
-        outline: "bg-[#f1f5f9] text-[#475569]",
-        success: "bg-[#dcfce7] text-[#166534]",
-        warning: "bg-[#fef3c7] text-[#92400e]",
-        destructive: "bg-[#fee2e2] text-[#991b1b]",
-        info: "bg-[#dbeafe] text-[#1e40af]",
+        default: "bg-brand-navy text-white",
+        secondary: "bg-fill text-ink-600",
+        muted: "bg-fill text-ink-600",
+        outline: "bg-fill text-ink-600",
+        success: "bg-tone-success-bg text-tone-success-fg",
+        warning: "bg-tone-warning-bg text-tone-warning-fg",
+        destructive: "bg-tone-danger-bg text-tone-danger-fg",
+        info: "bg-tone-info-bg text-brand-blue",
       },
     },
     defaultVariants: {

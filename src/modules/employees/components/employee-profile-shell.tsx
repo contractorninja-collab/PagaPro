@@ -83,7 +83,7 @@ export interface EmployeeProfileDocumentsBundle {
 /* ---------------------------------- 1b design primitives (local) ---------------------------------- */
 
 const TH =
-  "h-9 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+  "h-9 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 const TD = "px-4 py-2.5 align-middle text-[13px] text-[#334155]";
 
 const TAB_TRIGGER =

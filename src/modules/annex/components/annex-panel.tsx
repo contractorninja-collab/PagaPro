@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import { FileText, Printer, Plus, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,10 +17,8 @@ import type { AnnexPanelData } from "@/modules/annex/services/annex-service";
 import { AnnexDialog } from "./annex-dialog";
 
 const CARD = "rounded-[12px] border border-[#e2e8f0] bg-white p-4";
-const BTN_PRIMARY =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] bg-brand-blue px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-50";
-const BTN_DENSE =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#e2e8f0] bg-white px-3 text-[12.5px] font-semibold text-[#334155] transition-colors hover:bg-[#eef2f7] disabled:pointer-events-none disabled:opacity-50";
+const BTN_PRIMARY = buttonVariants({ size: "default" });
+const BTN_DENSE = buttonVariants({ variant: "secondary", size: "sm" });
 const FIELD =
   "h-9 rounded-[8px] border border-[#e2e8f0] bg-white px-2.5 text-[13px] text-[#334155] outline-none focus:border-brand-blue";
 
@@ -322,7 +321,7 @@ function ContractTermCard(props: {
       {editing ? (
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">Lloji</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Lloji</span>
             <select className={FIELD} value={type} onChange={(e) => setType(e.target.value as ContractTermType)}>
               {(["INDEFINITE", "FIXED_TERM", "SPECIFIC_TASK"] as ContractTermType[]).map((t) => (
                 <option key={t} value={t}>
@@ -333,7 +332,7 @@ function ContractTermCard(props: {
           </label>
           {type !== "INDEFINITE" ? (
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">
+              <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">
                 Data e skadimit
               </span>
               <input type="date" className={FIELD} value={end} onChange={(e) => setEnd(e.target.value)} />
@@ -360,7 +359,7 @@ function ContractTermCard(props: {
 function Term({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">{label}</dt>
       <dd className="mt-0.5 tabular-nums text-[#334155]">{value}</dd>
     </div>
   );

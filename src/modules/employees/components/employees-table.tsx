@@ -37,7 +37,7 @@ import { MaskedAmount } from "@/modules/employees/components/salary-visibility";
 import { TerminateEmployeeDialog } from "@/modules/employees/components/terminate-employee-dialog";
 
 const TH =
-  "h-10 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.05em] text-[#94a3b8]";
+  "h-10 whitespace-nowrap px-4 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]";
 
 function EmployeeAvatar({ row }: { row: EmployeeListRowDto }) {
   const initials = `${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase();
