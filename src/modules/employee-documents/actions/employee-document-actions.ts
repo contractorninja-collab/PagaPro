@@ -2,13 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import {
   createEmployeeDocument,
+  deleteEmployeeDocument,
   setEmployeeDocumentArchived,
   type EmployeeDocumentServiceError,
 } from "@/modules/employee-documents/services/employee-document-service";
 import {
   archiveEmployeeDocumentSchema,
+  deleteEmployeeDocumentSchema,
   uploadEmployeeDocumentPayloadSchema,
 } from "@/modules/employee-documents/validations/employee-document-schemas";
 
@@ -85,6 +88,29 @@ export async function archiveEmployeeDocumentAction(
     companyId,
     documentId: parsed.data.documentId,
     archived: parsed.data.archived,
+    actorUserId: user.id,
+  });
+  if (!result.ok) return { ok: false, error: SERVICE_ERROR_SQ[result.code] };
+
+  revalidatePath(`/punonjesit/${result.data.employeeId}`);
+  revalidatePath("/paneli");
+  return { ok: true };
+}
+
+export async function deleteEmployeeDocumentAction(
+  raw: unknown,
+): Promise<EmployeeDocumentActionResult> {
+  const ctx = await requireCapability("documents.write");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  const { companyId, user, role } = ctx.context;
+
+  const parsed = deleteEmployeeDocumentSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+  const result = await deleteEmployeeDocument({
+    companyId,
+    documentId: parsed.data.documentId,
+    actorCanSensitive: can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.sensitive"),
     actorUserId: user.id,
   });
   if (!result.ok) return { ok: false, error: SERVICE_ERROR_SQ[result.code] };

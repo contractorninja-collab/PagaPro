@@ -30,3 +30,7 @@ export const archiveEmployeeDocumentSchema = z.object({
   documentId: z.string().min(1),
   archived: z.boolean(),
 });
+
+export const deleteEmployeeDocumentSchema = z.object({
+  documentId: z.string().min(1),
+});

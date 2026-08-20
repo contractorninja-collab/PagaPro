@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import type { EmployeeDocumentCategory } from "@prisma/client";
 import { useCan } from "@/components/layout/capability-provider";
-import { archiveEmployeeDocumentAction } from "@/modules/employee-documents/actions/employee-document-actions";
+import {
+  archiveEmployeeDocumentAction,
+  deleteEmployeeDocumentAction,
+} from "@/modules/employee-documents/actions/employee-document-actions";
 import {
   EMPLOYEE_DOCUMENT_CATEGORY_HINTS,
   EMPLOYEE_DOCUMENT_CATEGORY_LABELS,
@@ -44,6 +47,7 @@ function DocRow({
   todayIso,
   onArchiveToggle,
   onPreview,
+  onDelete,
 }: {
   doc: EmployeeUploadedDocSummary;
   employeeId: string;
@@ -51,7 +55,14 @@ function DocRow({
   todayIso: string;
   onArchiveToggle: (doc: EmployeeUploadedDocSummary) => void;
   onPreview: (target: QuickViewTarget) => void;
+  onDelete: (doc: EmployeeUploadedDocSummary) => void;
 }) {
+  /**
+   * Armed two-step delete: the first click swaps the control for an explicit
+   * question, so a hard delete can never ride on one stray click. Arming
+   * resets when the row re-renders after any action.
+   */
+  const [armed, setArmed] = useState(false);
   const href = `/api/punonjesit/${employeeId}/documents/${doc.id}`;
   const Icon = doc.contentType.startsWith("image/") ? ImageIcon : FileText;
   return (
@@ -99,6 +110,35 @@ function DocRow({
             {doc.isArchived ? "Rikthe" : "Arkivo"}
           </button>
         ) : null}
+        {canWrite ? (
+          armed ? (
+            <span className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-[#a4262c]">Fshi përfundimisht?</span>
+              <button
+                type="button"
+                className="font-semibold text-[#a4262c] underline-offset-2 hover:underline"
+                onClick={() => onDelete(doc)}
+              >
+                Po, fshi
+              </button>
+              <button
+                type="button"
+                className="text-[#64748b] underline-offset-2 hover:underline"
+                onClick={() => setArmed(false)}
+              >
+                Jo
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="text-[#a4262c] underline-offset-2 hover:underline"
+              onClick={() => setArmed(true)}
+            >
+              Fshi
+            </button>
+          )
+        ) : null}
       </div>
     </li>
   );
@@ -136,6 +176,16 @@ export function EmployeeDocumentsFolders({
     () => bundle.documents.filter((d) => d.isArchived).length,
     [bundle.documents],
   );
+
+  async function removeDoc(doc: EmployeeUploadedDocSummary) {
+    const r = await deleteEmployeeDocumentAction({ documentId: doc.id });
+    if (!r.ok) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success("Dokumenti u fshi përfundimisht.");
+    router.refresh();
+  }
 
   async function toggleArchive(doc: EmployeeUploadedDocSummary) {
     const r = await archiveEmployeeDocumentAction({ documentId: doc.id, archived: !doc.isArchived });
@@ -191,6 +241,7 @@ export function EmployeeDocumentsFolders({
                 todayIso={todayIso}
                 onArchiveToggle={(x) => void toggleArchive(x)}
                 onPreview={setPreview}
+                onDelete={(x) => void removeDoc(x)}
               />
             ))}
           </ul>

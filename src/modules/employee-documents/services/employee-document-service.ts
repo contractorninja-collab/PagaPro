@@ -213,6 +213,70 @@ export async function setEmployeeDocumentArchived(params: {
   return { ok: true, data: { employeeId: doc.employeeId } };
 }
 
+/**
+ * Hard delete: row, then blob (best effort — an orphan blob is acceptable, an
+ * orphan row is not). The audit entry carries title, category and sha256 so
+ * the FACT of the document and of its deletion outlives the file — that is
+ * what makes a hard delete defensible under the LMDhP rather than a cover-up.
+ *
+ * `actorCanSensitive` guards the id-based path: a viewer whose list never
+ * contained a MJEKESORE row must not be able to delete one by crafted id.
+ * Not-found, not forbidden — same doctrine as the serve route.
+ */
+export async function deleteEmployeeDocument(params: {
+  companyId: string;
+  documentId: string;
+  actorCanSensitive: boolean;
+  actorUserId?: string | null;
+}): Promise<Result<{ employeeId: string }>> {
+  const doc = await prisma.employeeDocument.findFirst({
+    where: { id: params.documentId, companyId: params.companyId },
+    select: {
+      id: true, employeeId: true, title: true, category: true,
+      storageKey: true, sha256: true, sizeBytes: true,
+    },
+  });
+  if (!doc) return { ok: false, code: "DOCUMENT_NOT_FOUND" };
+  if (isSensitiveCategory(doc.category) && !params.actorCanSensitive) {
+    return { ok: false, code: "DOCUMENT_NOT_FOUND" };
+  }
+
+  try {
+    await prisma.employeeDocument.delete({ where: { id: doc.id } });
+  } catch {
+    return { ok: false, code: "DB_FAILED" };
+  }
+  await safeDeleteAsset(doc.storageKey);
+
+  try {
+    await appendEmployeeAuditLog({
+      companyId: params.companyId,
+      employeeId: doc.employeeId,
+      action: "EMPLOYEE_DOCUMENT_DELETED",
+      actorUserId: params.actorUserId,
+      diff: {
+        documentId: doc.id,
+        title: doc.title,
+        category: doc.category,
+        sha256: doc.sha256,
+        sizeBytes: doc.sizeBytes,
+      },
+    });
+    await appendEmployeeTimeline({
+      companyId: params.companyId,
+      employeeId: doc.employeeId,
+      eventType: "EMPLOYEE_DOCUMENT_DELETED",
+      title: `Dokument i fshirë nga dosja: ${doc.title}`,
+      actorUserId: params.actorUserId,
+      metadata: { documentId: doc.id, category: doc.category },
+    });
+  } catch (err) {
+    console.error("[employee-documents] delete audit failed", err);
+  }
+
+  return { ok: true, data: { employeeId: doc.employeeId } };
+}
+
 /** Serve-time read: row + the sensitivity verdict the route must enforce. */
 export async function getEmployeeDocumentForServe(params: {
   companyId: string;
