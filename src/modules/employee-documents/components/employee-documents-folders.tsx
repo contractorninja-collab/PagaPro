@@ -13,6 +13,7 @@ import {
   EMPLOYEE_DOCUMENT_CATEGORY_ORDER,
 } from "@/modules/employee-documents/components/employee-document-labels";
 import { classifyExpiry } from "@/modules/employee-documents/services/employee-document-expiry";
+import { DocumentQuickView, type QuickViewTarget } from "@/modules/employee-documents/components/document-quick-view";
 import type { EmployeeDossierBundle, EmployeeUploadedDocSummary } from "@/modules/employee-documents/types/employee-document-types";
 
 function fmtSize(bytes: number): string {
@@ -42,12 +43,14 @@ function DocRow({
   canWrite,
   todayIso,
   onArchiveToggle,
+  onPreview,
 }: {
   doc: EmployeeUploadedDocSummary;
   employeeId: string;
   canWrite: boolean;
   todayIso: string;
   onArchiveToggle: (doc: EmployeeUploadedDocSummary) => void;
+  onPreview: (target: QuickViewTarget) => void;
 }) {
   const href = `/api/punonjesit/${employeeId}/documents/${doc.id}`;
   const Icon = doc.contentType.startsWith("image/") ? ImageIcon : FileText;
@@ -69,9 +72,20 @@ function DocRow({
       </div>
       <div className="flex shrink-0 items-center gap-3 text-[12.5px] font-medium">
         {doc.inlinePreviewable ? (
-          <a className="text-brand-blue hover:underline" href={`${href}?inline=1`} target="_blank" rel="noreferrer">
-            Hape
-          </a>
+          <button
+            type="button"
+            className="text-brand-blue hover:underline"
+            onClick={() =>
+              onPreview({
+                url: `${href}?inline=1`,
+                downloadUrl: href,
+                title: doc.title,
+                kind: doc.contentType.startsWith("image/") ? "image" : "pdf",
+              })
+            }
+          >
+            Shiko
+          </button>
         ) : null}
         <a className="text-brand-blue hover:underline" href={href}>
           Shkarko
@@ -105,6 +119,7 @@ export function EmployeeDocumentsFolders({
   const router = useRouter();
   const canWrite = useCan("documents.write");
   const [showArchived, setShowArchived] = useState(false);
+  const [preview, setPreview] = useState<QuickViewTarget | null>(null);
 
   const grouped = useMemo(() => {
     const map = new Map<EmployeeDocumentCategory, EmployeeUploadedDocSummary[]>();
@@ -175,11 +190,13 @@ export function EmployeeDocumentsFolders({
                 canWrite={canWrite}
                 todayIso={todayIso}
                 onArchiveToggle={(x) => void toggleArchive(x)}
+                onPreview={setPreview}
               />
             ))}
           </ul>
         </section>
       ))}
+      <DocumentQuickView target={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

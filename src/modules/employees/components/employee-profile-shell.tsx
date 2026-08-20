@@ -42,6 +42,7 @@ import {
   type EmployeeLeaveBundle,
 } from "@/modules/leaves/helpers/employee-leave-view";
 import { EmployeeDocumentUploadDialog } from "@/modules/employee-documents/components/employee-document-upload-dialog";
+import { DocumentQuickView, type QuickViewTarget } from "@/modules/employee-documents/components/document-quick-view";
 import { EmployeeDocumentsFolders } from "@/modules/employee-documents/components/employee-documents-folders";
 import type { EmployeeDossierBundle } from "@/modules/employee-documents/types/employee-document-types";
 
@@ -408,6 +409,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
   // ACCOUNTANT holds both, but the two are separate capabilities and this tab
   // must ask for the one it actually uses.
   const canWriteDocuments = useCan("documents.write");
+  const [quickView, setQuickView] = useState<QuickViewTarget | null>(null);
   const byCategory = useMemo(() => {
     const map = new Map<DocumentCategory, EmployeeGeneratedDocSummary[]>();
     for (const doc of bundle.generatedDocuments) {
@@ -504,9 +506,25 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                         <a href={`/api/dokumentet/artifacts/${doc.id}/docx`}>DOCX</a>
                       </Button>
                       {doc.hasPdf ? (
-                        <Button variant="secondary" size="sm" asChild>
-                          <a href={`/api/dokumentet/artifacts/${doc.id}/pdf`}>PDF</a>
-                        </Button>
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              setQuickView({
+                                url: `/api/dokumentet/artifacts/${doc.id}/pdf?inline=1`,
+                                downloadUrl: `/api/dokumentet/artifacts/${doc.id}/pdf`,
+                                title: doc.title,
+                                kind: "pdf",
+                              })
+                            }
+                          >
+                            Shiko
+                          </Button>
+                          <Button variant="secondary" size="sm" asChild>
+                            <a href={`/api/dokumentet/artifacts/${doc.id}/pdf`}>PDF</a>
+                          </Button>
+                        </>
                       ) : null}
                     </td>
                   </tr>
@@ -609,7 +627,21 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
                     <td className={cn(TD, "whitespace-nowrap text-xs tabular-nums text-[#64748b]")}>
                       {new Date(item.p.generatedAtIso).toLocaleString("sq-AL")}
                     </td>
-                    <td className={cn(TD, "text-right")}>
+                    <td className={cn(TD, "space-x-2 text-right")}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setQuickView({
+                            url: `/api/payroll-documents/${item.p.id}?inline=1`,
+                            downloadUrl: `/api/payroll-documents/${item.p.id}`,
+                            title: `PDF pagë · ${item.p.periodLabel}`,
+                            kind: "pdf",
+                          })
+                        }
+                      >
+                        Shiko
+                      </Button>
                       <Button variant="secondary" size="sm" asChild>
                         <a href={`/api/payroll-documents/${item.p.id}`}>Shkarko</a>
                       </Button>
@@ -621,6 +653,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
           </table>
         </div>
       </SectionCard>
+      <DocumentQuickView target={quickView} onClose={() => setQuickView(null)} />
     </div>
   );
 }
