@@ -268,8 +268,32 @@ export async function listArtifactAuthorsForFilter(companyId: string) {
 }
 
 export async function listArtifactsForEmployee(companyId: string, employeeId: string) {
+  /**
+   * `artifact.employeeId` alone is not enough: rows written before it was
+   * threaded through every generation path carry NULL there, while their
+   * subject link (leave request, termination, warning) still names the
+   * employee. Match through the subjects too, so the profile shows every
+   * document however it was linked. `subjectId` for CONTRACT artifacts is
+   * the employee id itself in the current flow and a Contract row id in the
+   * legacy one, so both are included.
+   */
+  const [leaves, terminations, warnings, contracts] = await Promise.all([
+    prisma.leaveRequest.findMany({ where: { companyId, employeeId }, select: { id: true } }),
+    prisma.termination.findMany({ where: { companyId, employeeId }, select: { id: true } }),
+    prisma.disciplinaryWarning.findMany({ where: { companyId, employeeId }, select: { id: true } }),
+    prisma.contract.findMany({ where: { companyId, employeeId }, select: { id: true } }),
+  ]);
   return prisma.documentGenerationArtifact.findMany({
-    where: { companyId, employeeId },
+    where: {
+      companyId,
+      OR: [
+        { employeeId },
+        { subjectKind: "LEAVE", subjectId: { in: leaves.map((r) => r.id) } },
+        { subjectKind: "TERMINATION", subjectId: { in: terminations.map((r) => r.id) } },
+        { subjectKind: "WARNING", subjectId: { in: warnings.map((r) => r.id) } },
+        { subjectKind: "CONTRACT", subjectId: { in: [employeeId, ...contracts.map((r) => r.id)] } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
     include: { templateVersion: { include: { template: true } } },
