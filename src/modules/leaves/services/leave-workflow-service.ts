@@ -7,6 +7,7 @@ import { LEAVE_ENGINE_RULE_VERSION } from "@/modules/leaves/constants/rule-versi
 import { defaultPaidAndPayrollFlags } from "@/modules/leaves/helpers/leave-type-metadata";
 import { computeLeaveMetrics } from "@/modules/leaves/services/leave-calculation-service";
 import { syncLeaveBalancesForEmployeeYear } from "@/modules/leaves/services/leave-balance-service";
+import { autoGenerateLeaveDocumentOnApproval } from "@/modules/leaves/services/leave-auto-document-service";
 import {
   findOverlappingLeaveRequest,
   payrollLockedOverlapBlock,
@@ -436,6 +437,47 @@ export async function approveLeaveRequest(params: {
       }),
     ) as Prisma.InputJsonValue,
   });
+
+  // The approval is complete at this point; the document is a product of it,
+  // not a precondition — a template problem or storage hiccup must not undo
+  // or block the decision, so failures are recorded and swallowed.
+  try {
+    const doc = await autoGenerateLeaveDocumentOnApproval({
+      companyId: params.companyId,
+      leaveRequestId: lr.id,
+      leaveType: lr.type,
+      actorUserId: params.actorUserId,
+    });
+    if (!doc.generated && doc.reason === "no-leave-templates") {
+      await appendLeaveTimeline({
+        companyId: params.companyId,
+        employeeId: lr.employeeId,
+        leaveId: lr.id,
+        eventType: "LEAVE_DOCUMENT_SKIPPED",
+        title: "Dokumenti i pushimit nuk u gjenerua",
+        body: "Kompania nuk ka asnjë shabllon pushimi. Shtoni një te Dokumentet → Shabllonet.",
+        severity: TimelineEventSeverity.WARNING,
+      });
+    }
+  } catch (e) {
+    console.error("[pagapro] auto leave document failed", {
+      leaveId: lr.id,
+      error: e instanceof Error ? e.message : e,
+    });
+    try {
+      await appendLeaveTimeline({
+        companyId: params.companyId,
+        employeeId: lr.employeeId,
+        leaveId: lr.id,
+        eventType: "LEAVE_DOCUMENT_SKIPPED",
+        title: "Dokumenti i pushimit nuk u gjenerua",
+        body: e instanceof Error ? e.message : "Gjenerimi automatik dështoi.",
+        severity: TimelineEventSeverity.WARNING,
+      });
+    } catch {
+      /* the console line above is the record of last resort */
+    }
+  }
 }
 
 export async function rejectLeaveRequest(params: {
