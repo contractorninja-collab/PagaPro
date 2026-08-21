@@ -24,6 +24,12 @@
  * names any payroll period covering it — a locked or approved period keeps the
  * snapshot it was calculated with, but a DRAFT would change on recompute.
  *
+ * Runs with --apply on EVERY production deploy (vercel-build), so the official
+ * movable feasts are present by default for any company that keeps a calendar
+ * — including ones created between deploys by scripts that predate a date.
+ * A deactivated feast (isActive=false) keeps its row and is never re-added;
+ * only a fully deleted one comes back on the next deploy.
+ *
  *   node -r dotenv/config scripts/backfill-movable-holidays.cjs            # dry run
  *   node -r dotenv/config scripts/backfill-movable-holidays.cjs --apply    # write
  */
@@ -183,6 +189,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("[movable-holidays] failed:", err);
-  process.exitCode = 1;
+  // Part of vercel-build: a holiday backfill hiccup must never block a deploy.
+  console.error("[movable-holidays] failed:", err?.message ?? err);
 });

@@ -6,9 +6,9 @@
  * to keep in vercel-build permanently. Runs BEFORE seed-templates.cjs in the
  * chain, so the new company receives all document templates in the same build.
  *
- * Mirrors provisionCompany (company row → fixed holidays → payroll parameter
- * set → leave policy) plus: one stable ADMIN login and 15 Albanian employees,
- * none contractors.
+ * Mirrors provisionCompany (company row → full official holiday calendar,
+ * fixed + known-date movable feasts → payroll parameter set → leave policy)
+ * plus: one stable ADMIN login and 15 Albanian employees, none contractors.
  */
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
@@ -47,6 +47,19 @@ const FIXED_HOLIDAYS = [
   { sourceCode: "XK_LABOUR_DAY", month: 5, day: 1, name: "Dita Ndërkombëtare e Punës" },
   { sourceCode: "XK_EUROPE_DAY", month: 5, day: 9, name: "Dita e Evropës" },
   { sourceCode: "XK_CATHOLIC_CHRISTMAS", month: 12, day: 25, name: "Krishtlindjet katolike" },
+];
+
+/**
+ * Movable feasts (Bajramet, Pashkët) — seeded only for years whose date is
+ * known; the Bajram dates come from the Islamic Community's announcement, so
+ * unknown years are left for HR rather than estimated. Keep in sync with
+ * KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS in kosovo-public-holidays.ts.
+ */
+const MOVABLE_HOLIDAYS = [
+  { sourceCode: "XK_BAJRAM_I_MADH", name: "Fitër Bajrami", datesByYear: { 2026: [3, 20] } },
+  { sourceCode: "XK_CATHOLIC_EASTER", name: "Pashkët Katolike", datesByYear: { 2026: [4, 5] } },
+  { sourceCode: "XK_ORTHODOX_EASTER", name: "Pashkët Ortodokse", datesByYear: { 2026: [4, 12] } },
+  { sourceCode: "XK_BAJRAM_I_VOGEL", name: "Kurban Bajrami", datesByYear: { 2026: [5, 27] } },
 ];
 
 /** 15 employees, Albanian names, no contractors. Deterministic — never changes. */
@@ -100,15 +113,31 @@ async function main() {
 
     const year = new Date().getUTCFullYear();
     await prisma.companyHoliday.createMany({
-      data: FIXED_HOLIDAYS.map((h) => ({
-        companyId,
-        calendarYear: year,
-        observedOn: new Date(Date.UTC(year, h.month - 1, h.day, 12, 0, 0, 0)),
-        name: h.name,
-        category: "KOSOVO_OFFICIAL_FIXED",
-        isActive: true,
-        sourceCode: h.sourceCode,
-      })),
+      data: [
+        ...FIXED_HOLIDAYS.map((h) => ({
+          companyId,
+          calendarYear: year,
+          observedOn: new Date(Date.UTC(year, h.month - 1, h.day, 12, 0, 0, 0)),
+          name: h.name,
+          category: "KOSOVO_OFFICIAL_FIXED",
+          isActive: true,
+          sourceCode: h.sourceCode,
+        })),
+        ...MOVABLE_HOLIDAYS.flatMap((h) => {
+          const known = h.datesByYear[year];
+          if (!known) return [];
+          const [month, day] = known;
+          return [{
+            companyId,
+            calendarYear: year,
+            observedOn: new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0)),
+            name: h.name,
+            category: "KOSOVO_OFFICIAL_MOVABLE",
+            isActive: true,
+            sourceCode: h.sourceCode,
+          }];
+        }),
+      ],
     });
 
     await prisma.payrollParameterSet.create({

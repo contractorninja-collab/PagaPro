@@ -51,8 +51,18 @@ const KOSOVO_OFFICIAL_FIXED_SEED = [
   { sourceCode: "XK_CATHOLIC_CHRISTMAS", month: 12, day: 25, name: "Krishtlindjet katolike" },
 ];
 
+/** Keep in sync with `KOSOVO_OFFICIAL_MOVABLE_HOLIDAY_DEFINITIONS` — only years with known dates. */
+const KOSOVO_OFFICIAL_MOVABLE_SEED = [
+  { sourceCode: "XK_BAJRAM_I_MADH", name: "Fitër Bajrami", datesByYear: { 2026: [3, 20] } },
+  { sourceCode: "XK_CATHOLIC_EASTER", name: "Pashkët Katolike", datesByYear: { 2026: [4, 5] } },
+  { sourceCode: "XK_ORTHODOX_EASTER", name: "Pashkët Ortodokse", datesByYear: { 2026: [4, 12] } },
+  { sourceCode: "XK_BAJRAM_I_VOGEL", name: "Kurban Bajrami", datesByYear: { 2026: [5, 27] } },
+];
+
 /**
- * Dev bootstrap: match app behaviour — seed Kosovo FIXED holidays for UTC current year only when no rows exist.
+ * Dev bootstrap: match app behaviour — seed the full official Kosovo calendar
+ * (fixed dates plus movable feasts with known dates) for the UTC current year,
+ * only when no rows exist.
  */
 async function maybeSeedKosovoOfficialFixedForCurrentYearIfEmpty(companyId) {
   const calendarYear = new Date().getUTCFullYear();
@@ -62,17 +72,33 @@ async function maybeSeedKosovoOfficialFixedForCurrentYearIfEmpty(companyId) {
   if (existing > 0) return;
 
   await prisma.companyHoliday.createMany({
-    data: KOSOVO_OFFICIAL_FIXED_SEED.map((h) => ({
-      companyId,
-      calendarYear,
-      observedOn: new Date(Date.UTC(calendarYear, h.month - 1, h.day, 12, 0, 0, 0)),
-      name: h.name,
-      category: "KOSOVO_OFFICIAL_FIXED",
-      isActive: true,
-      sourceCode: h.sourceCode,
-    })),
+    data: [
+      ...KOSOVO_OFFICIAL_FIXED_SEED.map((h) => ({
+        companyId,
+        calendarYear,
+        observedOn: new Date(Date.UTC(calendarYear, h.month - 1, h.day, 12, 0, 0, 0)),
+        name: h.name,
+        category: "KOSOVO_OFFICIAL_FIXED",
+        isActive: true,
+        sourceCode: h.sourceCode,
+      })),
+      ...KOSOVO_OFFICIAL_MOVABLE_SEED.flatMap((h) => {
+        const known = h.datesByYear[calendarYear];
+        if (!known) return [];
+        const [month, day] = known;
+        return [{
+          companyId,
+          calendarYear,
+          observedOn: new Date(Date.UTC(calendarYear, month - 1, day, 12, 0, 0, 0)),
+          name: h.name,
+          category: "KOSOVO_OFFICIAL_MOVABLE",
+          isActive: true,
+          sourceCode: h.sourceCode,
+        }];
+      }),
+    ],
   });
-  console.log(`Seeded Kosovo official fixed holidays for ${calendarYear} (company ${companyId}).`);
+  console.log(`Seeded Kosovo official holidays for ${calendarYear} (company ${companyId}).`);
 }
 
 function upsertDevCompanyIdInEnv(companyId) {
