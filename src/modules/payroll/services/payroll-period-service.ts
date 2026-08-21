@@ -1461,16 +1461,56 @@ export async function updatePayrollEntryAmounts(
     monthEnd,
   );
   const freshWindow = freshWindows[entry.employeeId];
+
+  /**
+   * The Largimet workflow knows the last working day BEFORE the employee row
+   * is formally terminated — creation caps by it, so recalc must too, or a
+   * leaver whose outcome is not yet applied keeps a full-month expectation.
+   */
+  const activeTermination = await prisma.termination.findFirst({
+    where: {
+      companyId,
+      employeeId: entry.employeeId,
+      status: { not: "CANCELLED" },
+      lastWorkingDay: { gte: monthStart, lte: monthEnd },
+    },
+    orderBy: { lastWorkingDay: "desc" },
+    select: { lastWorkingDay: true },
+  });
+  const lwCap = activeTermination?.lastWorkingDay ?? null;
+
   const snapshotWd = entry.expectedWorkingDays
     ? Number(entry.expectedWorkingDays)
     : fullMonthWd;
   let wd: number = Number.isFinite(snapshotWd) ? snapshotWd : fullMonthWd;
+  const holidaySet = new Set(wt.weekdayPublicHolidayDates ?? []);
   if (freshWindow?.employed) {
-    const freshWd = Math.max(
-      0,
-      countWorkingDaysInWindow(freshWindow, new Set(wt.weekdayPublicHolidayDates ?? [])),
-    );
+    const capped: EmploymentWindow = lwCap
+      ? {
+          ...freshWindow,
+          segments: freshWindow.segments
+            .map((seg) => ({
+              start: seg.start,
+              end: seg.end.getTime() < lwCap.getTime() ? seg.end : lwCap,
+            }))
+            .filter((seg) => seg.start.getTime() <= seg.end.getTime()),
+        }
+      : freshWindow;
+    const freshWd = Math.max(0, countWorkingDaysInWindow(capped, holidaySet));
     if (freshWd < wd) wd = freshWd;
+  } else if (lwCap) {
+    const effectiveStart =
+      entry.employee.hireDate.getTime() > monthStart.getTime()
+        ? entry.employee.hireDate
+        : monthStart;
+    const cappedWd = Math.max(
+      0,
+      countWorkingDaysInWindow(
+        { employed: true, partial: true, segments: [{ start: effectiveStart, end: lwCap }] },
+        holidaySet,
+      ),
+    );
+    if (cappedWd < wd) wd = cappedWd;
   }
   const expHours =
     wd !== snapshotWd || entry.expectedRegularHours == null
@@ -1529,7 +1569,22 @@ export async function updatePayrollEntryAmounts(
     calendarSnapshot,
   );
 
-  if (!calc.ok) return { ok: false, error: calc.issues.map((i) => i.message).join("; ") };
+  if (!calc.ok) {
+    const below = calc.issues.some(
+      (i) => i.code === "BELOW_MINIMUM_GROSS" || i.code === "BELOW_MINIMUM_HOURLY",
+    );
+    if (below) {
+      const who = `${entry.employee.firstName} ${entry.employee.lastName}`.trim();
+      return {
+        ok: false,
+        error:
+          `${who}: bruto e llogaritur bie nën pagën minimale për një muaj të plotë pune. ` +
+          `Për largim/punësim mes muajit, regjistroni datën e fundit të punës te Largimet — ` +
+          `rreshti pro-ratohet automatikisht dhe minimumi nuk zbatohet për muaj të pjesshëm.`,
+      };
+    }
+    return { ok: false, error: calc.issues.map((i) => i.message).join("; ") };
+  }
 
   const v = calc.value;
 

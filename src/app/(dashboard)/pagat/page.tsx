@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
 import { PayrollsPageClient } from "@/modules/payroll/components/payrolls-page-client";
 import { listPayrollsForCompany } from "@/modules/payroll/services/payroll-period-service";
+import { isContractorPayrollAvailable } from "@/modules/payroll/contractor/contractor-payroll-service";
 import { requireCompanyContextPage } from "@/server/company-context";
 
 export const metadata: Metadata = {
@@ -13,18 +13,15 @@ export default async function PagatPage() {
 
   const initialYear = new Date().getFullYear();
   try {
-    const [rows, company] = await Promise.all([
+    const [rows, contractorAvailable] = await Promise.all([
       listPayrollsForCompany(companyId),
-      prisma.company.findUnique({
-        where: { id: companyId },
-        select: { contractorPayrollEnabled: true },
-      }),
+      isContractorPayrollAvailable(companyId),
     ]);
     return (
       <PayrollsPageClient
         initialRows={rows}
         initialYear={initialYear}
-        contractorEnabled={company?.contractorPayrollEnabled ?? false}
+        contractorEnabled={contractorAvailable}
       />
     );
   } catch (err) {

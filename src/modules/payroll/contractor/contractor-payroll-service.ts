@@ -20,6 +20,26 @@ import { recomputeTimeClockDaysForRange } from "@/modules/timeclock/services/tim
  * punch classification) is reused, not copied.
  */
 
+/**
+ * Contractor payroll is available when the admin flag says so OR the company
+ * actually has contractors. Gating the only path that can pay a contractor
+ * behind a manual console flag stranded companies that imported contractors
+ * before anyone flipped it.
+ */
+export async function isContractorPayrollAvailable(companyId: string): Promise<boolean> {
+  const [company, contractorCount] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { contractorPayrollEnabled: true },
+    }),
+    prisma.employee.count({
+      where: { companyId, employmentType: "CONTRACTOR", status: { not: "TERMINATED" } },
+    }),
+  ]);
+  if (!company) return false;
+  return company.contractorPayrollEnabled || contractorCount > 0;
+}
+
 export interface ContractorHoursInput {
   regularHours: string;
   overtimeHours: string;
@@ -247,12 +267,9 @@ export async function createContractorPayrollPeriod(params: {
 }): Promise<ContractorServiceResult<{ id: string }>> {
   const { companyId, year, month, actorUserId } = params;
   try {
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { contractorPayrollEnabled: true },
-    });
-    if (!company) return { ok: false, code: "NOT_FOUND" };
-    if (!company.contractorPayrollEnabled) return { ok: false, code: "NOT_ENABLED" };
+    if (!(await isContractorPayrollAvailable(companyId))) {
+      return { ok: false, code: "NOT_ENABLED" };
+    }
 
     const existing = await prisma.contractorPayrollPeriod.findUnique({
       where: { companyId_year_month: { companyId, year, month } },

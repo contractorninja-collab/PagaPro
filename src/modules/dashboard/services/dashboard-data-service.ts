@@ -620,7 +620,10 @@ async function loadDashboardOperationalDataUncached(
     loadDashboardCostMetrics(companyId, filters.year, filters.month),
   ]);
 
-  const contractorEnabled = companyFlags?.contractorPayrollEnabled ?? false;
+  const contractorHeadcount = await prisma.employee.count({
+    where: { companyId, employmentType: "CONTRACTOR", status: { not: "TERMINATED" } },
+  });
+  const contractorEnabled = (companyFlags?.contractorPayrollEnabled ?? false) || contractorHeadcount > 0;
   const contractorPeriods = contractorEnabled
     ? await listContractorPayrollsForCompany(companyId)
     : [];
