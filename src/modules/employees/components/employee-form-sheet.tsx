@@ -691,26 +691,39 @@ export function EmployeeFormSheet(props: {
                 />
               </FormField>
               <FormField label="Statusi" error={fieldErrors.status}>
-                <select
-                  className={cn(
-                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                    errClass("status"),
-                  )}
-                  value={values.status}
-                  onChange={(e) => {
-                    clearKey("status");
-                    setValues((s) => ({
-                      ...s,
-                      status: e.target.value as EmployeeFormValues["status"],
-                    }));
-                  }}
-                  disabled={pending}
-                >
-                  <option value="ACTIVE">Aktiv</option>
-                  <option value="INACTIVE">Jo aktiv</option>
-                  <option value="ON_LEAVE">Në pushim</option>
-                  <option value="SUSPENDED">Pezulluar</option>
-                </select>
+                {initialDetail?.status === "TERMINATED" ? (
+                  <>
+                    {/* The service pins a terminated status regardless of what the
+                        form sends; showing an editable select would be a lie. */}
+                    <div className="flex h-10 w-full items-center rounded-md border border-input bg-fill-faint px-3 text-sm text-ink-500">
+                      I larguar
+                    </div>
+                    <p className="mt-1 text-[11.5px] text-ink-400">
+                      Statusi ndryshohet vetëm me &quot;Rikthe në punë&quot; te profili.
+                    </p>
+                  </>
+                ) : (
+                  <select
+                    className={cn(
+                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
+                      errClass("status"),
+                    )}
+                    value={values.status}
+                    onChange={(e) => {
+                      clearKey("status");
+                      setValues((s) => ({
+                        ...s,
+                        status: e.target.value as EmployeeFormValues["status"],
+                      }));
+                    }}
+                    disabled={pending}
+                  >
+                    <option value="ACTIVE">Aktiv</option>
+                    <option value="INACTIVE">Jo aktiv</option>
+                    <option value="ON_LEAVE">Në pushim</option>
+                    <option value="SUSPENDED">Pezulluar</option>
+                  </select>
+                )}
               </FormField>
               <FormField label="Lloji i punonjësit" error={fieldErrors.employmentType}>
                 <select

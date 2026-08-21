@@ -863,10 +863,16 @@ export function EmployeeProfileShell(props: {
    * together would print "Profili është i mbyllur (i larguar)" at a read-only
    * member looking at a perfectly active employee.
    */
-  const canEdit = employee.status !== "TERMINATED";
+  /**
+   * Terminated profiles stay editable — corrections to personal data, bank
+   * details and documents are normal after a departure. The service pins the
+   * status, so an edit can never quietly reactivate someone; "Rikthe në punë"
+   * remains the only path back.
+   */
+  const isTerminated = employee.status === "TERMINATED";
   const canWriteEmployees = useCan("employees.write");
   const canWriteDocumentsTab = useCan("documents.write");
-  const mayEdit = canEdit && canWriteEmployees;
+  const mayEdit = canWriteEmployees;
 
   useEffect(() => {
     if (!openEditDocuments || !mayEdit) return;
@@ -919,16 +925,15 @@ export function EmployeeProfileShell(props: {
             <SubBarStatus tone="neutral">{EMPLOYMENT_TYPE_LABELS[employee.employmentType]}</SubBarStatus>
           </>
         }
-        description={canEdit ? metaLine : `${metaLine} — Profili është i mbyllur (i larguar).`}
+        description={isTerminated ? `${metaLine} — I larguar; statusi ndryshohet vetëm me rikthim në punë.` : metaLine}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SalaryVisibilityToggle />
+            {mayEdit && isTerminated ? <RehireControl employeeId={employee.id} onDone={reload} /> : null}
             {mayEdit ? (
               <Button type="button" onClick={() => setSheetOpen(true)}>
                 Ndrysho profilin
               </Button>
-            ) : canWriteEmployees && !canEdit ? (
-              <RehireControl employeeId={employee.id} onDone={reload} />
             ) : null}
           </div>
         }

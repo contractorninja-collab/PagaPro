@@ -499,7 +499,7 @@ export async function updateEmployee(
   | { ok: true }
   | {
       ok: false;
-      code: "NOT_FOUND" | "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "INVALID_JOB_TITLE" | "TERMINATED_LOCKED" | "DB_ERROR";
+      code: "NOT_FOUND" | "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "INVALID_JOB_TITLE" | "DB_ERROR";
       message?: string;
     }
 > {
@@ -515,7 +515,14 @@ export async function updateEmployee(
     },
   });
   if (!existing) return { ok: false, code: "NOT_FOUND" };
-  if (existing.status === "TERMINATED") return { ok: false, code: "TERMINATED_LOCKED" };
+  /**
+   * Terminated profiles stay editable — names, bank details and documents
+   * often need correcting after someone leaves (final payment, tax filings).
+   * What a plain edit must never do is resurrect them: the form has no
+   * TERMINATED option, so its status value would silently reactivate the
+   * person into payroll. The status is pinned; rehire is the only way back.
+   */
+  const statusForUpdate = existing.status === "TERMINATED" ? "TERMINATED" : input.status;
 
   if (input.departmentId) {
     const d = await prisma.department.findFirst({
@@ -544,7 +551,7 @@ export async function updateEmployee(
           departmentId: input.departmentId ?? null,
           jobTitleId: selectedJobTitle.id,
           employmentType: input.employmentType,
-          status: input.status,
+          status: statusForUpdate,
           workArrangement: input.workArrangement,
           firstName: input.firstName,
           lastName: input.lastName,
@@ -615,7 +622,9 @@ export async function updateEmployee(
       fields: Object.keys(input),
     });
 
-    if (existing.status !== input.status) {
+    // Pinned status on a terminated profile: no change happened, so no
+    // STATUS_CHANGED history may be written either.
+    if (existing.status !== statusForUpdate && existing.status !== "TERMINATED") {
       try {
         await appendEmployeeEmploymentHistory({
           companyId,

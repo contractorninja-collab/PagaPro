@@ -183,9 +183,6 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
     const res = await updateEmployee(companyId, employeeId, parsed.data, user.id);
     if (!res.ok) {
       if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
-      if (res.code === "TERMINATED_LOCKED") {
-        return { ok: false, error: "Punonjësit e larguar nuk mund të përpunohen nga ky formular." };
-      }
       if (res.code === "DUPLICATE_PERSONAL_ID") {
         return {
           ok: false,
