@@ -155,17 +155,19 @@ function RehireControl({
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Data e rikthimit</label>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      </div>
-      <Button type="button" disabled={busy} onClick={() => void submit()}>
+    // One h-9 row — the stacked label made this control taller than its
+    // neighbours and broke the sub-bar's baseline. The date names itself via
+    // aria-label/title instead.
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="date"
+        value={date}
+        aria-label="Data e rikthimit"
+        title="Data e rikthimit"
+        onChange={(e) => setDate(e.target.value)}
+        className="h-9 rounded-[9px] border border-line bg-white px-3 text-[13px] text-ink-700 transition-colors focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/25"
+      />
+      <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit()}>
         Rikthe në punë
       </Button>
     </div>
