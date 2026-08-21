@@ -39,6 +39,7 @@ import { DocumentPreviewSheet } from "@/modules/documents/components/document-pr
 import type { DocumentRegisterCounts } from "@/modules/documents/services/document-queries";
 
 export interface ArtifactRow {
+  rowType: "artifact";
   id: string;
   title: string;
   displayFilename: string;
@@ -55,8 +56,26 @@ export interface ArtifactRow {
   hasPdf: boolean;
 }
 
+/**
+ * An issued disciplinary warning. It lives in its own table and its document
+ * renders on demand — no artifact exists, so it gets its own row shape with
+ * print/download actions instead of the artifact preview sheet.
+ */
+export interface WarningRow {
+  rowType: "warning";
+  id: string;
+  employeeId: string;
+  title: string;
+  summary: string;
+  createdAt: string;
+  createdAtLabel: string;
+  employeeLabel: string | null;
+}
+
+export type RegisterRow = ArtifactRow | WarningRow;
+
 export interface DocumentsDashboardClientProps {
-  artifacts: ArtifactRow[];
+  rows: RegisterRow[];
   counts: DocumentRegisterCounts;
   page: { page: number; pageCount: number; total: number; pageSize: number };
   filtersActive: boolean;
@@ -144,9 +163,15 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
     }
   }
 
-  const ids = useMemo(() => props.artifacts.map((a) => a.id), [props.artifacts]);
+  // Selection and the preview sheet are artifact affordances — warnings render
+  // on demand and are excluded from bulk artifact endpoints by construction.
+  const artifacts = useMemo(
+    () => props.rows.filter((r): r is ArtifactRow => r.rowType === "artifact"),
+    [props.rows],
+  );
+  const ids = useMemo(() => artifacts.map((a) => a.id), [artifacts]);
   const allOnPageSelected = ids.length > 0 && ids.every((id) => selected.has(id));
-  const previewArtifact = props.artifacts.find((a) => a.id === previewId) ?? null;
+  const previewArtifact = artifacts.find((a) => a.id === previewId) ?? null;
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -339,7 +364,7 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
 
       {/* Register — mobile cards */}
       <div className="space-y-3 md:hidden">
-        {props.artifacts.length > 0 ? (
+        {artifacts.length > 0 ? (
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -357,10 +382,14 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
           </div>
         ) : null}
 
-        {props.artifacts.length === 0 ? (
+        {props.rows.length === 0 ? (
           <EmptyRegister filtersActive={props.filtersActive} />
         ) : (
-          props.artifacts.map((a) => {
+          props.rows.map((row) => {
+            if (row.rowType === "warning") {
+              return <WarningCardMobile key={`w-${row.id}`} row={row} />;
+            }
+            const a = row;
             const isSelected = selected.has(a.id);
             return (
               <div
@@ -492,14 +521,18 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
               </tr>
             </thead>
             <tbody>
-              {props.artifacts.length === 0 ? (
+              {props.rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-10">
                     <EmptyRegister filtersActive={props.filtersActive} bare />
                   </td>
                 </tr>
               ) : (
-                props.artifacts.map((a) => {
+                props.rows.map((row) => {
+                  if (row.rowType === "warning") {
+                    return <WarningRowDesktop key={`w-${row.id}`} row={row} />;
+                  }
+                  const a = row;
                   const templateDiffersFromTitle = a.templateName.trim() !== a.title.trim();
                   return (
                     <tr
@@ -624,6 +657,105 @@ export function DocumentsDashboardClient(props: DocumentsDashboardClientProps) {
         artifact={previewArtifact}
         onOpenChange={(o) => !o && closePreview()}
       />
+    </div>
+  );
+}
+
+/** Print preview doubles as "Shiko" — the warning's document renders on demand. */
+function warningPrintHref(row: WarningRow): string {
+  return `/api/dokumentet/print?warningIds=${encodeURIComponent(row.id)}`;
+}
+function warningDocxHref(row: WarningRow): string {
+  return `/api/punonjesit/${row.employeeId}/verejtje/${row.id}/document`;
+}
+
+function WarningActions({ row }: { row: WarningRow }) {
+  return (
+    <>
+      <a
+        className={docBtnSecondaryDense}
+        href={warningPrintHref(row)}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Shiko ${row.title}`}
+        title="Shiko"
+      >
+        <Eye className="h-3.5 w-3.5" aria-hidden />
+      </a>
+      <a
+        className={docBtnSecondaryDense}
+        href={warningDocxHref(row)}
+        aria-label="Shkarko DOCX"
+        title="Shkarko"
+      >
+        <Download className="h-3.5 w-3.5" aria-hidden />
+      </a>
+    </>
+  );
+}
+
+function WarningRowDesktop({ row }: { row: WarningRow }) {
+  return (
+    <tr className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint">
+      {/* No checkbox: bulk print/ZIP act on stored artifacts only. */}
+      <td className={docTableCell} />
+      <td className={docTableCell}>
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-tone-warning-fg" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link
+                href={`/punonjesit/${row.employeeId}`}
+                className="text-[13.5px] font-semibold text-ink-900 hover:text-brand-blue"
+              >
+                {row.title}
+              </Link>
+              <CategoryChip category="WARNING" />
+            </div>
+            <span className="block truncate text-[12px] text-ink-400">{row.summary}</span>
+          </div>
+        </div>
+      </td>
+      <td className={cn(docTableCell, "text-[13px] text-ink-700")}>{row.employeeLabel ?? "—"}</td>
+      <td className={cn(docTableCell, "whitespace-nowrap")}>
+        <span className="block text-[12.5px] tabular-nums text-ink-500">{row.createdAtLabel}</span>
+      </td>
+      <td className={cn(docTableCell, "text-right")}>
+        <div className="flex items-center justify-end gap-1.5">
+          <WarningActions row={row} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function WarningCardMobile({ row }: { row: WarningRow }) {
+  return (
+    <div className={cn(docCard, "p-4")}>
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-tone-warning-fg" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/punonjesit/${row.employeeId}`}
+            className="block truncate text-[13.5px] font-semibold text-ink-900"
+          >
+            {row.title}
+          </Link>
+          <p className="mt-0.5 truncate text-[12px] text-ink-400">{row.summary}</p>
+        </div>
+        <CategoryChip category="WARNING" />
+      </div>
+      {row.employeeLabel ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[12px] text-ink-500">{row.employeeLabel}</span>
+        </div>
+      ) : null}
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-line-soft pt-3">
+        <span className="block text-[11.5px] tabular-nums text-ink-500">{row.createdAtLabel}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <WarningActions row={row} />
+        </div>
+      </div>
     </div>
   );
 }

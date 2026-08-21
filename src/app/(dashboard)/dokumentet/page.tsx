@@ -9,7 +9,7 @@ import { WarningIssueTrigger } from "@/modules/documents/components/warning-issu
 import {
   getDocumentRegisterCounts,
   listArtifactAuthorsForFilter,
-  listDocumentArtifactsPage,
+  listDocumentRegisterPage,
   listDocumentTemplatesWithVersions,
   listEmployeesForDocumentFilters,
 } from "@/modules/documents/services/document-queries";
@@ -67,15 +67,15 @@ export default async function DokumentetPage({
     createdByUserId: authorId || undefined,
   } as const;
 
-  let artifactPage;
+  let registerPage;
   let counts;
   let templates;
   let employees;
   let authors;
 
   try {
-    [artifactPage, counts, templates, employees, authors] = await Promise.all([
-      listDocumentArtifactsPage(companyId, filters, pageNumber),
+    [registerPage, counts, templates, employees, authors] = await Promise.all([
+      listDocumentRegisterPage(companyId, filters, pageNumber),
       getDocumentRegisterCounts(companyId),
       listDocumentTemplatesWithVersions(companyId),
       listEmployeesForDocumentFilters(companyId),
@@ -102,21 +102,43 @@ export default async function DokumentetPage({
     );
   }
 
-  const artifactRows = artifactPage.rows.map((a) => ({
-    id: a.id,
-    title: a.title,
-    displayFilename: a.displayFilename,
-    documentCategory: a.documentCategory,
-    kind: a.kind,
-    generationStatus: a.generationStatus,
-    createdAt: a.createdAt.toISOString(),
-    createdAtLabel: a.createdAt.toLocaleString("sq-AL", { dateStyle: "short", timeStyle: "short" }),
-    isArchived: a.isArchived,
-    employeeLabel: a.employee ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : null,
-    templateName: a.templateVersion.template.name,
-    authorLabel: a.createdBy ? a.createdBy.displayName?.trim() || a.createdBy.email || null : null,
-    hasPdf: Boolean(a.generatedPdfStorageKey),
-  }));
+  const MEASURE_TITLES: Record<string, string> = {
+    ME_SHKRIM: "Vërejtje me shkrim",
+    VERBALE: "Vërejtje me gojë",
+  };
+
+  const registerRows = registerPage.rows.map((row) => {
+    if (row.rowType === "warning") {
+      const w = row.warning;
+      return {
+        rowType: "warning" as const,
+        id: w.id,
+        employeeId: w.employeeId,
+        title: MEASURE_TITLES[w.measure ?? ""] ?? "Vërejtje disiplinore",
+        summary: w.summary,
+        createdAt: w.issuedAt.toISOString(),
+        createdAtLabel: w.issuedAt.toLocaleDateString("sq-AL", { dateStyle: "short" }),
+        employeeLabel: w.employeeLabel,
+      };
+    }
+    const a = row.artifact;
+    return {
+      rowType: "artifact" as const,
+      id: a.id,
+      title: a.title,
+      displayFilename: a.displayFilename,
+      documentCategory: a.documentCategory,
+      kind: a.kind,
+      generationStatus: a.generationStatus,
+      createdAt: a.createdAt.toISOString(),
+      createdAtLabel: a.createdAt.toLocaleString("sq-AL", { dateStyle: "short", timeStyle: "short" }),
+      isArchived: a.isArchived,
+      employeeLabel: a.employee ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : null,
+      templateName: a.templateVersion.template.name,
+      authorLabel: a.createdBy ? a.createdBy.displayName?.trim() || a.createdBy.email || null : null,
+      hasPdf: Boolean(a.generatedPdfStorageKey),
+    };
+  });
 
   const templateSummary = {
     total: templates.length,
@@ -159,13 +181,13 @@ export default async function DokumentetPage({
         }
       />
       <DocumentsDashboardClient
-        artifacts={artifactRows}
+        rows={registerRows}
         counts={counts}
         page={{
-          page: artifactPage.page,
-          pageCount: artifactPage.pageCount,
-          total: artifactPage.total,
-          pageSize: artifactPage.pageSize,
+          page: registerPage.page,
+          pageCount: registerPage.pageCount,
+          total: registerPage.total,
+          pageSize: registerPage.pageSize,
         }}
         filtersActive={filtersActive}
         templateSummary={templateSummary}

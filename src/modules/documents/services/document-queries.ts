@@ -36,16 +36,8 @@ function artifactWhere(
   if (filters.archived === "yes") where.isArchived = true;
   if (filters.archived === "no") where.isArchived = false;
 
-  if (filters.month?.trim()) {
-    const [ys, ms] = filters.month.split("-");
-    const y = Number(ys);
-    const mo = Number(ms);
-    if (Number.isFinite(y) && Number.isFinite(mo) && mo >= 1 && mo <= 12) {
-      const start = new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0, 0));
-      const end = new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0));
-      where.createdAt = { gte: start, lt: end };
-    }
-  }
+  const window = monthWindow(filters.month);
+  if (window) where.createdAt = window;
 
   const q = filters.q?.trim();
   if (q) {
@@ -102,6 +94,155 @@ export async function listDocumentArtifactsPage(
 
   return {
     rows,
+    total,
+    page: safePage,
+    pageSize: DOCUMENTS_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / DOCUMENTS_PAGE_SIZE)),
+  };
+}
+
+function monthWindow(month?: string): { gte: Date; lt: Date } | null {
+  if (!month?.trim()) return null;
+  const [ys, ms] = month.split("-");
+  const y = Number(ys);
+  const mo = Number(ms);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) return null;
+  return {
+    gte: new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0, 0)),
+    lt: new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0)),
+  };
+}
+
+export interface WarningRegisterRow {
+  id: string;
+  employeeId: string;
+  employeeLabel: string | null;
+  measure: string | null;
+  summary: string;
+  issuedAt: Date;
+}
+
+export type DocumentRegisterRow =
+  | { rowType: "artifact"; artifact: Awaited<ReturnType<typeof findArtifactPage>>[number] }
+  | { rowType: "warning"; warning: WarningRegisterRow };
+
+export interface DocumentRegisterPage {
+  rows: DocumentRegisterRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/**
+ * Warnings that belong on the register for these filters. "Lësho vërejtje"
+ * stores a disciplinary_warnings row and renders its document on demand —
+ * there is no artifact — so the register lists them from their own table.
+ * Filters that cannot apply exclude them honestly: warnings have no archive
+ * state (hidden under "vetëm arkivi") and store no author (hidden when the
+ * author filter is set).
+ */
+function warningRegisterWhere(
+  companyId: string,
+  filters: ArtifactListFilters,
+): Prisma.DisciplinaryWarningWhereInput | null {
+  if (filters.documentCategory && filters.documentCategory !== "WARNING") return null;
+  if (filters.archived === "yes") return null;
+  if (filters.createdByUserId) return null;
+
+  const where: Prisma.DisciplinaryWarningWhereInput = {
+    companyId,
+    status: { not: "VOID" },
+  };
+  if (filters.employeeId) where.employeeId = filters.employeeId;
+
+  const window = monthWindow(filters.month);
+  if (window) where.issuedAt = window;
+
+  const q = filters.q?.trim();
+  if (q) {
+    where.OR = [
+      { summary: { contains: q, mode: "insensitive" } },
+      { employee: { firstName: { contains: q, mode: "insensitive" } } },
+      { employee: { lastName: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+  return where;
+}
+
+/**
+ * One page of the register with artifacts AND issued warnings interleaved by
+ * date. Both sources are fetched up to the requested window and merge-sorted,
+ * so pagination stays correct across the union without a SQL UNION.
+ */
+export async function listDocumentRegisterPage(
+  companyId: string,
+  filters: ArtifactListFilters,
+  page = 1,
+): Promise<DocumentRegisterPage> {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const windowEnd = safePage * DOCUMENTS_PAGE_SIZE;
+
+  const artifactsWhere = artifactWhere(companyId, filters);
+  const warningsWhere = warningRegisterWhere(companyId, filters);
+
+  const [artifactTotal, artifacts, warningTotal, warnings] = await Promise.all([
+    prisma.documentGenerationArtifact.count({ where: artifactsWhere }),
+    prisma.documentGenerationArtifact.findMany({
+      where: artifactsWhere,
+      orderBy: { createdAt: "desc" },
+      take: windowEnd,
+      include: {
+        templateVersion: { include: { template: true } },
+        employee: { select: { id: true, firstName: true, lastName: true } },
+        createdBy: { select: { id: true, displayName: true, email: true } },
+      },
+    }),
+    warningsWhere ? prisma.disciplinaryWarning.count({ where: warningsWhere }) : Promise.resolve(0),
+    warningsWhere
+      ? prisma.disciplinaryWarning.findMany({
+          where: warningsWhere,
+          orderBy: { issuedAt: "desc" },
+          take: windowEnd,
+          select: {
+            id: true,
+            employeeId: true,
+            issuedAt: true,
+            summary: true,
+            measure: true,
+            employee: { select: { firstName: true, lastName: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const merged: Array<{ at: number; row: DocumentRegisterRow }> = [
+    ...artifacts.map((artifact) => ({
+      at: artifact.createdAt.getTime(),
+      row: { rowType: "artifact", artifact } satisfies DocumentRegisterRow,
+    })),
+    ...warnings.map((w) => ({
+      at: w.issuedAt.getTime(),
+      row: {
+        rowType: "warning",
+        warning: {
+          id: w.id,
+          employeeId: w.employeeId,
+          employeeLabel: w.employee
+            ? `${w.employee.firstName} ${w.employee.lastName}`.trim()
+            : null,
+          measure: w.measure,
+          summary: w.summary,
+          issuedAt: w.issuedAt,
+        },
+      } satisfies DocumentRegisterRow,
+    })),
+  ];
+  merged.sort((a, b) => b.at - a.at);
+
+  const total = artifactTotal + warningTotal;
+  return {
+    rows: merged.slice((safePage - 1) * DOCUMENTS_PAGE_SIZE, windowEnd).map((m) => m.row),
     total,
     page: safePage,
     pageSize: DOCUMENTS_PAGE_SIZE,
