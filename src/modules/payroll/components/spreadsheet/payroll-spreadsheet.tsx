@@ -460,7 +460,7 @@ export function PayrollSpreadsheet(props: {
                   <td className={cn(footCell, "font-bold text-ink-900")}>€{footTaxable}</td>
                   <td
                     className={cn(
-                      "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-[#1d4ed8] [font-variant-numeric:tabular-nums]",
+                      "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-brand-blue-strong [font-variant-numeric:tabular-nums]",
                       stickyShadowRight,
                     )}
                   >
@@ -515,7 +515,7 @@ export function PayrollSpreadsheet(props: {
               <dt className="text-ink-500">Tatimi</dt>
               <dd className="text-right text-ink-700">€{e.pitWithheld}</dd>
               <dt className="text-ink-500">Neto</dt>
-              <dd className="text-right font-bold text-[#1d4ed8]">€{e.netPay}</dd>
+              <dd className="text-right font-bold text-brand-blue-strong">€{e.netPay}</dd>
               <dt className="text-ink-500">Trust 2</dt>
               <dd className="text-right text-ink-700">€{e.pensionEmployer}</dd>
             </dl>

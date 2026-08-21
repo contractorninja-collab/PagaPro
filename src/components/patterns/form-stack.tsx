@@ -31,8 +31,10 @@ export function FormField({ label, hint, error, required, children, className }:
           </span>
         ) : null}
       </div>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {children}
+      {/* Below the control, so inputs in adjacent columns share a baseline —
+          a hint above pushed its input down and broke the row alignment. */}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {error ? (
         <p className="text-xs font-medium text-destructive" role="alert">
           {error}

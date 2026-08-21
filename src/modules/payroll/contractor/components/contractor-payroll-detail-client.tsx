@@ -440,7 +440,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                         <td className={cn(footCell, "border-l border-line")} colSpan={3} />
                         <td
                           className={cn(
-                            "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-[#1d4ed8] [font-variant-numeric:tabular-nums]",
+                            "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-brand-blue-strong [font-variant-numeric:tabular-nums]",
                             stickyShadowRight,
                           )}
                         >
@@ -479,7 +479,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                           {flat ? "Mujore fikse" : `Orë · €${e.hourlyRate}`}
                         </p>
                       </div>
-                      <p className="text-right text-sm font-bold text-[#1d4ed8] [font-variant-numeric:tabular-nums]">
+                      <p className="text-right text-sm font-bold text-brand-blue-strong [font-variant-numeric:tabular-nums]">
                         €{e.grossPay}
                       </p>
                     </div>
