@@ -13,17 +13,15 @@ import {
   paidLeaveFromCombinedTotal,
 } from "@/modules/payroll/helpers/leave-hours-cell";
 import { cn } from "@/lib/utils";
+import {
+  CELL_BASE,
+  cellTone,
+  parseNum,
+  sumPlainEuro,
+  useSavedPulse,
+} from "@/modules/payroll/components/spreadsheet/spreadsheet-primitives";
 
 type Entry = PayrollDetailDto["entries"][number];
-
-function sumPlainEuro(vals: string[]): string {
-  let t = 0;
-  for (const v of vals) {
-    const n = Number(v.replace(",", "."));
-    if (!Number.isNaN(n)) t += n;
-  }
-  return t.toFixed(2);
-}
 
 function formatHourlyRateDisplay(raw: string): string {
   const n = Number(String(raw).trim().replace(",", "."));
@@ -43,11 +41,6 @@ function trustHeaderLabel(title: string, rateDecimalStr?: string): string {
   return `${title} (${pct.toFixed(dec)}%)`;
 }
 
-function parseNum(s: string): number | null {
-  const n = Number(String(s).trim().replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
-
 /**
  * Cell state drives the border colour, and each state means exactly one thing:
  *
@@ -57,33 +50,6 @@ function parseNum(s: string): number | null {
  *   blue     — in flight
  *   emerald  — just saved, fading back to neutral
  */
-type CellState = "idle" | "saving" | "saved";
-
-const CELL_BASE =
-  "box-border h-[26px] w-full min-w-[52px] rounded-md border px-2 text-right text-xs leading-tight outline-none transition-colors [font-variant-numeric:tabular-nums] focus:border-brand-blue focus:bg-white disabled:cursor-not-allowed disabled:opacity-60";
-
-function cellTone(state: CellState, deviates: boolean): string {
-  if (state === "saving") return "border-brand-blue bg-white text-ink-700";
-  if (state === "saved") return "border-[#6ee7b7] bg-[#ecfdf5] text-[#047857]";
-  if (deviates) return "border-[#fde68a] bg-[#fffbeb] text-[#b45309]";
-  return "border-line bg-fill-faint text-ink-600";
-}
-
-/** Holds the "just saved" tint briefly, then clears it. */
-function useSavedPulse(): [CellState, (s: CellState) => void] {
-  const [state, setState] = useState<CellState>("idle");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const set = useCallback((next: CellState) => {
-    setState(next);
-    if (timer.current) clearTimeout(timer.current);
-    if (next === "saved") timer.current = setTimeout(() => setState("idle"), 1400);
-  }, []);
-
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  return [state, set];
-}
-
 function CellInput(props: {
   disabled: boolean;
   entryId: string;
