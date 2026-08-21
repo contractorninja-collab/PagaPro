@@ -140,28 +140,40 @@ export async function getDocumentRegisterCounts(
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [byKind, archived, failed, byCategoryThisMonth, total] = await Promise.all([
-    prisma.documentGenerationArtifact.groupBy({
-      by: ["kind"],
-      where: { companyId },
-      _count: { _all: true },
-    }),
-    prisma.documentGenerationArtifact.count({ where: { companyId, isArchived: true } }),
-    prisma.documentGenerationArtifact.count({
-      where: { companyId, generationStatus: "FAILED" },
-    }),
-    prisma.documentGenerationArtifact.groupBy({
-      by: ["documentCategory"],
-      where: { companyId, createdAt: { gte: monthStart, lt: monthEnd } },
-      _count: { _all: true },
-    }),
-    prisma.documentGenerationArtifact.count({ where: { companyId } }),
-  ]);
+  const [byKind, archived, failed, byCategoryThisMonth, total, disciplinaryThisMonth] =
+    await Promise.all([
+      prisma.documentGenerationArtifact.groupBy({
+        by: ["kind"],
+        where: { companyId },
+        _count: { _all: true },
+      }),
+      prisma.documentGenerationArtifact.count({ where: { companyId, isArchived: true } }),
+      prisma.documentGenerationArtifact.count({
+        where: { companyId, generationStatus: "FAILED" },
+      }),
+      prisma.documentGenerationArtifact.groupBy({
+        by: ["documentCategory"],
+        where: { companyId, createdAt: { gte: monthStart, lt: monthEnd } },
+        _count: { _all: true },
+      }),
+      prisma.documentGenerationArtifact.count({ where: { companyId } }),
+      // "Lësho vërejtje" writes disciplinary_warnings and renders its document
+      // on demand — no artifact row exists, so counting artifacts alone showed
+      // 0 no matter how many warnings HR issued this month.
+      prisma.disciplinaryWarning.count({
+        where: {
+          companyId,
+          status: { not: "VOID" },
+          issuedAt: { gte: monthStart, lt: monthEnd },
+        },
+      }),
+    ]);
 
   const monthByCategory = { ...EMPTY_CATEGORY_COUNTS };
   for (const row of byCategoryThisMonth) {
     monthByCategory[row.documentCategory] = row._count._all;
   }
+  monthByCategory.WARNING += disciplinaryThisMonth;
 
   return {
     total,
