@@ -280,7 +280,7 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
           <div className="rounded-xl border border-line bg-white px-6 py-14 text-center shadow-card">
             <p className="text-sm font-semibold text-ink-900">Nuk ka kontraktorë në këtë periudhë.</p>
             <p className="mx-auto mt-2 max-w-md text-[13px] text-ink-500">
-              Shtypni „Rifresko listën" për t'i mbushur rreshtat nga kontraktorët aktivë.
+              Shtypni &bdquo;Rifresko listën&rdquo; për t&apos;i mbushur rreshtat nga kontraktorët aktivë.
             </p>
           </div>
         ) : (
