@@ -217,6 +217,10 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
     try {
       revalidatePath("/punonjesit");
       revalidatePath(`/punonjesit/${employeeId}`);
+      // A contractor's pay syncs into open periods on save — those pages must
+      // re-render or the user stares at the pre-sync amounts and calls it broken.
+      revalidatePath("/pagat/kontraktor");
+      revalidatePath("/pagat/kontraktor", "layout");
     } catch (revErr) {
       console.error("[updateEmployeeAction] revalidatePath failed:", revErr);
     }

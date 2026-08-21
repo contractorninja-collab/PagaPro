@@ -2,6 +2,7 @@ import type { HourBreakdown, PremiumRules } from "../types";
 import { D } from "../money/decimal";
 import { roundMoneyEUR } from "../money/rounding";
 import { computeGrossFromHours } from "./from-hours";
+import { computePremiumPays } from "./premiums";
 
 /**
  * What a contractor is paid for one month.
@@ -23,6 +24,13 @@ export interface ContractorPayInput {
   hourlyRate: string;
   /** Used when basis = MONTHLY_FLAT. */
   monthlyFlatAmount: string;
+  /**
+   * Denominator that turns a flat fee into an hourly rate for premium hours
+   * (overtime, weekend, holiday, night) — a flat contractor who works nights
+   * gets the uplift on top of the fee, priced at fee/standard hours. Optional:
+   * without it the flat basis stays fee-only, as before.
+   */
+  standardMonthlyHours?: string;
   hours: HourBreakdown;
   premiumRules: PremiumRules;
 }
@@ -45,15 +53,48 @@ export function computeContractorPay(input: ContractorPayInput): ContractorPayRe
         warning: "MISSING_MONTHLY_AMOUNT",
       };
     }
-    // Hours are recorded for attendance but never priced on this basis — that is
-    // exactly what "flat" means, and the breakdown says so out loud so a locked
-    // period can be explained later.
+    /**
+     * Flat covers the agreed month of REGULAR work; premium hours are real
+     * extra effort and are priced on top, at the full premium multiple of the
+     * fee-derived hourly rate (base + uplift — these hours are not inside the
+     * fee). Regular hours stay attendance-only: that is what "flat" means.
+     */
+    const stdHours = D(input.standardMonthlyHours ?? "0");
+    const derivedRate =
+      stdHours.isFinite() && stdHours.gt(0) ? amount.div(stdHours) : D("0");
+    const ot = D(input.hours.overtimeHours ?? "0");
+    const hol = D(input.hours.holidayHours ?? "0");
+    const we = D(input.hours.weekendHours ?? "0");
+    const ni = D(input.hours.nightHours ?? "0");
+    const anyPremiumHours = ot.gt(0) || hol.gt(0) || we.gt(0) || ni.gt(0);
+
+    let premiumTotal = D("0");
+    let premiumBreakdown: Record<string, string> | null = null;
+    if (anyPremiumHours && derivedRate.gt(0)) {
+      // computePremiumPays returns the FULL pay for each bucket (rate ×
+      // multiplier × hours) — the same figures an employee's premium hours
+      // produce — so the fee is the only other addend.
+      const pays = computePremiumPays(derivedRate, input.premiumRules, ot, hol, we, ni);
+      premiumTotal = roundMoneyEUR(
+        pays.overtimePay.plus(pays.holidayPay).plus(pays.weekendPay).plus(pays.nightPay),
+      );
+      premiumBreakdown = {
+        derivedHourlyRate: derivedRate.toFixed(4),
+        overtimePay: roundMoneyEUR(pays.overtimePay).toFixed(2),
+        holidayPay: roundMoneyEUR(pays.holidayPay).toFixed(2),
+        weekendPay: roundMoneyEUR(pays.weekendPay).toFixed(2),
+        nightPay: roundMoneyEUR(pays.nightPay).toFixed(2),
+      };
+    }
+
     return {
-      pay: roundMoneyEUR(amount).toFixed(2),
+      pay: roundMoneyEUR(amount).plus(premiumTotal).toFixed(2),
       breakdown: {
         basis: "MONTHLY_FLAT",
         monthlyFlatAmount: roundMoneyEUR(amount).toFixed(2),
-        hoursNotPriced: input.hours,
+        premiumPay: premiumTotal.toFixed(2),
+        ...(premiumBreakdown ? { premiums: premiumBreakdown } : {}),
+        regularHoursNotPriced: input.hours.regularHours ?? "0",
       },
       warning: null,
     };

@@ -108,7 +108,9 @@ export type ContractorServiceResult<T> =
 
 const CONTRACTOR_ELIGIBLE_STATUSES = ["ACTIVE", "ON_LEAVE"] as const;
 
-async function loadPremiumRules(companyId: string): Promise<PremiumRules> {
+async function loadPayRules(
+  companyId: string,
+): Promise<{ rules: PremiumRules; standardMonthlyHours: string }> {
   const settings = await prisma.payrollSettings.findUnique({
     where: { companyId },
     select: {
@@ -116,14 +118,20 @@ async function loadPremiumRules(companyId: string): Promise<PremiumRules> {
       weekendMultiplier: true,
       holidayMultiplier: true,
       nightWorkMultiplier: true,
+      standardWeeklyHours: true,
     },
   });
+  const weekly = Number(settings?.standardWeeklyHours ?? 40);
+  const monthly = Number.isFinite(weekly) && weekly > 0 ? (weekly * 52) / 12 : 174;
   return {
-    overtimeHourMultiplier: settings?.overtimeMultiplier.toString() ?? "1.3",
-    weekendHourMultiplier: settings?.weekendMultiplier.toString() ?? "1.5",
-    holidayHourMultiplier: settings?.holidayMultiplier.toString() ?? "1.5",
-    nightHourMultiplier: settings?.nightWorkMultiplier.toString() ?? "1.3",
-    stackPolicy: "additive",
+    rules: {
+      overtimeHourMultiplier: settings?.overtimeMultiplier.toString() ?? "1.3",
+      weekendHourMultiplier: settings?.weekendMultiplier.toString() ?? "1.5",
+      holidayHourMultiplier: settings?.holidayMultiplier.toString() ?? "1.5",
+      nightHourMultiplier: settings?.nightWorkMultiplier.toString() ?? "1.3",
+      stackPolicy: "additive",
+    },
+    standardMonthlyHours: monthly.toFixed(2),
   };
 }
 
@@ -136,12 +144,13 @@ function payForEntry(
   hourlyRate: string,
   monthlyFlatAmount: string,
   hours: ContractorHoursInput,
-  rules: PremiumRules,
+  pay: { rules: PremiumRules; standardMonthlyHours: string },
 ): { grossPay: string; breakdown: object } {
   const result = computeContractorPay({
     basis,
     hourlyRate,
     monthlyFlatAmount,
+    standardMonthlyHours: pay.standardMonthlyHours,
     hours: {
       regularHours: hours.regularHours,
       overtimeHours: hours.overtimeHours,
@@ -149,7 +158,7 @@ function payForEntry(
       holidayHours: hours.holidayHours,
       nightHours: hours.nightHours,
     },
-    premiumRules: rules,
+    premiumRules: pay.rules,
   });
   return { grossPay: result.pay, breakdown: result.breakdown };
 }
@@ -280,7 +289,7 @@ export async function createContractorPayrollPeriod(params: {
     const contractors = await findEligibleContractors(companyId, year, month);
     if (contractors.length === 0) return { ok: false, code: "NO_CONTRACTORS" };
 
-    const rules = await loadPremiumRules(companyId);
+    const payRules = await loadPayRules(companyId);
     const noHours: ContractorHoursInput = {
       regularHours: "0",
       overtimeHours: "0",
@@ -306,7 +315,7 @@ export async function createContractorPayrollPeriod(params: {
               snapshot.hourlyRateSnapshot.toString(),
               snapshot.monthlyFlatAmount.toString(),
               noHours,
-              rules,
+              payRules,
             );
             return {
               employeeId: c.id,
@@ -452,7 +461,7 @@ export async function syncContractorDraftEntriesForEmployee(
   });
   if (entries.length === 0) return { updated: 0 };
 
-  const rules = await loadPremiumRules(companyId);
+  const payRules = await loadPayRules(companyId);
   const snapshot = snapshotFor(employee);
   let updated = 0;
   for (const entry of entries) {
@@ -471,7 +480,7 @@ export async function syncContractorDraftEntriesForEmployee(
         holidayHours: entry.holidayHours.toString(),
         nightHours: entry.nightHours.toString(),
       },
-      rules,
+      payRules,
     );
     await prisma.contractorPayrollEntry.update({
       where: { id: entry.id },
@@ -497,9 +506,9 @@ export async function regenerateContractorPayrollEntries(
     if (!period) return { ok: false, code: "NOT_FOUND" };
     if (!editable) return { ok: false, code: "NOT_EDITABLE" };
 
-    const [contractors, rules, existingEntries] = await Promise.all([
+    const [contractors, payRules, existingEntries] = await Promise.all([
       findEligibleContractors(companyId, period.year, period.month),
-      loadPremiumRules(companyId),
+      loadPayRules(companyId),
       prisma.contractorPayrollEntry.findMany({
         where: { periodId },
         select: {
@@ -548,7 +557,7 @@ export async function regenerateContractorPayrollEntries(
         snapshot.hourlyRateSnapshot.toString(),
         flatAmount.toString(),
         hours,
-        rules,
+        payRules,
       );
       await prisma.contractorPayrollEntry.update({
         where: { id: existing.id },
@@ -596,7 +605,7 @@ export async function updateContractorEntryHours(params: {
     });
     if (!entry) return { ok: false, code: "NOT_FOUND" };
 
-    const rules = await loadPremiumRules(companyId);
+    const payRules = await loadPayRules(companyId);
     // The basis lives on the entry, never on the request: a client cannot talk an
     // hourly contractor into being paid a flat fee by posting one.
     const flatAmount =
@@ -608,7 +617,7 @@ export async function updateContractorEntryHours(params: {
       entry.hourlyRateSnapshot.toString(),
       flatAmount,
       hours,
-      rules,
+      payRules,
     );
 
     await prisma.contractorPayrollEntry.update({
@@ -699,13 +708,13 @@ export async function syncContractorEntryFromTimeClock(params: {
     };
     const daysNeedingReview = days.filter((d) => d.status === "NEEDS_REVIEW").length;
 
-    const rules = await loadPremiumRules(companyId);
+    const payRules = await loadPayRules(companyId);
     const { grossPay, breakdown } = payForEntry(
       "HOURLY",
       entry.hourlyRateSnapshot.toString(),
       "0",
       hours,
-      rules,
+      payRules,
     );
 
     await prisma.contractorPayrollEntry.update({

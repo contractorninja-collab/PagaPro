@@ -87,7 +87,12 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
     const draft = drafts[entryId];
     if (!entry || !draft) return false;
     if (entry.payBasis === "MONTHLY_FLAT") {
-      return Number(draft.monthlyFlatAmount) !== Number(entry.monthlyFlatAmount);
+      return (
+        Number(draft.monthlyFlatAmount) !== Number(entry.monthlyFlatAmount) ||
+        HOUR_FIELDS.some(
+          (f) => f.key !== "regularHours" && Number(draft[f.key]) !== Number(entry[f.key]),
+        )
+      );
     }
     return HOUR_FIELDS.some((f) => Number(draft[f.key]) !== Number(entry[f.key]));
   }
@@ -311,10 +316,12 @@ export function ContractorPayrollDetailClient(props: { detail: ContractorPeriodD
                     </td>
                     {HOUR_FIELDS.map((f) => (
                       <td key={f.key} className="px-2 py-2.5 text-right">
-                        {/* Hours are recorded for attendance on a flat fee but never
-                            priced — an editable box here would imply otherwise. */}
-                        {flat ? (
-                          <span className="tabular-nums text-ink-300" title="Nuk ndikon në pagesë">
+                        {/* On a flat fee the REGULAR hours are covered by the fee
+                            itself; premium hours (shtesë/vikend/festë/natë) are
+                            extra effort and are paid on top, so they are editable
+                            on every basis. */}
+                        {flat && f.key === "regularHours" ? (
+                          <span className="tabular-nums text-ink-300" title="Përfshirë në pagën fikse">
                             —
                           </span>
                         ) : editable ? (
