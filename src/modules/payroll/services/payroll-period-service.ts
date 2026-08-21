@@ -775,7 +775,20 @@ async function createPayrollEntriesForEmployeesTx(
     );
 
     if (!calc.ok) {
-      throw new Error(calc.issues.map((i) => i.message).join("; "));
+      // The raw engine issue named neither the person nor the way out — a
+      // below-minimum line read as "the system won't start payroll". Name both.
+      const who = `${emp.firstName} ${emp.lastName}`.trim();
+      const below = calc.issues.some(
+        (i) => i.code === "BELOW_MINIMUM_GROSS" || i.code === "BELOW_MINIMUM_HOURLY",
+      );
+      if (below) {
+        throw new Error(
+          `${who}: paga bruto ${emp.baseSalaryMonthly.toFixed(2)} € është nën minimumin ligjor. ` +
+            `Nëse ${who} është kontraktor, ndryshoni "Lloji i punësimit" në Kontraktor te profili — ` +
+            `kontraktorët paguhen te "Payroll kontraktorësh" pa tatim dhe pa pagë minimale.`,
+        );
+      }
+      throw new Error(`${who}: ${calc.issues.map((i) => i.message).join("; ")}`);
     }
 
     const v = calc.value;

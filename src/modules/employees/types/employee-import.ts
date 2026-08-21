@@ -10,6 +10,8 @@ export type EmployeeImportRow = {
   baseSalaryMonthly: string;
   bankName: string | null;
   iban: string | null;
+  /** "Lloji" column — contractors bypass tax, trust and the minimum wage. */
+  employmentType: "EMPLOYEE" | "CONTRACTOR";
   intendedStatus: Extract<EmploymentStatus, "ACTIVE" | "INACTIVE">;
   errors: string[];
 };

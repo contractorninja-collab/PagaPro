@@ -21,6 +21,7 @@ export const EMPLOYEE_IMPORT_HEADERS = [
   "Paga bruto",
   "Banka",
   "Numri i llogarisë",
+  "Lloji",
 ] as const;
 
 type ImportField =
@@ -31,7 +32,8 @@ type ImportField =
   | "hireDate"
   | "baseSalaryMonthly"
   | "bankName"
-  | "iban";
+  | "iban"
+  | "employmentType";
 
 const HEADER_FIELDS: Record<string, ImportField> = {
   emri: "firstName",
@@ -45,6 +47,8 @@ const HEADER_FIELDS: Record<string, ImportField> = {
   "nr i llogarise": "iban",
   "nr llogarise": "iban",
   iban: "iban",
+  lloji: "employmentType",
+  "lloji i punesimit": "employmentType",
 };
 
 const REQUIRED_FIELDS = new Set<ImportField>(["firstName", "lastName", "personalId", "hireDate"]);
@@ -162,6 +166,7 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       baseSalaryMonthly: "Paga bruto",
       bankName: "Banka",
       iban: "Numri i llogarisë",
+      employmentType: "Lloji",
     };
     throw new EmployeeImportError(`Mungojnë kolonat e detyrueshme: ${missing.map((field) => labels[field]).join(", ")}.`);
   }
@@ -190,6 +195,18 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
     const normalizedAccountNumber = normalizeBankAccountNumber(values.iban ?? "");
     if (normalizedAccountNumber.error) errors.push(normalizedAccountNumber.error);
 
+    // "Lloji": empty or "Punonjës" = employee; "Kontraktor" = service contract.
+    const typeRaw = (values.employmentType ?? "")
+      .trim()
+      .toLocaleLowerCase("sq-AL")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+    let employmentType: "EMPLOYEE" | "CONTRACTOR" = "EMPLOYEE";
+    if (typeRaw === "kontraktor" || typeRaw === "contractor") employmentType = "CONTRACTOR";
+    else if (typeRaw !== "" && typeRaw !== "punonjes" && typeRaw !== "employee") {
+      errors.push('Lloji duhet të jetë "Punonjës" ose "Kontraktor".');
+    }
+
     return {
       rowNumber: index + 2,
       firstName: values.firstName ?? "",
@@ -204,6 +221,7 @@ export function parseEmployeeImportCsv(source: Buffer): EmployeeImportRow[] {
       // verbatim rather than dropped, and shows in the preview as written.
       bankName: normalizeKosovoBankName(values.bankName).value,
       iban: normalizedAccountNumber.value,
+      employmentType,
       intendedStatus: salary.provided && !salary.error && Number(salary.amount) > 0 ? "ACTIVE" : "INACTIVE",
       errors,
     };
@@ -242,10 +260,11 @@ async function importOneEmployee(
   return prisma.$transaction(async (tx) => {
     const hireDate = new Date(`${row.hireDateIso}T12:00:00.000Z`);
     const salary = new Prisma.Decimal(row.baseSalaryMonthly);
+    const isContractor = row.employmentType === "CONTRACTOR";
     const employee = await tx.employee.create({
       data: {
         companyId,
-        employmentType: "EMPLOYEE",
+        employmentType: row.employmentType,
         status: row.intendedStatus,
         workArrangement: "ON_SITE",
         firstName: row.firstName,
@@ -255,8 +274,11 @@ async function importOneEmployee(
         hireDate,
         weeklyHours: new Prisma.Decimal(40),
         baseSalaryMonthly: salary,
-        applyTrust: true,
-        applyTax: true,
+        // The same stamps the employee form applies for contractors: no
+        // pension, no tax withholding, no statutory minimum.
+        applyTrust: !isContractor,
+        applyTax: !isContractor,
+        exemptFromMinimumSalary: isContractor,
         bankName: row.bankName ?? undefined,
         bankAccountIban: row.iban ? encryptField(row.iban) : undefined,
         addressCountry: "XK",
@@ -294,7 +316,7 @@ async function importOneEmployee(
         kind: EmployeeHistoryEventKind.CREATED,
         title: "Punonjësi u importua",
         description: "Regjistrim fillestar nga importi CSV.",
-        employmentType: "EMPLOYEE",
+        employmentType: row.employmentType,
         status: row.intendedStatus,
         metadata,
       },

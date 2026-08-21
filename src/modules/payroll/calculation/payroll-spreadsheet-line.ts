@@ -112,6 +112,15 @@ export function computePayrollSpreadsheetLine(
 ): PayrollCalculationResult<SpreadsheetLineComputed> {
   const issues: PayrollCalculationIssue[] = [];
 
+  /**
+   * Exempt by TYPE, not only by the stored bit: the form stamps
+   * exemptFromMinimumSalary for contractors, but rows created before the
+   * import knew about contractors carry the default false. The statutory
+   * minimum binds employees only (Ligji i Punës) — never service contracts.
+   */
+  const exemptFromMinimum =
+    employee.exemptFromMinimumSalary || employee.employmentType !== "EMPLOYEE";
+
   if (employee.employmentType !== "EMPLOYEE") {
     return {
       ok: false,
@@ -191,6 +200,7 @@ export function computePayrollSpreadsheetLine(
       };
     }
     if (
+      !exemptFromMinimum &&
       snapshot.minimumHourlyWage &&
       D(snapshot.minimumHourlyWage).isFinite() &&
       hourlyPrecise.lt(D(snapshot.minimumHourlyWage))
@@ -210,7 +220,7 @@ export function computePayrollSpreadsheetLine(
       targetNet: employee.targetNetMonthly,
       snapshot,
       employerPrimacy: employee.employerPrimacy,
-      enforceMinimumGross: !employee.exemptFromMinimumSalary,
+      enforceMinimumGross: !exemptFromMinimum,
       applyTrust: employee.applyTrust,
       applyTax: employee.applyTax,
     });
@@ -244,7 +254,7 @@ export function computePayrollSpreadsheetLine(
   // varies with hours worked, so the MONTHLY floor would reject lawful short months.
   // The hourly minimum was already enforced against the rate itself above.
   const enforceMonthlyMinimum =
-    !employee.exemptFromMinimumSalary &&
+    !exemptFromMinimum &&
     !partialPeriod &&
     employee.compensationBasis !== "HOURLY_GROSS";
 
