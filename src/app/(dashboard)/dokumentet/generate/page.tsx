@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { DocumentGenerateWizardClient } from "@/modules/documents/components/document-generate-wizard-client";
 import {
   listDocumentTemplatesWithVersions,
@@ -33,7 +34,7 @@ const WARNING_STATUS_LABELS_SQ: Record<string, string> = {
 };
 
 function sqDate(d: Date): string {
-  return d.toLocaleDateString("sq-AL", { timeZone: "UTC" });
+  return formatSqDate(d.toISOString());
 }
 
 export const metadata: Metadata = {

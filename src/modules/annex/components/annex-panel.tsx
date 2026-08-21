@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import { FileText, Printer, Plus, Trash2, Pencil } from "lucide-react";
@@ -25,7 +26,7 @@ const FIELD =
 function fmt(iso: string | null): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString("sq-AL", { timeZone: "UTC" });
+    return formatSqDate(iso);
   } catch {
     return iso;
   }

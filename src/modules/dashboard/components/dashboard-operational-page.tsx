@@ -140,7 +140,7 @@ export function DashboardOperationalPage(props: {
         }
       />
 
-      <div className="space-y-7 pb-24 md:pb-8">
+      <div className="space-y-6 pb-24 md:pb-8">
         {/* 1 — the run, with the numbers that qualify it. Until a payroll exists
             there is nothing to report, so the hero gives way to a one-line prompt;
             once it does, it can still be folded down to a strip on demand. Folded
@@ -151,7 +151,7 @@ export function DashboardOperationalPage(props: {
           <PayrollHeroFoldProvider defaultCollapsed={props.payrollHeroCollapsed ?? false}>
             <PayrollHeroFoldSwitch
               expanded={
-                <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+                <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
                   <DashboardPayrollPanel
                     payroll={data.payroll}
                     metrics={data.costMetrics}

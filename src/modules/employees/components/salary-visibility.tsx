@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Money } from "@/components/patterns/money";
 import { maskAmount } from "@/modules/employees/components/mask-amount";
 
 /**
@@ -65,7 +66,9 @@ export function useSalaryVisibility(): SalaryVisibility {
  */
 export function MaskedAmount({ value }: { value: string }) {
   const { hidden } = useSalaryVisibility();
-  if (!hidden) return <>{value}</>;
+  // Visible amounts get the ledger treatment — cents and € step back so the
+  // integer carries the figure. One place, so every money render matches.
+  if (!hidden) return <Money value={value} />;
   return (
     <span aria-label="Shuma e fshehur" title="Shumat janë të fshehura">
       {maskAmount(value, true)}

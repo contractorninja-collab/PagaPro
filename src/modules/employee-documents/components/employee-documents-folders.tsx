@@ -16,6 +16,7 @@ import {
   EMPLOYEE_DOCUMENT_CATEGORY_ORDER,
 } from "@/modules/employee-documents/components/employee-document-labels";
 import { classifyExpiry } from "@/modules/employee-documents/services/employee-document-expiry";
+import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import { DocumentQuickView, type QuickViewTarget } from "@/modules/employee-documents/components/document-quick-view";
 import type { EmployeeDossierBundle, EmployeeUploadedDocSummary } from "@/modules/employee-documents/types/employee-document-types";
 
@@ -28,7 +29,7 @@ function fmtSize(bytes: number): string {
 function ExpiryBadge({ expiresAtIso, todayIso }: { expiresAtIso: string | null; todayIso: string }) {
   const status = classifyExpiry(expiresAtIso, new Date(todayIso));
   if (status === "ok") return null;
-  const label = expiresAtIso ? new Date(expiresAtIso).toLocaleDateString("sq-AL") : "";
+  const label = formatSqDate(expiresAtIso);
   return status === "expired" ? (
     <span className="rounded bg-[#fdf3f4] px-1.5 py-0.5 text-[11px] font-semibold text-[#a4262c]">
       Skaduar {label}

@@ -170,7 +170,7 @@ export function HolidaySettingsPanel({
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-line-soft bg-fill-faint text-left text-[11px] font-bold uppercase tracking-[0.04em] text-ink-400">
                 <th className="px-3 py-2">Data</th>
                 <th className="px-3 py-2">Emërtimi</th>
                 <th className="px-3 py-2">Kategori</th>

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
+import { StatusPill } from "@/components/patterns/status-pill";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -122,14 +123,12 @@ function QueueRow({ item }: { item: QueueItem }) {
           <div className="mb-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <span className="text-[14.5px] font-bold leading-snug text-ink-900">{item.title}</span>
             {item.chip ? (
-              <span
-                className={cn(
-                  "inline-flex h-[19px] items-center rounded-full px-2 text-[10.5px] font-bold uppercase tracking-[0.03em]",
-                  TONE_STYLES[item.chip.tone].chip,
-                )}
+              <StatusPill
+                tone={item.chip.tone === "critical" ? "destructive" : item.chip.tone}
+                size="sm"
               >
                 {item.chip.label}
-              </span>
+              </StatusPill>
             ) : null}
           </div>
           {item.detail ? (

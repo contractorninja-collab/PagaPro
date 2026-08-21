@@ -284,7 +284,7 @@ export function PayrollsPageClient(props: {
                     <li className="text-sm text-muted-foreground">Nuk ka punonjës të përshtatshëm për këtë muaj.</li>
                   ) : (
                     previewEmployees.map((e) => (
-                      <li key={e.id} className="flex flex-wrap items-center gap-2 rounded-sm px-1 py-0.5 text-sm hover:bg-muted/60">
+                      <li key={e.id} className="flex flex-wrap items-center gap-2 rounded-md px-1.5 py-0.5 text-[13px] transition-colors hover:bg-fill-hover">
                         <label className="flex cursor-pointer items-center gap-2">
                           <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleId(e.id)} />
                           <span className="font-medium">

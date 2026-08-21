@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
@@ -77,13 +78,17 @@ export function PayrollCostChart({ data }: { data: PayrollCostPoint[] }) {
         <Legend wrapperStyle={LEGEND_STYLE} />
         <Bar dataKey="gross" name="Bruto" fill={CHART.blue} radius={[3, 3, 0, 0]} maxBarSize={22} />
         <Bar dataKey="net" name="Neto" fill={CHART.blueSoft} radius={[3, 3, 0, 0]} maxBarSize={22} />
-        <Line
+        {/* Area, not Line: the soft fill under the cost curve is the fintech
+            signature — the eye reads accumulated cost, not just a trajectory. */}
+        <Area
           type="monotone"
           dataKey="employerCost"
           name="Kosto totale e punëdhënësit"
           stroke={CHART.navy}
           strokeWidth={2}
+          fill="rgba(37, 99, 235, 0.08)"
           dot={{ r: 3, fill: CHART.navy }}
+          activeDot={{ r: 4 }}
         />
       </ComposedChart>
     </ResponsiveContainer>

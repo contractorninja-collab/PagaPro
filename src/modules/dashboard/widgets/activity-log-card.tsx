@@ -52,7 +52,7 @@ export function ActivityLogCard({ entries }: { entries: TimelineEntryDto[] }) {
   return (
     <section
       id="activity-log"
-      className="overflow-hidden rounded-lg border border-line bg-white shadow-card"
+      className="overflow-hidden rounded-xl border border-line bg-white shadow-card"
       aria-labelledby="activity-log-title"
     >
       <div className="border-b border-fill px-5 pb-4 pt-[18px]">

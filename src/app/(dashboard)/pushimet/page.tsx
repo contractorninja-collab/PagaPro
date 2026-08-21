@@ -175,21 +175,18 @@ function chipFromRow(row: PushimetLeaveRowDto): PushimetCalendarChipDto {
 }
 
 function DashboardFallback() {
+  // Mirrors the real client layout (3-up stat tiles, full-width bands) — a
+  // fallback drawing a different page makes hydration look like a bug.
   return (
-    <div className="animate-pulse space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="h-[72px] rounded-xl border border-line bg-white" />
+    <div className="animate-pulse space-y-6" aria-hidden>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="h-[72px] rounded-xl border border-line bg-white" />
         <div className="h-[72px] rounded-xl border border-line bg-white" />
         <div className="h-[72px] rounded-xl border border-line bg-white" />
       </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-6">
-          <div className="h-40 rounded-xl border border-line bg-white" />
-          <div className="h-64 rounded-xl border border-line bg-white" />
-        </div>
-        <div className="h-72 rounded-xl border border-line bg-white" />
-      </div>
+      <div className="h-40 rounded-xl border border-line bg-white" />
+      <div className="h-72 rounded-xl border border-line bg-white" />
+      <div className="h-64 rounded-xl border border-line bg-white" />
     </div>
   );
 }

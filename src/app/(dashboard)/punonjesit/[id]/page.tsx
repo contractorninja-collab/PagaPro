@@ -21,6 +21,7 @@ import {
 import type { EmployeeLeaveBundle } from "@/modules/leaves/helpers/employee-leave-view";
 import { listEmployeeDocumentsForEmployee } from "@/modules/employee-documents/services/employee-document-service";
 import { isInlinePreviewable } from "@/modules/employee-documents/services/employee-document-file";
+import { formatSqDate } from "@/modules/employees/components/employees-labels";
 import type { EmployeeDossierBundle } from "@/modules/employee-documents/types/employee-document-types";
 import { can } from "@/server/permissions";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
@@ -169,7 +170,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       expiresAtIso: d.expiresAt?.toISOString() ?? null,
       isArchived: d.isArchived,
       createdAtIso: d.createdAt.toISOString(),
-      createdAtLabel: d.createdAt.toLocaleDateString("sq-AL", { dateStyle: "medium" }),
+      createdAtLabel: formatSqDate(d.createdAt.toISOString()),
       uploadedByName: d.uploadedBy?.displayName ?? d.uploadedBy?.email ?? null,
       inlinePreviewable: isInlinePreviewable(d.contentType),
     })),

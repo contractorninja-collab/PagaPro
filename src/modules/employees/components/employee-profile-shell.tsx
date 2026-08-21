@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import type { DocumentCategory, EmploymentStatus } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CalendarDays, FileText, FolderOpen, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
+import { EmptySection } from "@/components/patterns/empty-section";
 import { Button } from "@/components/ui/button";
 import { useCan } from "@/components/layout/capability-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -198,7 +199,7 @@ function SalaryHistoryCard({ rows }: { rows: SalaryChangeDto[] }) {
       flush={rows.length > 0}
     >
       {rows.length === 0 ? (
-        <p className="text-[13px] text-ink-500">Nuk ka ndryshime të regjistruara të pagës.</p>
+        <EmptySection icon={TrendingUp} title="Asnjë ndryshim page" hint="Rritjet dhe rregullimet e pagës bazë do të shfaqen këtu me datën efektive." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px]">
@@ -373,7 +374,7 @@ function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
   if (rows.length === 0) {
     return (
       <SectionCard title="Kontratat" description="Regjistrimi i kontratave në sistem.">
-        <p className="text-[13px] text-ink-500">Nuk ka kontrata të regjistruara.</p>
+        <EmptySection icon={FileText} title="Asnjë kontratë e regjistruar" hint="Kontratat e gjeneruara për këtë punonjës do të listohen këtu." />
       </SectionCard>
     );
   }
@@ -450,7 +451,7 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
           ) : null
         }
       >
-        <p className="text-[13px] text-ink-500">Nuk ka dokumente për këtë punonjës.</p>
+        <EmptySection icon={FolderOpen} title="Asnjë dokument i gjeneruar" hint="Dokumentet nga moduli Dokumentet dhe PDF-të e pagave do të shfaqen këtu." />
       </SectionCard>
     );
   }
@@ -702,7 +703,7 @@ function LeaveTab({ bundle }: { bundle?: EmployeeLeaveBundle }) {
 
       <SectionCard title="Kërkesat" description="Kronologjikisht, më e fundit sipër." flush>
         {requests.length === 0 ? (
-          <p className="px-5 py-4 text-[13px] text-ink-500">Asnjë kërkesë pushimi deri tani.</p>
+          <EmptySection icon={CalendarDays} title="Asnjë kërkesë pushimi" hint="Kërkesat e pushimit krijohen te moduli Pushimet dhe shfaqen këtu me statusin e tyre." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
