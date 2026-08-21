@@ -111,6 +111,13 @@ export function computePayrollSpreadsheetLine(
   calendarSnapshot: PayrollMonthCalendarSnapshot,
 ): PayrollCalculationResult<SpreadsheetLineComputed> {
   const issues: PayrollCalculationIssue[] = [];
+  /**
+   * The statutory minimum never BLOCKS a line — part-timers agree to less than
+   * a full-time month, and missed hours lawfully pull a month under the floor.
+   * A line that lands below it computes normally and carries the fact here, so
+   * HR sees it without the payroll refusing to start.
+   */
+  const warnings: PayrollCalculationIssue[] = [];
 
   /**
    * Exempt by TYPE, not only by the stored bit: the form stamps
@@ -205,22 +212,19 @@ export function computePayrollSpreadsheetLine(
       D(snapshot.minimumHourlyWage).isFinite() &&
       hourlyPrecise.lt(D(snapshot.minimumHourlyWage))
     ) {
-      return {
-        ok: false,
-        issues: [
-          {
-            code: "BELOW_MINIMUM_HOURLY",
-            message: `Tarifa orare ${hourlyPrecise.toFixed(2)} € është nën minimumin orar ${D(snapshot.minimumHourlyWage).toFixed(2)} €.`,
-          },
-        ],
-      };
+      warnings.push({
+        code: "BELOW_MINIMUM_HOURLY",
+        message: `Tarifa orare ${hourlyPrecise.toFixed(2)} € është nën minimumin orar ${D(snapshot.minimumHourlyWage).toFixed(2)} €.`,
+      });
     }
   } else if (employee.compensationBasis === "TARGET_NET_MONTHLY" && employee.targetNetMonthly != null) {
     const solved = solveEquivalentMonthlyGrossForTargetNet({
       targetNet: employee.targetNetMonthly,
       snapshot,
       employerPrimacy: employee.employerPrimacy,
-      enforceMinimumGross: !exemptFromMinimum,
+      // A target net that maps under the minimum must still solve — the floor
+      // is a warning on the computed gross below, never a gate.
+      enforceMinimumGross: false,
       applyTrust: employee.applyTrust,
       applyTax: employee.applyTax,
     });
@@ -245,15 +249,14 @@ export function computePayrollSpreadsheetLine(
   /**
    * A line whose expected hours are below the month's calendar covers only part of
    * the period — someone hired or terminated mid-month. The statutory floor is a
-   * *monthly* minimum for a full month of work, so comparing it to a pro-rata gross
-   * would reject a lawful partial payment. The hourly minimum still applies.
+   * *monthly* minimum for a full month of work, so a pro-rata gross under it is
+   * lawful and not even worth a warning. Same for hourly-paid staff, whose gross
+   * legitimately varies with hours worked (their rate was checked above). What
+   * remains — a full-month salaried line under the floor — WARNS, never blocks.
    */
   const partialPeriod =
     calendarReg.isFinite() && calendarReg.gt(0) && expectedReg.gt(0) && expectedReg.lt(calendarReg);
-  // Hourly-paid staff have no fixed monthly wage — their monthly gross legitimately
-  // varies with hours worked, so the MONTHLY floor would reject lawful short months.
-  // The hourly minimum was already enforced against the rate itself above.
-  const enforceMonthlyMinimum =
+  const warnMonthlyMinimum =
     !exemptFromMinimum &&
     !partialPeriod &&
     employee.compensationBasis !== "HOURLY_GROSS";
@@ -299,6 +302,16 @@ export function computePayrollSpreadsheetLine(
     grossSubject = roundMoneyEUR(D(line.manualGrossOverride));
   }
 
+  if (warnMonthlyMinimum && grossSubject.gt(0) && grossSubject.lt(D(snapshot.minimumMonthlyGross))) {
+    warnings.push({
+      code: "BELOW_MINIMUM_GROSS",
+      message:
+        `Bruto ${grossSubject.toFixed(2)} € është nën pagën minimale ` +
+        `${D(snapshot.minimumMonthlyGross).toFixed(2)} € për një muaj të plotë — ` +
+        `lejohet (part-time / orë të munguara), por verifikojeni.`,
+    });
+  }
+
   const transparencyCalendar = {
     expectedWorkingDays: calendarSnapshot.expectedWorkingDays,
     hoursPerWorkingDay: calendarSnapshot.hoursPerWorkingDay,
@@ -337,7 +350,7 @@ export function computePayrollSpreadsheetLine(
       grossSalaryOverride: grossSubject.toFixed(2),
       bonusAmount: "0",
       otherDeductions: roundMoneyEUR(otherDed.plus(advance)).toFixed(2),
-      enforceMinimumGross: enforceMonthlyMinimum,
+      enforceMinimumGross: false,
       applyTrust: employee.applyTrust,
       applyTax: employee.applyTax,
     },
@@ -417,12 +430,17 @@ export function computePayrollSpreadsheetLine(
       unpaidLeaveDeduction: unpaidLeaveDeduction.toFixed(2),
       salaryAdvanceDeduction: advance.toFixed(2),
       otherDeductionsExAdvance: otherDed.toFixed(2),
+      // Persisted with the row so the below-minimum fact survives into audits.
+      ...(warnings.length > 0
+        ? { warnings: warnings.map((w) => ({ code: w.code, message: w.message })) }
+        : {}),
     },
     netPay: netPay.toFixed(2),
     payrollTransparency,
   };
   return {
     ok: true,
+    ...(warnings.length > 0 ? { warnings } : {}),
     value: {
       hourlyRate: hourlyPrecise.toFixed(6),
       regularPay: regularPay.toFixed(2),

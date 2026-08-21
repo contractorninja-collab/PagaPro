@@ -775,19 +775,9 @@ async function createPayrollEntriesForEmployeesTx(
     );
 
     if (!calc.ok) {
-      // The raw engine issue named neither the person nor the way out — a
-      // below-minimum line read as "the system won't start payroll". Name both.
+      // Below-minimum is a WARNING on an ok line now, never an issue here —
+      // what remains are genuine computation failures. Name the person.
       const who = `${emp.firstName} ${emp.lastName}`.trim();
-      const below = calc.issues.some(
-        (i) => i.code === "BELOW_MINIMUM_GROSS" || i.code === "BELOW_MINIMUM_HOURLY",
-      );
-      if (below) {
-        throw new Error(
-          `${who}: paga bruto ${emp.baseSalaryMonthly.toFixed(2)} € është nën minimumin ligjor. ` +
-            `Nëse ${who} është kontraktor, ndryshoni "Lloji i punësimit" në Kontraktor te profili — ` +
-            `kontraktorët paguhen te "Payroll kontraktorësh" pa tatim dhe pa pagë minimale.`,
-        );
-      }
       throw new Error(`${who}: ${calc.issues.map((i) => i.message).join("; ")}`);
     }
 
@@ -1570,19 +1560,7 @@ export async function updatePayrollEntryAmounts(
   );
 
   if (!calc.ok) {
-    const below = calc.issues.some(
-      (i) => i.code === "BELOW_MINIMUM_GROSS" || i.code === "BELOW_MINIMUM_HOURLY",
-    );
-    if (below) {
-      const who = `${entry.employee.firstName} ${entry.employee.lastName}`.trim();
-      return {
-        ok: false,
-        error:
-          `${who}: bruto e llogaritur bie nën pagën minimale për një muaj të plotë pune. ` +
-          `Për largim/punësim mes muajit, regjistroni datën e fundit të punës te Largimet — ` +
-          `rreshti pro-ratohet automatikisht dhe minimumi nuk zbatohet për muaj të pjesshëm.`,
-      };
-    }
+    // Below-minimum is a WARNING on an ok line now, never an issue here.
     return { ok: false, error: calc.issues.map((i) => i.message).join("; ") };
   }
 

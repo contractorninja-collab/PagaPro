@@ -343,7 +343,8 @@ describe("computePayrollSpreadsheetLine — hourly × hours (full-precision rate
 describe("computePayrollSpreadsheetLine — statutory monthly minimum", () => {
   const employeeAtMinimum = { ...employeeGross1000, baseSalaryMonthly: "500" };
 
-  it("rejects a full month paid below the monthly minimum", () => {
+  it("computes a full month below the monthly minimum and warns instead of blocking", () => {
+    // A lawful part-timer: 300 € contract for the company's full calendar month.
     const r = computePayrollSpreadsheetLine(
       { ...employeeAtMinimum, baseSalaryMonthly: "300" },
       lineInput(),
@@ -352,9 +353,13 @@ describe("computePayrollSpreadsheetLine — statutory monthly minimum", () => {
       calendarBase,
     );
 
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.issues.some((i) => i.code === "BELOW_MINIMUM_GROSS")).toBe(true);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.grossSalary).toBe("300.00");
+    expect(r.warnings?.some((w) => w.code === "BELOW_MINIMUM_GROSS")).toBe(true);
+    // The fact is persisted with the row, not just returned.
+    const sheet = r.value.breakdown.spreadsheet as { warnings?: Array<{ code: string }> };
+    expect(sheet.warnings?.some((w) => w.code === "BELOW_MINIMUM_GROSS")).toBe(true);
   });
 
   it("allows a pro-rata part month below it — a mid-month leaver is paid for days worked", () => {

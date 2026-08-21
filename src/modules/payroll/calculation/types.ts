@@ -236,5 +236,5 @@ export interface PayrollCalculationIssue {
 }
 
 export type PayrollCalculationResult<T> =
-  | { ok: true; value: T }
+  | { ok: true; value: T; warnings?: PayrollCalculationIssue[] }
   | { ok: false; issues: PayrollCalculationIssue[] };
