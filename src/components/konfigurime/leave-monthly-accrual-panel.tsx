@@ -57,10 +57,11 @@ export function LeaveMonthlyAccrualPanel() {
       <CardHeader>
         <CardTitle>Akumulimi mujor (Art 36)</CardTitle>
         <CardDescription>
-          Poston rreshta në <span className="font-mono text-xs">leave_accrual_ledger</span> për të gjithë punonjësit{" "}
+          Akumulimi postohet <span className="font-medium">automatikisht çdo ditë</span> për muajt e përfunduar — nuk
+          ka nevojë për postim manual. Ky panel shërben vetëm për plotësime historike më të vjetra se 12 muaj ose për
+          verifikim. Poston rreshta në <span className="font-mono text-xs">leave_accrual_ledger</span> për punonjësit{" "}
           <span className="font-medium">ACTIVE</span>/<span className="font-medium">ON_LEAVE</span> sipas politikës së
-          kompanisë (<span className="font-mono text-xs">monthlyAccrualDays</span>). Operacion idempotent për çdo
-          kombinim punonjës–muaj.
+          kompanisë; operacion idempotent për çdo kombinim punonjës–muaj.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -93,9 +94,8 @@ export function LeaveMonthlyAccrualPanel() {
             {pending ? "Duke u përpunuar…" : "Posto akumulimin për këtë muaj"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            API për automatizim: <span className="font-mono">POST /api/leaves/monthly-accrual</span> me cookie kompanie,
-            ose <span className="font-mono">Bearer LEAVE_ACCRUAL_JOB_SECRET</span> +{" "}
-            <span className="font-mono">companyId</span> në trup — shih <span className="font-mono">.env.example</span>.
+            Automatizimi: <span className="font-mono">/api/cron/leave-accrual</span> thirret çdo ditë (Vercel Cron) dhe
+            mbulon 12 muajt e fundit të përfunduar për të gjitha kompanitë aktive.
           </p>
         </div>
       </CardContent>

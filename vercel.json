@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/leave-accrual",
+      "schedule": "30 2 * * *"
+    }
+  ]
+}

@@ -19,7 +19,7 @@ const { user, companyId, role } = ctx.context;
 
 - RSC pages: `const { companyId } = await requireCompanyContextPage();` (redirects on failure).
 - Thread `user.id` as the actor into every audit/service/timeline write (many columns exist for this — never pass `null`).
-- Exemptions: `src/app/api/dev/*` (NODE_ENV-gated) and the bearer-token branch of `api/leaves/monthly-accrual` (external scheduler).
+- Exemptions: `src/app/api/dev/*` (NODE_ENV-gated), the bearer-token branch of `api/leaves/monthly-accrual` (external scheduler), and `api/cron/*` (CRON_SECRET-gated Vercel Cron jobs).
 - Middleware (`src/middleware.ts`) is a fast presence-only redirect for pages; it does **not** authorize — `getCompanyContext` is the authoritative gate.
 
 Company is the tenant root. Scope every query: `findFirst({ where: { id, companyId } })`, `updateMany/deleteMany({ where: { id, companyId } })`.

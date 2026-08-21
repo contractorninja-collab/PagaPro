@@ -534,7 +534,9 @@ export function PushimetDashboardClient(props: {
                 ? `Akumulimi mujor u postua së fundi për ${String(props.health.lastAccrual.month).padStart(2, "0")}/${props.health.lastAccrual.year}`
                 : "Akumulimi mujor nuk është postuar asnjëherë"}
             </p>
-            <p className="text-[12.5px] text-ink-500">Postimi bëhet manualisht te Konfigurimet.</p>
+            <p className="text-[12.5px] text-ink-500">
+              Postohet automatikisht çdo ditë — nëse vonesa vazhdon, posto manualisht te Konfigurimet.
+            </p>
           </div>
           <Link href="/konfigurime" className={BTN_SECONDARY_DENSE}>
             Hap Konfigurimet →
