@@ -1443,8 +1443,39 @@ export async function updatePayrollEntryAmounts(
   const dailyH =
     Number.isFinite(rawDailyH) && rawDailyH > 0 ? rawDailyH : Number(wt.hoursPerWorkingDay);
   const fullMonthHours = (fullMonthWd * dailyH).toFixed(2);
-  const wd = entry.expectedWorkingDays ?? fullMonthWd;
-  const expHours = entry.expectedRegularHours?.toString() ?? fullMonthHours;
+
+  /**
+   * The stored expected hours are a snapshot from the moment the payroll was
+   * drafted. A termination recorded AFTER drafting never reached that
+   * snapshot, so a leaver's row still expected a full month — the engine then
+   * saw no partial period and enforced the monthly minimum against lawful
+   * pro-rata pay. Re-derive the employment window fresh on every recalc; the
+   * row can only shrink toward the real window, never grow past its snapshot.
+   */
+  const monthStart = new Date(Date.UTC(entry.payroll.year, entry.payroll.month - 1, 1));
+  const monthEnd = new Date(Date.UTC(entry.payroll.year, entry.payroll.month, 0, 23, 59, 59, 999));
+  const freshWindows = await resolveEmploymentWindowsForEmployees(
+    companyId,
+    [entry.employee],
+    monthStart,
+    monthEnd,
+  );
+  const freshWindow = freshWindows[entry.employeeId];
+  const snapshotWd = entry.expectedWorkingDays
+    ? Number(entry.expectedWorkingDays)
+    : fullMonthWd;
+  let wd: number = Number.isFinite(snapshotWd) ? snapshotWd : fullMonthWd;
+  if (freshWindow?.employed) {
+    const freshWd = Math.max(
+      0,
+      countWorkingDaysInWindow(freshWindow, new Set(wt.weekdayPublicHolidayDates ?? [])),
+    );
+    if (freshWd < wd) wd = freshWd;
+  }
+  const expHours =
+    wd !== snapshotWd || entry.expectedRegularHours == null
+      ? (wd * dailyH).toFixed(2)
+      : entry.expectedRegularHours.toString();
 
   const calendarSnapshot: PayrollMonthCalendarSnapshot = {
     expectedWorkingDays: fullMonthWd,
