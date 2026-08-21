@@ -1357,6 +1357,12 @@ model ContractorPayrollEntry {
   /// a partial month (started late, left early) can be pro-rated by hand.
   monthlyFlatAmount Decimal @default(0) @db.Decimal(14, 2)
 
+  /// True once HR has edited the flat amount ON THIS PERIOD. Regeneration and
+  /// profile-salary sync overwrite the amount only while this is false — a
+  /// hand-entered pro-rata must survive a roster refresh, but a stale creation
+  /// snapshot must not block a salary change from the profile.
+  flatAmountManuallySet Boolean @default(false)
+
   regularHours  Decimal @default(0) @db.Decimal(10, 2)
   overtimeHours Decimal @default(0) @db.Decimal(10, 2)
   weekendHours  Decimal @default(0) @db.Decimal(10, 2)

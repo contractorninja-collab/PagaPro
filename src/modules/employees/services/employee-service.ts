@@ -1,4 +1,5 @@
 import { DomainActivityVerb, EmployeeHistoryEventKind, Prisma } from "@prisma/client";
+import { syncContractorDraftEntriesForEmployee } from "@/modules/payroll/contractor/contractor-payroll-service";
 import type { EmploymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptField, encryptField } from "@/lib/field-crypto";
@@ -645,6 +646,17 @@ export async function updateEmployee(
         });
       } catch (err) {
         console.error("[employees] status-change audit failed:", err);
+      }
+    }
+
+    // A contractor's pay lives on the profile; open contractor periods must
+    // follow it without a manual refresh. Best-effort — a sync failure must
+    // not fail the profile save.
+    if (input.employmentType === "CONTRACTOR") {
+      try {
+        await syncContractorDraftEntriesForEmployee(companyId, employeeId);
+      } catch (err) {
+        console.error("[employees] contractor payroll sync failed:", err);
       }
     }
 

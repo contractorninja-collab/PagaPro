@@ -419,6 +419,75 @@ async function loadEditablePeriod(companyId: string, periodId: string) {
  * contractors, refreshes each snapshot rate to the current wage, recomputes
  * gross from whatever hours are already entered. DRAFT only.
  */
+/**
+ * A salary change on a contractor's PROFILE reaches every open (unlocked)
+ * period automatically — the "live update" a client expects. Hand-edited
+ * pro-ratas (flatAmountManuallySet) are left alone; hours already entered are
+ * kept and the gross recomputes from them at the new rate.
+ */
+export async function syncContractorDraftEntriesForEmployee(
+  companyId: string,
+  employeeId: string,
+): Promise<{ updated: number }> {
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, companyId, employmentType: "CONTRACTOR" },
+  });
+  if (!employee) return { updated: 0 };
+
+  const entries = await prisma.contractorPayrollEntry.findMany({
+    where: {
+      employeeId,
+      period: { companyId, lockedAt: null },
+    },
+    select: {
+      id: true,
+      flatAmountManuallySet: true,
+      monthlyFlatAmount: true,
+      regularHours: true,
+      overtimeHours: true,
+      weekendHours: true,
+      holidayHours: true,
+      nightHours: true,
+    },
+  });
+  if (entries.length === 0) return { updated: 0 };
+
+  const rules = await loadPremiumRules(companyId);
+  const snapshot = snapshotFor(employee);
+  let updated = 0;
+  for (const entry of entries) {
+    const flatAmount =
+      snapshot.payBasis === "MONTHLY_FLAT" && entry.flatAmountManuallySet
+        ? entry.monthlyFlatAmount
+        : snapshot.monthlyFlatAmount;
+    const { grossPay, breakdown } = payForEntry(
+      snapshot.payBasis,
+      snapshot.hourlyRateSnapshot.toString(),
+      flatAmount.toString(),
+      {
+        regularHours: entry.regularHours.toString(),
+        overtimeHours: entry.overtimeHours.toString(),
+        weekendHours: entry.weekendHours.toString(),
+        holidayHours: entry.holidayHours.toString(),
+        nightHours: entry.nightHours.toString(),
+      },
+      rules,
+    );
+    await prisma.contractorPayrollEntry.update({
+      where: { id: entry.id },
+      data: {
+        payBasis: snapshot.payBasis,
+        hourlyRateSnapshot: snapshot.hourlyRateSnapshot,
+        monthlyFlatAmount: flatAmount,
+        grossPay: new PrismaNs.Decimal(grossPay),
+        calculationBreakdown: JSON.parse(JSON.stringify(breakdown)),
+      },
+    });
+    updated += 1;
+  }
+  return { updated };
+}
+
 export async function regenerateContractorPayrollEntries(
   companyId: string,
   periodId: string,
@@ -437,6 +506,7 @@ export async function regenerateContractorPayrollEntries(
           id: true,
           employeeId: true,
           monthlyFlatAmount: true,
+          flatAmountManuallySet: true,
           regularHours: true,
           overtimeHours: true,
           weekendHours: true,
@@ -466,10 +536,11 @@ export async function regenerateContractorPayrollEntries(
         holidayHours: existing.holidayHours.toString(),
         nightHours: existing.nightHours.toString(),
       };
-      // A flat fee already edited on this period (a pro-rated partial month) is
-      // kept; refreshing the roster must not quietly undo that decision.
+      // A flat fee HAND-EDITED on this period (a pro-rated partial month) is
+      // kept; a stale creation snapshot is not — otherwise a salary change on
+      // the profile could never reach an existing draft period.
       const flatAmount =
-        snapshot.payBasis === "MONTHLY_FLAT" && existing.monthlyFlatAmount.gt(0)
+        snapshot.payBasis === "MONTHLY_FLAT" && existing.flatAmountManuallySet
           ? existing.monthlyFlatAmount
           : snapshot.monthlyFlatAmount;
       const { grossPay, breakdown } = payForEntry(
@@ -549,6 +620,9 @@ export async function updateContractorEntryHours(params: {
         holidayHours: new PrismaNs.Decimal(hours.holidayHours),
         nightHours: new PrismaNs.Decimal(hours.nightHours),
         monthlyFlatAmount: new PrismaNs.Decimal(flatAmount),
+        ...(entry.payBasis === "MONTHLY_FLAT" && monthlyFlatAmount !== undefined
+          ? { flatAmountManuallySet: true }
+          : {}),
         hoursSource: "MANUAL",
         grossPay: new PrismaNs.Decimal(grossPay),
         calculationBreakdown: JSON.parse(JSON.stringify(breakdown)),
