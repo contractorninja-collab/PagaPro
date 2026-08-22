@@ -4,7 +4,7 @@ import type {
   ClassifierRules,
   WorkedInterval,
 } from "./types";
-import { isNightHour, isWeekend, zonedParts, zoneOffsetMinutes } from "./zoned-time";
+import { isNightHour, zonedParts, zoneOffsetMinutes } from "./zoned-time";
 
 const MINUTE_MS = 60_000;
 
@@ -55,7 +55,7 @@ function factsForMinute(instant: Date, rules: ClassifierRules): MinuteFacts {
   const parts = zonedParts(instant, rules.timeZone);
   return {
     isHoliday: rules.holidayIsoDates.has(parts.isoDate),
-    isWeekend: isWeekend(parts.weekday),
+    isWeekend: rules.restDayNumbers.has(parts.weekday),
     isNight: isNightHour(parts.hour, rules.nightStartHour, rules.nightEndHour),
   };
 }

@@ -14,6 +14,7 @@ import { LeaveMonthlyAccrualPanel } from "@/components/konfigurime/leave-monthly
 import { KonfigurimePageSkeleton } from "@/components/konfigurime/konfigurime-skeleton";
 import { SetupWizardCard } from "@/components/konfigurime/setup/setup-wizard-card";
 import { DepartmentsSettingsPanel } from "@/modules/departments/components/departments-settings-panel";
+import { RestDaysPanel } from "@/components/konfigurime/rest-days-panel";
 import { JobTitlesSettingsPanel } from "@/modules/job-titles/components/job-titles-settings-panel";
 import type { KonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
 import { Button } from "@/components/ui/button";
@@ -786,6 +787,10 @@ export function KonfigurimeConfigurator({
                 </div>
               </CardContent>
             </Card>
+
+            <div className="mt-4">
+              <RestDaysPanel />
+            </div>
           </TabsContent>
 
           <TabsContent value="departamentet">

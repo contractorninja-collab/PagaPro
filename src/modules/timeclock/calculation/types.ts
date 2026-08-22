@@ -24,6 +24,12 @@ export interface ClassifierRules {
   nightEndHour: number;
   /** `YYYY-MM-DD` dates treated as public holidays, from the company calendar. */
   holidayIsoDates: ReadonlySet<string>;
+  /**
+   * Weekdays (0 = Sunday … 6 = Saturday) that pay the weekend premium.
+   * From `PayrollSettings.restDays`. Hardcoding Saturday+Sunday paid every
+   * Saturday hour at 1.5× in a company whose working week includes Saturday.
+   */
+  restDayNumbers: ReadonlySet<number>;
   /** IANA zone the local-day rules are evaluated in. */
   timeZone: string;
 }

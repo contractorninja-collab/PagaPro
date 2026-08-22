@@ -10,6 +10,7 @@ function rules(overrides: Partial<ClassifierRules> = {}): ClassifierRules {
     nightStartHour: 22,
     nightEndHour: 6,
     holidayIsoDates: new Set<string>(),
+    restDayNumbers: new Set([0, 6]),
     timeZone: TZ,
     ...overrides,
   };

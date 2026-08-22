@@ -193,3 +193,46 @@ export async function getEmployeePresenceMonthAction(
   );
   return { ok: true, data };
 }
+
+/**
+ * Rest days — which weekdays the time clock pays the weekend premium on.
+ * Lives with the time clock because that is the only thing it affects;
+ * salaried expected-hours math is a separate concept and unchanged by this.
+ */
+export async function loadRestDaysAction(): Promise<TimeClockActionResult<number[]>> {
+  const ctx = await getCompanyContext();
+  if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
+
+  const settings = await prisma.payrollSettings.findUnique({
+    where: { companyId: ctx.context.companyId },
+    select: { restDays: true },
+  });
+  return { ok: true, data: settings?.restDays?.length ? settings.restDays : [0, 6] };
+}
+
+const restDaysSchema = z.object({
+  /** 0 = Sunday … 6 = Saturday. */
+  restDays: z.array(z.number().int().min(0).max(6)).max(7),
+});
+
+export async function saveRestDaysAction(raw: unknown): Promise<TimeClockActionResult> {
+  const ctx = await requireCapability("company.settings");
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  const { companyId } = ctx.context;
+
+  const parsed = restDaysSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Të dhënat nuk janë valide." };
+  const restDays = [...new Set(parsed.data.restDays)].sort((a, b) => a - b);
+
+  const updated = await prisma.payrollSettings.updateMany({
+    where: { companyId },
+    data: { restDays },
+  });
+  if (updated.count === 0) {
+    return { ok: false, error: "Cilësimet e pagave nuk janë inicializuar ende për këtë kompani." };
+  }
+
+  safeRev("/prezenca");
+  safeRev("/konfigurime");
+  return { ok: true };
+}

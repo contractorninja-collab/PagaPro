@@ -82,10 +82,6 @@ export function zoneOffsetMinutes(instant: Date, timeZone: string): number {
   return Math.round((asUtc - flooredInstant) / 60_000);
 }
 
-export function isWeekend(weekday: number): boolean {
-  return weekday === 0 || weekday === 6;
-}
-
 /**
  * The instant at which a local wall-clock time occurs in a zone.
  *

@@ -1572,6 +1572,10 @@ model PayrollSettings {
 
   standardWeeklyHours Decimal @db.Decimal(6, 2)
 
+  /// Ditët e pushimit javor (0 = e diel … 6 = e shtunë) — vetëm këto ditë paguhen
+  /// me shtesën e fundjavës në orën e punës. Default e shtunë + e diel.
+  restDays Int[] @default([0, 6])
+
   /// Lista opsionale ISO `YYYY-MM-DD` për festa shtesë (per kompani / përditësime ligjore)
   payrollExtraHolidayDates Json?
 

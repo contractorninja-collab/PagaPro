@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { classifyDay } from "@/modules/timeclock/calculation/classify-day";
+import { applyWeeklyOvertime } from "@/modules/timeclock/calculation/apply-weekly-overtime";
 import type { ClassifiedDay, ClassifierPunch, ClassifierRules } from "@/modules/timeclock/calculation/types";
 import { zonedParts } from "@/modules/timeclock/calculation/zoned-time";
 import { getMergedHolidayIsoSetForUtcRange } from "@/modules/leaves/services/leave-working-time-service";
@@ -16,7 +17,11 @@ export type RecomputeDaysOutcome =
   | { ok: true; days: ClassifiedDay[] }
   | { ok: false; code: "COMPANY_NOT_FOUND" | "ERROR" };
 
-async function buildRules(companyId: string, rangeStart: Date, rangeEnd: Date): Promise<ClassifierRules | null> {
+async function buildRules(
+  companyId: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+): Promise<{ rules: ClassifierRules; weeklyRegularMinutes: number } | null> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { timezone: true },
@@ -25,18 +30,28 @@ async function buildRules(companyId: string, rangeStart: Date, rangeEnd: Date): 
 
   const settings = await prisma.payrollSettings.findUnique({
     where: { companyId },
-    select: { hoursPerWorkingDay: true, nightStartHour: true, nightEndHour: true },
+    select: {
+      hoursPerWorkingDay: true,
+      nightStartHour: true,
+      nightEndHour: true,
+      restDays: true,
+      overtimeWeeklyThresholdHours: true,
+    },
   });
 
   const hoursPerDay = settings ? Number(settings.hoursPerWorkingDay) : 8;
   const holidayIsoDates = await getMergedHolidayIsoSetForUtcRange(companyId, rangeStart, rangeEnd);
 
   return {
-    dailyRegularMinutes: Math.round(hoursPerDay * 60),
-    nightStartHour: settings?.nightStartHour ?? 22,
-    nightEndHour: settings?.nightEndHour ?? 6,
-    holidayIsoDates,
-    timeZone: company.timezone,
+    rules: {
+      dailyRegularMinutes: Math.round(hoursPerDay * 60),
+      nightStartHour: settings?.nightStartHour ?? 22,
+      nightEndHour: settings?.nightEndHour ?? 6,
+      holidayIsoDates,
+      restDayNumbers: new Set(settings?.restDays?.length ? settings.restDays : [0, 6]),
+      timeZone: company.timezone,
+    },
+    weeklyRegularMinutes: Math.round(Number(settings?.overtimeWeeklyThresholdHours ?? 40) * 60),
   };
 }
 
@@ -93,11 +108,23 @@ export async function recomputeTimeClockDaysForRange(params: {
 }): Promise<RecomputeDaysOutcome> {
   const { companyId, employeeId, rangeStart, rangeEnd } = params;
   try {
-    const paddedStart = new Date(rangeStart.getTime() - DAY_MS);
-    const paddedEnd = new Date(rangeEnd.getTime() + DAY_MS);
+    /**
+     * Weekly overtime needs the WHOLE local week as context — a Saturday's
+     * minutes only become overtime because of the Monday–Friday before it.
+     * The fetch window therefore extends past the range far enough to cover
+     * the full ISO weeks at both ends (9 days is enough in any timezone,
+     * overnight spillover included); only in-range days are written back,
+     * but they are classified with their week fully in view.
+     */
+    const paddedStart = new Date(rangeStart.getTime() - 9 * DAY_MS);
+    const paddedEnd = new Date(rangeEnd.getTime() + 9 * DAY_MS);
 
-    const rules = await buildRules(companyId, paddedStart, paddedEnd);
-    if (!rules) return { ok: false, code: "COMPANY_NOT_FOUND" };
+    const built = await buildRules(companyId, paddedStart, paddedEnd);
+    if (!built) return { ok: false, code: "COMPANY_NOT_FOUND" };
+    const { rules, weeklyRegularMinutes } = built;
+
+    const startDayIso = zonedParts(rangeStart, rules.timeZone).isoDate;
+    const endDayIso = zonedParts(rangeEnd, rules.timeZone).isoDate;
 
     const punches = await prisma.timeClockPunch.findMany({
       where: {
@@ -110,24 +137,26 @@ export async function recomputeTimeClockDaysForRange(params: {
       select: { occurredAt: true, direction: true },
     });
 
-    const startDayIso = zonedParts(rangeStart, rules.timeZone).isoDate;
-    const endDayIso = zonedParts(rangeEnd, rules.timeZone).isoDate;
-
     const groups = groupPunchesByWorkDay(punches, rules.timeZone);
 
-    const days: ClassifiedDay[] = [];
+    const allDays: ClassifiedDay[] = [];
     for (const [dayIso, dayPunches] of groups) {
-      if (dayIso < startDayIso || dayIso > endDayIso) continue;
       const classified = classifyDay(dayPunches, rules);
       // classifyDay derives the date from the first interval; a review-only day
       // keeps the grouping key so the row lands where the punches sit.
-      days.push({ ...classified, workDateIso: classified.workDateIso || dayIso });
+      allDays.push({ ...classified, workDateIso: classified.workDateIso || dayIso });
     }
+
+    const days = applyWeeklyOvertime(allDays, weeklyRegularMinutes).filter(
+      (day) => day.workDateIso >= startDayIso && day.workDateIso <= endDayIso,
+    );
 
     const ruleSnapshot = {
       dailyRegularMinutes: rules.dailyRegularMinutes,
+      weeklyRegularMinutes,
       nightStartHour: rules.nightStartHour,
       nightEndHour: rules.nightEndHour,
+      restDays: [...rules.restDayNumbers],
       timeZone: rules.timeZone,
     };
 
