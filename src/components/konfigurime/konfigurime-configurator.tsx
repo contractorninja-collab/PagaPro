@@ -793,7 +793,10 @@ export function KonfigurimeConfigurator({
           </TabsContent>
 
           <TabsContent value="pozitat">
-            <JobTitlesSettingsPanel initialJobTitles={initial.jobTitles} />
+            <JobTitlesSettingsPanel
+              initialJobTitles={initial.jobTitles}
+              departments={initial.departments.map((d) => d.name)}
+            />
           </TabsContent>
 
           <TabsContent value="festat">

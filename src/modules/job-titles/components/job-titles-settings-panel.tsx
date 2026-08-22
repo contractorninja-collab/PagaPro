@@ -61,6 +61,8 @@ function flattenErrors(raw?: Record<string, string[] | undefined>): Record<strin
 
 export function JobTitlesSettingsPanel(props: {
   initialJobTitles: JobTitleDto[];
+  /** Department names for the picker, from the company's own list. */
+  departments: string[];
 }) {
   const { initialJobTitles } = props;
   const [jobTitles, setJobTitles] = useState(initialJobTitles);
@@ -108,6 +110,19 @@ export function JobTitlesSettingsPanel(props: {
         .includes(q);
     });
   }, [jobTitles, query, status]);
+
+  /**
+   * The company's departments, plus whatever this record already carries.
+   * Older job titles were typed by hand and may name a department that has
+   * since been renamed or removed — editing such a row must not silently
+   * reassign it just because its value is missing from the list.
+   */
+  const departmentOptions = useMemo(() => {
+    const names = [...props.departments];
+    const current = draft.department.trim();
+    if (current !== "" && !names.includes(current)) names.push(current);
+    return names;
+  }, [props.departments, draft.department]);
 
   const patchDraft = (patch: Partial<Draft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -208,27 +223,33 @@ export function JobTitlesSettingsPanel(props: {
                 {fieldErrors.title ? <p className="text-xs text-destructive">{fieldErrors.title}</p> : null}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="job-title-department">Departamenti</Label>
-                  <Input
-                    id="job-title-department"
-                    value={draft.department}
-                    onChange={(e) => patchDraft({ department: e.target.value })}
-                    placeholder="p.sh. Shitje"
-                    disabled={locked}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="job-title-level">Niveli</Label>
-                  <Input
-                    id="job-title-level"
-                    value={draft.level}
-                    onChange={(e) => patchDraft({ level: e.target.value })}
-                    placeholder="Junior, Senior, Lead"
-                    disabled={locked}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="job-title-department">Departamenti</Label>
+                {/*
+                  A list, not free text: typing "Shitje" here and "Shitjet" on
+                  the employee meant two departments that only a human could see
+                  were the same. The options come from the departments this
+                  company actually has, managed in the panel above.
+                */}
+                <select
+                  id="job-title-department"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  value={draft.department}
+                  onChange={(e) => patchDraft({ department: e.target.value })}
+                  disabled={locked || departmentOptions.length === 0}
+                >
+                  <option value="">Pa departament</option>
+                  {departmentOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {departmentOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Shtoni së pari një departament te „Departamentet&rdquo; më lart.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
@@ -244,30 +265,6 @@ export function JobTitlesSettingsPanel(props: {
                   disabled={locked}
                 />
                 {fieldErrors.description ? <p className="text-xs text-destructive">{fieldErrors.description}</p> : null}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="job-title-responsibilities">Përgjegjësitë</Label>
-                <textarea
-                  id="job-title-responsibilities"
-                  className="min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={draft.responsibilities}
-                  onChange={(e) => patchDraft({ responsibilities: e.target.value })}
-                  placeholder="Një përgjegjësi për rresht"
-                  disabled={locked}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="job-title-requirements">Kërkesat</Label>
-                <textarea
-                  id="job-title-requirements"
-                  className="min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={draft.requirements}
-                  onChange={(e) => patchDraft({ requirements: e.target.value })}
-                  placeholder="Një kërkesë për rresht"
-                  disabled={locked}
-                />
               </div>
             </div>
 
@@ -311,7 +308,6 @@ export function JobTitlesSettingsPanel(props: {
                   <TableRow>
                     <TableHead>Pozita</TableHead>
                     <TableHead>Departamenti</TableHead>
-                    <TableHead>Niveli</TableHead>
                     <TableHead>Statusi</TableHead>
                     <TableHead>Punonjës</TableHead>
                     <TableHead className="text-right">Veprime</TableHead>
@@ -320,7 +316,7 @@ export function JobTitlesSettingsPanel(props: {
                 <TableBody>
                   {filteredRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                         Nuk ka pozita për këto filtra.
                       </TableCell>
                     </TableRow>
@@ -334,7 +330,6 @@ export function JobTitlesSettingsPanel(props: {
                           </div>
                         </TableCell>
                         <TableCell>{row.department ?? "—"}</TableCell>
-                        <TableCell>{row.level ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant={row.status === "ACTIVE" ? "success" : "secondary"}>
                             {row.status === "ACTIVE" ? "Aktive" : "Arkivuar"}
