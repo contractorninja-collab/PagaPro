@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { DocumentTemplateSubtype } from "@prisma/client";
 import { notFound } from "next/navigation";
 import {
   EmployeeProfileShell,
@@ -11,7 +12,7 @@ import {
 } from "@/modules/employees/services/employee-service";
 import {
   listArtifactsForEmployee,
-  listContractsForEmployee,
+  listContractDocumentsForEmployee,
   listPayrollGeneratedDocsForEmployee,
 } from "@/modules/documents/services/document-queries";
 import {
@@ -36,6 +37,18 @@ type Props = {
 function first(v: string | string[] | undefined): string {
   if (Array.isArray(v)) return v[0] ?? "";
   return v ?? "";
+}
+
+/** Contract subtype → the wording used on the contract itself. */
+const CONTRACT_SUBTYPE_LABELS: Record<DocumentTemplateSubtype, string> = {
+  AFAT_I_CAKTUAR: "Në kohë të caktuar",
+  AFAT_I_PACAKTUAR: "Në kohë të pacaktuar",
+  KONTRATE_SPECIFIKE: "Kontratë specifike",
+  PRAKTIKANT: "Praktikant",
+};
+
+function contractSubtypeLabel(subtype: DocumentTemplateSubtype | null): string | null {
+  return subtype ? CONTRACT_SUBTYPE_LABELS[subtype] : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -66,7 +79,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   let employee;
   let departments;
   let genDocs;
-  let contracts;
+  let contractDocs;
   let payrollDocs;
   let jobTitles;
   let leaveRequests;
@@ -74,12 +87,12 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   let timelineRows;
   let uploadedDocs;
   try {
-    [employee, departments, genDocs, contracts, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
+    [employee, departments, genDocs, contractDocs, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
       await Promise.all([
         getEmployeeById(companyId, id),
         listDepartmentsForCompany(companyId),
         listArtifactsForEmployee(companyId, id),
-        listContractsForEmployee(companyId, id),
+        listContractDocumentsForEmployee(companyId, id),
         listPayrollGeneratedDocsForEmployee(companyId, id),
         listActiveJobTitleOptions(companyId),
         listLeaveHistoryForEmployee(companyId, id),
@@ -125,11 +138,18 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       generatedAtIso: p.generatedAt.toISOString(),
       periodLabel: `${p.payroll.year}-${String(p.payroll.month).padStart(2, "0")}`,
     })),
-    contracts: contracts.map((c) => ({
-      id: c.id,
-      status: c.status,
-      referenceCode: c.referenceCode,
-      effectiveDateIso: c.effectiveDate.toISOString(),
+    /**
+     * The generated contract documents — not rows of the `contracts` table,
+     * which nothing in the app writes, so this register was empty for every
+     * employee while their contract sat one tab over under Dokumentet.
+     */
+    contracts: contractDocs.map((a) => ({
+      id: a.id,
+      title: a.title,
+      kind: a.kind,
+      subtypeLabel: contractSubtypeLabel(a.templateVersion.template.templateSubtype),
+      createdAtIso: a.createdAt.toISOString(),
+      hasPdf: Boolean(a.generatedPdfStorageKey),
     })),
   };
 

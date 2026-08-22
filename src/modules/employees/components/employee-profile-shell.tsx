@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import type { DocumentCategory, EmploymentStatus } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, FileText, FolderOpen, TrendingUp } from "lucide-react";
+import { AlertTriangle, CalendarDays, Download, FileText, FolderOpen, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { AppSubBar, SubBarStatus } from "@/components/layout/app-sub-bar";
 import { EmptySection } from "@/components/patterns/empty-section";
+import { StatusPill } from "@/components/patterns/status-pill";
 import { Button } from "@/components/ui/button";
 import { useCan } from "@/components/layout/capability-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,11 +68,24 @@ export interface EmployeePayrollPdfSummary {
   periodLabel: string;
 }
 
+/**
+ * A generated employment contract.
+ *
+ * This used to describe a row of the `contracts` table — which nothing in the
+ * app has ever written, so the register was empty for every employee in every
+ * company while their contract sat one tab over under Dokumentet. It now
+ * describes the generated document itself, which is what the empty state
+ * always promised would be listed here.
+ */
 export interface EmployeeContractSummary {
   id: string;
-  status: string;
-  referenceCode: string | null;
-  effectiveDateIso: string;
+  title: string;
+  /** PREVIEW or ARCHIVED_FINAL. */
+  kind: string;
+  /** Albanian label for the contract subtype (afat i caktuar / i pacaktuar…). */
+  subtypeLabel: string | null;
+  createdAtIso: string;
+  hasPdf: boolean;
 }
 
 export interface EmployeeProfileDocumentsBundle {
@@ -375,29 +389,58 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
 function ContractsTab({ rows }: { rows: EmployeeContractSummary[] }) {
   if (rows.length === 0) {
     return (
-      <SectionCard title="Kontratat" description="Regjistrimi i kontratave në sistem.">
-        <EmptySection icon={FileText} title="Asnjë kontratë e regjistruar" hint="Kontratat e gjeneruara për këtë punonjës do të listohen këtu." />
+      <SectionCard title="Kontratat" description="Kontratat e gjeneruara për këtë punonjës.">
+        <EmptySection
+          icon={FileText}
+          title="Asnjë kontratë e gjeneruar"
+          hint="Gjeneroni një kontratë te Dokumentet dhe do të shfaqet këtu."
+        />
       </SectionCard>
     );
   }
 
   return (
-    <SectionCard title="Kontratat" description="Kronologjikisht sipas datës së efektshme." flush>
+    <SectionCard title="Kontratat" description="Kronologjikisht, më e reja e para." flush>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[480px]">
+        <table className="w-full min-w-[560px]">
           <thead>
             <tr className="border-b border-line-soft bg-fill-faint">
-              <th className={TH}>Referenca</th>
-              <th className={TH}>Statusi</th>
-              <th className={TH}>Efektive nga</th>
+              <th className={TH}>Kontrata</th>
+              <th className={TH}>Lloji</th>
+              <th className={TH}>Gjeneruar</th>
+              <th className={cn(TH, "text-right")}>Veprime</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((c) => (
               <tr key={c.id} className="border-b border-fill transition-colors last:border-0 hover:bg-fill-faint">
-                <td className={cn(TD, "font-mono text-xs")}>{c.referenceCode ?? c.id.slice(0, 10)}</td>
-                <td className={TD}>{c.status}</td>
-                <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(c.effectiveDateIso)}</td>
+                <td className={TD}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Link
+                      href={`/dokumentet/${c.id}`}
+                      className="font-semibold text-ink-900 hover:text-brand-blue"
+                    >
+                      {c.title}
+                    </Link>
+                    {c.kind === "PREVIEW" ? (
+                      <StatusPill tone="warning" size="sm">
+                        Parapamje
+                      </StatusPill>
+                    ) : null}
+                  </div>
+                </td>
+                <td className={cn(TD, "text-ink-600")}>{c.subtypeLabel ?? "—"}</td>
+                <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{formatSqDate(c.createdAtIso)}</td>
+                <td className={cn(TD, "text-right")}>
+                  <a
+                    href={`/api/dokumentet/artifacts/${c.id}/${c.hasPdf ? "pdf" : "docx"}`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-line bg-white px-3 text-[12.5px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover"
+                    aria-label={`Shkarko ${c.title}`}
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                    Shkarko
+                  </a>
+                </td>
               </tr>
             ))}
           </tbody>

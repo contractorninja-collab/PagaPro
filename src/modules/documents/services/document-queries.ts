@@ -453,6 +453,48 @@ export async function listArtifactsForEmployee(companyId: string, employeeId: st
   });
 }
 
+/**
+ * The employee's generated employment contracts, newest first.
+ *
+ * Annexes are excluded structurally, by their own subject ids — not by
+ * template subtype, which looks like the obvious discriminator and is not:
+ * plenty of real contract artifacts point at template rows whose subtype was
+ * never set, so filtering on it hides the very contracts this list exists to
+ * show. An annex artifact is registered with `subjectId` = the annex row id
+ * (see register-annex-artifact.ts); a contract's subject is the employee.
+ */
+export async function listContractDocumentsForEmployee(companyId: string, employeeId: string) {
+  const annexes = await prisma.employeeContractAnnex.findMany({
+    where: { companyId, employeeId },
+    select: { id: true },
+  });
+  const annexIds = annexes.map((a) => a.id);
+
+  return prisma.documentGenerationArtifact.findMany({
+    where: {
+      companyId,
+      documentCategory: "CONTRACT",
+      employeeId,
+      isArchived: false,
+      ...(annexIds.length > 0 ? { subjectId: { notIn: annexIds } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: { templateVersion: { include: { template: true } } },
+  });
+}
+
+/**
+ * Rows of the `contracts` table.
+ *
+ * Note before building on this: **nothing in the app writes that table.**
+ * Contract generation produces a DocumentGenerationArtifact, and the contract's
+ * own terms (start, end, type) live on the Employee record. The profile's
+ * contract register reads the artifacts for that reason. Kept because
+ * `listArtifactsForEmployee` still resolves legacy artifacts whose subjectId is
+ * a Contract row id — and because the dashboard's expiring-contract alert
+ * counts this table, which is why that count is always zero.
+ */
 export async function listContractsForEmployee(companyId: string, employeeId: string) {
   return prisma.contract.findMany({
     where: { companyId, employeeId },
