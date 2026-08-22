@@ -94,15 +94,15 @@ describe("professional payslip PDF", () => {
     expect(Math.round(height)).toBe(842);
   });
 
-  it("embeds a sans face for copy and a mono face for figures", async () => {
+  it("embeds a face for copy and a face for figures", async () => {
     const bytes = await buildProfessionalPayslipPdf(sampleInput);
     const pdf = await PDFDocument.load(bytes);
     const names = pageFontNames(pdf).join(" ");
 
-    // Falls back to metrically compatible faces until the brand fonts are
-    // dropped into templates/fonts, so assert the roles rather than the files.
-    expect(names).toMatch(/LiberationSans|InstrumentSans/);
-    expect(names).toMatch(/Courier|IBMPlexMono/);
+    // Roles, not filenames: the loader falls back to metrically compatible
+    // faces when a brand font is missing, and the payslip must still render.
+    expect(names).toMatch(/Manrope|LiberationSans|InstrumentSans|Helvetica/);
+    expect(names).toMatch(/Manrope|Courier|IBMPlexMono/);
   });
 
   it("draws the configured company logo", async () => {
@@ -145,7 +145,10 @@ describe("professional payslip PDF", () => {
     // U+2212 is outside WinAnsi, so an unmapped minus used to reach the page as
     // "?46.39" — on a money column that is worse than being merely wrong.
     expect(drawn).not.toContain("?46.39");
-    expect(drawn).toContain("-46.39");
+    // Either mark is correct: the standard-font path sanitises U+2212 down to a
+    // hyphen, while an embedded face draws the true minus. What must never
+    // happen is the amount losing its sign.
+    expect(drawn).toMatch(/[-−]46\.39/);
   });
 
   it("renders when attendance and year-to-date figures are unavailable", async () => {

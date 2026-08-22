@@ -8,16 +8,28 @@ const SERIF_REGULAR_PATH = path.join(FONT_DIR, "LiberationSerif-Regular.ttf");
 const SANS_BOLD_PATH = path.join(FONT_DIR, "LiberationSans-Bold.ttf");
 
 /**
- * Brand faces the redesigned payroll documents are drawn in. They are optional:
- * drop the files into `templates/fonts/` and the next render picks them up with
- * no code change. Until then the documents fall back to metrically compatible
- * faces (Helvetica ≈ Liberation Sans ≈ Arial), so column maths holds either way.
+ * Brand faces the payroll documents are drawn in — Manrope, the same face the
+ * app's interface uses, so a payslip looks like it came from the product the
+ * employee's manager is looking at. They remain optional: the loader falls back
+ * to metrically compatible standard faces (Helvetica ≈ Liberation Sans ≈ Arial)
+ * if a file is missing, so column maths holds either way.
+ *
+ * The figure faces are a SEPARATE, deliberately prepared pair. Manrope's digits
+ * are proportional by default — "1" is 3.2pt where "6" is 5.6pt — so two amounts
+ * with the same decimals come out different widths and the commas wander down
+ * the column. Manrope does ship tabular alternates (`tnum`), but pdf-lib draws
+ * glyphs straight through the cmap and cannot apply OpenType features, so the
+ * feature alone would never reach the page. The -Tabular files therefore have
+ * the tabular glyphs mapped onto the digit codepoints, making them the default:
+ * every digit is one width, and money lines up without a monospaced face.
+ *
+ * Regenerate with scripts/build-manrope-pdf-fonts.py after a font update.
  */
 const OPTIONAL_FACES = {
-  sans: "InstrumentSans-Regular.ttf",
-  sansBold: "InstrumentSans-SemiBold.ttf",
-  mono: "IBMPlexMono-Regular.ttf",
-  monoBold: "IBMPlexMono-SemiBold.ttf",
+  sans: "Manrope-Regular.ttf",
+  sansBold: "Manrope-SemiBold.ttf",
+  mono: "Manrope-Regular-Tabular.ttf",
+  monoBold: "Manrope-SemiBold-Tabular.ttf",
 } as const;
 
 let fontBytesPromise:

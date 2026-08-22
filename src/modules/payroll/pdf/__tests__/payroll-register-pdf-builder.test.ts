@@ -77,8 +77,9 @@ describe("payroll register PDF layout", () => {
     expect(buf.byteLength).toBeGreaterThan(500);
     expect(new TextDecoder().decode(buf.subarray(0, 4))).toBe("%PDF");
     const names = pageFontNames(await PDFDocument.load(buf)).join(" ");
-    // The redesign is set in sans throughout; the serif body font is gone.
-    expect(names).toContain("LiberationSans");
+    // Set in sans throughout; the serif body font is gone. Named by role, not
+    // by file — the loader falls back when a brand face is absent.
+    expect(names).toMatch(/Manrope|LiberationSans|InstrumentSans|Helvetica/);
     expect(names).not.toContain("LiberationSerif");
   });
 
