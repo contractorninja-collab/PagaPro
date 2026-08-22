@@ -251,6 +251,38 @@ export function PrezencaDashboardClient(props: {
         </div>
       ) : null}
 
+      {/* Unexplained no-shows. A day with zero punches produces no derived row,
+          so before this list an unexcused absence was simply invisible. */}
+      {presence.absences.length > 0 ? (
+        <div className={`overflow-hidden ${CARD}`}>
+          <div className="flex items-center gap-2 border-b border-line-soft px-5 py-3.5">
+            <AlarmClock className="h-4 w-4 text-[#dc2626]" aria-hidden />
+            <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
+              Mungesa të pashpjeguara
+            </h2>
+            <span className="rounded-full bg-[#fef2f2] px-2 py-0.5 text-[11px] font-bold text-[#dc2626]">
+              {presence.absences.length}
+            </span>
+            <p className="ml-auto text-[12px] text-ink-400">
+              Ditë pune pa skanim, pa pushim të miratuar dhe pa festë
+            </p>
+          </div>
+          <ul className="grid gap-x-3 px-3 py-2 sm:grid-cols-2 xl:grid-cols-3">
+            {presence.absences.map((a) => (
+              <li
+                key={`${a.employeeId}:${a.workDateIso}`}
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[13px] transition-colors hover:bg-fill-faint"
+              >
+                <span className="truncate font-medium text-ink-900">{a.employeeName}</span>
+                <span className="shrink-0 tabular-nums text-ink-500">
+                  {a.workDateIso.split("-").reverse().join(".")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {/* the month grid */}
       <div className={`overflow-hidden ${CARD}`}>
         {presence.employees.length === 0 ? (
