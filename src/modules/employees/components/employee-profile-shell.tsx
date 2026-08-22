@@ -412,6 +412,12 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
   // ACCOUNTANT holds both, but the two are separate capabilities and this tab
   // must ask for the one it actually uses.
   const canWriteDocuments = useCan("documents.write");
+  /**
+   * Payslip PDFs print the employee's bank account, so their download route is
+   * gated on payroll.prepare. Hide the links from anyone who does not hold it
+   * rather than leaving rows that answer 403 when clicked.
+   */
+  const canSeePayrollPdfs = useCan("payroll.prepare");
   const [quickView, setQuickView] = useState<QuickViewTarget | null>(null);
   const byCategory = useMemo(() => {
     const map = new Map<DocumentCategory, EmployeeGeneratedDocSummary[]>();
@@ -431,12 +437,14 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
     for (const a of bundle.generatedDocuments) {
       out.push({ k: "artifact", t: Date.parse(a.createdAtIso), a });
     }
-    for (const p of bundle.payrollPdfs) {
-      out.push({ k: "payroll", t: Date.parse(p.generatedAtIso), p });
+    if (canSeePayrollPdfs) {
+      for (const p of bundle.payrollPdfs) {
+        out.push({ k: "payroll", t: Date.parse(p.generatedAtIso), p });
+      }
     }
     out.sort((x, y) => y.t - x.t);
     return out;
-  }, [bundle.generatedDocuments, bundle.payrollPdfs]);
+  }, [bundle.generatedDocuments, bundle.payrollPdfs, canSeePayrollPdfs]);
 
   if (merged.length === 0) {
     return (

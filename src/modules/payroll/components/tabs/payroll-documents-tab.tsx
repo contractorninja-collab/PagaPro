@@ -3,6 +3,7 @@
 import { Download, FileText, HelpCircle, Printer } from "lucide-react";
 import type { PayrollPeriodStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/layout/capability-provider";
 import type { PayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
 import { CARD, CARD_TITLE } from "@/modules/payroll/components/payroll-card";
 
@@ -32,6 +33,11 @@ export function PayrollDocumentsTab(props: {
   pending: boolean;
   onGenerate: () => void;
 }) {
+  // The payment list carries every employee's bank account, so the card is
+  // hidden — not disabled — for anyone the route would refuse.
+  const canSeeBankList = useCan("payroll.prepare");
+  const bankListReady = props.status === "LOCKED" || props.status === "ARCHIVED";
+
   const bundle = props.documents.find((d) => d.kind === "PAYSLIPS_PRINT_BUNDLE");
   const payslips = props.documents.filter((d) => d.kind === "EMPLOYEE_PAYSLIP");
   const registers = props.documents.filter(
@@ -184,6 +190,37 @@ export function PayrollDocumentsTab(props: {
           ) : null}
         </>
       )}
+
+      {/* The monthly click: the file finance uploads to the bank. Above the
+          Libri i Pagave card because executing the payment comes first and
+          the archival reporting comes after. */}
+      {canSeeBankList ? (
+        <section className={CARD}>
+          <h3 className={CARD_TITLE}>Lista e pagave për ekzekutim</h3>
+          <div className="space-y-3 px-5 py-4 text-[13px] leading-relaxed text-ink-500">
+            <p>
+              Emri, mbiemri, llogaria bankare dhe paga neto për çdo punonjës — gati për financat.
+              Punonjësit pa llogari të vlefshme shfaqen veçmas, që askush të mos mbetet pa pagesë
+              pa u vënë re.
+            </p>
+            {bankListReady ? (
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outlinePrimary">
+                  <a href={`/api/payroll/${props.payrollId}/export-bank-list`} download>
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                    Shkarko Excel
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-ink-400">
+                Aktive pasi payroll-i të jetë kyçur — që shumat në listën e pagesave të mos
+                ndryshojnë pasi financat ta kenë marrë skedarin.
+              </p>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       {/* Moved out of the ATK tab: these are internal financial exports, not a filing. */}
       <section className={CARD}>

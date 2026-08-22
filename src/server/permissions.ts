@@ -9,12 +9,20 @@ import type { CompanyMembershipRole } from "@prisma/client";
  * This module is the single place that answers "may they?", so the answer
  * cannot drift between the server action, the API route and the button.
  *
- * Reading is deliberately NOT gated, with ONE exception. A member of a company
+ * Reading is deliberately NOT gated, with TWO exceptions. A member of a company
  * may see everything in it, salaries included — the roles separate who can
- * *change* things. The exception is `documents.sensitive`: medical and
- * disciplinary files in an employee's dossier are special-category personal
- * data under the Kosovo LMDhP (06/L-082), so seeing them requires the
- * capability — enforced in the list service, the download route and the UI.
+ * *change* things.
+ *
+ *   1. `documents.sensitive`: medical and disciplinary files in an employee's
+ *      dossier are special-category personal data under the Kosovo LMDhP
+ *      (06/L-082), so seeing them requires the capability — enforced in the
+ *      list service, the download route and the UI.
+ *   2. `payroll.prepare` also guards two *reads*: the payment list at
+ *      `api/payroll/[id]/export-bank-list` and the payslip PDFs at
+ *      `api/payroll-documents/[id]`. Both hand over decrypted bank account
+ *      numbers in bulk — a payment rail, not a salary figure — which is why
+ *      `field-crypto` exists at all. Do not "fix" these back to plain company
+ *      membership; the gate is the point.
  */
 
 export type Capability =

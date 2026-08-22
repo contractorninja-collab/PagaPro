@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Company, CompanySetting, Employee, EmployeeBankAccount, Payroll, PayrollEntry } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { decryptField } from "@/lib/field-crypto";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
+import { resolveEmployeeBank } from "@/modules/employees/helpers/employee-bank-resolver";
 import { payrollDocumentPdfKey } from "@/modules/documents/engine/storage/payroll-path-keys";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import { decimalToPlain } from "@/modules/payroll/helpers/money-format";
@@ -36,20 +36,6 @@ function resolveCompanyAddress(company: Company, settings: CompanySetting | null
 
 function resolveCityLine(company: Company): string {
   return [company.postalCode, company.city, company.country].filter(Boolean).join(" ");
-}
-
-function resolveEmployeeBank(employee: Employee & { bankAccounts: EmployeeBankAccount[] }) {
-  const primary =
-    employee.bankAccounts.find((a) => a.isPrimary && (a.validTo == null || a.validTo > new Date())) ??
-    employee.bankAccounts[0];
-  const storedIban = primary?.iban ?? employee.bankAccountIban ?? null;
-  return {
-    bankName: primary?.bankName ?? employee.bankName ?? null,
-    // Stored encrypted; the payslip prints the real account number.
-    iban: storedIban ? decryptField(storedIban) : null,
-    accountHolder: primary?.accountHolderName ?? `${employee.firstName} ${employee.lastName}`,
-    bicSwift: primary?.bicSwift ?? null,
-  };
 }
 
 const MONTH_ABBR_SQ = [
@@ -117,7 +103,12 @@ function buildPayslipInput(params: {
       fullName: `${entry.employee.firstName} ${entry.employee.lastName}`,
       personalId: entry.employee.personalId,
       jobTitle: entry.jobTitleSnapshot ?? entry.employee.jobTitle,
-      ...bank,
+      // Mapped field by field rather than spread: the resolver also returns
+      // `source`, which the payslip has no use for.
+      bankName: bank.bankName,
+      iban: bank.iban,
+      accountHolder: bank.accountHolder,
+      bicSwift: bank.bicSwift,
     },
     period: {
       year: pay.year,

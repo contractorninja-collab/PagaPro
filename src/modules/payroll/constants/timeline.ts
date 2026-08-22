@@ -11,6 +11,7 @@ export const PAYROLL_TIMELINE = {
   PAYROLL_ATK_DOWNLOADED: "PAYROLL_ATK_DOWNLOADED",
   PAYROLL_ATK_REGENERATED: "PAYROLL_ATK_REGENERATED",
   PAYROLL_ATK_ARCHIVED: "PAYROLL_ATK_ARCHIVED",
+  PAYROLL_BANK_LIST_DOWNLOADED: "PAYROLL_BANK_LIST_DOWNLOADED",
   ARCHIVED: "PAYROLL_ARCHIVED",
   RECALCULATED: "PAYROLL_RECALCULATED",
 } as const;
@@ -31,6 +32,7 @@ export const PAYROLL_TIMELINE_LABELS: Record<string, string> = {
   PAYROLL_ATK_REGENERATED: "Eksporti ATK u rigjenerua",
   PAYROLL_ATK_DOWNLOADED: "Eksporti ATK u shkarkua",
   PAYROLL_ATK_ARCHIVED: "Eksporti ATK u arkivua",
+  PAYROLL_BANK_LIST_DOWNLOADED: "Lista e pagave për ekzekutim u shkarkua",
 };
 
 /** Falls back to a readable form of the constant rather than the constant itself. */
@@ -46,7 +48,9 @@ export type PayrollTimelineTone = "status" | "document" | "atk" | "neutral";
 
 export function payrollTimelineTone(verb: string): PayrollTimelineTone {
   if (verb.includes("ATK")) return "atk";
-  if (verb.includes("PDF")) return "document";
+  if (verb.includes("PDF") || verb === PAYROLL_TIMELINE.PAYROLL_BANK_LIST_DOWNLOADED) {
+    return "document";
+  }
   if (
     verb === PAYROLL_TIMELINE.CREATED ||
     verb === PAYROLL_TIMELINE.REVIEWED ||
