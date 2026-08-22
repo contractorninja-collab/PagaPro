@@ -1,5 +1,5 @@
 import type {
-  ContractKind,
+  ContractTermType,
   EmploymentStatus,
   EmploymentType,
   LeaveRequestStatus,
@@ -42,11 +42,11 @@ export interface DashboardPayrollSlice {
 }
 
 export interface ContractExpiryRow {
-  contractId: string;
   employeeId: string;
   employeeName: string;
   jobTitle: string | null;
-  contractKind: ContractKind;
+  /** The employee's contract term — the thing that actually expires. */
+  contractTerm: ContractTermType;
   endDateIso: string;
   daysRemaining: number;
   urgency: "7" | "14" | "30";

@@ -1,4 +1,4 @@
-import type { ContractKind, PayrollPeriodStatus } from "@prisma/client";
+import type { PayrollPeriodStatus } from "@prisma/client";
 
 export const PAYROLL_STATUS_LABELS_SQ: Record<PayrollPeriodStatus, string> = {
   DRAFT: "Draft",
@@ -10,8 +10,8 @@ export const PAYROLL_STATUS_LABELS_SQ: Record<PayrollPeriodStatus, string> = {
 
 export { LEAVE_TYPE_LABELS_SQ } from "@/modules/leaves/helpers/leave-type-metadata";
 
-export const CONTRACT_KIND_LABELS_SQ: Record<ContractKind, string> = {
-  EMPLOYMENT: "Punësim",
-  CONTRACTOR_AGREEMENT: "Kontraktor",
-  AMENDMENT: "Amendament",
-};
+/**
+ * Contract *kind* labels lived here for the expiry alert. That alert now reads
+ * the employee's contract term and labels it with CONTRACT_TERM_LABELS from
+ * the annex module, so nothing needed these.
+ */

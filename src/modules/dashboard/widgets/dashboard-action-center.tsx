@@ -28,7 +28,8 @@ import type {
   LeaveTodayCounts,
   OperationalAlert,
 } from "../types/dashboard-types";
-import { CONTRACT_KIND_LABELS_SQ, LEAVE_TYPE_LABELS_SQ } from "../helpers/dashboard-labels";
+import { CONTRACT_TERM_LABELS } from "@/modules/annex/types";
+import { LEAVE_TYPE_LABELS_SQ } from "../helpers/dashboard-labels";
 
 /** ATK monthly-declaration deadline row — computed server-side and passed in. */
 export interface AtkDeadlineItem {
@@ -216,7 +217,7 @@ export function DashboardActionCenter(props: {
   props.contractExpiries.forEach((c, idx) => {
     const tone: QueueTone = c.urgency === "7" ? "critical" : c.urgency === "14" ? "warning" : "neutral";
     items.push({
-      key: `contract-${c.contractId}`,
+      key: `contract-${c.employeeId}`,
       tone,
       icon: FileText,
       title: `Kontrata e ${c.employeeName} skadon ${c.daysRemaining === 0 ? "sot" : `për ${c.daysRemaining} ditë`}`,
@@ -224,7 +225,7 @@ export function DashboardActionCenter(props: {
         label: c.urgency === "7" ? "Kritike" : c.urgency === "14" ? "≤ 14 ditë" : "≤ 30 ditë",
         tone,
       },
-      detail: `${c.jobTitle ?? "Pa pozitë"} · ${CONTRACT_KIND_LABELS_SQ[c.contractKind]} · skadon ${formatSqDate(c.endDateIso)}`,
+      detail: `${c.jobTitle ?? "Pa pozitë"} · ${CONTRACT_TERM_LABELS[c.contractTerm]} · skadon ${formatSqDate(c.endDateIso)}`,
       anchorId: idx === 0 ? "contracts-expiry" : undefined,
       action: (
         <>

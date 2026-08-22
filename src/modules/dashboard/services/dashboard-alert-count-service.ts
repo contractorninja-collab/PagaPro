@@ -49,11 +49,17 @@ export const countOperationalAlerts = cache(async (companyId: string): Promise<n
       where: { companyId_year_month: { companyId, year: filters.year, month: filters.month } },
       select: { id: true, status: true },
     }),
-    prisma.contract.count({
+    /**
+     * Contract expiry lives on the employee (`contractEndDate`), not in the
+     * `contracts` table this used to count — nothing in the app has ever
+     * written a row there, so this alert was permanently zero and a fixed-term
+     * contract could lapse with nothing on screen having said a word.
+     */
+    prisma.employee.count({
       where: {
         companyId,
-        status: "ACTIVE",
-        endDate: { not: null, gte: todayStart, lte: horizonEnd },
+        status: { not: "TERMINATED" },
+        contractEndDate: { not: null, gte: todayStart, lte: horizonEnd },
       },
     }),
     prisma.leaveRequest.count({ where: { companyId, status: "PENDING" } }),

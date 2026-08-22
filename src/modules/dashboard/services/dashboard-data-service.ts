@@ -168,12 +168,12 @@ async function loadDashboardOperationalDataUncached(
     correctionsOpen,
   ] = await Promise.all([
     prisma.employee.count({ where: { ...empBase, status: "ACTIVE" } }),
-    prisma.contract.count({
+    prisma.employee.count({
       where: {
         companyId,
-        status: "ACTIVE",
-        endDate: { not: null, gte: todayStart, lte: horizonEnd },
-        ...contractDeptNested,
+        status: { not: "TERMINATED" },
+        contractEndDate: { not: null, gte: todayStart, lte: horizonEnd },
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
       },
     }),
     // A payroll period belongs to the company, not to a department, so this one
@@ -220,27 +220,27 @@ async function loadDashboardOperationalDataUncached(
       _sum: { grossSalary: true, netPay: true, employerTotalCost: true },
       _count: { _all: true },
     }),
-    prisma.contract.findMany({
+    /**
+     * Expiring contracts, read from the employee's own contract term. The
+     * `contracts` table these came from has never had a row written to it, so
+     * this list was always empty — see listContractsForEmployee.
+     */
+    prisma.employee.findMany({
       where: {
         companyId,
-        status: "ACTIVE",
-        endDate: { not: null, gte: todayStart, lte: horizonEnd },
-        ...contractDeptNested,
+        status: { not: "TERMINATED" },
+        contractEndDate: { not: null, gte: todayStart, lte: horizonEnd },
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
       },
-      orderBy: { endDate: "asc" },
+      orderBy: { contractEndDate: "asc" },
       take: 60,
       select: {
         id: true,
-        kind: true,
-        endDate: true,
-        employee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            jobTitle: true,
-          },
-        },
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        contractType: true,
+        contractEndDate: true,
       },
     }),
     prisma.leaveRequest.findMany({
@@ -491,15 +491,14 @@ async function loadDashboardOperationalDataUncached(
     lockedAtIso: payrollRow?.lockedAt?.toISOString() ?? null,
   };
 
-  const contractExpiries: ContractExpiryRow[] = expiringContracts.map((c) => {
-    const end = c.endDate!;
+  const contractExpiries: ContractExpiryRow[] = expiringContracts.map((e) => {
+    const end = e.contractEndDate!;
     const daysRemaining = Math.max(0, daysBetweenUtc(todayStart, end));
     return {
-      contractId: c.id,
-      employeeId: c.employee.id,
-      employeeName: `${c.employee.firstName} ${c.employee.lastName}`.trim(),
-      jobTitle: c.employee.jobTitle,
-      contractKind: c.kind as ContractKind,
+      employeeId: e.id,
+      employeeName: `${e.firstName} ${e.lastName}`.trim(),
+      jobTitle: e.jobTitle,
+      contractTerm: e.contractType,
       endDateIso: end.toISOString(),
       daysRemaining,
       urgency: urgencyBucket(daysRemaining),
