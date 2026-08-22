@@ -54,9 +54,13 @@ export function PrezencaResolveDialog(props: {
     }
     setBusy(true);
     try {
+      // Wall-clock values only; the server converts them in the company's
+      // timezone. Building an ISO string here as literal UTC put every manual
+      // punch one or two hours away from the time HR typed.
       const r = await addManualPunchAction({
         employeeId: target.employeeId,
-        occurredAtIso: `${target.workDateIso}T${timeValue}:00.000Z`,
+        workDateIso: target.workDateIso,
+        time: timeValue,
         direction,
         note: note || `Plotësim manual për ${target.workDateIso}`,
       });
@@ -131,10 +135,7 @@ export function PrezencaResolveDialog(props: {
                   >
                     {p.direction === "IN" ? "HYRJE" : "DALJE"}
                   </span>
-                  <span className="tabular-nums font-medium text-ink-900">
-                    {p.occurredAtIso.slice(0, 10).split("-").reverse().join(".")}{" "}
-                    {p.occurredAtIso.slice(11, 16)}
-                  </span>
+                  <span className="tabular-nums font-medium text-ink-900">{p.occurredAtLabel}</span>
                   <span className="text-ink-400">
                     {p.source === "MANUAL" ? "manual" : p.deviceLabel ?? "kiosk"}
                   </span>
@@ -201,7 +202,7 @@ export function PrezencaResolveDialog(props: {
                 className="h-9 rounded-lg border border-line bg-white px-2 text-[13px] tabular-nums"
               />
               <span className="text-[12px] text-ink-400">
-                më {target.workDateIso.split("-").reverse().join(".")} (UTC)
+                më {target.workDateIso.split("-").reverse().join(".")} (ora lokale)
               </span>
             </div>
             <input

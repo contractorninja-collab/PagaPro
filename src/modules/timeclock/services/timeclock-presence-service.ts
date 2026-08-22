@@ -233,6 +233,12 @@ async function getPresenceMonthForEmployees(
 export interface PresencePunchDto {
   id: string;
   occurredAtIso: string;
+  /**
+   * "DD.MM.YYYY HH:MM" in the COMPANY's zone. The dialog used to slice the
+   * ISO string, which showed every kiosk punch in UTC — one or two hours off
+   * the wall clock the person actually scanned at.
+   */
+  occurredAtLabel: string;
   direction: "IN" | "OUT";
   source: "KIOSK" | "MANUAL";
   note: string | null;
@@ -251,6 +257,21 @@ export async function listPunchesAroundDay(
   employeeId: string,
   workDateIso: string,
 ): Promise<PresencePunchDto[]> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  const timeZone = company?.timezone ?? "Europe/Belgrade";
+  const localLabel = new Intl.DateTimeFormat("sq-AL", {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   const dayStart = new Date(`${workDateIso}T00:00:00.000Z`);
   const rows = await prisma.timeClockPunch.findMany({
     where: {
@@ -276,6 +297,7 @@ export async function listPunchesAroundDay(
   return rows.map((r) => ({
     id: r.id,
     occurredAtIso: r.occurredAt.toISOString(),
+    occurredAtLabel: localLabel.format(r.occurredAt),
     direction: r.direction,
     source: r.source,
     note: r.note,

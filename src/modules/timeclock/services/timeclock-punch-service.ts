@@ -6,6 +6,7 @@ import {
   pairedMinutes,
   SHIFT_LOOKBACK_MS,
 } from "@/modules/timeclock/calculation/punch-inference";
+import { resolvePunchInstant } from "@/modules/timeclock/calculation/punch-instant";
 
 /**
  * Recording a badge scan. The rules themselves (direction inference, the
@@ -59,13 +60,25 @@ export async function recordBadgePunch(params: {
       };
     }
 
+    /**
+     * A queued offline scan happened when the DEVICE says it did, not when the
+     * wifi came back and delivered it. Everything below — the lookback window,
+     * the duplicate guard, direction inference, and the stored occurredAt —
+     * runs on the effective instant, so a drained queue reconstructs the
+     * morning instead of piling every scan onto the reconnect minute.
+     */
     const now = new Date();
+    const { instant: effectiveAt } = resolvePunchInstant(now, params.deviceReportedAt ?? null);
 
     const recentPunches = await prisma.timeClockPunch.findMany({
       where: {
         companyId: params.companyId,
         employeeId: employee.id,
-        occurredAt: { gte: new Date(now.getTime() - SHIFT_LOOKBACK_MS) },
+        occurredAt: {
+          gte: new Date(effectiveAt.getTime() - SHIFT_LOOKBACK_MS),
+          // Punches recorded after this instant cannot inform its direction.
+          lte: effectiveAt,
+        },
         voidedAt: null,
       },
       orderBy: { occurredAt: "asc" },
@@ -74,7 +87,7 @@ export async function recordBadgePunch(params: {
 
     const last = recentPunches[recentPunches.length - 1];
 
-    if (last && isDuplicateScan(recentPunches, now)) {
+    if (last && isDuplicateScan(recentPunches, effectiveAt)) {
       return {
         ok: true,
         result: {
@@ -95,7 +108,7 @@ export async function recordBadgePunch(params: {
         companyId: params.companyId,
         employeeId: employee.id,
         deviceId: params.deviceId ?? undefined,
-        occurredAt: now,
+        occurredAt: effectiveAt,
         deviceReportedAt: params.deviceReportedAt ?? undefined,
         direction,
         source: "KIOSK",
@@ -109,8 +122,8 @@ export async function recordBadgePunch(params: {
         employeeId: employee.id,
         displayName: displayNameFor(employee.firstName, employee.lastName),
         direction,
-        occurredAt: now,
-        todayMinutes: pairedMinutes([...recentPunches, { occurredAt: now, direction }]),
+        occurredAt: effectiveAt,
+        todayMinutes: pairedMinutes([...recentPunches, { occurredAt: effectiveAt, direction }]),
         duplicateIgnored: false,
       },
     };

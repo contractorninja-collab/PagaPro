@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
 import { addManualPunch, voidPunch } from "@/modules/timeclock/services/timeclock-correction-service";
+import { zonedWallTimeToUtc } from "@/modules/timeclock/calculation/zoned-time";
 import {
   getEmployeePresenceMonth,
   listPunchesAroundDay,
@@ -30,8 +32,15 @@ function safeRev(path: string) {
 
 const manualPunchSchema = z.object({
   employeeId: z.string().min(1),
-  /** ISO instant, minute precision from the dialog's datetime-local input. */
-  occurredAtIso: z.string().datetime({ message: "Ora nuk është valide." }),
+  /**
+   * Wall-clock date and time as HR typed them. The dialog used to send a
+   * ready-made ISO instant built as literal UTC, which landed every manual
+   * punch one or two hours away from the time the person actually typed —
+   * classification runs in the company's zone. The conversion belongs here,
+   * where the company's timezone is known.
+   */
+  workDateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data nuk është valide."),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "Shkruani orën si HH:MM."),
   direction: z.enum(["IN", "OUT"]),
   note: z.string().max(300).default(""),
 });
@@ -46,10 +55,24 @@ export async function addManualPunchAction(raw: unknown): Promise<TimeClockActio
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Të dhënat nuk janë valide." };
   }
 
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  if (!company) return { ok: false, error: "Kompania nuk u gjet." };
+
+  const [hourStr, minuteStr] = parsed.data.time.split(":");
+  const occurredAt = zonedWallTimeToUtc(
+    parsed.data.workDateIso,
+    Number(hourStr),
+    Number(minuteStr),
+    company.timezone,
+  );
+
   const r = await addManualPunch({
     companyId,
     employeeId: parsed.data.employeeId,
-    occurredAt: new Date(parsed.data.occurredAtIso),
+    occurredAt,
     direction: parsed.data.direction,
     note: parsed.data.note,
     actorUserId: user.id,

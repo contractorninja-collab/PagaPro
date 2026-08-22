@@ -87,6 +87,33 @@ export function isWeekend(weekday: number): boolean {
 }
 
 /**
+ * The instant at which a local wall-clock time occurs in a zone.
+ *
+ * The inverse of `zonedParts`: HR types "08:00" meaning eight in the morning
+ * at the factory, and the punch must be stored as the UTC instant that wall
+ * time names — which shifts with DST. Guess-and-correct: interpret the wall
+ * time as UTC, read the zone's offset at that guess, subtract, and re-check
+ * once for the DST-transition edge where the first offset was wrong.
+ */
+export function zonedWallTimeToUtc(
+  isoDate: string,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  const guessMs = Date.parse(
+    `${isoDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`,
+  );
+  const firstOffset = zoneOffsetMinutes(new Date(guessMs), timeZone);
+  let resultMs = guessMs - firstOffset * 60_000;
+  const secondOffset = zoneOffsetMinutes(new Date(resultMs), timeZone);
+  if (secondOffset !== firstOffset) {
+    resultMs = guessMs - secondOffset * 60_000;
+  }
+  return new Date(resultMs);
+}
+
+/**
  * Night runs across midnight, so the window is a union of two ranges rather than
  * a simple interval: [nightStart, 24:00) ∪ [00:00, nightEnd).
  */
