@@ -434,7 +434,7 @@ export function LeaveWallchart(props: {
                 emp.departmentName !== lastDept ? (
                   <div
                     key={`dept-${emp.departmentName ?? "none"}`}
-                    className="grid h-[26px] border-b border-[#f1f5f9] bg-[#f8fafc]"
+                    className="grid min-h-[26px] border-b border-[#f1f5f9] bg-[#f8fafc]"
                     style={{ gridTemplateColumns: cols }}
                   >
                     <div className="sticky left-0 z-[3] flex items-center border-r border-[#eef2f7] bg-[#f8fafc] px-3 text-[10.5px] font-bold uppercase tracking-[0.04em] text-[#64748b]">
@@ -456,12 +456,18 @@ export function LeaveWallchart(props: {
               return (
                 <div key={emp.id}>
                   {deptHeader}
+                  {/* minHeight + minmax lanes, never a fixed height: on machines
+                      that render text larger than ours (Windows "Text size",
+                      browser minimum font, substituted fonts) a fixed row kept
+                      its 36px while the two-line name stack did not, and every
+                      roster row overlapped the next. Rows now grow with their
+                      text; bars stay centered in their lanes. */}
                   <div
                     className="group/row grid border-b border-[#f6f8fb] hover:bg-[#fbfcfe]"
                     style={{
                       gridTemplateColumns: cols,
-                      gridTemplateRows: `repeat(${laneCount}, ${LANE_PX}px)`,
-                      height: rowHeight,
+                      gridTemplateRows: `repeat(${laneCount}, minmax(${LANE_PX}px, auto))`,
+                      minHeight: rowHeight,
                       alignContent: "center",
                     }}
                   >
@@ -472,15 +478,17 @@ export function LeaveWallchart(props: {
                       <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-[#e8eefb] text-[10.5px] font-bold text-[#1e40af]">
                         {initials(emp.name)}
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 py-0.5">
                         <Link
                           href={`/punonjesit/${emp.id}`}
-                          className="block truncate text-[12.5px] font-semibold text-[#0f172a] hover:underline"
+                          className="block truncate text-[12.5px] font-semibold leading-snug text-[#0f172a] hover:underline"
                         >
                           {emp.name}
                         </Link>
                         {emp.jobTitle ? (
-                          <span className="block truncate text-[10.5px] text-[#94a3b8]">{emp.jobTitle}</span>
+                          <span className="block truncate text-[10.5px] leading-snug text-[#94a3b8]">
+                            {emp.jobTitle}
+                          </span>
                         ) : null}
                       </span>
                     </div>
