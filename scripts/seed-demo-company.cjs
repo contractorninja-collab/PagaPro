@@ -1,10 +1,12 @@
 /**
  * DEMO USER — a permanent, stable demo tenant for sales demonstrations.
  *
- * Idempotent by slug: if the company already exists, NOTHING is touched, so
- * the demo stays exactly as configured no matter how many deploys run. Safe
- * to keep in vercel-build permanently. Runs BEFORE seed-templates.cjs in the
- * chain, so the new company receives all document templates in the same build.
+ * Idempotent by slug: if the company already exists, its configuration is not
+ * touched — with ONE additive exception: employees still missing a bank
+ * account get their fictional demo account filled in, so the bank payment
+ * list demos with everyone payable instead of a wall of red. Safe to keep in
+ * vercel-build permanently. Runs BEFORE seed-templates.cjs in the chain, so a
+ * new company receives all document templates in the same build.
  *
  * Mirrors provisionCompany (company row → full official holiday calendar,
  * fixed + known-date movable feasts → payroll parameter set → leave policy)
@@ -13,6 +15,7 @@
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const bcrypt = require("bcryptjs");
+const { createCipheriv, randomBytes } = require("node:crypto");
 
 const DEMO_SLUG = "demo-user";
 const DEMO_EMAIL = "demo@paga-pro.com";
@@ -62,6 +65,20 @@ const MOVABLE_HOLIDAYS = [
   { sourceCode: "XK_BAJRAM_I_VOGEL", name: "Kurban Bajrami", datesByYear: { 2026: [5, 27] } },
 ];
 
+/**
+ * Fictional demo bank accounts — 16 digits (the format the payment list
+ * validates), obviously synthetic, one per employee by list position, bank
+ * names from the canonical Kosovo list so normalisation recognises them.
+ * These belong to fictional people in a demo tenant; they are not accounts.
+ */
+const DEMO_BANKS = ["Raiffeisen", "ProCredit", "NLB", "TEB", "BKT"];
+function demoBankFor(seq) {
+  return {
+    bankName: DEMO_BANKS[(seq - 1) % DEMO_BANKS.length],
+    account: `15010000${String(9000 + seq)}${String(1000 + seq)}`.slice(0, 16),
+  };
+}
+
 /** 15 employees, Albanian names, no contractors. Deterministic — never changes. */
 const EMPLOYEES = [
   { first: "Arben", last: "Gashi", title: "Menaxher i Përgjithshëm", dept: "Administratë", salary: "1450", hired: "2024-02-01" },
@@ -81,6 +98,63 @@ const EMPLOYEES = [
   { first: "Leutrim", last: "Maloku", title: "Agjent Shitjesh", dept: "Shitje", salary: "680", hired: "2026-03-01" },
 ];
 
+/** Mirrors src/lib/field-crypto.ts — see encrypt-bank-fields.cjs. */
+const ENC_PREFIX = "enc1:";
+function loadFieldKey() {
+  const raw = process.env.FIELD_ENCRYPTION_KEY;
+  if (!raw) return null;
+  const key = Buffer.from(raw, "base64");
+  return key.length === 32 ? key : null;
+}
+function encryptField(plain, key) {
+  if (!key) return plain; // matches app semantics: keyless envs store plaintext
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${ENC_PREFIX}${iv.toString("base64")}:${tag.toString("base64")}:${ct.toString("base64")}`;
+}
+
+/**
+ * Fills demo bank accounts for employees that have NONE — additive only, so a
+ * hand-edited demo account is never overwritten. Both storage places are
+ * written (the account row the payslip pays from, and the legacy profile
+ * column) so the two can never diverge for demo people.
+ */
+async function ensureDemoBankAccounts(prisma, companyId, P) {
+  const key = loadFieldKey();
+  if (!key) console.warn(`${P} FIELD_ENCRYPTION_KEY absent — demo accounts stored plaintext.`);
+
+  const employees = await prisma.employee.findMany({
+    where: { companyId },
+    select: { id: true, firstName: true, lastName: true, bankAccountIban: true, bankAccounts: { select: { id: true } } },
+    orderBy: { personalId: "asc" },
+  });
+
+  let filled = 0;
+  for (let i = 0; i < employees.length; i++) {
+    const e = employees[i];
+    if (e.bankAccounts.length > 0 || e.bankAccountIban) continue;
+    const { bankName, account } = demoBankFor(i + 1);
+    const stored = encryptField(account, key);
+    await prisma.employeeBankAccount.create({
+      data: {
+        employeeId: e.id,
+        iban: stored,
+        bankName,
+        accountHolderName: `${e.firstName} ${e.lastName}`,
+        isPrimary: true,
+      },
+    });
+    await prisma.employee.update({
+      where: { id: e.id },
+      data: { bankName, bankAccountIban: stored },
+    });
+    filled += 1;
+  }
+  console.log(`${P} demo bank accounts ensured (${filled} filled, ${employees.length - filled} already had one).`);
+}
+
 async function main() {
   const connectionString = resolveConnectionString();
   if (!connectionString) {
@@ -94,7 +168,8 @@ async function main() {
   try {
     const existing = await prisma.company.findUnique({ where: { slug: DEMO_SLUG }, select: { id: true } });
     if (existing) {
-      console.log(`${P} DEMO USER already provisioned (${existing.id}) — untouched.`);
+      console.log(`${P} DEMO USER already provisioned (${existing.id}) — configuration untouched.`);
+      await ensureDemoBankAccounts(prisma, existing.id, P);
       return;
     }
 
@@ -220,6 +295,7 @@ async function main() {
       });
     }
     console.log(`${P} 15 employees created. Login: ${DEMO_EMAIL}`);
+    await ensureDemoBankAccounts(prisma, companyId, P);
     // Templates are seeded by seed-templates.cjs later in this same build.
   } finally {
     await prisma.$disconnect();
