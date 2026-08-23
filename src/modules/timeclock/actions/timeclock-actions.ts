@@ -195,38 +195,60 @@ export async function getEmployeePresenceMonthAction(
 }
 
 /**
- * Rest days — which weekdays the time clock pays the weekend premium on.
- * Lives with the time clock because that is the only thing it affects;
- * salaried expected-hours math is a separate concept and unchanged by this.
+ * Time-clock rules — rest days, punch rounding, automatic unpaid break.
+ * They live with the time clock because that is the only thing they affect;
+ * salaried expected-hours math is a separate concept and unchanged by these.
  */
-export async function loadRestDaysAction(): Promise<TimeClockActionResult<number[]>> {
+export interface TimeclockRulesDto {
+  /** 0 = Sunday … 6 = Saturday. */
+  restDays: number[];
+  /** 0 = off; otherwise 5/10/15 (nearest, symmetric). */
+  punchRoundingMinutes: number;
+  /** 0 = off; unpaid break auto-deducted from single-interval days over 6h. */
+  breakDeductMinutes: number;
+}
+
+export async function loadTimeclockRulesAction(): Promise<TimeClockActionResult<TimeclockRulesDto>> {
   const ctx = await getCompanyContext();
   if (!ctx.ok) return { ok: false, error: companyContextErrorMessage(ctx.reason) };
 
   const settings = await prisma.payrollSettings.findUnique({
     where: { companyId: ctx.context.companyId },
-    select: { restDays: true },
+    select: { restDays: true, punchRoundingMinutes: true, breakDeductMinutes: true },
   });
-  return { ok: true, data: settings?.restDays?.length ? settings.restDays : [0, 6] };
+  return {
+    ok: true,
+    data: {
+      restDays: settings?.restDays?.length ? settings.restDays : [0, 6],
+      punchRoundingMinutes: settings?.punchRoundingMinutes ?? 0,
+      breakDeductMinutes: settings?.breakDeductMinutes ?? 0,
+    },
+  };
 }
 
-const restDaysSchema = z.object({
-  /** 0 = Sunday … 6 = Saturday. */
+const timeclockRulesSchema = z.object({
   restDays: z.array(z.number().int().min(0).max(6)).max(7),
+  // Only grids where epoch rounding equals wall-clock rounding in whole-hour zones.
+  punchRoundingMinutes: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(15)]),
+  breakDeductMinutes: z.union([z.literal(0), z.literal(30), z.literal(45), z.literal(60)]),
 });
 
-export async function saveRestDaysAction(raw: unknown): Promise<TimeClockActionResult> {
+export async function saveTimeclockRulesAction(raw: unknown): Promise<TimeClockActionResult> {
   const ctx = await requireCapability("company.settings");
   if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId } = ctx.context;
 
-  const parsed = restDaysSchema.safeParse(raw);
+  const parsed = timeclockRulesSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhënat nuk janë valide." };
   const restDays = [...new Set(parsed.data.restDays)].sort((a, b) => a - b);
 
   const updated = await prisma.payrollSettings.updateMany({
     where: { companyId },
-    data: { restDays },
+    data: {
+      restDays,
+      punchRoundingMinutes: parsed.data.punchRoundingMinutes,
+      breakDeductMinutes: parsed.data.breakDeductMinutes,
+    },
   });
   if (updated.count === 0) {
     return { ok: false, error: "Cilësimet e pagave nuk janë inicializuar ende për këtë kompani." };

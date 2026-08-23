@@ -11,6 +11,9 @@ function rules(overrides: Partial<ClassifierRules> = {}): ClassifierRules {
     nightEndHour: 6,
     holidayIsoDates: new Set<string>(),
     restDayNumbers: new Set([0, 6]),
+    punchRoundingMinutes: 0,
+    breakDeductMinutes: 0,
+    breakDeductAfterMinutes: 360,
     timeZone: TZ,
     ...overrides,
   };
@@ -160,5 +163,39 @@ describe("classifyDay", () => {
     const day = classifyDay([], rules());
     expect(day.workedMinutes).toBe(0);
     expect(day.status).toBe("OK");
+  });
+
+  it("applies rounding then the automatic break, in that order", () => {
+    // 07:56–16:04 with 15-minute rounding reads as 08:00–16:00 (8h); that
+    // rounded length crosses the 6h threshold, so the 60-minute unpaid lunch
+    // comes out of the middle: 7h paid, none of it overtime.
+    const day = classifyDay(
+      [
+        { occurredAt: local("2026-07-08T07:56", 2), direction: "IN" },
+        { occurredAt: local("2026-07-08T16:04", 2), direction: "OUT" },
+      ],
+      rules({ punchRoundingMinutes: 15, breakDeductMinutes: 60 }),
+    );
+
+    expect(day.workedMinutes).toBe(420);
+    expect(day.regularMinutes).toBe(420);
+    expect(day.overtimeMinutes).toBe(0);
+    expect(day.firstInAt).toEqual(local("2026-07-08T08:00", 2));
+    expect(day.lastOutAt).toEqual(local("2026-07-08T16:00", 2));
+  });
+
+  it("does not auto-deduct a break from a punched-out lunch day", () => {
+    const day = classifyDay(
+      [
+        { occurredAt: local("2026-07-08T08:00", 2), direction: "IN" },
+        { occurredAt: local("2026-07-08T12:00", 2), direction: "OUT" },
+        { occurredAt: local("2026-07-08T13:00", 2), direction: "IN" },
+        { occurredAt: local("2026-07-08T17:00", 2), direction: "OUT" },
+      ],
+      rules({ breakDeductMinutes: 60 }),
+    );
+
+    // Their hour off is already unpaid; the policy must not take it twice.
+    expect(day.workedMinutes).toBe(480);
   });
 });

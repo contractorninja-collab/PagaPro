@@ -5,6 +5,7 @@ import type {
   WorkedInterval,
 } from "./types";
 import { isNightHour, zonedParts, zoneOffsetMinutes } from "./zoned-time";
+import { applyBreakDeduction, roundIntervals } from "./interval-policies";
 
 const MINUTE_MS = 60_000;
 
@@ -79,7 +80,15 @@ export function classifyDay(
   punches: readonly ClassifierPunch[],
   rules: ClassifierRules,
 ): ClassifiedDay {
-  const { intervals, unpairedIn, strayOut } = pairPunches(punches);
+  const paired = pairPunches(punches);
+  const { unpairedIn, strayOut } = paired;
+  // Policy order matters: round first (the punches are the raw material),
+  // then judge the rounded day's length for the automatic break.
+  const intervals = applyBreakDeduction(
+    roundIntervals(paired.intervals, rules.punchRoundingMinutes),
+    rules.breakDeductMinutes,
+    rules.breakDeductAfterMinutes,
+  );
 
   const empty: ClassifiedDay = {
     workDateIso: punches.length > 0

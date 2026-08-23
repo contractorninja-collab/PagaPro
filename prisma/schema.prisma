@@ -1582,6 +1582,21 @@ model PayrollSettings {
   /// me shtesën e fundjavës në orën e punës. Default e shtunë + e diel.
   restDays Int[] @default([0, 6])
 
+  /// Rrumbullakimi i skanimeve në minuta (0 = fikur; 5/10/15). SIMETRIK — më i
+  /// afërti — sepse një rregull që gjithmonë pret në dëm të punonjësit nuk i
+  /// mbijeton Nenit 55 (pagë për punën e kryer).
+  punchRoundingMinutes Int @default(0)
+
+  /// Zbritje automatike e pauzës së papaguar në minuta (0 = fikur). Zbatohet
+  /// VETËM në ditë me një interval të vetëm (kush skanon del/hyn për pauzë nuk
+  /// paguhet dyfish më pak) dhe vetëm kur dita kalon pragun më poshtë.
+  /// KUJDES ligjor: pauza 30-minutëshe e Nenit 64 është pjesë e orarit të PAGUAR —
+  /// kjo zbritje është për pauza shtesë të papaguara sipas politikës së kompanisë.
+  breakDeductMinutes Int @default(0)
+
+  /// Pragu në minuta të punuara mbi të cilin zbatohet zbritja e pauzës.
+  breakDeductAfterMinutes Int @default(360)
+
   /// Lista opsionale ISO `YYYY-MM-DD` për festa shtesë (per kompani / përditësime ligjore)
   payrollExtraHolidayDates Json?
 

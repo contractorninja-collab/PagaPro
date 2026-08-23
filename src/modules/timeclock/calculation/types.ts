@@ -30,6 +30,15 @@ export interface ClassifierRules {
    * Saturday hour at 1.5× in a company whose working week includes Saturday.
    */
   restDayNumbers: ReadonlySet<number>;
+  /**
+   * Nearest-N punch rounding in minutes; 0 disables. Symmetric by design —
+   * see interval-policies.ts for why a one-sided rule is not an option.
+   */
+  punchRoundingMinutes: number;
+  /** Automatic unpaid break in minutes (0 disables), single-interval days only. */
+  breakDeductMinutes: number;
+  /** Worked-minutes threshold above which the break deduction applies. */
+  breakDeductAfterMinutes: number;
   /** IANA zone the local-day rules are evaluated in. */
   timeZone: string;
 }

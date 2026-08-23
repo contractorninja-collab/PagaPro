@@ -36,6 +36,9 @@ async function buildRules(
       nightEndHour: true,
       restDays: true,
       overtimeWeeklyThresholdHours: true,
+      punchRoundingMinutes: true,
+      breakDeductMinutes: true,
+      breakDeductAfterMinutes: true,
     },
   });
 
@@ -49,6 +52,9 @@ async function buildRules(
       nightEndHour: settings?.nightEndHour ?? 6,
       holidayIsoDates,
       restDayNumbers: new Set(settings?.restDays?.length ? settings.restDays : [0, 6]),
+      punchRoundingMinutes: settings?.punchRoundingMinutes ?? 0,
+      breakDeductMinutes: settings?.breakDeductMinutes ?? 0,
+      breakDeductAfterMinutes: settings?.breakDeductAfterMinutes ?? 360,
       timeZone: company.timezone,
     },
     weeklyRegularMinutes: Math.round(Number(settings?.overtimeWeeklyThresholdHours ?? 40) * 60),
@@ -157,6 +163,9 @@ export async function recomputeTimeClockDaysForRange(params: {
       nightStartHour: rules.nightStartHour,
       nightEndHour: rules.nightEndHour,
       restDays: [...rules.restDayNumbers],
+      punchRoundingMinutes: rules.punchRoundingMinutes,
+      breakDeductMinutes: rules.breakDeductMinutes,
+      breakDeductAfterMinutes: rules.breakDeductAfterMinutes,
       timeZone: rules.timeZone,
     };
 
