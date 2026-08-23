@@ -12,6 +12,7 @@ import { listJobTitlesForCompany, type JobTitleDto } from "@/modules/job-titles/
 import { syncPayrollSettingsFromKonfigurime } from "@/modules/payroll/services/payroll-settings-service";
 import { syncLeaveBalancesForCompanyYear } from "@/modules/leaves/services/leave-balance-service";
 import { resolveLeavePolicyParameterSet } from "@/modules/leaves/services/leave-policy-service";
+import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 
 export interface KonfigurimeRepresentativeDto {
   id?: string;
@@ -74,6 +75,8 @@ export interface KonfigurimePageDto {
   departments: DepartmentWithEmployeeCountDto[];
   jobTitles: JobTitleDto[];
   employees: KonfigurimeEmployeeOptionDto[];
+  /** Admin-console entitlement — drives whether time-clock-only panels render. */
+  timeClockEnabled: boolean;
 }
 
 function decToString(v: Prisma.Decimal | null | undefined): string | null {
@@ -134,7 +137,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
   const cfg = row.configuration;
 
   const defaultHolidayYear = new Date().getUTCFullYear();
-  const [holidays, departments, jobTitles, employeeRows, leavePolicyRow] = await Promise.all([
+  const [holidays, departments, jobTitles, employeeRows, leavePolicyRow, timeClockEnabled] = await Promise.all([
     listCompanyHolidaysDto(row.id, defaultHolidayYear),
     listDepartmentsWithEmployeeCounts(row.id),
     listJobTitlesForCompany(row.id),
@@ -144,6 +147,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     resolveLeavePolicyParameterSet(row.id, new Date()),
+    isTimeClockEnabled(row.id),
   ]);
 
   const employees: KonfigurimeEmployeeOptionDto[] = employeeRows.map((e) => ({
@@ -201,6 +205,7 @@ export async function loadKonfigurimePageDto(companyId: string): Promise<Konfigu
     departments,
     jobTitles,
     employees,
+    timeClockEnabled,
   };
 }
 

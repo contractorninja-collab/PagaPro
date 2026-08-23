@@ -238,6 +238,12 @@ export async function saveTimeclockRulesAction(raw: unknown): Promise<TimeClockA
   if (!ctx.ok) return { ok: false, error: ctx.error };
   const { companyId } = ctx.context;
 
+  // The panel is hidden without the entitlement; the action refuses too —
+  // hiding is presentation, not a gate.
+  if (!(await isTimeClockEnabled(companyId))) {
+    return { ok: false, error: "Ora e punës nuk është e aktivizuar për këtë kompani." };
+  }
+
   const parsed = timeclockRulesSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhënat nuk janë valide." };
   const restDays = [...new Set(parsed.data.restDays)].sort((a, b) => a - b);

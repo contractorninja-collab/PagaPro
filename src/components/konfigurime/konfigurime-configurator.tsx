@@ -788,9 +788,13 @@ export function KonfigurimeConfigurator({
               </CardContent>
             </Card>
 
-            <div className="mt-4">
-              <RestDaysPanel />
-            </div>
+            {/* Kiosk-hour policies — meaningless without the time clock, so a
+                company without the entitlement never sees the panel at all. */}
+            {initial.timeClockEnabled ? (
+              <div className="mt-4">
+                <RestDaysPanel />
+              </div>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="departamentet">
