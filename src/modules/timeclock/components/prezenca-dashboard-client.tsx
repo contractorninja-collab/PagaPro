@@ -256,11 +256,11 @@ export function PrezencaDashboardClient(props: {
       {presence.absences.length > 0 ? (
         <div className={`overflow-hidden ${CARD}`}>
           <div className="flex items-center gap-2 border-b border-line-soft px-5 py-3.5">
-            <AlarmClock className="h-4 w-4 text-[#dc2626]" aria-hidden />
+            <AlarmClock className="h-4 w-4 text-tone-danger-fg" aria-hidden />
             <h2 className="text-[13.5px] font-bold tracking-[-0.01em] text-ink-900">
               Mungesa të pashpjeguara
             </h2>
-            <span className="rounded-full bg-[#fef2f2] px-2 py-0.5 text-[11px] font-bold text-[#dc2626]">
+            <span className="rounded-full bg-tone-danger-bg px-2 py-0.5 text-[11px] font-bold text-tone-danger-fg">
               {presence.absences.length}
             </span>
             <p className="ml-auto text-[12px] text-ink-400">

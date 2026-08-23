@@ -1453,6 +1453,12 @@ model PayrollEntry {
 
   jobTitleSnapshot String?
 
+  /// Department at calculation time. Deriving department cost from the
+  /// employee's CURRENT department silently rewrites history on transfer —
+  /// any per-department payroll report must read these, not the live row.
+  departmentIdSnapshot   String?
+  departmentNameSnapshot String?
+
   compensationBasisSnapshot CompensationBasis?
 
   contractGrossMonthlySnapshot Decimal? @db.Decimal(14, 2)

@@ -58,24 +58,39 @@ describe("applyWeeklyOvertime", () => {
     expect(saturday.workedMinutes).toBe(420); // total untouched
   });
 
-  it("attributes the overflow to the day the norm was crossed, split correctly", () => {
-    // 4 × 9h (daily rule already made 1h/day OT) + Friday 8h = 44h.
-    // Weekly overflow is 4h; daily OT already claimed 4h of it. The pass only
-    // counts against the weekly norm — Friday crosses it at the 36h+4h mark.
-    const days = [
-      day("2026-08-17", { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
-      day("2026-08-18", { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
-      day("2026-08-19", { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
-      day("2026-08-20", { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
-      day("2026-08-21", { workedMinutes: 480 }),
-    ];
+  it("never double-counts hours the daily rule already made overtime", () => {
+    // Five 9-hour days: 45h. The daily rule already classified 1h/day = 5h of
+    // overtime, and the weekly requirement is max(0, 45h − 40h) = the SAME 5h.
+    // A naive weekly pass would add another 5h and pay a 45-hour week as if
+    // it carried 10h of overtime.
+    const days = ["17", "18", "19", "20", "21"].map((d) =>
+      day(`2026-08-${d}`, { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
+    );
     const out = applyWeeklyOvertime(days, WEEK_MINUTES);
 
-    // Week total 44h → 4h beyond norm, all landing inside Friday's minutes
-    // (cumulative before Friday = 36h, after = 44h → overflow-in-day = 4h).
-    const friday = out[4]!;
-    expect(friday.overtimeMinutes).toBe(240);
-    expect(friday.regularMinutes).toBe(240);
+    const totalOt = out.reduce((s, d) => s + d.overtimeMinutes, 0);
+    expect(totalOt).toBe(300); // exactly 5h — unchanged
+    expect(out.every((d) => d.regularMinutes === 480)).toBe(true);
+  });
+
+  it("tops up only the deficit when daily overtime covers part of the week's overflow", () => {
+    // Mon 10h (2h daily OT) + Tue–Fri 8h = 42h. Weekly requirement 2h, already
+    // fully supplied by Monday's daily OT → nothing more is promoted.
+    const days = [
+      day("2026-08-17", { workedMinutes: 600, regularMinutes: 480, overtimeMinutes: 120 }),
+      ...["18", "19", "20", "21"].map((d) => day(`2026-08-${d}`, { workedMinutes: 480 })),
+    ];
+    const out = applyWeeklyOvertime(days, WEEK_MINUTES);
+    expect(out.reduce((s, d) => s + d.overtimeMinutes, 0)).toBe(120);
+
+    // But Mon 9h (1h OT) + Tue–Sat 7h = 44h: requirement 4h, daily supplied 1h,
+    // so exactly 3h more is promoted where the norm was crossed.
+    const days2 = [
+      day("2026-08-17", { workedMinutes: 540, regularMinutes: 480, overtimeMinutes: 60 }),
+      ...["18", "19", "20", "21", "22"].map((d) => day(`2026-08-${d}`, { workedMinutes: 420 })),
+    ];
+    const out2 = applyWeeklyOvertime(days2, WEEK_MINUTES);
+    expect(out2.reduce((s, d) => s + d.overtimeMinutes, 0)).toBe(240); // 4h total
   });
 
   it("never promotes premium minutes, only plain regular ones", () => {

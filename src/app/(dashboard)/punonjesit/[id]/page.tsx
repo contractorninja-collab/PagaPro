@@ -27,6 +27,7 @@ import type { EmployeeDossierBundle } from "@/modules/employee-documents/types/e
 import { can } from "@/server/permissions";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
+import { listFinalizedPayrollYearsForEmployee } from "@/modules/payroll/services/employee-annual-statement-service";
 import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
 
 type Props = {
@@ -81,19 +82,21 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   let genDocs;
   let contractDocs;
   let payrollDocs;
+  let taxStatementYears;
   let jobTitles;
   let leaveRequests;
   let leaveBalances;
   let timelineRows;
   let uploadedDocs;
   try {
-    [employee, departments, genDocs, contractDocs, payrollDocs, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
+    [employee, departments, genDocs, contractDocs, payrollDocs, taxStatementYears, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
       await Promise.all([
         getEmployeeById(companyId, id),
         listDepartmentsForCompany(companyId),
         listArtifactsForEmployee(companyId, id),
         listContractDocumentsForEmployee(companyId, id),
         listPayrollGeneratedDocsForEmployee(companyId, id),
+        listFinalizedPayrollYearsForEmployee(companyId, id),
         listActiveJobTitleOptions(companyId),
         listLeaveHistoryForEmployee(companyId, id),
         listLeaveBalancesForEmployee(companyId, id, balanceYear),
@@ -224,6 +227,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
       timelineEntries={timelineEntries}
       openEditDocuments={openEditDocuments}
       timeClockEnabled={await isTimeClockEnabled(companyId)}
+      taxStatementYears={taxStatementYears}
     />
   );
 }

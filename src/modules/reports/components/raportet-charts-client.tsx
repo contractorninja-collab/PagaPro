@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Download, type LucideIcon } from "lucide-react";
 import { ChartFrame, ChartSkeleton } from "@/components/patterns/chart-frame";
 import type {
   LeavePressure,
@@ -56,17 +56,32 @@ function pct(part: number, whole: number): number {
 function Section({
   title,
   question,
+  csvHref,
   children,
 }: {
   title: string;
   question: string;
+  /** Same aggregates as the charts, in a file finance can actually take away. */
+  csvHref?: string;
   children: ReactNode;
 }) {
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-[17px] font-extrabold tracking-[-0.02em] text-brand-navy">{title}</h2>
-        <p className="mt-0.5 text-[13px] text-[#64748b]">{question}</p>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-[17px] font-extrabold tracking-[-0.02em] text-brand-navy">{title}</h2>
+          <p className="mt-0.5 text-[13px] text-[#64748b]">{question}</p>
+        </div>
+        {csvHref ? (
+          <a
+            href={csvHref}
+            download
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-[12.5px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden />
+            CSV
+          </a>
+        ) : null}
       </div>
       {children}
     </section>
@@ -210,6 +225,7 @@ export function RaportetChartsClient(props: {
       <Section
         title="Kostoja e pagave"
         question={`Sa na kushton paga muaj pas muaji në ${props.year}?`}
+        csvHref={`/api/reports/analytics/csv?section=cost&year=${props.year}`}
       >
         {cost.length === 0 ? (
           <EmptySection
@@ -259,7 +275,11 @@ export function RaportetChartsClient(props: {
       </Section>
 
       {/* ---------------------------------------------------------------- */}
-      <Section title="Fuqia punëtore" question="Kush punon këtu, ku, dhe si po lëviz numri?">
+      <Section
+        title="Fuqia punëtore"
+        question="Kush punon këtu, ku, dhe si po lëviz numri?"
+        csvHref={`/api/reports/analytics/csv?section=workforce&year=${props.year}`}
+      >
         {workforce.headcount === 0 ? (
           <EmptySection
             message="Nuk ka punonjës aktivë të regjistruar."
@@ -337,6 +357,7 @@ export function RaportetChartsClient(props: {
       <Section
         title="Presioni i pushimeve"
         question={`Sa pushim është përdorur, sa ka mbetur, dhe kur bie ngarkesa në ${props.year}?`}
+        csvHref={`/api/reports/analytics/csv?section=leave&year=${props.year}`}
       >
         {leave.employees === 0 ? (
           <EmptySection

@@ -640,6 +640,14 @@ async function createPayrollEntriesForEmployeesTx(
     nightWorkPeriodDescription: params.wt.nightWorkPeriodDescription,
   };
 
+  // Resolved once; the snapshot must say where the person worked THIS month,
+  // and the name survives even if the department is later renamed or removed.
+  const departments = await tx.department.findMany({
+    where: { companyId: params.companyId },
+    select: { id: true, name: true },
+  });
+  const departmentNameById = new Map(departments.map((d) => [d.id, d.name]));
+
   let aggPaidLeaveHrs = 0;
   let aggSickLeaveHrs = 0;
   let aggUnpaidLeaveHrs = 0;
@@ -793,6 +801,10 @@ async function createPayrollEntriesForEmployeesTx(
         calendarDaysInMonth: days,
         paidDays: new Prisma.Decimal(lineWd),
         jobTitleSnapshot: emp.jobTitle,
+        departmentIdSnapshot: emp.departmentId,
+        departmentNameSnapshot: emp.departmentId
+          ? departmentNameById.get(emp.departmentId) ?? null
+          : null,
         compensationBasisSnapshot: emp.compensationBasis,
         contractGrossMonthlySnapshot: emp.baseSalaryMonthly,
         contractNetMonthlySnapshot: emp.targetNetMonthly,

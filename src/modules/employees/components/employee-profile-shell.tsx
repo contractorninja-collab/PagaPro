@@ -888,6 +888,8 @@ export function EmployeeProfileShell(props: {
   timelineEntries?: EmployeeTimelineEntry[];
   openEditDocuments?: boolean;
   timeClockEnabled?: boolean;
+  /** Years with finalized payroll months — each gets a tax-certificate button. */
+  taxStatementYears?: number[];
 }) {
   const {
     employee: initial,
@@ -925,6 +927,9 @@ export function EmployeeProfileShell(props: {
   const isTerminated = employee.status === "TERMINATED";
   const canWriteEmployees = useCan("employees.write");
   const canWriteDocumentsTab = useCan("documents.write");
+  // Same gate as the payslip/certificate download routes — hide, don't 403.
+  const canSeePayrollPdfsTab = useCan("payroll.prepare");
+  const taxStatementYears = props.taxStatementYears ?? [];
   const mayEdit = canWriteEmployees;
 
   useEffect(() => {
@@ -1052,8 +1057,27 @@ export function EmployeeProfileShell(props: {
           <TabsContent value="summary" className="mt-5">
             <SummaryTab e={employee} timeClockEnabled={timeClockEnabled} />
           </TabsContent>
-          <TabsContent value="payroll" className="mt-5">
+          <TabsContent value="payroll" className="mt-5 space-y-5">
             <SalaryHistoryCard rows={employee.salaryHistory} />
+            {canSeePayrollPdfsTab && taxStatementYears.length > 0 ? (
+              <SectionCard
+                title="Vërtetim tatimor vjetor"
+                description="Tatimi dhe kontributet e mbajtura në burim, sipas periudhave të finalizuara."
+              >
+                <div className="flex flex-wrap gap-2 px-1 py-1">
+                  {taxStatementYears.map((year) => (
+                    <a
+                      key={year}
+                      href={`/api/punonjesit/${employee.id}/vertetim-tatimor?year=${year}`}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-line bg-white px-3.5 text-[13px] font-semibold text-ink-700 transition-colors hover:bg-fill-hover"
+                    >
+                      <Download className="h-3.5 w-3.5" aria-hidden />
+                      Vërtetimi {year}
+                    </a>
+                  ))}
+                </div>
+              </SectionCard>
+            ) : null}
           </TabsContent>
           <TabsContent value="contracts" className="mt-5 space-y-5">
             <AnnexPanel employeeId={employee.id} canEdit={mayEdit} />

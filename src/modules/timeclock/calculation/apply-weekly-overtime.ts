@@ -35,22 +35,28 @@ export function applyWeeklyOvertime(
   }
 
   const ordered = [...days].sort((a, b) => a.workDateIso.localeCompare(b.workDateIso));
-  const cumulativeByWeek = new Map<string, number>();
+  const weekState = new Map<string, { worked: number; overtime: number }>();
 
   return ordered.map((day) => {
     // Review days contribute no minutes and must not advance the counter.
     if (day.status !== "OK" || day.workedMinutes === 0) return { ...day };
 
     const week = isoWeekKey(day.workDateIso);
-    const before = cumulativeByWeek.get(week) ?? 0;
-    const after = before + day.workedMinutes;
-    cumulativeByWeek.set(week, after);
+    const state = weekState.get(week) ?? { worked: 0, overtime: 0 };
+    state.worked += day.workedMinutes;
+    // The daily rule's overtime counts toward the weekly requirement — the two
+    // rules describe the SAME hours, not additive ones. Five 9-hour days is a
+    // 45-hour week with five hours of overtime, not ten: the week demands
+    // max(0, 45h − 40h) and the daily rule has already supplied all of it.
+    state.overtime += day.overtimeMinutes;
+    weekState.set(week, state);
 
-    const overflowInDay =
-      Math.max(0, after - weeklyRegularMinutes) - Math.max(0, before - weeklyRegularMinutes);
-    const promoted = Math.min(day.regularMinutes, overflowInDay);
+    const requiredSoFar = Math.max(0, state.worked - weeklyRegularMinutes);
+    const deficit = requiredSoFar - state.overtime;
+    const promoted = Math.min(Math.max(0, deficit), day.regularMinutes);
     if (promoted <= 0) return { ...day };
 
+    state.overtime += promoted;
     return {
       ...day,
       regularMinutes: day.regularMinutes - promoted,

@@ -86,7 +86,7 @@ export function RestDaysPanel() {
                     onClick={() => toggle(d.value)}
                     className={`h-9 w-12 rounded-lg border text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                       on
-                        ? "border-brand-blue bg-[#eff6ff] text-brand-blue"
+                        ? "border-brand-blue bg-tone-info-bg text-brand-blue"
                         : "border-line bg-white text-ink-500 hover:bg-fill-faint"
                     }`}
                   >
