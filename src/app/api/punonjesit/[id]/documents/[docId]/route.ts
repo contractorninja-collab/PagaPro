@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextHttpError, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { canSeeEmployeeSalary } from "@/server/salary-redaction";
 import { assertCompanyScopedStorageKey } from "@/server/company-scope";
 import { can } from "@/server/permissions";
 import {
@@ -28,6 +30,27 @@ export async function GET(
     !can(permissionSubjectOf(result.context), "documents.sensitive")
   ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // A scanned signed contract carries the salary the same as a generated one.
+  // Same per-employee rule as the generated-document routes; absence-style 404
+  // is not needed here — the employee's dossier is not itself secret.
+  if (found.doc.category === "KONTRATA_TE_NENSHKRUARA") {
+    const emp = await prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { salaryConfidential: true },
+    });
+    if (
+      !canSeeEmployeeSalary(
+        { salaryAccess: result.context.salaryAccess },
+        emp ?? { salaryConfidential: true },
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Nuk keni leje të shihni shumat e pagave." },
+        { status: 403 },
+      );
+    }
   }
 
   try {

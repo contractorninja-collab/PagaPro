@@ -297,3 +297,53 @@ export function redactSalaryBearingText(
   if (!EURO_TEXT.test(body)) return body;
   return "Përmban shuma — e dukshme vetëm me qasje në paga.";
 }
+
+/* ------------------------------------------------------------------ */
+/* Documents                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Placeholder keys whose values are salary amounts. */
+export const SALARY_PLACEHOLDER_KEYS = ["salary_gross", "salary_gross_words"] as const;
+
+/**
+ * Scrubs salary placeholders from a resolved placeholder map for viewers
+ * without rights on the subject employee. The IBAN stays (payment rail, not
+ * an amount — the module doctrine), but any value that visibly carries a
+ * euro amount under a salary-ish key goes.
+ */
+export function redactPlaceholderValues(
+  values: Record<string, string>,
+  viewer: SalaryViewer,
+  employee: { salaryConfidential: boolean },
+): Record<string, string> {
+  if (canSeeEmployeeSalary(viewer, employee)) return values;
+  const out = { ...values };
+  for (const key of SALARY_PLACEHOLDER_KEYS) {
+    if (key in out) out[key] = "";
+  }
+  return out;
+}
+
+/**
+ * Document categories whose rendered files CONTAIN the salary. Blocking is
+ * per-employee: a STANDARD viewer handles regular staff's contracts and is
+ * refused the confidential ones; NONE gets none. Vërejtje (warnings) carry
+ * no amounts and stay open.
+ */
+export const SALARY_BEARING_DOCUMENT_CATEGORIES: ReadonlySet<string> = new Set([
+  "CONTRACT",
+  "TERMINATION",
+  "PAYROLL",
+]);
+
+export function canDownloadSalaryBearingDocument(
+  viewer: SalaryViewer,
+  documentCategory: string,
+  employee: { salaryConfidential: boolean } | null,
+): boolean {
+  if (!SALARY_BEARING_DOCUMENT_CATEGORIES.has(documentCategory)) return true;
+  // No linked employee (company-level document): treat as aggregate-ish —
+  // FULL only, since we cannot apply the per-employee rule.
+  if (!employee) return viewer.salaryAccess === "FULL";
+  return canSeeEmployeeSalary(viewer, employee);
+}

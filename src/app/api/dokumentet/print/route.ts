@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { viewerMayDownloadArtifact } from "@/modules/documents/services/artifact-access";
 import { renderAnnexDocument } from "@/modules/annex/documents/render-annex-document";
 import { renderWarningDocument } from "@/modules/warnings/documents/render-warning-document";
 import { renderDocxToPrintHtml } from "@/modules/documents/print/docx-to-print-html";
@@ -64,10 +65,19 @@ export async function GET(request: Request) {
 
   const artifacts = await prisma.documentGenerationArtifact.findMany({
     where: { id: { in: requestedIds }, companyId },
-    select: { id: true, title: true, displayFilename: true, generatedDocxStorageKey: true },
+    select: { id: true, title: true, displayFilename: true, generatedDocxStorageKey: true, documentCategory: true, employeeId: true },
   });
 
-  const byId = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
+  // Per-employee salary rule applies to each rendered document; disallowed
+  // ones are simply not part of the print run.
+  const printableArtifacts = [];
+  for (const artifact of artifacts) {
+    if (await viewerMayDownloadArtifact(context.context, artifact)) {
+      printableArtifacts.push(artifact);
+    }
+  }
+
+  const byId = new Map(printableArtifacts.map((artifact) => [artifact.id, artifact]));
   const storage = getCompanyAssetStorage();
   const documents: PrintablePageDocument[] = [];
   const skipped: string[] = [];

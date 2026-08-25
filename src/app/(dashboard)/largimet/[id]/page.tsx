@@ -12,12 +12,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function LargimetDetailPage({ params }: Props) {
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
   const { id } = await params;
 
   let bundle;
   try {
-    bundle = await getTerminationDetailBundle(companyId, id);
+    bundle = await getTerminationDetailBundle(companyId, id, { salaryAccess: context.salaryAccess });
   } catch (err) {
     console.error("[pagapro] LargimetDetailPage load failed", err);
     return (

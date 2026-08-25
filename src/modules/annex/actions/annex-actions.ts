@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getCompanyContext, companyContextErrorMessage, requireCapability } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { canSeeEmployeeSalary } from "@/server/salary-redaction";
 import {
   computeAnnexDiff,
   createEmployeeContractAnnex,
@@ -35,7 +37,20 @@ export async function getAnnexDiffAction(raw: unknown): Promise<AnnexActionResul
 
   const res = await computeAnnexDiff(companyId, parsed.data.employeeId);
   if (!res.ok) return res;
-  return { ok: true, data: res.diff };
+
+  // The SALARY suggestion is an old→new pair of amounts.
+  const emp = await prisma.employee.findFirst({
+    where: { id: parsed.data.employeeId, companyId },
+    select: { salaryConfidential: true },
+  });
+  const mayseeSalary = canSeeEmployeeSalary(
+    { salaryAccess: ctx.context.salaryAccess },
+    emp ?? { salaryConfidential: true },
+  );
+  const diff = mayseeSalary
+    ? res.diff
+    : { ...res.diff, suggestions: res.diff.suggestions.filter((s) => s.category !== "SALARY") };
+  return { ok: true, data: diff };
 }
 
 export async function getAnnexPanelDataAction(

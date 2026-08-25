@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import PizZip from "pizzip";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { ensureArtifactPdf } from "@/modules/documents/services/artifact-pdf-service";
 import { mergePdfBuffers } from "@/modules/documents/services/bulk-pdf-service";
 
 export async function POST(request: Request) {
-  const result = await getCompanyContext();
-  if (!result.ok) {
-    return companyContextHttpError(result.reason);
-  }
+  const result = await requireCapabilitiesHttp("salaries.full");
+  if (!result.ok) return result.response;
   const companyId = result.context.companyId;
   const inline = new URL(request.url).searchParams.get("inline") === "1";
 

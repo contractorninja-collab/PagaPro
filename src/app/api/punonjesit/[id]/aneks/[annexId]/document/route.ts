@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { canSeeEmployeeSalary } from "@/server/salary-redaction";
 import { renderAnnexDocument } from "@/modules/annex/documents/render-annex-document";
 
 export const runtime = "nodejs";
@@ -18,6 +20,18 @@ export async function GET(
 
   const { annexId } = await params;
   const inline = new URL(request.url).searchParams.get("inline") === "1";
+
+  // An annex quotes the previous and new salary — per-employee tier check.
+  const annexRow = await prisma.employeeContractAnnex.findFirst({
+    where: { id: annexId, companyId },
+    select: { employee: { select: { salaryConfidential: true } } },
+  });
+  if (
+    annexRow &&
+    !canSeeEmployeeSalary({ salaryAccess: ctx.context.salaryAccess }, annexRow.employee)
+  ) {
+    return NextResponse.json({ error: "Nuk keni leje të shihni shumat e pagave." }, { status: 403 });
+  }
 
   const result = await renderAnnexDocument(companyId, annexId);
   if (!result.ok) {

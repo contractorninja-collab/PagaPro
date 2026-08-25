@@ -1,5 +1,6 @@
 import type { Prisma, TerminationStatus, TerminationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { canSeeEmployeeSalary, type SalaryViewer } from "@/server/salary-redaction";
 import { TERMINATION_ENTITY, TERMINATION_TIMELINE } from "@/modules/terminations/types";
 import { TIMELINE_TYPES } from "@/modules/employees/services/employee-audit";
 
@@ -67,7 +68,11 @@ export async function listTerminationsForCompany(companyId: string, filters: Ter
   });
 }
 
-export async function getTerminationDetailBundle(companyId: string, terminationId: string) {
+export async function getTerminationDetailBundle(
+  companyId: string,
+  terminationId: string,
+  viewer: SalaryViewer,
+) {
   const termination = await prisma.termination.findFirst({
     where: { id: terminationId, companyId },
     include: {
@@ -117,6 +122,17 @@ export async function getTerminationDetailBundle(companyId: string, terminationI
         })
       : null;
 
+  // Final-pay figures and severance obey the viewer's tier for this employee.
+  const maySeeSalary = canSeeEmployeeSalary(viewer, {
+    salaryConfidential: termination.employee.salaryConfidential,
+  });
+  const payrollEntryForViewer =
+    payrollEntry == null
+      ? null
+      : maySeeSalary
+        ? payrollEntry
+        : { ...payrollEntry, netPay: null, grossSalary: null };
+
   const timeline = await prisma.employeeTimelineEvent.findMany({
     where: {
       companyId,
@@ -154,9 +170,12 @@ export async function getTerminationDetailBundle(companyId: string, terminationI
   });
 
   return {
-    termination,
+    // Severance is an amount on the termination row itself.
+    termination: maySeeSalary
+      ? termination
+      : { ...termination, severanceAmount: null },
     artifacts,
-    payrollEntry,
+    payrollEntry: payrollEntryForViewer,
     timeline,
     activities,
     audits,

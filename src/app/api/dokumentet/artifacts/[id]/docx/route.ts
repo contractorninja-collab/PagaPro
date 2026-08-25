@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { viewerMayDownloadArtifact } from "@/modules/documents/services/artifact-access";
 
 export async function GET(
   request: Request,

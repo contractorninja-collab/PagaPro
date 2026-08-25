@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { redactPlaceholderValues } from "@/server/salary-redaction";
 import {
   templateVersionSourceKey,
 } from "@/modules/documents/engine";
@@ -414,9 +415,11 @@ export async function previewPlaceholderValuesAction(
 ): Promise<
   DocumentModuleActionResult<{ values: Record<string, string>; errors: { key: string; message: string }[] }>
 > {
-  const auth = await getCompanyContext();
+  // This returns resolved salary and bank values — it was gated by nothing
+  // but membership. Document authoring rights at minimum.
+  const auth = await requireCapability("documents.write");
   if (!auth.ok) {
-    return { ok: false, error: companyContextErrorMessage(auth.reason) };
+    return { ok: false, error: auth.error };
   }
   const { companyId } = auth.context;
 
@@ -444,10 +447,23 @@ export async function previewPlaceholderValuesAction(
     },
   });
 
+  // Salary placeholders obey the viewer's tier for THIS employee.
+  const subjectEmployee = parsed.data.employeeId
+    ? await prisma.employee.findFirst({
+        where: { id: parsed.data.employeeId, companyId },
+        select: { salaryConfidential: true },
+      })
+    : null;
+  const values = redactPlaceholderValues(
+    result.values,
+    { salaryAccess: auth.context.salaryAccess },
+    subjectEmployee ?? { salaryConfidential: true },
+  );
+
   return {
     ok: true,
     data: {
-      values: result.values,
+      values,
       errors: result.errors.map((e) => ({ key: e.key, message: e.message })),
     },
   };

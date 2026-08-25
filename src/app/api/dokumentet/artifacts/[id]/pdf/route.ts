@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { viewerMayDownloadArtifact } from "@/modules/documents/services/artifact-access";
 import { ensureArtifactPdf } from "@/modules/documents/services/artifact-pdf-service";
 
 export async function GET(
@@ -25,6 +26,15 @@ export async function GET(
   if (!artifact) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // Rendered file contains the salary — per-employee tier check on the bytes.
+  if (!(await viewerMayDownloadArtifact(result.context, artifact))) {
+    return NextResponse.json(
+      { error: "Nuk keni leje të shihni shumat e pagave." },
+      { status: 403 },
+    );
+  }
+
 
   const pdf = await ensureArtifactPdf(artifact, getCompanyAssetStorage());
   if (!pdf.ok) {

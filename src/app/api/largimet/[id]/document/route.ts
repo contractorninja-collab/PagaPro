@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { TerminationType } from "@prisma/client";
 import { getCompanyContext, companyContextHttpError, permissionSubjectOf } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { canSeeEmployeeSalary } from "@/server/salary-redaction";
 import { can } from "@/server/permissions";
 import { renderTerminationDocument } from "@/modules/terminations/documents/render-termination-document";
 import { registerRenderedArtifact } from "@/modules/documents/services/register-rendered-artifact";
@@ -41,6 +43,18 @@ export async function GET(
   const mayRegister = can(permissionSubjectOf(ctx.context), "documents.write");
 
   const { id } = await params;
+
+  // Termination decisions carry the final-pay figures — per-employee check.
+  const terminationRow = await prisma.termination.findFirst({
+    where: { id, companyId },
+    select: { employee: { select: { salaryConfidential: true } } },
+  });
+  if (
+    terminationRow &&
+    !canSeeEmployeeSalary({ salaryAccess: ctx.context.salaryAccess }, terminationRow.employee)
+  ) {
+    return NextResponse.json({ error: "Nuk keni leje të shihni shumat e pagave." }, { status: 403 });
+  }
   const searchParams = new URL(request.url).searchParams;
   const inline = searchParams.get("inline") === "1";
   const templateType = parseTemplate(searchParams.get("template"));

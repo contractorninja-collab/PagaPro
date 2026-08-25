@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { DocumentDetailClient } from "@/modules/documents/components/document-detail-client";
 import { getDocumentArtifactDetail } from "@/modules/documents/services/document-queries";
 import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { redactPlaceholderValues } from "@/server/salary-redaction";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -37,7 +39,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DokumentDetailPage({ params }: Props) {
   const { id } = await params;
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
 
   let a;
   try {
@@ -53,7 +56,18 @@ export default async function DokumentDetailPage({ params }: Props) {
 
   if (!a) notFound();
 
-  const mergedPayload = jsonToPayloadRecord(a.mergedPayload);
+  // The payload panel prints every resolved placeholder — salary included.
+  const subjectEmployee = a.employeeId
+    ? await prisma.employee.findFirst({
+        where: { id: a.employeeId, companyId },
+        select: { salaryConfidential: true },
+      })
+    : null;
+  const mergedPayload = redactPlaceholderValues(
+    jsonToPayloadRecord(a.mergedPayload),
+    { salaryAccess: context.salaryAccess },
+    subjectEmployee ?? { salaryConfidential: true },
+  );
   const detectedKeys = toDetectedKeys(a.detectedPlaceholderKeys);
 
   const artifact = {
