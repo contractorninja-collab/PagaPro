@@ -31,6 +31,8 @@ export function PayrollAtkTab(props: {
   // The generate button already arrives pre-gated via canGenerate; archiving an
   // export is the same payroll.prepare and had no prop of its own.
   const canPreparePayroll = useCan("payroll.prepare");
+  // The ATK workbook carries every employee's gross/tax/pension.
+  const canSeeMoneyDocs = useCan("salaries.full");
   const active = props.exports.find((x) => !x.isArchived);
   const previous = props.exports.filter((x) => x.id !== active?.id);
   const statusEligible = isAtkStatusEligible(props.status);
@@ -99,12 +101,12 @@ export function PayrollAtkTab(props: {
             </p>
           )}
 
-          {props.canGenerate ? (
+          {props.canGenerate && canSeeMoneyDocs ? (
             <Button type="button" size="sm" disabled={props.pending} onClick={props.onGenerate}>
               {props.pending ? "Duke punuar…" : active ? "Rigjenero eksportin" : "Gjenero eksportin ATK"}
             </Button>
           ) : null}
-          {props.canGenerate && active ? (
+          {props.canGenerate && active && canSeeMoneyDocs ? (
             <p className="text-xs text-ink-400">Rigjenerimi arkivon automatikisht eksportin aktual.</p>
           ) : null}
         </div>

@@ -63,7 +63,8 @@ function getPrimaryAction(
 }
 
 /** Plain payroll decimal string → EUR display (e.g. €91,640.00). */
-function formatListEuro(raw: string): string {
+function formatListEuro(raw: string | null): string {
+  if (raw == null) return "—"; // redacted for this viewer
   const n = Number(String(raw).trim().replace(",", "."));
   if (!Number.isFinite(n)) return `€${raw}`;
   return new Intl.NumberFormat("en-US", {
@@ -132,8 +133,8 @@ export type PayrollListRow = {
   monthLabel: string;
   companyLabel: string;
   employeeCount: number;
-  totalGross: string;
-  totalNet: string;
+  totalGross: string | null;
+  totalNet: string | null;
   status: PayrollPeriodStatus;
   createdAt: string;
 };

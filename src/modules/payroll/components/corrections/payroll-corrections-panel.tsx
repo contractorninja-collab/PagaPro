@@ -33,7 +33,8 @@ const SELECT =
   "h-10 w-full rounded-md border border-line bg-white px-3 text-sm text-ink-700 focus-visible:border-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30";
 
 /** A correction can add or take away; the sign has to be unmissable. */
-function signedAmount(raw: string): { text: string; negative: boolean } {
+function signedAmount(raw: string | null): { text: string; negative: boolean } {
+  if (raw == null) return { text: "—", negative: false };
   const n = Number(String(raw).trim().replace(",", "."));
   if (!Number.isFinite(n)) return { text: `€${raw}`, negative: false };
   const negative = n < 0;

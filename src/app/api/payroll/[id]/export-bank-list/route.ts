@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { requireCapabilityHttp } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 import { resolveEmployeeBank } from "@/modules/employees/helpers/employee-bank-resolver";
 import { buildBankPaymentSheet } from "@/modules/reports/exporters/bank-payment-rows";
@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireCapabilityHttp("payroll.prepare");
+  const auth = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
   if (!auth.ok) return auth.response;
   const { companyId, user } = auth.context;
 

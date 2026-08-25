@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import type { Employee, PayrollEntryStatus, PayrollPeriodStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  redactPayrollDetail,
+  redactPayrollListRow,
+  type RedactedPayrollDetail,
+  type SalaryViewer,
+} from "@/server/salary-redaction";
 import { calendarDaysInMonth } from "@/modules/payroll/helpers/payroll-anchor";
 import { payrollMonthLabel } from "@/modules/payroll/helpers/month-label";
 import { decimalToPlain } from "@/modules/payroll/helpers/money-format";
@@ -197,7 +203,7 @@ async function findEmployeesEligibleForPayrollMonth(
   };
 }
 
-export async function listPayrollsForCompany(companyId: string, year?: number) {
+export async function listPayrollsForCompany(companyId: string, viewer: SalaryViewer, year?: number) {
   const rows = await prisma.payroll.findMany({
     where: {
       companyId,
@@ -226,21 +232,28 @@ export async function listPayrollsForCompany(companyId: string, year?: number) {
   });
   const companyLabel = company?.tradeName?.trim() || company?.legalName || "";
 
-  return rows.map((p) => ({
+  // One count decides whether STANDARD viewers may see period totals at all —
+  // a total minus their visible rows would reveal the confidential remainder.
+  const confidentialCount = await prisma.employee.count({
+    where: { companyId, salaryConfidential: true },
+  });
+  const anyConfidential = confidentialCount > 0;
+
+  return rows.map((p) => redactPayrollListRow({
     id: p.id,
     year: p.year,
     month: p.month,
     monthLabel: payrollMonthLabel(p.year, p.month),
     companyLabel,
     employeeCount: p._count.entries,
-    totalGross: decimalToPlain(grossMap.get(p.id)),
-    totalNet: decimalToPlain(netMap.get(p.id)),
+    totalGross: decimalToPlain(grossMap.get(p.id)) as string | null,
+    totalNet: decimalToPlain(netMap.get(p.id)) as string | null,
     status: p.status,
     createdAt: p.createdAt.toISOString(),
-  }));
+  }, viewer, { anyConfidential }));
 }
 
-export async function getPayrollDetailDto(companyId: string, payrollId: string) {
+async function getPayrollDetailRaw(companyId: string, payrollId: string) {
   const payroll = await prisma.payroll.findFirst({
     where: { id: payrollId, companyId },
     include: {
@@ -268,6 +281,8 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
               personalId: true,
               employmentType: true,
               jobTitle: true,
+              salaryConfidential: true,
+              salaryPending: true,
             },
           },
           adjustments: true,
@@ -419,6 +434,10 @@ export async function getPayrollDetailDto(companyId: string, payrollId: string) 
       jobTitle: e.jobTitleSnapshot ?? e.employee.jobTitle ?? "",
       personalId: e.employee.personalId,
       employmentType: e.employmentTypeSnapshot,
+      /** High-level personnel — STANDARD-tier viewers get this row masked. */
+      salaryConfidential: e.employee.salaryConfidential,
+      /** Profile still waiting for Finance to set a salary. */
+      salaryPending: e.employee.salaryPending,
       isLocked: e.isLocked,
       expectedWorkingDays: e.expectedWorkingDays,
       expectedRegularHours: e.expectedRegularHours != null ? decimalToPlain(e.expectedRegularHours) : null,
@@ -1783,6 +1802,24 @@ export async function validatePayrollSpreadsheet(
   });
 
   return { ok: true, warnings };
+}
+
+type PayrollDetailRaw = NonNullable<Awaited<ReturnType<typeof getPayrollDetailRaw>>>;
+
+/**
+ * The one public reader of a payroll period. The viewer is REQUIRED so no
+ * call site can fetch amounts without saying who is looking; the returned
+ * type carries `string | null` money fields, which is how the compiler
+ * enumerates every consumer that assumed amounts are always present.
+ */
+export async function getPayrollDetailDto(
+  companyId: string,
+  payrollId: string,
+  viewer: SalaryViewer,
+) {
+  const raw = await getPayrollDetailRaw(companyId, payrollId);
+  if (!raw) return null;
+  return redactPayrollDetail(raw, viewer) as RedactedPayrollDetail<PayrollDetailRaw>;
 }
 
 export type PayrollDetailDto = NonNullable<Awaited<ReturnType<typeof getPayrollDetailDto>>>;

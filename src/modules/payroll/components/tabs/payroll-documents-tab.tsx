@@ -66,7 +66,8 @@ export function PayrollDocumentsTab(props: {
 }) {
   // The payment list carries every employee's bank account, so the card is
   // hidden — not disabled — for anyone the route would refuse.
-  const canSeeBankList = useCan("payroll.prepare");
+  const canSeeMoneyDocs = useCan("salaries.full");
+  const canSeeBankList = useCan("payroll.prepare") && canSeeMoneyDocs;
   const bankListReady = props.status === "LOCKED" || props.status === "ARCHIVED";
 
   const bundle = props.documents.find((d) => d.kind === "PAYSLIPS_PRINT_BUNDLE");
@@ -102,6 +103,20 @@ export function PayrollDocumentsTab(props: {
       {props.pending ? "Duke gjeneruar…" : hasAny ? "Rigjenero PDF" : "Gjenero PDF"}
     </Button>
   );
+
+  // Payslips, registers, Libri i Pagave, the bank list — every document this
+  // tab produces is a sheet of amounts. Explain rather than render dead ends.
+  if (!canSeeMoneyDocs) {
+    return (
+      <div className="rounded-xl border border-line bg-white px-6 py-12 text-center shadow-card">
+        <p className="text-sm font-semibold text-ink-900">Dokumentet e pagave kërkojnë qasje të plotë në paga.</p>
+        <p className="mx-auto mt-1.5 max-w-md text-[13px] text-ink-500">
+          Fletëpagesat, regjistrat dhe listat përmbajnë shumat e çdo punonjësi. Kërkojini
+          administratorit qasjen nëse ju duhet kjo pjesë.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -23,7 +23,8 @@ import {
 
 type Entry = PayrollDetailDto["entries"][number];
 
-function formatHourlyRateDisplay(raw: string): string {
+function formatHourlyRateDisplay(raw: string | null): string {
+  if (raw == null) return "—";
   const n = Number(String(raw).trim().replace(",", "."));
   if (!Number.isFinite(n)) return raw;
   return new Intl.NumberFormat("en-US", {
@@ -255,7 +256,19 @@ export function PayrollSpreadsheet(props: {
 }) {
   // Editing a payroll row is payroll.prepare; the status alone was deciding it.
   const canPreparePayroll = useCan("payroll.prepare");
+  /**
+   * NONE-tier viewers get the hours half of the sheet only: the computed band,
+   * the Neto column and the money footer are structurally absent, not just
+   * blanked. The server already nulled the values — this is presentation.
+   * STANDARD viewers keep the band, and confidential rows render "—" per cell.
+   */
+  const canSeeAmounts = useCan("salaries.view");
   const editable = props.status === "DRAFT" && canPreparePayroll;
+  // Client footer sums only make sense when every row is visible — a partial
+  // sum labeled "Totalet" would be quietly wrong for STANDARD viewers.
+  const allAmountsVisible = props.entries.every((e) => e.grossSalary != null);
+  const showMoneyFooter = canSeeAmounts && allAmountsVisible;
+  const eur = (v: string | null): string => (v == null ? "—" : `€${v}`);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const markSaved = useCallback(() => setSavedAt(new Date()), []);
 
@@ -271,7 +284,7 @@ export function PayrollSpreadsheet(props: {
    * user the diff tool for an internal reconciliation. They should always agree;
    * when they do not, that is a bug and deserves an alarm, not a quiet row.
    */
-  const mismatches = (
+  const mismatches = !showMoneyFooter ? [] : (
     [
       ["Bruto", footGross, props.footerTotals.gross],
       ["Trust 1", footPenE, props.footerTotals.pensionEmployee],
@@ -351,18 +364,22 @@ export function PayrollSpreadsheet(props: {
                   <th className={thBand} colSpan={INPUT_COLUMNS.length}>
                     Orët &amp; shtesat {editable ? "· redaktueshme" : "· vetëm lexim"}
                   </th>
-                  <th className={cn(thBand, "border-l border-line")} colSpan={6}>
-                    Llogaritja · nga motori
-                  </th>
-                  <th
-                    rowSpan={2}
-                    className={cn(
-                      "sticky right-0 z-40 min-w-[100px] border-b border-l border-line bg-fill px-1.5 py-[9px] text-right text-[10.5px] font-bold leading-tight text-ink-900",
-                      stickyShadowRight,
-                    )}
-                  >
-                    Neto
-                  </th>
+                  {canSeeAmounts ? (
+                    <>
+                      <th className={cn(thBand, "border-l border-line")} colSpan={6}>
+                        Llogaritja · nga motori
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className={cn(
+                          "sticky right-0 z-40 min-w-[100px] border-b border-l border-line bg-fill px-1.5 py-[9px] text-right text-[10.5px] font-bold leading-tight text-ink-900",
+                          stickyShadowRight,
+                        )}
+                      >
+                        Neto
+                      </th>
+                    </>
+                  ) : null}
                 </tr>
                 <tr>
                   {INPUT_COLUMNS.map((c) => (
@@ -370,12 +387,16 @@ export function PayrollSpreadsheet(props: {
                       {c.label}
                     </th>
                   ))}
-                  <th className={cn(thNum, "border-l border-line")}>Bruto</th>
-                  <th className={thNum}>Çmimi/orë</th>
-                  <th className={thNum}>{trust1Header}</th>
-                  <th className={thNum}>{trust2Header}</th>
-                  <th className={thNum}>Tatimi në pagë</th>
-                  <th className={thNum}>Baza tat.</th>
+                  {canSeeAmounts ? (
+                    <>
+                      <th className={cn(thNum, "border-l border-line")}>Bruto</th>
+                      <th className={thNum}>Çmimi/orë</th>
+                      <th className={thNum}>{trust1Header}</th>
+                      <th className={thNum}>{trust2Header}</th>
+                      <th className={thNum}>Tatimi në pagë</th>
+                      <th className={thNum}>Baza tat.</th>
+                    </>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -422,22 +443,26 @@ export function PayrollSpreadsheet(props: {
                       </td>
                     ))}
 
-                    {/* Derived */}
-                    <td className={cn(tdNum, "border-l border-line-soft")}>€{e.grossSalary}</td>
-                    <td className={tdNum}>{formatHourlyRateDisplay(e.hourlyRate)}</td>
-                    <td className={tdNum}>€{e.pensionEmployee}</td>
-                    <td className={tdNum}>€{e.pensionEmployer}</td>
-                    <td className={tdNum}>€{e.pitWithheld}</td>
-                    <td className={tdNum}>€{e.taxableIncome}</td>
+                    {/* Derived — a "—" cell is a confidential row for a STANDARD viewer */}
+                    {canSeeAmounts ? (
+                      <>
+                        <td className={cn(tdNum, "border-l border-line-soft")}>{eur(e.grossSalary)}</td>
+                        <td className={tdNum}>{formatHourlyRateDisplay(e.hourlyRate)}</td>
+                        <td className={tdNum}>{eur(e.pensionEmployee)}</td>
+                        <td className={tdNum}>{eur(e.pensionEmployer)}</td>
+                        <td className={tdNum}>{eur(e.pitWithheld)}</td>
+                        <td className={tdNum}>{eur(e.taxableIncome)}</td>
 
-                    <td
-                      className={cn(
-                        "sticky right-0 z-20 min-w-[100px] whitespace-nowrap border-l border-line-soft bg-white px-1.5 py-1.5 text-right text-xs font-bold text-ink-900 transition-colors [font-variant-numeric:tabular-nums] group-hover:bg-fill-faint",
-                        stickyShadowRight,
-                      )}
-                    >
-                      €{e.netPay}
-                    </td>
+                        <td
+                          className={cn(
+                            "sticky right-0 z-20 min-w-[100px] whitespace-nowrap border-l border-line-soft bg-white px-1.5 py-1.5 text-right text-xs font-bold text-ink-900 transition-colors [font-variant-numeric:tabular-nums] group-hover:bg-fill-faint",
+                            stickyShadowRight,
+                          )}
+                        >
+                          {eur(e.netPay)}
+                        </td>
+                      </>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -452,20 +477,30 @@ export function PayrollSpreadsheet(props: {
                     Totalet ({props.entries.length} rreshta)
                   </td>
                   <td className={footCell} colSpan={INPUT_COLUMNS.length} />
-                  <td className={cn(footCell, "border-l border-line font-bold text-ink-900")}>€{footGross}</td>
-                  <td className={footCell} />
-                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenE}</td>
-                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenEr}</td>
-                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footPit}</td>
-                  <td className={cn(footCell, "font-bold text-ink-900")}>€{footTaxable}</td>
-                  <td
-                    className={cn(
-                      "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-brand-blue-strong [font-variant-numeric:tabular-nums]",
-                      stickyShadowRight,
-                    )}
-                  >
-                    €{footNet}
-                  </td>
+                  {showMoneyFooter ? (
+                    <>
+                      <td className={cn(footCell, "border-l border-line font-bold text-ink-900")}>€{footGross}</td>
+                      <td className={footCell} />
+                      <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenE}</td>
+                      <td className={cn(footCell, "font-bold text-ink-900")}>€{footPenEr}</td>
+                      <td className={cn(footCell, "font-bold text-ink-900")}>€{footPit}</td>
+                      <td className={cn(footCell, "font-bold text-ink-900")}>€{footTaxable}</td>
+                      <td
+                        className={cn(
+                          "sticky right-0 z-40 min-w-[100px] whitespace-nowrap border-l border-line bg-fill px-1.5 py-[9px] text-right text-xs font-extrabold text-brand-blue-strong [font-variant-numeric:tabular-nums]",
+                          stickyShadowRight,
+                        )}
+                      >
+                        €{footNet}
+                      </td>
+                    </>
+                  ) : canSeeAmounts ? (
+                    <td className={footCell} colSpan={7}>
+                      <span className="text-[11px] font-medium text-ink-400">
+                        Totalet fshihen — periudha përmban paga konfidenciale
+                      </span>
+                    </td>
+                  ) : null}
                 </tr>
               </tfoot>
             </table>

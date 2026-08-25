@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { logPayrollAtkExportDownloaded } from "@/modules/payroll/atk/services/atk-payroll-export-service";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const result = await getCompanyContext();
-  if (!result.ok) {
-    return companyContextHttpError(result.reason);
-  }
+  // The ATK workbook lists every employee's gross/tax/pension — full salary
+  // visibility required, not just membership.
+  const result = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
+  if (!result.ok) return result.response;
   const { companyId, user } = result.context;
 
   const { id } = await context.params;

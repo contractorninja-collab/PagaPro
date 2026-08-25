@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { getPayrollDetailDto } from "@/modules/payroll/services/payroll-period-service";
 import { generateBrandedFinancialWorkbookBuffer } from "@/modules/reports/exporters/branded-financial-export";
 import { buildLibriPagaveRows, type LibriPagaveEntryInput } from "@/modules/reports/exporters/libri-pagave-rows";
@@ -12,11 +12,11 @@ import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { loadCompanyLogo } from "@/modules/company-branding/company-logo";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const result = await getCompanyContext();
-  if (!result.ok) {
-    return companyContextHttpError(result.reason);
-  }
-  const { companyId } = result.context;
+  // Every employee's amounts in one file: preparation rights alone are not
+  // enough — the viewer must also hold full salary visibility.
+  const auth = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
+  if (!auth.ok) return auth.response;
+  const { companyId } = auth.context;
 
   const { id } = await context.params;
 
@@ -59,7 +59,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     );
   }
 
-  const data = await getPayrollDetailDto(companyId, id);
+  // The gate above guarantees FULL, so amounts are runtime non-null.
+  const data = await getPayrollDetailDto(companyId, id, { salaryAccess: "FULL" });
   if (!data) {
     return NextResponse.json({ error: "Payroll not found" }, { status: 404 });
   }
@@ -245,7 +246,15 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         monthLabel: data.payroll.monthLabel,
       },
       companyLabel: data.companyLabel,
-      totals: data.totals,
+      totals: data.totals as {
+        gross: string;
+        net: string;
+        employerTotalCost: string;
+        taxableIncome: string;
+        pitWithheld: string;
+        pensionEmployee: string;
+        pensionEmployer: string;
+      },
       entries: entriesMapped,
       logo,
     });

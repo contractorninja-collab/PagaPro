@@ -460,7 +460,9 @@ function DocumentsCenterTab(bundle: EmployeeProfileDocumentsBundle) {
    * gated on payroll.prepare. Hide the links from anyone who does not hold it
    * rather than leaving rows that answer 403 when clicked.
    */
-  const canSeePayrollPdfs = useCan("payroll.prepare");
+  const canPreparePayrollDocs = useCan("payroll.prepare");
+  const canSeeFullSalaries = useCan("salaries.full");
+  const canSeePayrollPdfs = canPreparePayrollDocs && canSeeFullSalaries;
   const [quickView, setQuickView] = useState<QuickViewTarget | null>(null);
   const byCategory = useMemo(() => {
     const map = new Map<DocumentCategory, EmployeeGeneratedDocSummary[]>();
@@ -928,7 +930,9 @@ export function EmployeeProfileShell(props: {
   const canWriteEmployees = useCan("employees.write");
   const canWriteDocumentsTab = useCan("documents.write");
   // Same gate as the payslip/certificate download routes — hide, don't 403.
-  const canSeePayrollPdfsTab = useCan("payroll.prepare");
+  const canPrepareTab = useCan("payroll.prepare");
+  const canSeeFullSalariesTab = useCan("salaries.full");
+  const canSeePayrollPdfsTab = canPrepareTab && canSeeFullSalariesTab;
   const taxStatementYears = props.taxStatementYears ?? [];
   const mayEdit = canWriteEmployees;
 

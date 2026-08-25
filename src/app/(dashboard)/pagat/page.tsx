@@ -9,12 +9,13 @@ export const metadata: Metadata = {
 };
 
 export default async function PagatPage() {
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
 
   const initialYear = new Date().getFullYear();
   try {
     const [rows, contractorAvailable] = await Promise.all([
-      listPayrollsForCompany(companyId),
+      listPayrollsForCompany(companyId, { salaryAccess: context.salaryAccess }),
       isContractorPayrollAvailable(companyId),
     ]);
     return (

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type { PayrollCorrectionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, permissionSubjectOf, requireCapability } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import {
   approvePayroll,
   archivePayroll,
@@ -84,7 +85,13 @@ export async function payrollSelectionPreviewAction(
   if (!wt || !settings) {
     return { ok: false, error: "Mungon PayrollSettings për këtë kompani." };
   }
-  const employees = await listEmployeesEligibleForPayrollSelection(companyId, year, month);
+  const employeesRaw = await listEmployeesEligibleForPayrollSelection(companyId, year, month);
+  // The picker needs names and eligibility, not compensation. Anyone with
+  // company context may open it, so the roster's money fields are redacted
+  // for viewers without salary visibility.
+  const employees = can(permissionSubjectOf(result.context), "salaries.view")
+    ? employeesRaw
+    : employeesRaw.map((e) => ({ ...e, baseSalaryMonthly: null, targetNetMonthly: null }));
   return {
     ok: true,
     data: {
@@ -232,6 +239,10 @@ export async function archivePayrollAction(payrollId: string): Promise<PayrollAc
 export async function generatePayrollAtkExportAction(payrollId: string): Promise<PayrollActionResult<{ exportId: string }>> {
   const result = await requireCapability("payroll.prepare");
   if (!result.ok) return { ok: false, error: result.error };
+  // The ATK workbook lists every employee's gross/tax/pension.
+  if (!can(permissionSubjectOf(result.context), "salaries.full")) {
+    return { ok: false, error: "Nuk keni leje të shihni totalet dhe eksportet e pagave." };
+  }
   const { companyId, user } = result.context;
 
   const res = await generatePayrollAtkExport({ companyId, payrollId, actorUserId: user.id });
@@ -262,6 +273,10 @@ export async function archivePayrollAtkExportAction(exportId: string): Promise<P
 export async function generatePayrollPdfsAction(payrollId: string): Promise<PayrollActionResult> {
   const result = await requireCapability("payroll.prepare");
   if (!result.ok) return { ok: false, error: result.error };
+  // Payslips and registers print every employee's amounts.
+  if (!can(permissionSubjectOf(result.context), "salaries.full")) {
+    return { ok: false, error: "Nuk keni leje të shihni totalet dhe eksportet e pagave." };
+  }
   const { companyId, user } = result.context;
 
   const payroll = await prisma.payroll.findFirst({
@@ -333,6 +348,21 @@ export async function updatePayrollEntryAction(raw: unknown): Promise<PayrollAct
   }
   const { payrollId, entryId, ...patch } = parsed.data;
   void payrollId;
+  // Writing money blind is a covert channel (set a gross override, watch a
+  // dashboard count move) and workflow nonsense — a blind preparer edits
+  // hours, never amounts. Bonus/Avans are amounts too.
+  if (!can(permissionSubjectOf(result.context), "salaries.view")) {
+    const moneyKeys = [
+      "manualGrossOverride",
+      "manualNetOverride",
+      "bonuses",
+      "salaryAdvanceDeduction",
+      "otherDeductions",
+    ] as const;
+    if (moneyKeys.some((k) => (patch as Record<string, unknown>)[k] !== undefined)) {
+      return { ok: false, error: "Nuk keni leje të ndryshoni shuma — vetëm orët." };
+    }
+  }
   const ownedError = await rejectIfClockOwned(companyId, entryId, patch);
   if (ownedError) return { ok: false, error: ownedError };
   const res = await updatePayrollEntryAmounts(companyId, entryId, patch, user.id);
@@ -357,6 +387,22 @@ export async function patchPayrollEntriesBulkAction(raw: unknown): Promise<Payro
     const { entryId, ...rest } = r;
     return { entryId, patch: rest };
   });
+  // Same rule as the single-cell action: a viewer without salary visibility
+  // edits hours, never amounts.
+  if (!can(permissionSubjectOf(result.context), "salaries.view")) {
+    const moneyKeys = [
+      "manualGrossOverride",
+      "manualNetOverride",
+      "bonuses",
+      "salaryAdvanceDeduction",
+      "otherDeductions",
+    ] as const;
+    for (const row of rows) {
+      if (moneyKeys.some((k) => (row.patch as Record<string, unknown>)[k] !== undefined)) {
+        return { ok: false, error: "Nuk keni leje të ndryshoni shuma — vetëm orët." };
+      }
+    }
+  }
   for (const row of rows) {
     const ownedError = await rejectIfClockOwned(companyId, row.entryId, row.patch);
     if (ownedError) return { ok: false, error: ownedError };
@@ -371,6 +417,10 @@ export async function createPayrollCorrectionAction(raw: unknown): Promise<Payro
   const result = await requireCapability("payroll.prepare");
   if (!result.ok) return { ok: false, error: result.error };
   const { companyId, user } = result.context;
+  // A correction IS an amount; a viewer who may not see money may not write it.
+  if (!can(permissionSubjectOf(result.context), "salaries.view")) {
+    return { ok: false, error: "Nuk keni leje të shihni shumat e pagave." };
+  }
   const parsed = payrollCorrectionCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return {

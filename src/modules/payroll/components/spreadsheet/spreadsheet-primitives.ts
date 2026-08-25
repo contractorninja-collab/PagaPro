@@ -38,12 +38,13 @@ export function useSavedPulse(): [CellState, (s: CellState) => void] {
   return [state, set];
 }
 
-export function parseNum(s: string): number | null {
+export function parseNum(s: string | null): number | null {
+  if (s == null) return null; // redacted amount — not a zero
   const n = Number(String(s).trim().replace(",", "."));
   return Number.isFinite(n) ? n : null;
 }
 
-export function sumPlainEuro(vals: string[]): string {
+export function sumPlainEuro(vals: Array<string | null>): string {
   let total = 0;
   for (const v of vals) {
     const n = parseNum(v);

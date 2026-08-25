@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { requireCapabilityHttp } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 
 /**
  * Payslip and register PDFs.
@@ -13,7 +13,7 @@ import { requireCapabilityHttp } from "@/server/company-context";
  * the same data stayed reachable one route over.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireCapabilityHttp("payroll.prepare");
+  const auth = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
   if (!auth.ok) return auth.response;
   const { companyId } = auth.context;
 

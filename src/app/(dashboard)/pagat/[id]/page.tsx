@@ -13,7 +13,8 @@ export async function generateMetadata({
     const { id } = await params;
     const result = await getCompanyContext();
     if (!result.ok) return { title: "Pagat" };
-    const data = await getPayrollDetailDto(result.context.companyId, id);
+    // Metadata needs only the month label — fetch with nothing visible.
+    const data = await getPayrollDetailDto(result.context.companyId, id, { salaryAccess: "NONE" });
     return {
       title: data ? `${data.payroll.monthLabel} · Pagat` : "Pagat",
     };
@@ -23,12 +24,13 @@ export async function generateMetadata({
 }
 
 export default async function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
 
   const { id } = await params;
   let data;
   try {
-    data = await getPayrollDetailDto(companyId, id);
+    data = await getPayrollDetailDto(companyId, id, { salaryAccess: context.salaryAccess });
   } catch (err) {
     console.error("[pagapro] PayrollDetailPage: getPayrollDetailDto failed", err);
     return (

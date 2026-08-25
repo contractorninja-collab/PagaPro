@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { getContractorPayrollDetail } from "@/modules/payroll/contractor/contractor-payroll-service";
 import { rowsToCsvBuffer } from "@/modules/reports/exporters/csv-export";
 import type { ReportColumnDef, ReportRow } from "@/modules/reports/types";
@@ -21,8 +21,8 @@ const COLUMNS: ReportColumnDef[] = [
 ];
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const result = await getCompanyContext();
-  if (!result.ok) return companyContextHttpError(result.reason);
+  const result = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
+  if (!result.ok) return result.response;
   const { companyId } = result.context;
 
   const { id } = await context.params;

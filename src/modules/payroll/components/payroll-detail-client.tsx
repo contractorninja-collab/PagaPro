@@ -36,7 +36,9 @@ const SEG_TRIGGER =
   "rounded-[7px] px-[15px] py-[7px] text-[13px] font-medium text-ink-500 transition-colors hover:text-ink-700 data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-ink-900 data-[state=active]:shadow-[0_1px_2px_rgba(15,23,42,0.08)]";
 
 /** Plain payroll decimal string → EUR display (e.g. €999,999.99) without clipping large amounts. */
-function formatPayrollEuro(amountStr: string): string {
+function formatPayrollEuro(amountStr: string | null): string {
+  // Redacted for this viewer — render an em dash, never "€null".
+  if (amountStr == null) return "—";
   const normalized = String(amountStr).trim().replace(",", ".");
   const n = Number(normalized);
   if (!Number.isFinite(n)) return `€${amountStr}`;
@@ -62,14 +64,17 @@ function formatHeadcount(raw: string): string {
  */
 function PayrollTotalsStrip({ data }: { data: PayrollDetailDto }) {
   const { totals } = data;
-  const cells: Array<{ label: string; display: string; accent?: boolean }> = [
+  // Server redaction nulls the money totals for viewers without aggregate
+  // rights; a strip of six em dashes is noise, so collapse to headcount only.
+  const moneyVisible = totals.gross != null;
+  const cells: Array<{ label: string; display: string; accent?: boolean }> = moneyVisible ? [
     { label: "Bruto", display: formatPayrollEuro(totals.gross) },
     { label: "Neto", display: formatPayrollEuro(totals.net), accent: true },
     { label: "Tatimi", display: formatPayrollEuro(totals.pitWithheld) },
     { label: "Trust 1", display: formatPayrollEuro(totals.pensionEmployee) },
     { label: "Trust 2", display: formatPayrollEuro(totals.pensionEmployer) },
     { label: "Punonjës", display: formatHeadcount(String(totals.headcount)) },
-  ];
+  ] : [{ label: "Punonjës", display: formatHeadcount(String(totals.headcount)) }];
 
   return (
     <div aria-label="Totalet" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

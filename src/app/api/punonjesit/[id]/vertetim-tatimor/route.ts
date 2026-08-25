@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCapabilityHttp } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { getEmployeeAnnualStatement } from "@/modules/payroll/services/employee-annual-statement-service";
 import { buildVertetimTatimorPdf } from "@/modules/payroll/pdf/vertetim-tatimor-pdf-builder";
 import { sanitizeFilenamePart } from "@/modules/payroll/pdf/payslip-filename";
@@ -12,7 +12,7 @@ import { sanitizeFilenamePart } from "@/modules/payroll/pdf/payslip-filename";
  * cannot change under a certificate that has already been handed out.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireCapabilityHttp("payroll.prepare");
+  const auth = await requireCapabilitiesHttp("payroll.prepare", "salaries.full");
   if (!auth.ok) return auth.response;
   const { companyId } = auth.context;
 
