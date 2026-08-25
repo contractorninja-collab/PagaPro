@@ -6,6 +6,8 @@ import { loadDashboardOperationalData } from "@/modules/dashboard/services/dashb
 import { parseDashboardFilters } from "@/modules/dashboard/helpers/dashboard-time";
 import { listDepartmentsForCompany } from "@/modules/employees/services/employee-service";
 import { requireCompanyContextPage } from "@/server/company-context";
+import { prisma } from "@/lib/prisma";
+import { redactDashboardPayload } from "@/server/salary-redaction";
 
 export const metadata: Metadata = {
   title: "Paneli",
@@ -16,7 +18,8 @@ type Props = {
 };
 
 export default async function PaneliPage({ searchParams }: Props) {
-  const { companyId, user } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId, user } = context;
   const sp = await searchParams;
   const filters = parseDashboardFilters(sp);
   // Presentation preference only — never trusted for anything, so an absent or
@@ -24,10 +27,16 @@ export default async function PaneliPage({ searchParams }: Props) {
   const payrollHeroCollapsed = (await cookies()).get(PAYROLL_HERO_COOKIE)?.value === "1";
 
   try {
-    const [departments, data] = await Promise.all([
+    const [departments, rawData, confidentialCount] = await Promise.all([
       listDepartmentsForCompany(companyId),
       loadDashboardOperationalData(companyId, filters),
+      prisma.employee.count({ where: { companyId, salaryConfidential: true } }),
     ]);
+    // The loader is viewer-free (and request-cached); the viewer's tier is
+    // applied here, at the page seam.
+    const data = redactDashboardPayload(rawData, { salaryAccess: context.salaryAccess }, {
+      anyConfidential: confidentialCount > 0,
+    });
     return (
       <DashboardOperationalPage
         data={data}

@@ -240,3 +240,60 @@ export function redactEmployeeDetail<
   if (canSeeEmployeeSalary(viewer, detail)) return detail;
   return { ...detail, baseSalaryMonthly: null, hourlyRate: null, salaryHistory: [] };
 }
+
+/* ------------------------------------------------------------------ */
+/* Dashboard                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Post-processes the dashboard payload for the viewer. Applied at the page,
+ * not inside the (per-request-cached) loader, so the loader stays viewer-free.
+ * Cost aggregates mix every employee — including confidential ones — so the
+ * aggregate rule applies, not the per-row one.
+ */
+export function redactDashboardPayload<
+  T extends {
+    payroll: { totals: { grossSalary: string | null; netPay: string | null; employerTotalCost: string | null } };
+    costMetrics: unknown;
+    contractor: { latest: { totalGross: string | null } | null };
+  },
+>(payload: T, viewer: SalaryViewer, opts: { anyConfidential: boolean }): T {
+  if (canSeeSalaryAggregates(viewer, opts)) return payload;
+  return {
+    ...payload,
+    payroll: {
+      ...payload.payroll,
+      totals: { grossSalary: null, netPay: null, employerTotalCost: null },
+    },
+    costMetrics: null,
+    contractor: {
+      ...payload.contractor,
+      latest: payload.contractor.latest ? { ...payload.contractor.latest, totalGross: null } : null,
+    },
+    timeline: (payload as { timeline?: Array<{ subtitle?: string }> }).timeline?.map((t) =>
+      t.subtitle != null && EURO_TEXT.test(t.subtitle)
+        ? { ...t, subtitle: "Përmban shuma — e dukshme vetëm me qasje në paga." }
+        : t,
+    ),
+  } as T;
+}
+
+/** Free text that plainly carries an amount ("Paga: 500,00 € → 700,00 €"). */
+const EURO_TEXT = /€|EUR/;
+
+/**
+ * Timeline bodies are free text and annex events embed salary changes in
+ * them. Rather than trusting an event-type list to stay complete, any body
+ * that visibly carries a euro amount is withheld from viewers without rights
+ * on that employee.
+ */
+export function redactSalaryBearingText(
+  body: string | null,
+  viewer: SalaryViewer,
+  employee: { salaryConfidential: boolean },
+): string | null {
+  if (body == null) return null;
+  if (canSeeEmployeeSalary(viewer, employee)) return body;
+  if (!EURO_TEXT.test(body)) return body;
+  return "Përmban shuma — e dukshme vetëm me qasje në paga.";
+}

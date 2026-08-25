@@ -8,7 +8,8 @@ import {
   reportingYears,
   workforceShape,
 } from "@/modules/reports/services/report-analytics-service";
-import { requireCompanyContextPage } from "@/server/company-context";
+import { permissionSubjectOf, requireCompanyContextPage } from "@/server/company-context";
+import { can } from "@/server/permissions";
 
 export const metadata: Metadata = {
   title: "Raportet",
@@ -25,7 +26,8 @@ export default async function RaportetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
 
   const sp = await searchParams;
   const raw = Number(first(sp, "year"));
@@ -43,8 +45,10 @@ export default async function RaportetPage({
     years = await reportingYears(companyId, defaultYear);
     const year = years.includes(requested) ? requested : (years[0] ?? defaultYear);
 
+    // The cost series is a company-wide aggregate — FULL visibility only.
+    const canSeeCost = can(permissionSubjectOf(context), "salaries.full");
     [cost, workforce, leave] = await Promise.all([
-      payrollCostSeries(companyId, year),
+      canSeeCost ? payrollCostSeries(companyId, year) : Promise.resolve([]),
       workforceShape(companyId, year),
       leavePressure(companyId, year),
     ]);
@@ -57,7 +61,7 @@ export default async function RaportetPage({
           description="Kostoja e pagave, forma e fuqisë punëtore dhe presioni i pushimeve — të gjitha për vitin e zgjedhur."
           actions={<ReportYearSelect year={year} years={years} />}
         />
-        <RaportetChartsClient year={year} cost={cost} workforce={workforce} leave={leave} />
+        <RaportetChartsClient year={year} cost={cost} workforce={workforce} leave={leave} showCost={canSeeCost} />
       </>
     );
   } catch (err) {

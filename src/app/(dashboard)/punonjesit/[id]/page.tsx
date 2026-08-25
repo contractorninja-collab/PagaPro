@@ -98,7 +98,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
         listActiveJobTitleOptions(companyId),
         listLeaveHistoryForEmployee(companyId, id),
         listLeaveBalancesForEmployee(companyId, id, balanceYear),
-        listTimelineForEmployee(companyId, id),
+        listTimelineForEmployee(companyId, id, { salaryAccess: context.salaryAccess }),
         listEmployeeDocumentsForEmployee({
           companyId,
           employeeId: id,

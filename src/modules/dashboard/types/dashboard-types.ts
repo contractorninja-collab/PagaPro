@@ -32,9 +32,10 @@ export interface DashboardPayrollSlice {
   status: PayrollPeriodStatus | null;
   employeeCount: number;
   totals: {
-    grossSalary: string;
-    netPay: string;
-    employerTotalCost: string;
+    /** Null when redacted for the viewer. */
+    grossSalary: string | null;
+    netPay: string | null;
+    employerTotalCost: string | null;
   };
   reviewedAtIso: string | null;
   approvedAtIso: string | null;
@@ -127,7 +128,7 @@ export interface DashboardContractorSlice {
     month: number;
     status: "DRAFT" | "LOCKED" | "ARCHIVED";
     entryCount: number;
-    totalGross: string;
+    totalGross: string | null;
   } | null;
 }
 
@@ -154,5 +155,6 @@ export interface DashboardOperationalPayload {
   contractor: DashboardContractorSlice;
   movement: WorkforceMovementPointDto[];
   /** Cost trend plus the month-over-month / year-to-date comparisons. */
-  costMetrics: DashboardCostMetrics;
+  /** Null when the viewer may not see aggregates. */
+  costMetrics: DashboardCostMetrics | null;
 }

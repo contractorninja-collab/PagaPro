@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { companyContextHttpError, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import {
   leavePressure,
   payrollCostSeries,
@@ -44,6 +45,13 @@ export async function GET(request: Request) {
       : new Date().getUTCFullYear();
 
   if (section === "cost") {
+    // Seven money columns for the whole company — aggregates are FULL-only.
+    if (!can(permissionSubjectOf(result.context), "salaries.full")) {
+      return NextResponse.json(
+        { error: "Nuk keni leje të shihni totalet dhe eksportet e pagave." },
+        { status: 403 },
+      );
+    }
     const series = await payrollCostSeries(companyId, year);
     const columns: ReportColumnDef[] = [
       { key: "muaji", headerSq: "Muaji" },

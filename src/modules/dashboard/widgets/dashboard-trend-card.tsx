@@ -50,10 +50,13 @@ export function DashboardBrutoTrendCard({
   metrics,
   year,
 }: {
-  metrics: DashboardCostMetrics;
+  /** Null when the viewer may not see cost aggregates. */
+  metrics: DashboardCostMetrics | null;
   year: number;
 }) {
   const { hidden } = useSalaryVisibility();
+  // The whole card is a cost aggregate; nothing to draw for masked viewers.
+  if (!metrics) return null;
   const series = metrics.series;
 
   if (series.length < MIN_POINTS_FOR_TREND) {

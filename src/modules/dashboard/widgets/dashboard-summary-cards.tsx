@@ -89,14 +89,15 @@ export function DashboardKpiCards({
   layout = "rail",
 }: {
   summary: DashboardSummaryCards;
-  metrics: DashboardCostMetrics;
+  /** Null when the viewer may not see cost aggregates. */
+  metrics: DashboardCostMetrics | null;
   movement: WorkforceMovementPointDto[];
   month: number;
   /** "rail" sits beside the payroll hero; "wide" spans the page when the hero is collapsed. */
   layout?: "rail" | "wide";
 }) {
-  const mom = metrics.momEmployerCostPct;
-  const employerCost = metrics.current?.employerCost ?? null;
+  const mom = metrics?.momEmployerCostPct ?? null;
+  const employerCost = metrics?.current?.employerCost ?? null;
   // `movement` is the twelve months of the filtered year, zero-filled and in order.
   const thisMonthMovement = movement[month - 1] ?? null;
 
@@ -146,14 +147,14 @@ export function DashboardKpiCards({
       <Tile
         label="Kosto mesatare / punonjës"
         value={
-          metrics.averageEmployerCostPerEmployee != null ? (
+          metrics?.averageEmployerCostPerEmployee != null ? (
             <MaskedAmount value={formatEur(metrics.averageEmployerCostPerEmployee)} />
           ) : (
             <span className="text-ink-300">—</span>
           )
         }
         hint={
-          metrics.current != null
+          metrics?.current != null
             ? `${metrics.current.employees} punonjës në pagë`
             : "Pa pagë për këtë muaj"
         }
@@ -162,14 +163,14 @@ export function DashboardKpiCards({
       <Tile
         label="Kosto vjetore deri tani"
         value={
-          metrics.ytd.months > 0 ? (
+          metrics != null && metrics.ytd.months > 0 ? (
             <MaskedAmount value={formatEur(metrics.ytd.employerCost)} />
           ) : (
             <span className="text-ink-300">—</span>
           )
         }
         hint={
-          metrics.ytd.months > 0
+          metrics != null && metrics.ytd.months > 0
             ? `${metrics.ytd.months} muaj të finalizuar`
             : "Asnjë muaj i finalizuar"
         }

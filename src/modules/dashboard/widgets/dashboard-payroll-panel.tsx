@@ -153,7 +153,8 @@ export function DashboardPayrollPanel({
   atkDeadline,
 }: {
   payroll: DashboardPayrollSlice;
-  metrics: DashboardCostMetrics;
+  /** Null when the viewer may not see cost aggregates. */
+  metrics: DashboardCostMetrics | null;
   activeEmployeeCount: number;
   atkDeadline?: AtkDeadlineItem | null;
 }) {
@@ -173,7 +174,7 @@ export function DashboardPayrollPanel({
     ARCHIVED: null,
   };
 
-  const mom = metrics.momEmployerCostPct;
+  const mom = metrics?.momEmployerCostPct ?? null;
 
   return (
     <section
@@ -237,13 +238,13 @@ export function DashboardPayrollPanel({
             <MaskedAmount value={formatEur(payroll.totals.employerTotalCost)} />
           </dd>
         </div>
-        {metrics.ytd.months > 0 ? (
+        {metrics != null && metrics.ytd.months > 0 ? (
           <div>
             <dt className="mb-0.5 text-[11.5px] text-[#8b95a7]">
-              Kosto {payroll.year} ({metrics.ytd.months} muaj)
+              Kosto {payroll.year} ({metrics!.ytd.months} muaj)
             </dt>
             <dd className="text-[16px] font-bold text-white tabular-nums">
-              <MaskedAmount value={formatEur(metrics.ytd.employerCost)} />
+              <MaskedAmount value={formatEur(metrics!.ytd.employerCost)} />
             </dd>
           </div>
         ) : null}

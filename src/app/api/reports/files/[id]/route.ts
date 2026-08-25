@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
 import { assertCompanyScopedStorageKey } from "@/server/company-scope";
-import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
+import { requireCapabilitiesHttp } from "@/server/company-context";
 import { appendReportExportLog } from "@/modules/reports/services/report-log-service";
 
 function dispositionFilename(reportTitle: string, format: string): string {
@@ -25,10 +25,10 @@ function mimeFor(format: string): string {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const result = await getCompanyContext();
-  if (!result.ok) {
-    return companyContextHttpError(result.reason);
-  }
+  // The archive holds financial exports (Libri i Pagave, registers) — the
+  // blob bytes bypass every DTO redactor, so the gate sits on the download.
+  const result = await requireCapabilitiesHttp("salaries.full");
+  if (!result.ok) return result.response;
   const companyId = result.context.companyId;
 
   const { id } = await context.params;

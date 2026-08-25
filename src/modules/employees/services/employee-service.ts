@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   redactEmployeeDetail,
   redactEmployeeListRow,
+  redactSalaryBearingText,
   type SalaryViewer,
 } from "@/server/salary-redaction";
 import { decryptField, encryptField } from "@/lib/field-crypto";
@@ -1048,14 +1049,32 @@ export async function deleteEmployeeHard(
   return { ok: true };
 }
 
-export async function listTimelineForEmployee(companyId: string, employeeId: string) {
-  return prisma.employeeTimelineEvent.findMany({
-    where: { companyId, employeeId },
-    orderBy: { occurredAt: "desc" },
-    take: 60,
-    include: {
-      actor: { select: { displayName: true, email: true } },
-      actorMembership: { select: { user: { select: { displayName: true, email: true } } } },
-    },
-  });
+export async function listTimelineForEmployee(
+  companyId: string,
+  employeeId: string,
+  viewer: SalaryViewer,
+) {
+  const [rows, employee] = await Promise.all([
+    prisma.employeeTimelineEvent.findMany({
+      where: { companyId, employeeId },
+      orderBy: { occurredAt: "desc" },
+      take: 60,
+      include: {
+        actor: { select: { displayName: true, email: true } },
+        actorMembership: { select: { user: { select: { displayName: true, email: true } } } },
+      },
+    }),
+    prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { salaryConfidential: true },
+    }),
+  ]);
+  // Annex events embed the raise in free text ("Paga: 500 € → 700 €"), so
+  // bodies visibly carrying amounts are withheld from viewers without salary
+  // rights on this employee.
+  const subject = employee ?? { salaryConfidential: false };
+  return rows.map((r) => ({
+    ...r,
+    body: redactSalaryBearingText(r.body, viewer, subject),
+  }));
 }

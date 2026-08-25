@@ -191,6 +191,8 @@ function EmptySection({ message, cta }: { message: string; cta?: { href: string;
 
 export function RaportetChartsClient(props: {
   year: number;
+  /** False when the viewer lacks full salary visibility — the cost section is an aggregate. */
+  showCost?: boolean;
   cost: PayrollCostPoint[];
   workforce: WorkforceShape;
   leave: LeavePressure;
@@ -222,6 +224,7 @@ export function RaportetChartsClient(props: {
   return (
     <div className="space-y-10">
       {/* ---------------------------------------------------------------- */}
+      {props.showCost === false ? null : (
       <Section
         title="Kostoja e pagave"
         question={`Sa na kushton paga muaj pas muaji në ${props.year}?`}
@@ -273,6 +276,7 @@ export function RaportetChartsClient(props: {
           </>
         )}
       </Section>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       <Section
