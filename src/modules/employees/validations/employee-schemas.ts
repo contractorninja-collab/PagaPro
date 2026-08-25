@@ -183,6 +183,8 @@ export const employeeUpsertSchema = z
     emergencyContactRelationship: z.preprocess(emptyToNull, z.string().trim().max(120).nullable().optional()),
 
     internalNotes: z.preprocess(emptyToNull, z.string().max(10000).nullable().optional()),
+    /** Settable only by FULL-tier viewers; the action drops it otherwise. */
+    salaryConfidential: z.boolean().optional(),
     documentsMissing: z.boolean(),
     terminationDate: z.preprocess(parseOptionalDate, z.date().nullable().optional()),
     terminationReason: z.preprocess(emptyToNull, z.string().max(5000).nullable().optional()),

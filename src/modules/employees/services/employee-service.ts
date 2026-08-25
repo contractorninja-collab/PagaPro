@@ -2,6 +2,11 @@ import { DomainActivityVerb, EmployeeHistoryEventKind, Prisma } from "@prisma/cl
 import { syncContractorDraftEntriesForEmployee } from "@/modules/payroll/contractor/contractor-payroll-service";
 import type { EmploymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  redactEmployeeDetail,
+  redactEmployeeListRow,
+  type SalaryViewer,
+} from "@/server/salary-redaction";
 import { decryptField, encryptField } from "@/lib/field-crypto";
 import type {
   EmployeeCountsDto,
@@ -46,6 +51,8 @@ function mapListRow(e: {
   status: EmploymentStatus;
   employmentType: import("@prisma/client").EmploymentType;
   baseSalaryMonthly: Prisma.Decimal;
+  salaryConfidential: boolean;
+  salaryPending: boolean;
   hireDate: Date;
   department: { name: string } | null;
   jobTitleProfile: { description: string; status: "ACTIVE" | "ARCHIVED" } | null;
@@ -63,7 +70,9 @@ function mapListRow(e: {
     departmentName: e.department?.name ?? null,
     status: e.status,
     employmentType: e.employmentType,
-    baseSalaryMonthly: moneyToString(e.baseSalaryMonthly),
+    baseSalaryMonthly: moneyToString(e.baseSalaryMonthly) as string | null,
+    salaryConfidential: e.salaryConfidential,
+    salaryPending: e.salaryPending,
     hireDate: toIso(e.hireDate),
   };
 }
@@ -73,6 +82,7 @@ export { listDepartmentsForCompany } from "@/modules/departments/services/depart
 export async function getEmployeesPageData(
   companyId: string,
   filters: EmployeeFiltersDto,
+  viewer: SalaryViewer,
 ): Promise<EmployeesPageDataDto> {
   const search = filters.search?.trim();
   const where: Prisma.EmployeeWhereInput = {
@@ -120,7 +130,7 @@ export async function getEmployeesPageData(
   ]);
 
   return {
-    employees: employees.map(mapListRow),
+    employees: employees.map((e) => redactEmployeeListRow(mapListRow(e), viewer)),
     departments,
     jobTitles,
     counts,
@@ -144,7 +154,11 @@ async function countEmployeesForCompany(
   return { total, active, onLeave, contractors, documentsMissing, terminated };
 }
 
-export async function getEmployeeById(companyId: string, id: string): Promise<EmployeeDetailDto | null> {
+export async function getEmployeeById(
+  companyId: string,
+  id: string,
+  viewer: SalaryViewer,
+): Promise<EmployeeDetailDto | null> {
   const e = await prisma.employee.findFirst({
     where: { id, companyId },
     include: {
@@ -182,7 +196,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
   const iban = rawIban ? decryptField(rawIban) : null;
   const bankName = e.bankName ?? bank?.bankName ?? null;
 
-  return {
+  const dto: EmployeeDetailDto = {
     id: e.id,
     firstName: e.firstName,
     lastName: e.lastName,
@@ -207,7 +221,9 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
     status: e.status,
     employmentType: e.employmentType,
     workArrangement: e.workArrangement,
-    baseSalaryMonthly: moneyToString(e.baseSalaryMonthly),
+    baseSalaryMonthly: moneyToString(e.baseSalaryMonthly) as string | null,
+    salaryConfidential: e.salaryConfidential,
+    salaryPending: e.salaryPending,
     hourlyRate: e.hourlyRate ? moneyToString(e.hourlyRate) : null,
     compensationBasis: e.compensationBasis,
     weeklyHours: moneyToString(e.weeklyHours),
@@ -246,6 +262,7 @@ export async function getEmployeeById(companyId: string, id: string): Promise<Em
       createdAtIso: toIso(s.createdAt),
     })),
   };
+  return redactEmployeeDetail(dto, viewer);
 }
 
 async function syncEmergencyContact(
@@ -379,6 +396,16 @@ export async function createEmployee(
   companyId: string,
   input: EmployeeUpsertInput,
   actorUserId: string | null,
+  opts?: {
+    /**
+     * Salary-blind creation: whatever the form sent, the profile is stored
+     * with salary 0, no hourly rate, salaryPending=true and NO initial
+     * salary-history row — Finance completes it. Pending profiles are
+     * excluded from payroll until then.
+     */
+    withoutCompensation?: boolean;
+    salaryConfidential?: boolean;
+  },
 ): Promise<
   | { ok: true; id: string }
   | { ok: false; code: "DUPLICATE_PERSONAL_ID" | "INVALID_DEPARTMENT" | "INVALID_JOB_TITLE" | "DB_ERROR"; message?: string }
@@ -389,6 +416,7 @@ export async function createEmployee(
       select: { id: true, title: true },
     });
     if (!selectedJobTitle) return { ok: false, code: "INVALID_JOB_TITLE" };
+    const withoutCompensation = opts?.withoutCompensation === true;
 
     if (input.departmentId) {
       const d = await prisma.department.findFirst({
@@ -418,9 +446,17 @@ export async function createEmployee(
           jobTitle: selectedJobTitle.title,
           probationMonths: input.probationMonths ?? undefined,
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
-          baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
-          hourlyRate: input.hourlyRate != null ? new Prisma.Decimal(String(input.hourlyRate)) : undefined,
-          compensationBasis: input.salaryBasis === "HOURLY" ? "HOURLY_GROSS" : "GROSS_MONTHLY",
+          baseSalaryMonthly: withoutCompensation
+            ? new Prisma.Decimal(0)
+            : new Prisma.Decimal(String(input.baseSalaryMonthly)),
+          hourlyRate:
+            !withoutCompensation && input.hourlyRate != null
+              ? new Prisma.Decimal(String(input.hourlyRate))
+              : undefined,
+          compensationBasis:
+            !withoutCompensation && input.salaryBasis === "HOURLY" ? "HOURLY_GROSS" : "GROSS_MONTHLY",
+          salaryPending: withoutCompensation,
+          salaryConfidential: opts?.salaryConfidential ?? false,
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
@@ -453,19 +489,23 @@ export async function createEmployee(
         },
       });
 
-      await tx.employeeSalaryChange.create({
-        data: {
-          companyId,
-          employeeId: row.id,
-          effectiveFrom: input.hireDate,
-          previousBaseSalary: null,
-          newBaseSalary: row.baseSalaryMonthly,
-          compensationBasis: row.compensationBasis,
-          targetNetMonthly: row.targetNetMonthly,
-          reason: "Rekord fillestar (punësim)",
-          changedById: actorUserId ?? undefined,
-        },
-      });
+      // A pending profile has no salary yet — a history row saying "0" would
+      // be a lie the raise timeline never recovers from.
+      if (!withoutCompensation) {
+        await tx.employeeSalaryChange.create({
+          data: {
+            companyId,
+            employeeId: row.id,
+            effectiveFrom: input.hireDate,
+            previousBaseSalary: null,
+            newBaseSalary: row.baseSalaryMonthly,
+            compensationBasis: row.compensationBasis,
+            targetNetMonthly: row.targetNetMonthly,
+            reason: "Rekord fillestar (punësim)",
+            changedById: actorUserId ?? undefined,
+          },
+        });
+      }
 
       await syncEmergencyContact(tx, row.id, input);
       await syncPrimaryBankAccount(tx, row.id, input.bankAccountIban, input.bankName);
@@ -496,6 +536,18 @@ export async function updateEmployee(
   employeeId: string,
   input: EmployeeUpsertInput,
   actorUserId: string | null,
+  opts?: {
+    /**
+     * The salary-blind merge. When true, every compensation field the form
+     * sent is DISCARDED and the stored values win: base salary, hourly rate,
+     * basis — and no EmployeeSalaryChange row is written. Without this, a
+     * blind HR fixing a phone number would zero the salary (the form submits
+     * 0 for an empty field) and pollute the raise history.
+     */
+    preserveCompensation?: boolean;
+    /** FULL viewers may set the confidential marker; others cannot touch it. */
+    salaryConfidential?: boolean;
+  },
 ): Promise<
   | { ok: true }
   | {
@@ -511,11 +563,14 @@ export async function updateEmployee(
       status: true,
       jobTitleId: true,
       baseSalaryMonthly: true,
+      hourlyRate: true,
       compensationBasis: true,
       targetNetMonthly: true,
+      salaryPending: true,
     },
   });
   if (!existing) return { ok: false, code: "NOT_FOUND" };
+  const preserveCompensation = opts?.preserveCompensation === true;
   /**
    * Terminated profiles stay editable — names, bank details and documents
    * often need correcting after someone leaves (final payment, tax filings).
@@ -565,16 +620,29 @@ export async function updateEmployee(
           jobTitle: selectedJobTitle.title,
           probationMonths: input.probationMonths ?? null,
           weeklyHours: new Prisma.Decimal(String(input.weeklyHours)),
-          baseSalaryMonthly: new Prisma.Decimal(String(input.baseSalaryMonthly)),
-          hourlyRate: input.hourlyRate != null ? new Prisma.Decimal(String(input.hourlyRate)) : null,
+          baseSalaryMonthly: preserveCompensation
+            ? undefined
+            : new Prisma.Decimal(String(input.baseSalaryMonthly)),
+          hourlyRate: preserveCompensation
+            ? undefined
+            : input.hourlyRate != null
+              ? new Prisma.Decimal(String(input.hourlyRate))
+              : null,
           // HOURLY always wins; MONTHLY only reverts an hourly employee — a
           // TARGET_NET basis set by the salary tools is never clobbered here.
-          compensationBasis:
-            input.salaryBasis === "HOURLY"
+          compensationBasis: preserveCompensation
+            ? undefined
+            : input.salaryBasis === "HOURLY"
               ? "HOURLY_GROSS"
               : existing.compensationBasis === "HOURLY_GROSS"
                 ? "GROSS_MONTHLY"
                 : undefined,
+          // A FULL viewer saving a real salary completes a pending profile.
+          salaryPending:
+            !preserveCompensation && existing.salaryPending && Number(input.baseSalaryMonthly) > 0
+              ? false
+              : undefined,
+          salaryConfidential: opts?.salaryConfidential,
           exemptFromMinimumSalary: input.exemptFromMinimumSalary,
           applyTrust: input.applyTrust,
           applyTax: input.applyTax,
@@ -599,7 +667,7 @@ export async function updateEmployee(
       });
 
       const newBase = new Prisma.Decimal(String(input.baseSalaryMonthly));
-      if (!existing.baseSalaryMonthly.equals(newBase)) {
+      if (!preserveCompensation && !existing.baseSalaryMonthly.equals(newBase)) {
         await tx.employeeSalaryChange.create({
           data: {
             companyId,

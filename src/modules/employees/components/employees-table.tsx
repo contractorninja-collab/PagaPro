@@ -270,7 +270,16 @@ export function EmployeesTable(props: {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-ink-900">
-                    <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
+                    {row.salaryPending ? (
+                      <span
+                        className="rounded-full bg-tone-warning-bg px-2 py-0.5 text-[11px] font-bold text-tone-warning-fg"
+                        title="Profili u krijua pa pagë — Financa duhet ta plotësojë."
+                      >
+                        Paga mungon
+                      </span>
+                    ) : (
+                      <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-ink-500">
                     {formatSqDate(row.hireDate)}
@@ -335,7 +344,13 @@ export function EmployeesTable(props: {
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Paga bruto</dt>
                 <dd className="text-[13px] font-semibold tabular-nums text-ink-900">
-                  <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
+                  {row.salaryPending ? (
+                    <span className="rounded-full bg-tone-warning-bg px-2 py-0.5 text-[11px] font-bold text-tone-warning-fg">
+                      Paga mungon
+                    </span>
+                  ) : (
+                    <MaskedAmount value={formatEur(row.baseSalaryMonthly)} />
+                  )}
                 </dd>
               </div>
               <div>

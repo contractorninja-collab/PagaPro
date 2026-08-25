@@ -113,6 +113,10 @@ async function findEmployeesEligibleForPayrollMonth(
   const eligibleWhere = {
     companyId,
     employmentType: "EMPLOYEE" as const,
+    // A profile whose salary Finance has not set yet cannot be calculated —
+    // and the engine's behavior on a 0 salary ranges from a silent zero row
+    // to aborting the whole company's run. Excluded until completed.
+    salaryPending: false,
     hireDate: { lte: end },
     OR: [
       {

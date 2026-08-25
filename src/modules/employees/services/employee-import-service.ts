@@ -256,10 +256,11 @@ async function importOneEmployee(
   companyId: string,
   actorUserId: string,
   row: EmployeeImportRow,
+  withoutCompensation = false,
 ): Promise<string> {
   return prisma.$transaction(async (tx) => {
     const hireDate = new Date(`${row.hireDateIso}T12:00:00.000Z`);
-    const salary = new Prisma.Decimal(row.baseSalaryMonthly);
+    const salary = withoutCompensation ? new Prisma.Decimal(0) : new Prisma.Decimal(row.baseSalaryMonthly);
     const isContractor = row.employmentType === "CONTRACTOR";
     const employee = await tx.employee.create({
       data: {
@@ -274,6 +275,7 @@ async function importOneEmployee(
         hireDate,
         weeklyHours: new Prisma.Decimal(40),
         baseSalaryMonthly: salary,
+        salaryPending: withoutCompensation,
         // The same stamps the employee form applies for contractors: no
         // pension, no tax withholding, no statutory minimum.
         applyTrust: !isContractor,
@@ -287,7 +289,7 @@ async function importOneEmployee(
     });
 
     await tx.employmentPeriod.create({ data: { companyId, employeeId: employee.id, startedAt: hireDate, reason: "HIRE" } });
-    await tx.employeeSalaryChange.create({
+    if (!withoutCompensation) await tx.employeeSalaryChange.create({
       data: {
         companyId,
         employeeId: employee.id,
@@ -362,6 +364,15 @@ export async function commitEmployeeImport(
   companyId: string,
   actorUserId: string,
   source: Buffer,
+  opts?: {
+    /**
+     * Salary-blind import: the salary column is IGNORED (whatever it says),
+     * every row lands with salary 0 + salaryPending, no salary-history row,
+     * and Finance completes the profiles. Keeps bulk onboarding in HR's hands
+     * without handing them a way to read or write amounts.
+     */
+    withoutCompensation?: boolean;
+  },
 ): Promise<EmployeeImportCommitResult> {
   const preview = await previewEmployeeImport(companyId, source);
   const results: EmployeeImportCommitResult["rows"] = preview.rows
@@ -374,7 +385,7 @@ export async function commitEmployeeImport(
     const settled = await Promise.all(
       batch.map(async (row) => {
         try {
-          const employeeId = await importOneEmployee(companyId, actorUserId, row);
+          const employeeId = await importOneEmployee(companyId, actorUserId, row, opts?.withoutCompensation === true);
           return { rowNumber: row.rowNumber, personalId: row.personalId, employeeId, imported: true, errors: [] };
         } catch (error) {
           const duplicate = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";

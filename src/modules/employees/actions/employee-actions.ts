@@ -17,7 +17,8 @@ import {
   rehireEmployeeSchema,
   terminateEmployeeSchema,
 } from "@/modules/employees/validations/employee-schemas";
-import { companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { permissionSubjectOf, companyContextErrorMessage, getCompanyContext, requireCapability } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import { z } from "zod";
 import { calculateEmployeeLine } from "@/modules/payroll/calculation/payroll-calculator";
 import { loadPayrollLegislationContext } from "@/modules/payroll/services/payroll-settings-service";
@@ -50,6 +51,10 @@ export async function previewNetHourlyRateAction(raw: unknown): Promise<
       return { ok: false, error: companyContextErrorMessage(result.reason) };
     }
     const { companyId } = result.context;
+    // A net-salary calculator IS a salary reader.
+    if (!can(permissionSubjectOf(result.context), "salaries.view")) {
+      return { ok: false, error: "Nuk keni leje të shihni shumat e pagave." };
+    }
 
     const parsed = netHourlyPreviewSchema.safeParse(raw);
     if (!parsed.success) return { ok: false, error: "Vlera jo valide." };
@@ -98,7 +103,22 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
     }
     const { user, companyId } = result.context;
 
-    const parsed = employeeUpsertSchema.safeParse(raw);
+    const subject = permissionSubjectOf(result.context);
+    const blind = !can(subject, "salaries.view");
+    const full = can(subject, "salaries.full");
+
+    // A blind form has no compensation section; fill the required fields with
+    // placeholders the service will discard, so validation passes on the
+    // fields the actor actually edited.
+    const rawObj = (raw ?? {}) as Record<string, unknown>;
+    if (blind && rawObj.employmentType === "CONTRACTOR") {
+      return { ok: false, error: "Kontraktorët kërkojnë tarifën e pagesës — kjo mbetet për Financën." };
+    }
+    const toParse = blind
+      ? { ...rawObj, baseSalaryMonthly: 0, hourlyRate: null, salaryBasis: "MONTHLY" }
+      : rawObj;
+
+    const parsed = employeeUpsertSchema.safeParse(toParse);
     if (!parsed.success) {
       return {
         ok: false,
@@ -107,7 +127,10 @@ export async function createEmployeeAction(raw: unknown): Promise<EmployeeAction
       };
     }
 
-    const res = await createEmployee(companyId, parsed.data, user.id);
+    const res = await createEmployee(companyId, parsed.data, user.id, {
+      withoutCompensation: blind,
+      salaryConfidential: full ? parsed.data.salaryConfidential : undefined,
+    });
     if (!res.ok) {
       if (res.code === "DUPLICATE_PERSONAL_ID") {
         return {
@@ -171,7 +194,18 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
       return { ok: false, error: "ID e punonjësit mungon." };
     }
 
-    const parsed = employeeUpsertSchema.safeParse(body.payload ?? {});
+    const subject = permissionSubjectOf(result.context);
+    const blind = !can(subject, "salaries.view");
+    const full = can(subject, "salaries.full");
+
+    const payloadObj = (body.payload ?? {}) as Record<string, unknown>;
+    // Blind edits: placeholder the compensation group so validation passes;
+    // the service's preserveCompensation merge discards it all anyway.
+    const toParse = blind
+      ? { ...payloadObj, baseSalaryMonthly: 0, hourlyRate: null, salaryBasis: "MONTHLY" }
+      : payloadObj;
+
+    const parsed = employeeUpsertSchema.safeParse(toParse);
     if (!parsed.success) {
       return {
         ok: false,
@@ -180,7 +214,10 @@ export async function updateEmployeeAction(raw: unknown): Promise<EmployeeAction
       };
     }
 
-    const res = await updateEmployee(companyId, employeeId, parsed.data, user.id);
+    const res = await updateEmployee(companyId, employeeId, parsed.data, user.id, {
+      preserveCompensation: blind,
+      salaryConfidential: full ? parsed.data.salaryConfidential : undefined,
+    });
     if (!res.ok) {
       if (res.code === "NOT_FOUND") return { ok: false, error: "Punonjësi nuk u gjet." };
       if (res.code === "DUPLICATE_PERSONAL_ID") {
@@ -341,7 +378,11 @@ export async function getEmployeeDetailAction(employeeId: string): Promise<Emplo
   try {
     const result = await getCompanyContext();
     if (!result.ok) return null;
-    return await getEmployeeById(result.context.companyId, employeeId);
+    // The action is directly invocable — redaction happens in the service,
+    // driven by the caller's real tier.
+    return await getEmployeeById(result.context.companyId, employeeId, {
+      salaryAccess: result.context.salaryAccess,
+    });
   } catch (err) {
     console.error("[getEmployeeDetailAction] failed:", err);
     return null;

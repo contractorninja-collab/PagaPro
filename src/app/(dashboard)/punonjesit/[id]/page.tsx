@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { id } = await params;
     const result = await getCompanyContext();
     if (!result.ok) return { title: "Punonjësi" };
-    const e = await getEmployeeById(result.context.companyId, id);
+    const e = await getEmployeeById(result.context.companyId, id, { salaryAccess: "NONE" });
     if (!e) return { title: "Punonjësi" };
     return { title: `${e.firstName} ${e.lastName}` };
   } catch {
@@ -89,7 +89,7 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   try {
     [employee, departments, genDocs, contractDocs, payrollDocs, taxStatementYears, jobTitles, leaveRequests, leaveBalances, timelineRows, uploadedDocs] =
       await Promise.all([
-        getEmployeeById(companyId, id),
+        getEmployeeById(companyId, id, { salaryAccess: context.salaryAccess }),
         listDepartmentsForCompany(companyId),
         listArtifactsForEmployee(companyId, id),
         listContractDocumentsForEmployee(companyId, id),

@@ -462,6 +462,9 @@ async function loadDashboardOperationalDataUncached(
             exemptFromMinimumSalary: false,
             status: { not: "TERMINATED" },
             baseSalaryMonthly: { lt: settingsRow.minimumSalaryMonthly },
+            // Pending profiles have no salary yet; flagging them as below-minimum
+            // would fire a permanent critical alert on every blind new hire.
+            salaryPending: false,
           },
         })
       : 0;

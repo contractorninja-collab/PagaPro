@@ -125,6 +125,9 @@ export const countOperationalAlerts = cache(async (companyId: string): Promise<n
             exemptFromMinimumSalary: false,
             status: { not: "TERMINATED" },
             baseSalaryMonthly: { lt: settingsRow.minimumSalaryMonthly },
+            // Pending profiles have no salary yet; flagging them as below-minimum
+            // would fire a permanent critical alert on every blind new hire.
+            salaryPending: false,
           },
         })
       : Promise.resolve(0),

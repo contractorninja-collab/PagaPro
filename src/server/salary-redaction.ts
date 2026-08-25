@@ -213,3 +213,30 @@ export type RedactedPayrollDetail<
     }
   >;
 };
+
+/* ------------------------------------------------------------------ */
+/* Employees                                                           */
+/* ------------------------------------------------------------------ */
+
+export function redactEmployeeListRow<
+  T extends { baseSalaryMonthly: string | null; salaryConfidential: boolean },
+>(row: T, viewer: SalaryViewer): T {
+  if (canSeeEmployeeSalary(viewer, row)) return row;
+  return { ...row, baseSalaryMonthly: null };
+}
+
+/**
+ * Detail masking: base salary, hourly rate, and the entire raise history —
+ * a history row IS a pair of salaries with a date attached.
+ */
+export function redactEmployeeDetail<
+  T extends {
+    baseSalaryMonthly: string | null;
+    hourlyRate: string | null;
+    salaryConfidential: boolean;
+    salaryHistory: unknown[];
+  },
+>(detail: T, viewer: SalaryViewer): T {
+  if (canSeeEmployeeSalary(viewer, detail)) return detail;
+  return { ...detail, baseSalaryMonthly: null, hourlyRate: null, salaryHistory: [] };
+}

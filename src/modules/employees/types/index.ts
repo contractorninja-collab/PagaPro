@@ -31,7 +31,10 @@ export interface EmployeeListRowDto {
   departmentName: string | null;
   status: EmploymentStatus;
   employmentType: EmploymentType;
-  baseSalaryMonthly: string;
+  /** Null when redacted for the viewer. */
+  baseSalaryMonthly: string | null;
+  salaryConfidential: boolean;
+  salaryPending: boolean;
   hireDate: string;
 }
 
@@ -67,7 +70,10 @@ export interface EmployeeDetailDto {
   status: EmploymentStatus;
   employmentType: EmploymentType;
   workArrangement: WorkArrangement;
-  baseSalaryMonthly: string;
+  /** Null when redacted for the viewer. */
+  baseSalaryMonthly: string | null;
+  salaryConfidential: boolean;
+  salaryPending: boolean;
   /// Tarifa orare — paga reale kur punonjësi paguhet me orë (HOURLY_GROSS) ose kontraktor.
   hourlyRate: string | null;
   /// GROSS_MONTHLY | TARGET_NET_MONTHLY | HOURLY_GROSS — si jepet paga bruto.

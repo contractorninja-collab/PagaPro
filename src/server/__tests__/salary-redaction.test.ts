@@ -3,6 +3,8 @@ import {
   PAYROLL_ENTRY_MONEY_KEYS,
   canSeeEmployeeSalary,
   canSeeSalaryAggregates,
+  redactEmployeeDetail,
+  redactEmployeeListRow,
   redactPayrollDetail,
   redactPayrollListRow,
 } from "@/server/salary-redaction";
@@ -215,5 +217,34 @@ describe("redactPayrollListRow", () => {
   it("STANDARD loses list totals only when the company has confidential staff", () => {
     expect(redactPayrollListRow(row, { salaryAccess: "STANDARD" }, { anyConfidential: false }).totalNet).toBe("1500.00");
     expect(redactPayrollListRow(row, { salaryAccess: "STANDARD" }, { anyConfidential: true }).totalNet).toBeNull();
+  });
+});
+
+describe("employee redactors", () => {
+  const listRow = { id: "e1", baseSalaryMonthly: "850.00" as string | null, salaryConfidential: false };
+
+  it("list row: NONE loses the salary, STANDARD loses only confidential rows", () => {
+    expect(redactEmployeeListRow(listRow, { salaryAccess: "NONE" }).baseSalaryMonthly).toBeNull();
+    expect(redactEmployeeListRow(listRow, { salaryAccess: "STANDARD" }).baseSalaryMonthly).toBe("850.00");
+    expect(
+      redactEmployeeListRow({ ...listRow, salaryConfidential: true }, { salaryAccess: "STANDARD" })
+        .baseSalaryMonthly,
+    ).toBeNull();
+  });
+
+  it("detail: masks salary, hourly rate, and EMPTIES the raise history", () => {
+    const detailDto = {
+      baseSalaryMonthly: "850.00" as string | null,
+      hourlyRate: "4.90" as string | null,
+      salaryConfidential: false,
+      salaryHistory: [{ newBaseSalary: "850.00" }],
+    };
+    const out = redactEmployeeDetail(detailDto, { salaryAccess: "NONE" });
+    expect(out.baseSalaryMonthly).toBeNull();
+    expect(out.hourlyRate).toBeNull();
+    // A history row IS a pair of salaries with a date — it goes entirely.
+    expect(out.salaryHistory).toEqual([]);
+    // FULL is the identity.
+    expect(redactEmployeeDetail(detailDto, { salaryAccess: "FULL" })).toBe(detailDto);
   });
 });

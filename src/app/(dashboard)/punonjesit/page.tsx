@@ -24,7 +24,8 @@ export default async function PunonjesitPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { companyId } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
 
   const sp = await searchParams;
   const q = first(sp.q);
@@ -43,7 +44,7 @@ export default async function PunonjesitPage({
 
   let data;
   try {
-    data = await getEmployeesPageData(companyId, filters);
+    data = await getEmployeesPageData(companyId, filters, { salaryAccess: context.salaryAccess });
   } catch (err) {
     console.error("[pagapro] PunonjesitPage: getEmployeesPageData failed", err);
     return (

@@ -39,7 +39,8 @@ export const GENDER_OPTIONS = [
   { value: "FEMALE", label: GENDER_LABELS.FEMALE },
 ] as const;
 
-export function formatEur(amount: string | number): string {
+export function formatEur(amount: string | number | null): string {
+  if (amount == null) return "—"; // redacted for this viewer
   const n = typeof amount === "string" ? Number(amount) : amount;
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("sq-XK", {

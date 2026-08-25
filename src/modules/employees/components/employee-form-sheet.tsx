@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FormField, FormStack } from "@/components/patterns/form-stack";
+import { useCan } from "@/components/layout/capability-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -65,6 +66,7 @@ export interface EmployeeFormValues {
   workArrangement: "ON_SITE" | "REMOTE" | "HYBRID";
   baseSalaryMonthly: string;
   salaryBasis: "MONTHLY" | "HOURLY";
+  salaryConfidential: boolean;
   hourlyRate: string;
   weeklyHours: string;
   bankName: string;
@@ -107,6 +109,7 @@ function defaults(): EmployeeFormValues {
     workArrangement: "ON_SITE",
     baseSalaryMonthly: "",
     salaryBasis: "MONTHLY",
+    salaryConfidential: false,
     hourlyRate: "",
     weeklyHours: "40",
     bankName: "",
@@ -152,8 +155,9 @@ function fromDetail(e: EmployeeDetailDto): EmployeeFormValues {
         : (e.status as "ACTIVE" | "INACTIVE" | "ON_LEAVE" | "SUSPENDED"),
     employmentType: e.employmentType,
     workArrangement: e.workArrangement,
-    baseSalaryMonthly: e.baseSalaryMonthly,
+    baseSalaryMonthly: e.baseSalaryMonthly ?? "",
     salaryBasis: e.compensationBasis === "HOURLY_GROSS" ? "HOURLY" : "MONTHLY",
+    salaryConfidential: e.salaryConfidential,
     hourlyRate: e.hourlyRate ?? "",
     weeklyHours: e.weeklyHours,
     bankName: e.bankName ?? "",
@@ -220,6 +224,7 @@ function payloadFromValues(v: EmployeeFormValues): Record<string, unknown> {
           : Number(v.baseSalaryMonthly.replace(",", ".")),
     // Kontraktorët zgjedhin vetë bazën: mujore fikse ose orë (të dyja neto).
     salaryBasis: v.salaryBasis,
+    salaryConfidential: v.salaryConfidential,
     hourlyRate: v.hourlyRate === "" ? null : Number(v.hourlyRate.replace(",", ".")),
     weeklyHours: v.weeklyHours === "" ? 40 : Number(v.weeklyHours.replace(",", ".")),
     bankName: v.bankName || null,
@@ -268,6 +273,8 @@ export function EmployeeFormSheet(props: {
   const [pending, setPending] = useState(false);
   const [values, setValues] = useState<EmployeeFormValues>(defaults);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const canSeeAmounts = useCan("salaries.view");
+  const canSetConfidential = useCan("salaries.full");
   // "≈ neto/orë" nën kutinë e pagës orare — llogaritet nga motori real në server.
   const [netHourlyHint, setNetHourlyHint] = useState<{
     netHourly: string;
@@ -275,7 +282,8 @@ export function EmployeeFormSheet(props: {
     monthlyHours: string;
   } | null>(null);
 
-  const hourlyEmployee = values.employmentType === "EMPLOYEE" && values.salaryBasis === "HOURLY";
+  const hourlyEmployee =
+    canSeeAmounts && values.employmentType === "EMPLOYEE" && values.salaryBasis === "HOURLY";
   useEffect(() => {
     if (!hourlyEmployee) {
       setNetHourlyHint(null);
@@ -828,6 +836,11 @@ export function EmployeeFormSheet(props: {
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Pagat & banka</h3>
             <div className={fieldGrid}>
+              {/* Compensation is FULL/STANDARD territory. A blind viewer's form
+                  sends placeholder values and the server merge discards them —
+                  these fields are hidden for honesty, not as the gate. */}
+              {canSeeAmounts ? (
+              <>
               {values.employmentType === "CONTRACTOR" ? (
                 <FormField
                   label={
@@ -976,6 +989,24 @@ export function EmployeeFormSheet(props: {
                   )}
                 </FormField>
               )}
+              {canSetConfidential && values.employmentType === "EMPLOYEE" ? (
+                <FormField label="Pagë konfidenciale">
+                  <label className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-ink-700">
+                    <input
+                      type="checkbox"
+                      checked={values.salaryConfidential}
+                      onChange={(e) =>
+                        setValues((s) => ({ ...s, salaryConfidential: e.target.checked }))
+                      }
+                      disabled={pending}
+                      className="h-4 w-4 rounded border-line"
+                    />
+                    Personel i lartë — paga e dukshme vetëm me qasje të plotë
+                  </label>
+                </FormField>
+              ) : null}
+              </>
+              ) : null}
               <FormField label="Orët javore" required error={fieldErrors.weeklyHours}>
                 <Input
                   className={cn("tabular-nums", errClass("weeklyHours"))}

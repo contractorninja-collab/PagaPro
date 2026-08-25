@@ -30,6 +30,10 @@ export async function listEmployeesEligibleForPayrollSelection(
     where: {
       companyId,
       employmentType: "EMPLOYEE",
+      // Pending-salary profiles cannot enter payroll; the dialog explains
+      // rather than silently hiding them? No — the picker mirrors the engine:
+      // whoever the engine would refuse is not offered.
+      salaryPending: false,
       status: { in: ELIGIBLE_STATUSES },
       hireDate: { lte: end },
       OR: [{ terminationDate: null }, { terminationDate: { gte: start } }],

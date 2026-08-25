@@ -281,7 +281,13 @@ function SummaryTab({ e, timeClockEnabled }: { e: EmployeeDetailDto; timeClockEn
               <>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-400">Paga bruto mujore</p>
                 <p className="mt-0.5 text-[22px] font-extrabold leading-tight tracking-[-0.02em] tabular-nums text-ink-900">
-                  <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
+                  {e.salaryPending ? (
+                    <span className="rounded-full bg-tone-warning-bg px-2.5 py-1 text-[12px] font-bold text-tone-warning-fg">
+                      Paga në pritje nga Financa
+                    </span>
+                  ) : (
+                    <MaskedAmount value={formatEur(e.baseSalaryMonthly)} />
+                  )}
                 </p>
               </>
             )}

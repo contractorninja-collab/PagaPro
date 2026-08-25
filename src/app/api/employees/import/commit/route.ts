@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { companyContextHttpError, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
+import { can } from "@/server/permissions";
 import { canImportEmployees } from "@/modules/employees/services/employee-import-access";
 import {
   commitEmployeeImport,
@@ -20,7 +21,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const file = formData.get("file");
     if (!(file instanceof File)) throw new EmployeeImportError("Zgjidhni një skedar CSV.");
     validateEmployeeImportFile(file);
-    const committed = await commitEmployeeImport(companyId, user.id, Buffer.from(await file.arrayBuffer()));
+    // Salary-blind importers keep bulk onboarding — the salary column is
+    // ignored and every row lands pending, for Finance to complete.
+    const withoutCompensation = !can(permissionSubjectOf(result.context), "salaries.view");
+    const committed = await commitEmployeeImport(companyId, user.id, Buffer.from(await file.arrayBuffer()), {
+      withoutCompensation,
+    });
     return NextResponse.json(committed);
   } catch (error) {
     if (error instanceof EmployeeImportError) {
