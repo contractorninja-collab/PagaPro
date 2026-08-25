@@ -524,10 +524,13 @@ export function PayrollDetailClient(props: { data: PayrollDetailDto }) {
           </TabsContent>
         </Tabs>
 
-        {workflowActions.length > 0 ? (
+        {/* Same capability filter as the desktop bar — iterating the unfiltered
+            list gave an HR_MANAGER on a phone clickable Mirato/Kyç buttons that
+            only failed server-side. */}
+        {visibleWorkflowActions.length > 0 ? (
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 backdrop-blur lg:hidden">
             <div className="mx-auto flex max-w-lg flex-wrap gap-2">
-              {workflowActions.map((a) => (
+              {visibleWorkflowActions.map((a) => (
                 <Button
                   key={a.id}
                   size="sm"

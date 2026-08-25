@@ -1162,6 +1162,12 @@ export async function reviewPayrollExplicit(
   const payroll = await prisma.payroll.findFirst({ where: { id: payrollId, companyId } });
   if (!payroll) return { ok: false, error: "Payroll nuk u gjet." };
   if (payroll.status !== "DRAFT") return { ok: false, error: "Vetëm payroll-i në DRAFT kalon në REVIEWED manualisht." };
+  // Valido first — this was the side door around the check in approvePayroll:
+  // DRAFT→REVIEWED here, then approve accepts REVIEWED without ever validating.
+  // clearPayrollValidation wipes validatedAt on any edit, so the gate is real.
+  if (payroll.validatedAt == null) {
+    return { ok: false, error: "Ekzekutoni «Valido» para se ta shënoni si të shqyrtuar." };
+  }
 
   await prisma.payroll.update({
     where: { id: payrollId },
@@ -1200,6 +1206,12 @@ export async function approvePayroll(
     return { ok: false, error: "Miratimi kërkon payroll në draft." };
   }
   if (payroll._count.entries === 0) return { ok: false, error: "S’ka rreshta pagë për të miratuar." };
+  // Valido-before-Mirato was client-side folklore until now: the detail page
+  // enforced it in the button gating while this service accepted any DRAFT.
+  // REVIEWED rows are exempt — legacy periods predate the validation step.
+  if (payroll.status === "DRAFT" && payroll.validatedAt == null) {
+    return { ok: false, error: "Ekzekutoni «Valido» para miratimit." };
+  }
 
   await prisma.payroll.update({
     where: { id: payrollId },
