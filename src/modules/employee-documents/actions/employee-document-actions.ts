@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireCapability } from "@/server/company-context";
+import { permissionSubjectOf, requireCapability } from "@/server/company-context";
 import { can } from "@/server/permissions";
 import {
   createEmployeeDocument,
@@ -102,7 +102,7 @@ export async function deleteEmployeeDocumentAction(
 ): Promise<EmployeeDocumentActionResult> {
   const ctx = await requireCapability("documents.write");
   if (!ctx.ok) return { ok: false, error: ctx.error };
-  const { companyId, user, role } = ctx.context;
+  const { companyId, user } = ctx.context;
 
   const parsed = deleteEmployeeDocumentSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
@@ -110,7 +110,7 @@ export async function deleteEmployeeDocumentAction(
   const result = await deleteEmployeeDocument({
     companyId,
     documentId: parsed.data.documentId,
-    actorCanSensitive: can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.sensitive"),
+    actorCanSensitive: can(permissionSubjectOf(ctx.context), "documents.sensitive"),
     actorUserId: user.id,
   });
   if (!result.ok) return { ok: false, error: SERVICE_ERROR_SQ[result.code] };

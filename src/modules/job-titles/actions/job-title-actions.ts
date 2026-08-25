@@ -11,7 +11,7 @@ import {
   jobTitleIdSchema,
   jobTitleUpsertSchema,
 } from "@/modules/job-titles/validation/job-title-schemas";
-import { companyContextErrorMessage, getCompanyContext } from "@/server/company-context";
+import { companyContextErrorMessage, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
 import { can, capabilityDeniedMessage, type Capability } from "@/server/permissions";
 
 const REVALIDATE_PATHS = ["/konfigurime", "/punonjesit", "/dokumentet"] as const;
@@ -31,8 +31,8 @@ async function companyIdOrError(
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
 
-  const { user, role, companyId } = result.context;
-  if (capability && !can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+  const { user, companyId } = result.context;
+  if (capability && !can(permissionSubjectOf(result.context), capability)) {
     return { ok: false, error: capabilityDeniedMessage(capability) };
   }
   return { ok: true, companyId, userId: user.id };
