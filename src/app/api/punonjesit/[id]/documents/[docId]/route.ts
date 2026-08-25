@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCompanyAssetStorage } from "@/lib/company-asset-storage";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { companyContextHttpError, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
 import { assertCompanyScopedStorageKey } from "@/server/company-scope";
 import { can } from "@/server/permissions";
 import {
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   const result = await getCompanyContext();
   if (!result.ok) return companyContextHttpError(result.reason);
-  const { companyId, user, role } = result.context;
+  const { companyId, user } = result.context;
 
   const { id: employeeId, docId } = await context.params;
   const found = await getEmployeeDocumentForServe({ companyId, employeeId, documentId: docId });
@@ -25,7 +25,7 @@ export async function GET(
   // document exists to someone not allowed to know that.
   if (
     found.sensitive &&
-    !can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.sensitive")
+    !can(permissionSubjectOf(result.context), "documents.sensitive")
   ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

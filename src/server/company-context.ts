@@ -2,7 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { ADMIN_BASE_PATH } from "@/lib/admin-path";
 import { NextResponse } from "next/server";
-import type { CompanyMembershipRole } from "@prisma/client";
+import type { CompanyMembershipRole, SalaryAccess } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, type SessionUser } from "@/modules/auth/services/session";
 import { resolveActiveCompanyId } from "@/server/company-scope";
@@ -19,6 +19,8 @@ export interface CompanyContext {
   companyId: string;
   /** Membership role in the active company; null for platform admins acting without a membership. */
   role: CompanyMembershipRole | null;
+  /** Salary visibility tier of the membership; FULL for membership-less platform admins. */
+  salaryAccess: SalaryAccess;
 }
 
 export type CompanyContextResult =
@@ -42,11 +44,19 @@ export const getCompanyContext = cache(async (): Promise<CompanyContextResult> =
 
   const membership = await prisma.userCompanyMembership.findUnique({
     where: { userId_companyId: { userId: user.id, companyId } },
-    select: { isActive: true, role: true, company: { select: { status: true } } },
+    select: {
+      isActive: true,
+      role: true,
+      salaryAccess: true,
+      company: { select: { status: true } },
+    },
   });
 
   if (membership?.isActive && membership.company.status === "ACTIVE") {
-    return { ok: true, context: { user, companyId, role: membership.role } };
+    return {
+      ok: true,
+      context: { user, companyId, role: membership.role, salaryAccess: membership.salaryAccess },
+    };
   }
 
   // Platform admins may enter any existing company (including suspended/archived
@@ -58,7 +68,15 @@ export const getCompanyContext = cache(async (): Promise<CompanyContextResult> =
       select: { id: true },
     });
     if (!company) return { ok: false, reason: "NO_ACTIVE_COMPANY" };
-    return { ok: true, context: { user, companyId, role: membership?.role ?? null } };
+    return {
+      ok: true,
+      context: {
+        user,
+        companyId,
+        role: membership?.role ?? null,
+        salaryAccess: membership?.salaryAccess ?? "FULL",
+      },
+    };
   }
 
   return { ok: false, reason: "FORBIDDEN" };
@@ -101,8 +119,7 @@ export async function requireCapability(
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, error: companyContextErrorMessage(result.reason) };
 
-  const { user, role } = result.context;
-  if (!can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
+  if (!can(permissionSubjectOf(result.context), capability)) {
     return { ok: false, error: capabilityDeniedMessage(capability) };
   }
   return { ok: true, context: result.context };
@@ -112,17 +129,43 @@ export async function requireCapability(
 export async function requireCapabilityHttp(
   capability: Capability,
 ): Promise<{ ok: true; context: CompanyContext } | { ok: false; response: NextResponse }> {
+  return requireCapabilitiesHttp(capability);
+}
+
+/**
+ * All-of variant for routes that sit behind more than one gate — e.g. the
+ * financial exports need both `payroll.prepare` (the role side) and
+ * `salaries.full` (the visibility tier). Denies with the FIRST missing
+ * capability's message, so the caller learns the most relevant reason.
+ */
+export async function requireCapabilitiesHttp(
+  ...capabilities: Capability[]
+): Promise<{ ok: true; context: CompanyContext } | { ok: false; response: NextResponse }> {
   const result = await getCompanyContext();
   if (!result.ok) return { ok: false, response: companyContextHttpError(result.reason) };
 
-  const { user, role } = result.context;
-  if (!can({ role, isPlatformAdmin: user.isPlatformAdmin }, capability)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: capabilityDeniedMessage(capability) }, { status: 403 }),
-    };
+  const subject = permissionSubjectOf(result.context);
+  for (const capability of capabilities) {
+    if (!can(subject, capability)) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: capabilityDeniedMessage(capability) },
+          { status: 403 },
+        ),
+      };
+    }
   }
   return { ok: true, context: result.context };
+}
+
+/** The one way a CompanyContext becomes a permission subject — never hand-build it. */
+export function permissionSubjectOf(context: CompanyContext) {
+  return {
+    role: context.role,
+    isPlatformAdmin: context.user.isPlatformAdmin,
+    salaryAccess: context.salaryAccess,
+  };
 }
 
 /**

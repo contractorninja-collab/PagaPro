@@ -34,6 +34,16 @@ enum UserStatus {
   DISABLED
 }
 
+/// How much salary information a membership may see.
+/// FULL — everything (default; matches pre-feature behavior for every tenant).
+/// STANDARD — sees regular staff amounts but not employees marked salaryConfidential.
+/// NONE — sees no amounts anywhere ("salary-blind HR": hours in, Llogarit, Valido).
+enum SalaryAccess {
+  FULL
+  STANDARD
+  NONE
+}
+
 enum CompanyMembershipRole {
   OWNER
   ADMIN
@@ -768,6 +778,10 @@ model UserCompanyMembership {
 
   role CompanyMembershipRole
 
+  /// Salary visibility tier — orthogonal to role. Every copy path that clones
+  /// memberships to sibling companies must carry this field explicitly.
+  salaryAccess SalaryAccess @default(FULL)
+
   isActive  Boolean   @default(true)
   invitedAt DateTime?
   acceptedAt DateTime?
@@ -897,6 +911,15 @@ model Employee {
 
   /// Stored monthly gross for employees; for contractors, interpret as agreed monthly fee baseline (still validated unless exempt)
   baseSalaryMonthly Decimal @db.Decimal(14, 2)
+
+  /// "High-level personnel": STANDARD-tier viewers see everyone's amounts
+  /// except employees carrying this flag. Settable by FULL viewers only.
+  salaryConfidential Boolean @default(false)
+
+  /// Profile was created without compensation (by a salary-blind user or a
+  /// blind bulk import). Excluded from payroll eligibility until a FULL user
+  /// saves a salary, which clears the flag.
+  salaryPending Boolean @default(false)
 
   compensationBasis CompensationBasis @default(GROSS_MONTHLY)
 

@@ -6,14 +6,15 @@ import { CapabilityProvider } from "@/components/layout/capability-provider";
 import { capabilitiesOf } from "@/server/permissions";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { prisma } from "@/lib/prisma";
-import { requireCompanyContextPage } from "@/server/company-context";
+import { permissionSubjectOf, requireCompanyContextPage } from "@/server/company-context";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, companyId, role } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { user, companyId, role } = context;
 
   /**
    * Resolved once here rather than per page. Every mutating action re-checks
@@ -21,10 +22,7 @@ export default async function DashboardLayout({
    * so a member who cannot approve payroll stops being shown an Aprovo button
    * that was always going to refuse them.
    */
-  const capabilities = capabilitiesOf({
-    role,
-    isPlatformAdmin: user.isPlatformAdmin,
-  });
+  const capabilities = capabilitiesOf(permissionSubjectOf(context));
 
   let activeCompanyLabel: string | null = null;
   /**

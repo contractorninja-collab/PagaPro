@@ -93,6 +93,7 @@ export interface AdminCompanyUser {
   email: string;
   displayName: string | null;
   role: "OWNER" | "ADMIN" | "HR_MANAGER" | "ACCOUNTANT" | "READ_ONLY";
+  salaryAccess: "FULL" | "STANDARD" | "NONE";
   membershipActive: boolean;
   userStatus: "INVITED" | "ACTIVE" | "DISABLED";
   lastLoginAt: string | null;
@@ -151,6 +152,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
         select: {
           id: true,
           role: true,
+          salaryAccess: true,
           isActive: true,
           createdAt: true,
           user: {
@@ -189,6 +191,7 @@ export async function getCompanyDetailForAdmin(companyId: string): Promise<Admin
       email: m.user.email,
       displayName: m.user.displayName,
       role: m.role,
+      salaryAccess: m.salaryAccess,
       membershipActive: m.isActive,
       userStatus: m.user.status,
       lastLoginAt: m.user.lastLoginAt?.toISOString() ?? null,
@@ -336,6 +339,7 @@ export async function createCompanyUserForAdmin(
           userId: existing.id,
           companyId,
           role: input.role,
+          salaryAccess: input.salaryAccess,
           isActive: true,
           invitedAt: new Date(),
           acceptedAt: new Date(),
@@ -358,6 +362,7 @@ export async function createCompanyUserForAdmin(
           create: {
             companyId,
             role: input.role,
+            salaryAccess: input.salaryAccess,
             isActive: true,
             invitedAt: new Date(),
             acceptedAt: new Date(),
@@ -602,4 +607,75 @@ export async function setMembershipActiveForAdmin(membershipId: string, isActive
     await destroyAllSessionsForUser(membership.userId);
   }
   return true;
+}
+
+/**
+ * Sets a membership's salary-visibility tier.
+ *
+ * Downgrades end the user's sessions: the client capability set and any
+ * fetched DTOs are snapshotted per page load, so revocation must cut the
+ * session to be real (same reasoning as setMembershipActiveForAdmin).
+ * Upgrades simply apply on the next full load — nothing leaked meanwhile.
+ *
+ * Callers gate: the admin console via requireAdmin, the tenant panel via
+ * company.settings + tenant scoping + the no-self-change rule.
+ */
+export async function setMembershipSalaryAccess(
+  membershipId: string,
+  salaryAccess: "FULL" | "STANDARD" | "NONE",
+): Promise<boolean> {
+  const membership = await prisma.userCompanyMembership.findUnique({
+    where: { id: membershipId },
+    select: { userId: true, salaryAccess: true },
+  });
+  if (!membership) return false;
+  if (membership.salaryAccess === salaryAccess) return true;
+
+  const isDowngrade =
+    salaryAccess === "NONE" ||
+    (salaryAccess === "STANDARD" && membership.salaryAccess === "FULL");
+
+  await prisma.userCompanyMembership.update({
+    where: { id: membershipId },
+    data: { salaryAccess },
+  });
+
+  if (isDowngrade) {
+    await destroyAllSessionsForUser(membership.userId);
+  }
+  return true;
+}
+
+/**
+ * Changes a membership's role — the console could create users with a role but
+ * never change it afterwards. Sessions end either way: role shrinks AND grows
+ * are both snapshotted client-side, and a stale grant is as confusing as a
+ * stale denial.
+ */
+export async function setMembershipRoleForAdmin(
+  membershipId: string,
+  role: "OWNER" | "ADMIN" | "HR_MANAGER" | "ACCOUNTANT" | "READ_ONLY",
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "DUPLICATE_OWNER" | "DB_ERROR" }> {
+  const membership = await prisma.userCompanyMembership.findUnique({
+    where: { id: membershipId },
+    select: { userId: true, role: true },
+  });
+  if (!membership) return { ok: false, code: "NOT_FOUND" };
+  if (membership.role === role) return { ok: true };
+
+  try {
+    await prisma.userCompanyMembership.update({
+      where: { id: membershipId },
+      data: { role },
+    });
+  } catch (err) {
+    if ((err as { code?: string })?.code === "P2002") {
+      // One-OWNER-per-company unique index.
+      return { ok: false, code: "DUPLICATE_OWNER" };
+    }
+    return { ok: false, code: "DB_ERROR" };
+  }
+
+  await destroyAllSessionsForUser(membership.userId);
+  return { ok: true };
 }

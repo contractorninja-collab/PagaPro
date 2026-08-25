@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { companyContextHttpError, getCompanyContext } from "@/server/company-context";
+import { companyContextHttpError, getCompanyContext, permissionSubjectOf } from "@/server/company-context";
 import { canImportEmployees } from "@/modules/employees/services/employee-import-access";
 import {
   commitEmployeeImport,
@@ -10,8 +10,8 @@ import {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = await getCompanyContext();
   if (!result.ok) return companyContextHttpError(result.reason);
-  const { companyId, role, user } = result.context;
-  if (!canImportEmployees({ role, isPlatformAdmin: user.isPlatformAdmin })) {
+  const { companyId, user } = result.context;
+  if (!canImportEmployees(permissionSubjectOf(result.context))) {
     return NextResponse.json({ error: "Nuk keni leje për importin e punonjësve." }, { status: 403 });
   }
 

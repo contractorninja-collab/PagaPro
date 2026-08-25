@@ -10,18 +10,18 @@ import { canImportEmployees } from "@/modules/employees/services/employee-import
  */
 describe("employee import access", () => {
   it.each(["OWNER", "ADMIN", "HR_MANAGER", "ACCOUNTANT"] as const)("allows %s", (role) => {
-    expect(canImportEmployees({ role, isPlatformAdmin: false })).toBe(true);
+    expect(canImportEmployees({ role, isPlatformAdmin: false, salaryAccess: "FULL" })).toBe(true);
   });
 
   it("denies READ_ONLY", () => {
-    expect(canImportEmployees({ role: "READ_ONLY", isPlatformAdmin: false })).toBe(false);
+    expect(canImportEmployees({ role: "READ_ONLY", isPlatformAdmin: false, salaryAccess: "FULL" })).toBe(false);
   });
 
   it("denies a non-member", () => {
-    expect(canImportEmployees({ role: null, isPlatformAdmin: false })).toBe(false);
+    expect(canImportEmployees({ role: null, isPlatformAdmin: false, salaryAccess: "FULL" })).toBe(false);
   });
 
   it("allows platform administrators", () => {
-    expect(canImportEmployees({ role: null, isPlatformAdmin: true })).toBe(true);
+    expect(canImportEmployees({ role: null, isPlatformAdmin: true, salaryAccess: "FULL" })).toBe(true);
   });
 });

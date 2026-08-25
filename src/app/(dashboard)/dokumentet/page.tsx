@@ -14,7 +14,7 @@ import {
   listEmployeesForDocumentFilters,
 } from "@/modules/documents/services/document-queries";
 import { WarningIssuePanel } from "@/modules/warnings/components/warning-issue-panel";
-import { requireCompanyContextPage } from "@/server/company-context";
+import { permissionSubjectOf, requireCompanyContextPage } from "@/server/company-context";
 import { can } from "@/server/permissions";
 
 export const metadata: Metadata = {
@@ -41,9 +41,10 @@ export default async function DokumentetPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { companyId, role, user } = await requireCompanyContextPage();
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
   // A server component cannot use the client hook, so it asks the same matrix.
-  const canWriteDocuments = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
+  const canWriteDocuments = can(permissionSubjectOf(context), "documents.write");
 
   const sp = await searchParams;
   const q = first(sp, "q");

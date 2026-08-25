@@ -15,6 +15,7 @@ import { KonfigurimePageSkeleton } from "@/components/konfigurime/konfigurime-sk
 import { SetupWizardCard } from "@/components/konfigurime/setup/setup-wizard-card";
 import { DepartmentsSettingsPanel } from "@/modules/departments/components/departments-settings-panel";
 import { RestDaysPanel } from "@/components/konfigurime/rest-days-panel";
+import { CompanyUsersPanel } from "@/components/konfigurime/company-users-panel";
 import { JobTitlesSettingsPanel } from "@/modules/job-titles/components/job-titles-settings-panel";
 import type { KonfigurimeTabId } from "@/components/konfigurime/konfigurime-tabs";
 import { Button } from "@/components/ui/button";
@@ -472,6 +473,7 @@ export function KonfigurimeConfigurator({
             <TabsTrigger value="dokumentet">Dokumentet</TabsTrigger>
             <TabsTrigger value="pushimet">Pushimet</TabsTrigger>
             <TabsTrigger value="njoftimet">Njoftimet</TabsTrigger>
+            <TabsTrigger value="perdoruesit">Përdoruesit</TabsTrigger>
           </TabsList>
 
           <TabsContent value="kompania">
@@ -1067,6 +1069,10 @@ export function KonfigurimeConfigurator({
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="perdoruesit">
+            <CompanyUsersPanel />
           </TabsContent>
         </Tabs>
       </form>

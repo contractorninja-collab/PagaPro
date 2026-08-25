@@ -34,6 +34,8 @@ import {
   resetUserPasswordAction,
   setCompanyStatusAction,
   setMembershipActiveAction,
+  setMembershipRoleAction,
+  setMembershipSalaryAccessAction,
   updateCompanyAction,
 } from "@/modules/admin/actions/admin-actions";
 import type { AdminCompanyDetail } from "@/modules/admin/services/admin-service";
@@ -300,6 +302,37 @@ export function BiznesDetailClient({
     });
   }
 
+  function onChangeRole(membershipId: string, role: (typeof MEMBERSHIP_ROLES)[number]) {
+    startRowTransition(async () => {
+      const res = await setMembershipRoleAction({ companyId: company.id, membershipId, role });
+      if (res.ok) {
+        toast.success("Roli u ndryshua. Sesionet e përdoruesit u mbyllën.");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function onChangeSalaryAccess(
+    membershipId: string,
+    salaryAccess: "FULL" | "STANDARD" | "NONE",
+  ) {
+    startRowTransition(async () => {
+      const res = await setMembershipSalaryAccessAction({
+        companyId: company.id,
+        membershipId,
+        salaryAccess,
+      });
+      if (res.ok) {
+        toast.success("Qasja në paga u ndryshua.");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
@@ -396,6 +429,7 @@ export function BiznesDetailClient({
                   <TableRow>
                     <TableHead>Përdoruesi</TableHead>
                     <TableHead>Roli</TableHead>
+                    <TableHead>Pagat</TableHead>
                     <TableHead>Qasja</TableHead>
                     <TableHead className="text-right">Veprime</TableHead>
                   </TableRow>
@@ -407,7 +441,41 @@ export function BiznesDetailClient({
                         <p className="font-medium text-foreground">{u.displayName?.trim() || u.email}</p>
                         {u.displayName?.trim() ? <p className="text-xs text-muted-foreground">{u.email}</p> : null}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{ROLE_LABELS[u.role]}</TableCell>
+                      <TableCell>
+                        <select
+                          value={u.role}
+                          disabled={rowPending}
+                          aria-label={`Roli i ${u.email}`}
+                          onChange={(e) =>
+                            onChangeRole(u.membershipId, e.target.value as (typeof MEMBERSHIP_ROLES)[number])
+                          }
+                          className="h-8 rounded-md border border-input bg-background px-2 text-sm text-muted-foreground"
+                        >
+                          {MEMBERSHIP_ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABELS[r]}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        <select
+                          value={u.salaryAccess}
+                          disabled={rowPending}
+                          aria-label={`Qasja në paga e ${u.email}`}
+                          onChange={(e) =>
+                            onChangeSalaryAccess(
+                              u.membershipId,
+                              e.target.value as "FULL" | "STANDARD" | "NONE",
+                            )
+                          }
+                          className="h-8 rounded-md border border-input bg-background px-2 text-sm text-muted-foreground"
+                        >
+                          <option value="FULL">Sheh të gjitha</option>
+                          <option value="STANDARD">Pa personelin e lartë</option>
+                          <option value="NONE">Nuk sheh paga</option>
+                        </select>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={u.membershipActive ? "success" : "secondary"}>
                           {u.membershipActive ? "Aktive" : "E çaktivizuar"}

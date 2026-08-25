@@ -11,7 +11,7 @@ import {
   docTableHead,
 } from "@/modules/documents/components/doc-ui";
 import { getDocumentTemplateDetail } from "@/modules/documents/services/document-queries";
-import { requireCompanyContextPage } from "@/server/company-context";
+import { permissionSubjectOf, requireCompanyContextPage } from "@/server/company-context";
 import { can } from "@/server/permissions";
 
 export default async function TemplateDetailPage({
@@ -19,8 +19,9 @@ export default async function TemplateDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { companyId, role, user } = await requireCompanyContextPage();
-  const canWriteDocuments = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
+  const canWriteDocuments = can(permissionSubjectOf(context), "documents.write");
 
   const { id } = await params;
   const template = await getDocumentTemplateDetail(companyId, id);

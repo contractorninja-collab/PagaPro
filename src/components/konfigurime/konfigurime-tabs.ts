@@ -7,7 +7,8 @@ export type KonfigurimeTabId =
   | "festat"
   | "dokumentet"
   | "pushimet"
-  | "njoftimet";
+  | "njoftimet"
+  | "perdoruesit";
 
 const KONFIGURIME_TAB_IDS = new Set<KonfigurimeTabId>([
   "kompania",
@@ -19,6 +20,7 @@ const KONFIGURIME_TAB_IDS = new Set<KonfigurimeTabId>([
   "dokumentet",
   "pushimet",
   "njoftimet",
+  "perdoruesit",
 ]);
 
 export function parseKonfigurimeTabId(raw: string | undefined): KonfigurimeTabId {

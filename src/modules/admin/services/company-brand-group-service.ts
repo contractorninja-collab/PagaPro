@@ -179,7 +179,9 @@ export async function copyCompanyMemberships(
 
   const sourceMemberships = await prisma.userCompanyMembership.findMany({
     where: { companyId: fromCompanyId, isActive: true },
-    select: { userId: true, role: true },
+    // salaryAccess travels with the copy — omitting it here silently resets a
+    // salary-blind HR back to FULL on every sibling company.
+    select: { userId: true, role: true, salaryAccess: true },
   });
 
   let copied = 0;
@@ -195,6 +197,7 @@ export async function copyCompanyMemberships(
         userId: m.userId,
         companyId: toCompanyId,
         role: m.role,
+        salaryAccess: m.salaryAccess,
         isActive: true,
         invitedAt: new Date(),
         acceptedAt: new Date(),
@@ -237,23 +240,27 @@ export async function backfillCompanyMembershipsFromGroup(companyId: string): Pr
   const groupMemberships = await prisma.userCompanyMembership.findMany({
     where: { isActive: true, company: { brandGroupId: company.brandGroupId } },
     orderBy: { createdAt: "asc" },
-    select: { userId: true, role: true },
+    select: { userId: true, role: true, salaryAccess: true },
   });
 
-  const byUser = new Map<string, (typeof groupMemberships)[number]["role"]>();
+  const byUser = new Map<
+    string,
+    Pick<(typeof groupMemberships)[number], "role" | "salaryAccess">
+  >();
   for (const m of groupMemberships) {
-    if (!byUser.has(m.userId)) byUser.set(m.userId, m.role);
+    if (!byUser.has(m.userId)) byUser.set(m.userId, { role: m.role, salaryAccess: m.salaryAccess });
   }
   if (byUser.size === 0) return 0;
 
   let copied = 0;
   for (const target of empty) {
-    for (const [userId, role] of byUser) {
+    for (const [userId, m] of byUser) {
       await prisma.userCompanyMembership.create({
         data: {
           userId,
           companyId: target.id,
-          role,
+          role: m.role,
+          salaryAccess: m.salaryAccess,
           isActive: true,
           invitedAt: new Date(),
           acceptedAt: new Date(),

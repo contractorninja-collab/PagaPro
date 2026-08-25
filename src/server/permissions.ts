@@ -1,4 +1,4 @@
-import type { CompanyMembershipRole } from "@prisma/client";
+import type { CompanyMembershipRole, SalaryAccess } from "@prisma/client";
 
 /**
  * What each company role is allowed to change.
@@ -9,9 +9,9 @@ import type { CompanyMembershipRole } from "@prisma/client";
  * This module is the single place that answers "may they?", so the answer
  * cannot drift between the server action, the API route and the button.
  *
- * Reading is deliberately NOT gated, with TWO exceptions. A member of a company
- * may see everything in it, salaries included — the roles separate who can
- * *change* things.
+ * Reading is deliberately NOT gated, with THREE exceptions. A member of a
+ * company may see everything in it — the roles separate who can *change*
+ * things.
  *
  *   1. `documents.sensitive`: medical and disciplinary files in an employee's
  *      dossier are special-category personal data under the Kosovo LMDhP
@@ -23,6 +23,15 @@ import type { CompanyMembershipRole } from "@prisma/client";
  *      numbers in bulk — a payment rail, not a salary figure — which is why
  *      `field-crypto` exists at all. Do not "fix" these back to plain company
  *      membership; the gate is the point.
+ *   3. `salaries.view` / `salaries.full`: salary AMOUNTS. These two are not in
+ *      the role matrix at all — they derive from the membership's
+ *      `salaryAccess` tier (FULL by default, so nothing changes for a tenant
+ *      that never touches it). NONE sees no amounts anywhere; STANDARD sees
+ *      per-employee amounts except staff marked `salaryConfidential`, but not
+ *      aggregates or whole-company exports (a total minus the visible rows
+ *      would reveal the confidential remainder — that is why `salaries.full`
+ *      exists as a separate check). Do not add these to `ROLE_CAPABILITIES`:
+ *      READ_ONLY's set is empty yet READ_ONLY sees salaries by default.
  */
 
 export type Capability =
@@ -41,7 +50,11 @@ export type Capability =
   /** Review, approve, lock, archive — the irreversible steps that freeze amounts. */
   | "payroll.signoff"
   /** Konfigurimet: company profile, payroll parameters, holidays, representatives, leave policy. */
-  | "company.settings";
+  | "company.settings"
+  /** See salary amounts at all (tier ≠ NONE). Derived from membership.salaryAccess, not the role. */
+  | "salaries.view"
+  /** See aggregates and whole-company money artifacts (tier = FULL). */
+  | "salaries.full";
 
 /**
  * Agreed with the product owner:
@@ -96,6 +109,12 @@ const ROLE_CAPABILITIES: Record<CompanyMembershipRole, ReadonlySet<Capability>> 
 export interface PermissionSubject {
   role: CompanyMembershipRole | null;
   isPlatformAdmin: boolean;
+  /**
+   * REQUIRED on purpose: every construction site must say which tier the
+   * subject holds, so a forgotten spot is a compile error, never a silent
+   * fail-open. Non-membership contexts pass "FULL".
+   */
+  salaryAccess: SalaryAccess;
 }
 
 /**
@@ -106,6 +125,10 @@ export interface PermissionSubject {
 export function can(subject: PermissionSubject, capability: Capability): boolean {
   if (subject.isPlatformAdmin) return true;
   if (subject.role == null) return false;
+  // Salary visibility comes from the membership tier, not the role — see the
+  // header's exception 3. Every role holds these by default (tier FULL).
+  if (capability === "salaries.view") return subject.salaryAccess !== "NONE";
+  if (capability === "salaries.full") return subject.salaryAccess === "FULL";
   return ROLE_CAPABILITIES[subject.role].has(capability);
 }
 
@@ -123,6 +146,8 @@ export const ALL_CAPABILITIES: readonly Capability[] = [
   "payroll.prepare",
   "payroll.signoff",
   "company.settings",
+  "salaries.view",
+  "salaries.full",
 ];
 
 /**
@@ -139,6 +164,8 @@ const CAPABILITY_DENIAL_SQ: Record<Capability, string> = {
   "payroll.prepare": "Nuk keni leje të përgatitni pagat.",
   "payroll.signoff": "Nuk keni leje të miratoni ose mbyllni pagat.",
   "company.settings": "Nuk keni leje të ndryshoni konfigurimet e kompanisë.",
+  "salaries.view": "Nuk keni leje të shihni shumat e pagave.",
+  "salaries.full": "Nuk keni leje të shihni totalet dhe eksportet e pagave.",
 };
 
 export function capabilityDeniedMessage(capability: Capability): string {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { TerminationType } from "@prisma/client";
-import { getCompanyContext, companyContextHttpError } from "@/server/company-context";
+import { getCompanyContext, companyContextHttpError, permissionSubjectOf } from "@/server/company-context";
 import { can } from "@/server/permissions";
 import { renderTerminationDocument } from "@/modules/terminations/documents/render-termination-document";
 import { registerRenderedArtifact } from "@/modules/documents/services/register-rendered-artifact";
@@ -34,11 +34,11 @@ export async function GET(
 ) {
   const ctx = await getCompanyContext();
   if (!ctx.ok) return companyContextHttpError(ctx.reason);
-  const { companyId, role, user } = ctx.context;
+  const { companyId, user } = ctx.context;
   // Downloading is reading, and every role may read. But this GET also files the
   // document in the company's register, which is authoring — so the download
   // stays open to everyone and only the bookkeeping is gated.
-  const mayRegister = can({ role, isPlatformAdmin: user.isPlatformAdmin }, "documents.write");
+  const mayRegister = can(permissionSubjectOf(ctx.context), "documents.write");
 
   const { id } = await params;
   const searchParams = new URL(request.url).searchParams;

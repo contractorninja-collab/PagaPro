@@ -28,7 +28,7 @@ import { can } from "@/server/permissions";
 import { listActiveJobTitleOptions } from "@/modules/job-titles/services/job-title-service";
 import { isTimeClockEnabled } from "@/modules/timeclock/services/timeclock-entitlement";
 import { listFinalizedPayrollYearsForEmployee } from "@/modules/payroll/services/employee-annual-statement-service";
-import { getCompanyContext, requireCompanyContextPage } from "@/server/company-context";
+import { getCompanyContext, permissionSubjectOf, requireCompanyContextPage } from "@/server/company-context";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -69,11 +69,9 @@ export default async function EmployeeProfilePage({ params, searchParams }: Prop
   const { id } = await params;
   const sp = await searchParams;
   const openEditDocuments = first(sp.edit) === "documents";
-  const { companyId, user, role } = await requireCompanyContextPage();
-  const viewerSeesSensitive = can(
-    { role, isPlatformAdmin: user.isPlatformAdmin },
-    "documents.sensitive",
-  );
+  const context = await requireCompanyContextPage();
+  const { companyId } = context;
+  const viewerSeesSensitive = can(permissionSubjectOf(context), "documents.sensitive");
 
   const balanceYear = new Date().getUTCFullYear();
 

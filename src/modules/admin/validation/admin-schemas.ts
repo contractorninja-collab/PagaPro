@@ -57,10 +57,14 @@ export const companyStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]);
 
 export const MEMBERSHIP_ROLES = ["OWNER", "ADMIN", "HR_MANAGER", "ACCOUNTANT", "READ_ONLY"] as const;
 
+export const SALARY_ACCESS_LEVELS = ["FULL", "STANDARD", "NONE"] as const;
+
 export const createCompanyUserSchema = z.object({
   email: z.string().trim().toLowerCase().email("Email jo valid."),
   displayName: z.preprocess(emptyToNull, z.string().max(255).nullable().optional()),
   role: z.enum(MEMBERSHIP_ROLES),
+  /** Salary visibility tier; FULL matches pre-feature behavior. */
+  salaryAccess: z.enum(SALARY_ACCESS_LEVELS).default("FULL"),
 });
 
 export type CreateCompanyUserInput = z.infer<typeof createCompanyUserSchema>;

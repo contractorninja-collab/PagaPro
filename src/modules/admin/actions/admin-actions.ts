@@ -15,6 +15,8 @@ import {
   setCompanyTimeClockEnabledForAdmin,
   setMembershipActiveForAdmin,
   updateCompanyForAdmin,
+  setMembershipSalaryAccess,
+  setMembershipRoleForAdmin,
 } from "@/modules/admin/services/admin-service";
 import {
   addUserToBrandGroupCompanies,
@@ -40,6 +42,7 @@ import {
   companyUpsertSchema,
   createCompanyUserSchema,
   formatAdminFieldErrors,
+  MEMBERSHIP_ROLES,
 } from "@/modules/admin/validation/admin-schemas";
 
 export type AdminActionResult<T = undefined> =
@@ -794,5 +797,61 @@ export async function setMembershipActiveAction(raw: unknown): Promise<AdminActi
   } catch (err) {
     console.error("[setMembershipActiveAction] unexpected:", err);
     return { ok: false, error: "Ndryshimi i qasjes dështoi papritur." };
+  }
+}
+
+const setMembershipSalaryAccessSchema = z.object({
+  companyId: z.string().min(1),
+  membershipId: z.string().min(1),
+  salaryAccess: z.enum(["FULL", "STANDARD", "NONE"]),
+});
+
+export async function setMembershipSalaryAccessAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = setMembershipSalaryAccessSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const ok = await setMembershipSalaryAccess(parsed.data.membershipId, parsed.data.salaryAccess);
+    if (!ok) return { ok: false, error: "Anëtarësia nuk u gjet." };
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setMembershipSalaryAccessAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi i qasjes në paga dështoi papritur." };
+  }
+}
+
+const setMembershipRoleSchema = z.object({
+  companyId: z.string().min(1),
+  membershipId: z.string().min(1),
+  role: z.enum(MEMBERSHIP_ROLES),
+});
+
+export async function setMembershipRoleAction(raw: unknown): Promise<AdminActionResult> {
+  try {
+    if (!(await requireAdmin())) return { ok: false, error: NOT_AUTHORIZED };
+
+    const parsed = setMembershipRoleSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "Të dhëna të pavlefshme." };
+
+    const r = await setMembershipRoleForAdmin(parsed.data.membershipId, parsed.data.role);
+    if (!r.ok) {
+      const msg =
+        r.code === "DUPLICATE_OWNER"
+          ? "Kompania ka tashmë një pronar aktiv — hiqni ose ndryshoni rolin e tij së pari."
+          : r.code === "NOT_FOUND"
+            ? "Anëtarësia nuk u gjet."
+            : "Ndryshimi i rolit dështoi.";
+      return { ok: false, error: msg };
+    }
+
+    revalidateBizneset(parsed.data.companyId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[setMembershipRoleAction] unexpected:", err);
+    return { ok: false, error: "Ndryshimi i rolit dështoi papritur." };
   }
 }
