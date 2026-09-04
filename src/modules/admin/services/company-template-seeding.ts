@@ -1,5 +1,4 @@
 import path from "node:path";
-import { createRequire } from "node:module";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -19,7 +18,34 @@ import type { PrismaClient } from "@prisma/client";
 
 type PerCompanySeeder = (prisma: PrismaClient, companyId: string) => Promise<number>;
 
-const FAMILIES: ReadonlyArray<{ label: string; module: string; export: string }> = [
+/**
+ * A real Node `require` rooted in scripts/, acquired WITHOUT importing
+ * `node:module`.
+ *
+ * `import { createRequire } from "node:module"` compiled, under Next 15.5's
+ * webpack, to `let c = void 0` — the import and the call were eliminated as
+ * dead code, so every company created between deploys got "c is not a
+ * function" and ZERO document templates (the build-time seeder later healed
+ * them on the next deploy, which is why nothing looked wrong for long).
+ * `process.getBuiltinModule` is a runtime property access on a global; no
+ * bundler can resolve or tree-shake it. Node ≥ 20.16 — both Vercel's runtime
+ * and local dev qualify.
+ */
+export function requireFromScriptsDir(): (id: string) => unknown {
+  const proc = process as unknown as {
+    getBuiltinModule?: (id: string) => { createRequire: (base: string) => (id: string) => unknown };
+  };
+  const nodeModule = proc.getBuiltinModule?.("node:module");
+  if (!nodeModule) {
+    throw new Error(
+      "process.getBuiltinModule mungon — kërkohet Node 20.16+ për ngarkimin e seeder-ëve.",
+    );
+  }
+  // Resolution base inside scripts/ — the file itself doesn't need to exist.
+  return nodeModule.createRequire(path.join(process.cwd(), "scripts", "__resolve__.cjs"));
+}
+
+export const FAMILIES: ReadonlyArray<{ label: string; module: string; export: string }> = [
   { label: "kontratat", module: "./seed-contract-templates.cjs", export: "seedContractTemplatesForCompany" },
   { label: "pushimet", module: "./seed-leave-templates.cjs", export: "seedLeaveTemplatesForCompany" },
   { label: "largimet", module: "./seed-termination-templates.cjs", export: "seedTerminationTemplatesForCompany" },
@@ -38,8 +64,7 @@ export async function seedDocumentTemplatesForCompany(
   prisma: PrismaClient,
   companyId: string,
 ): Promise<CompanyTemplateSeedResult> {
-  // Resolution base inside scripts/ — the file itself doesn't need to exist.
-  const requireFromScripts = createRequire(path.join(process.cwd(), "scripts", "__resolve__.cjs"));
+  const requireFromScripts = requireFromScriptsDir();
 
   let seeded = 0;
   const warnings: string[] = [];
