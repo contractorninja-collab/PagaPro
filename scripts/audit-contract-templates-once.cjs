@@ -12,6 +12,7 @@ const { createHash } = require("node:crypto");
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const PizZip = require("pizzip");
+const { PDFDocument } = require("pdf-lib");
 const { getStorage, describeStorage } = require("./seed-storage.cjs");
 
 function resolveConnectionString() {
@@ -68,6 +69,35 @@ function spacingSignature(buf) {
   }
 }
 
+/** Character-weighted font sizes + paragraphs that lost their style. No text. */
+function sizeProfile(buf) {
+  try {
+    const doc = new PizZip(buf).file("word/document.xml")?.asText() ?? "";
+    const STYLE_SZ = { BodyLegal: 20, ArticleTitle: 21 };
+    const bySize = {};
+    let unstyled = 0;
+    for (const p of doc.match(/<w:p[\s>][\s\S]*?<\/w:p>/g) ?? []) {
+      const sid = p.match(/<w:pStyle w:val="([^"]+)"/)?.[1];
+      const hasText = /<w:t[ >]/.test(p);
+      if (!sid && hasText) unstyled += 1;
+      for (const r of p.match(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/g) ?? []) {
+        const n = [...r.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].reduce((s, m) => s + m[1].length, 0);
+        if (!n) continue;
+        const sz = Number(r.match(/<w:sz w:val="(\d+)"\/>/)?.[1] ?? STYLE_SZ[sid] ?? 21) / 2;
+        bySize[sz] = (bySize[sz] ?? 0) + n;
+      }
+    }
+    const sizes = Object.entries(bySize)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([s, n]) => `${s}pt:${n}`)
+      .join(",");
+    return `unstyledTextParas=${unstyled} sizes=${sizes}`;
+  } catch (e) {
+    return `sizeProfile failed: ${e.message}`;
+  }
+}
+
 async function main() {
   const P = "[tpl-audit]";
   const cs = resolveConnectionString();
@@ -119,6 +149,47 @@ async function main() {
             `pub=v${pub?.versionNumber ?? "-"} (${pub?.originalFilename ?? "-"}, ${pub?.uploadedAt?.toISOString().slice(0, 10) ?? "-"}) ` +
             `artifacts=${artifacts} :: ${info}`,
         );
+
+        // What people actually DOWNLOAD: the generated contracts, which are
+        // frozen snapshots of whichever template version was published then.
+        // Structure + spacing only — never text, names or amounts.
+        const recent = await prisma.documentGenerationArtifact.findMany({
+          where: { companyId: c.id, templateVersion: { templateId: t.id }, generatedDocxStorageKey: { not: null } },
+          orderBy: { createdAt: "desc" },
+          take: 4,
+          select: {
+            createdAt: true,
+            kind: true,
+            generatedDocxStorageKey: true,
+            generatedPdfStorageKey: true,
+            templateVersion: { select: { versionNumber: true, originalFilename: true } },
+          },
+        });
+        for (const a of recent) {
+          let sig = "docx missing in storage";
+          const buf = await getStorage(a.generatedDocxStorageKey);
+          if (buf) sig = sizeProfile(buf) + ` | docx paras/empty: ${spacingSignature(buf).split(" | ")[0]}`;
+          // The PDF is what people open — converted separately from the DOCX.
+          let pdfInfo = "no pdf";
+          if (a.generatedPdfStorageKey) {
+            const pdfBuf = await getStorage(a.generatedPdfStorageKey);
+            if (!pdfBuf) pdfInfo = "pdf missing";
+            else {
+              try {
+                const pdf = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
+                const producer = (pdf.getProducer() ?? "-").slice(0, 40);
+                pdfInfo = `PDF pages=${pdf.getPageCount()} bytes=${pdfBuf.length} producer="${producer}"`;
+              } catch (e) {
+                pdfInfo = `pdf unreadable: ${e.message}`;
+              }
+            }
+          }
+          sig = `${pdfInfo} || ${sig}`;
+          console.log(
+            `${P}    artifact ${a.createdAt.toISOString().slice(0, 16)} ${a.kind} from v${a.templateVersion.versionNumber} ` +
+              `(${a.templateVersion.originalFilename ?? "-"}) pdf=${a.generatedPdfStorageKey ? "yes" : "no"} :: ${sig}`,
+          );
+        }
       }
     }
   } finally {
