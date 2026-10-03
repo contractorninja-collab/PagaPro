@@ -118,6 +118,77 @@ describe("renderDocxToPrintHtml", () => {
     expect(renderDocxToPrintHtml(docx("<w:p/>")).logoDataUri).toBeNull();
   });
 
+  it("resolves spacing, alignment and font through the paragraph style chain", () => {
+    const styles =
+      `<?xml version="1.0"?><w:styles ${WORD_NS}>` +
+      '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme="minorHAnsi"/><w:sz w:val="22"/></w:rPr></w:rPrDefault>' +
+      '<w:pPrDefault><w:pPr><w:spacing w:after="200" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:pPr><w:spacing w:after="40"/></w:pPr>' +
+      '<w:rPr><w:rFonts w:ascii="Liberation Serif"/><w:sz w:val="21"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Base"><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="both"/></w:pPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Body"><w:basedOn w:val="Base"/>' +
+      '<w:pPr><w:spacing w:after="50" w:line="252" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style>' +
+      "</w:styles>";
+    const buffer = docx(
+      '<w:p><w:pPr><w:pStyle w:val="Body"/></w:pPr><w:r><w:t>styled</w:t></w:r></w:p>' +
+        // Direct formatting overrides one attribute; the style's other spacing survives.
+        '<w:p><w:pPr><w:pStyle w:val="Body"/><w:spacing w:before="120"/></w:pPr><w:r><w:t>override</w:t></w:r></w:p>' +
+        "<w:p><w:r><w:t>unstyled</w:t></w:r></w:p>",
+      { "word/styles.xml": styles },
+    );
+
+    const render = renderDocxToPrintHtml(buffer);
+    const paragraphs = [...render.html.matchAll(/<p style="([^"]*)"/g)].map((m) => m[1]);
+
+    expect(paragraphs[0]).toContain("text-align:justify");
+    expect(paragraphs[0]).toContain("margin:0pt 0 2.5pt");
+    expect(paragraphs[0]).toContain("line-height:1.21");
+    expect(paragraphs[0]).toContain("font-size:10pt");
+    expect(paragraphs[0]).toContain("'Liberation Serif'");
+    expect(paragraphs[1]).toContain("margin:6pt 0 2.5pt");
+    // No pStyle → the default paragraph style, not the bare document defaults.
+    expect(paragraphs[2]).toContain("margin:0pt 0 2pt");
+    expect(paragraphs[2]).toContain("font-size:10.5pt");
+    expect(render.fontFamily).toBe("Liberation Serif");
+    expect(render.fontSizePt).toBe(10.5);
+  });
+
+  it("lets a run switch off bold that its paragraph style turns on", () => {
+    const styles =
+      `<?xml version="1.0"?><w:styles ${WORD_NS}>` +
+      '<w:style w:type="paragraph" w:styleId="Title"><w:rPr><w:b/></w:rPr></w:style></w:styles>';
+    const buffer = docx(
+      '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t>plain</w:t></w:r></w:p>',
+      { "word/styles.xml": styles },
+    );
+    const { html } = renderDocxToPrintHtml(buffer);
+
+    expect(html).toMatch(/<p style="[^"]*font-weight:700/);
+    expect(html).toContain('<span style="font-weight:400">plain</span>');
+  });
+
+  it("prints both employment contracts with the same compact spacing", () => {
+    const signatures = ["kontrate-me-afat-te-caktuar", "kontrate-me-afat-te-pacaktuar"].map((name) => {
+      const { html } = renderDocxToPrintHtml(
+        readFileSync(path.join(process.cwd(), "templates/contracts", `${name}.docx`)),
+      );
+      const paragraphs = [...html.matchAll(/<p style="([^"]*)"/g)].map((m) => m[1]!);
+      const clauses = paragraphs.filter((s) => s.includes("text-align:justify"));
+      expect(clauses.length, name).toBeGreaterThan(40);
+      for (const clause of clauses) {
+        expect(clause, name).toContain("margin:0pt 0 2.5pt");
+        expect(clause, name).toContain("line-height:1.21");
+        expect(clause, name).toContain("font-size:10pt");
+      }
+      // Only the one deliberate 10pt gap, under the contract's title.
+      const wideGaps = paragraphs.filter((s) => Number(s.match(/margin:[\d.]+pt 0 ([\d.]+)pt/)?.[1]) >= 10);
+      expect(wideGaps, name).toHaveLength(1);
+      return [...new Set(paragraphs)].sort();
+    });
+
+    expect(signatures[0]).toEqual(signatures[1]);
+  });
+
   it("converts the real contract template without leaving markup artefacts", () => {
     const templatePath = path.join(
       process.cwd(),

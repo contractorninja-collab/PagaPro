@@ -85,7 +85,7 @@ ${doc.render.html}
     color: #000;
     font-family: ${bodyFont};
     font-size: ${bodySize}pt;
-    line-height: 1.35;
+    line-height: 1.15;
   }
   .bar {
     position: sticky;
