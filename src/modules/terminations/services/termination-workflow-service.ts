@@ -414,14 +414,17 @@ export async function completeTerminationWorkflow(
       const payroll = await prisma.payroll.findFirst({
         where: { id: row.finalPayrollId, companyId },
       });
-      if (!payroll || payroll.status !== "DRAFT") {
-        throw new Error("Final payroll duhet të jetë i lidhur me një payroll në DRAFT (HR nuk duhet ta kyçë para përfundimit).");
+      if (!payroll) {
+        throw new Error("Payroll-i përfundimtar nuk u gjet — klikoni «Përgatit payroll» dhe provoni sërish.");
       }
+      // Any status: "Llogarit pagat" rebuilds rows as FINAL, and Finance may have
+      // validated or locked the month since — the leaver's pay is in it either way.
       const entry = await prisma.payrollEntry.findFirst({
         where: { payrollId: row.finalPayrollId, employeeId: row.employeeId },
+        select: { id: true },
       });
-      if (!entry || entry.status !== "DRAFT") {
-        throw new Error("Rreshti i pagës për punonjësin duhet të jetë në DRAFT për përfundim.");
+      if (!entry) {
+        throw new Error("Punonjësi nuk ka rresht në payroll-in përfundimtar — klikoni «Përgatit payroll» dhe provoni sërish.");
       }
     }
 

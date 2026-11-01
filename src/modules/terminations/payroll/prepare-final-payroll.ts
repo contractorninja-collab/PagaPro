@@ -11,7 +11,8 @@ function monthYearFromDate(d: Date): { year: number; month: number } {
 /**
  * Ensures a DRAFT payroll for the termination month, includes the employee, rebuilds their row
  * with partial-month pro-rata through lastWorkingDay, preserves bonus/advance inputs when present.
- * Does not lock or approve payroll.
+ * Does not lock or approve payroll. A month already past DRAFT is linked as-is when it has the
+ * employee's row.
  */
 export async function prepareTerminationFinalPayroll(params: {
   companyId: string;
@@ -49,9 +50,18 @@ export async function prepareTerminationFinalPayroll(params: {
   }
 
   if (payroll.status !== "DRAFT") {
+    // The month has moved on (reviewed, approved, locked): the leaver's pay was
+    // settled in it, so link that payroll rather than block the termination.
+    const settled = await prisma.payrollEntry.findFirst({
+      where: { payrollId: payroll.id, employeeId: params.employeeId },
+      select: { id: true },
+    });
+    if (settled) return { ok: true, payrollId: payroll.id };
     return {
       ok: false,
-      error: "Pagë përfunduese mund të përgatitet vetëm kur payroll-i mujor është në DRAFT.",
+      error:
+        "Payroll-i i muajit të largimit nuk është më në DRAFT dhe nuk ka rresht për këtë punonjës. " +
+        "Ktheni payroll-in në DRAFT ose çaktivizoni «Pagë përfunduese e detyrueshme» te largimi.",
     };
   }
 

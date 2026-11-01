@@ -617,8 +617,29 @@ export async function createPayrollDraft(
  * rebuild pro-rates a leaver instead of paying them a whole month. Callers that
  * know the last working day (the termination workflow) override these.
  */
-function terminationDayCaps(employees: Employee[], start: Date, end: Date): Record<string, Date> {
+/**
+ * Last day worked this month for everyone leaving in it. `Employee.terminationDate`
+ * is only written when a termination is completed, and completion comes after the
+ * final payroll — so an approved, not-yet-completed termination supplies its own
+ * last working day, or a recalculation would pay the leaver a full month.
+ */
+async function terminationDayCaps(
+  companyId: string,
+  employees: Employee[],
+  start: Date,
+  end: Date,
+): Promise<Record<string, Date>> {
   const caps: Record<string, Date> = {};
+  const approved = await prisma.termination.findMany({
+    where: {
+      companyId,
+      status: "APPROVED",
+      employeeId: { in: employees.map((e) => e.id) },
+      lastWorkingDay: { gte: start, lte: end },
+    },
+    select: { employeeId: true, lastWorkingDay: true },
+  });
+  for (const t of approved) caps[t.employeeId] = t.lastWorkingDay;
   for (const employee of employees) {
     const left = employee.terminationDate;
     if (left && left >= start && left <= end) caps[employee.id] = left;
@@ -937,6 +958,7 @@ export async function recalculatePayrollEntriesForEmployees(params: {
 
   const employees = eligibleFiltered.filter((e) => employeeIds.includes(e.id));
   const entryStatus = params.entryStatus ?? "FINAL";
+  const leaverCaps = await terminationDayCaps(params.companyId, employees, start, end);
 
   let leaveTotals = { aggPaidLeaveHrs: 0, aggSickLeaveHrs: 0, aggUnpaidLeaveHrs: 0 };
 
@@ -980,7 +1002,7 @@ export async function recalculatePayrollEntriesForEmployees(params: {
         wt,
         sickPct,
         lastWorkingDayByEmployeeId: {
-          ...terminationDayCaps(employees, start, end),
+          ...leaverCaps,
           ...(params.lastWorkingDayByEmployeeId ?? {}),
         },
         entryStatus,
@@ -1092,6 +1114,7 @@ export async function regeneratePayrollEntriesAndCalculate(
   const inclSet = new Set(inclusion.map((i) => i.employeeId));
 
   const employees = picked.employees.filter((e) => inclSet.size === 0 || inclSet.has(e.id));
+  const leaverCaps = await terminationDayCaps(companyId, employees, start, end);
 
   // The rebuild below deletes every entry first. Refuse rather than empty a draft
   // that cannot be repopulated — that silently destroyed calculated lines.
@@ -1122,7 +1145,7 @@ export async function regeneratePayrollEntriesAndCalculate(
         ctx,
         wt,
         sickPct,
-        lastWorkingDayByEmployeeId: terminationDayCaps(employees, start, end),
+        lastWorkingDayByEmployeeId: leaverCaps,
         employmentWindows: picked.windows,
         entryStatus: "FINAL",
       });
